@@ -2,18 +2,26 @@ const express = require("express");
 const mysql = require("mysql");
 const cors = require("cors");
 const app = express();
+const path = require("path");
 
 // Enable CORS
 app.use(cors());
 app.use(express.json()); // To parse JSON-encoded request bodies
 app.use(express.urlencoded({ extended: true })); // To parse URL-encoded request bodies
 
+// Serve static files from React
+app.use(express.static(path.join(__dirname, 'client/build')));
 
 var con = mysql.createConnection({
     host: "localhost",
     user: "root",
     password: "",
     database: "trip_booking_backend",
+});
+
+// Catch-all route to serve React's index.html for any undefined routes
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
 });
 
 // Filtered Bookings Data
