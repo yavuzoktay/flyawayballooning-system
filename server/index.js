@@ -10,7 +10,7 @@ app.use(express.json()); // To parse JSON-encoded request bodies
 app.use(express.urlencoded({ extended: true })); // To parse URL-encoded request bodies
 
 // Serve static files from React
-app.use(express.static(path.join(__dirname, 'client/build')));
+app.use(express.static(path.join(__dirname, '../client/build')));
 
 var con = mysql.createConnection({
     host: "localhost",
@@ -21,7 +21,7 @@ var con = mysql.createConnection({
 
 // Catch-all route to serve React's index.html for any undefined routes
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
+    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
 });
 
 // Filtered Bookings Data
