@@ -10,7 +10,9 @@ app.use(express.json()); // To parse JSON-encoded request bodies
 app.use(express.urlencoded({ extended: true })); // To parse URL-encoded request bodies
 
 // Serve static files from React
-app.use(express.static(path.join(__dirname, '../client/build')));
+const _dirname = path.dirname("");
+const buildpath = path.join(_dirname, "../client/build");
+app.use(express.static(buildpath));
 
 var con = mysql.createConnection({
     host: "localhost",
@@ -113,7 +115,7 @@ app.get('/api/getAllVoucher', (req, res) => {
 // Insert Admin Notes
 app.post("/api/addAdminNotes", (req, res) => {
     console.log('ssdas', req.body);
-    
+
     var date = req?.body?.date;
     var note = req?.body?.note;
     var booking_id = req?.body?.booking_id;
@@ -127,7 +129,7 @@ app.post("/api/addAdminNotes", (req, res) => {
 app.post("/api/getAllAvailableSlot", (req, res) => {
     const id = req.body.activity_id;
     console.log('id??', id);
-    
+
     const availableSlot = `SELECT * FROM specific_availability WHERE activity_id="${id}"`;
     con.query(availableSlot, (err, result) => {
         if (err) {
@@ -156,14 +158,14 @@ app.get("/api/getAdminNotes", (req, res) => {
 // Add Slot Data
 app.post("/api/addSpecificSlot", (req, res) => {
     var data = req.body;
-    
+
     var activity_id = data.activityId;
     var date = data.date;
     var seats = data.seats;
     var slot = data.slot;
     var addSlot =  'INSERT INTO specific_availability (time_slot, date, seats, activity_id) VALUES ("'+slot+'","'+date+'","'+seats+'","'+activity_id+'")';
     console.log('addSlot', addSlot);
-    
+
     con.query(addSlot, (err, resp) => {
         if(resp){
             res.send({data: resp});
