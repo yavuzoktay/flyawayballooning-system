@@ -8,6 +8,9 @@ const path = require("path");
 app.use(cors());
 app.use(express.json()); // To parse JSON-encoded request bodies
 app.use(express.urlencoded({ extended: true })); // To parse URL-encoded request bodies
+app.use(cors({
+  origin: 'http://flyawayballooning-system.com/' // Replace with your actual frontend domain
+}));
 
 // Serve static files from React
 const _dirname = path.dirname("");
