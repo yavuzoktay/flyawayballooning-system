@@ -15,10 +15,10 @@ const buildpath = path.join(_dirname, "../client/build");
 app.use(express.static(buildpath));
 
 var con = mysql.createConnection({
-    host: "localhost",
-    user: "root",
-    password: "",
-    database: "trip_booking_backend",
+    host: "nnmeqdrilkem9ked.cbetxkdyhwsb.us-east-1.rds.amazonaws.com",
+    user: "oupso1x0nbdkxl3a",
+    password: "cpfgl3sas09ri8g1",
+    database: "pvbwl6fk6a281gbo",
 });
 
 // Catch-all route to serve React's index.html for any undefined routes
