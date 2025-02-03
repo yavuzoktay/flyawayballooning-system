@@ -49,16 +49,17 @@ const DateRangeSelector = ({ bookingData }) => {
     // Add All Values Result
     const calculateSummary = (data) => {
         const safeValue = (value) => isNaN(value) ? 0 : value;
+       if(data){
         const summary = {
-            totalFlights: data.length,
-            totalPax: data.reduce((sum, item) => sum + safeValue(parseInt(item.pax, 10)), 0),
-            completedFlights: data.reduce((sum, item) => sum + safeValue(parseInt(item.paid.replace("£", ""), 10)), 0),
-            totalSales: data.reduce((sum, item) => sum + safeValue(parseFloat(item.paid.replace("£", ""))), 0),
-            totalLiability: data.reduce((sum, item) => sum + safeValue(parseFloat(item.due.replace("£", ""))), 0),
-            totalVAT: data.reduce((sum, item) => sum + safeValue(parseFloat(item.paid.replace("£", "")) * 0.2), 0),
+            totalFlights: data?.length,
+            totalPax: data?.reduce((sum, item) => sum + safeValue(parseInt(item.pax, 10)), 0),
+            completedFlights: data?.reduce((sum, item) => sum + safeValue(parseInt(item.paid.replace("£", ""), 10)), 0),
+            totalSales: data?.reduce((sum, item) => sum + safeValue(parseFloat(item.paid.replace("£", ""))), 0),
+            totalLiability: data?.reduce((sum, item) => sum + safeValue(parseFloat(item.due.replace("£", ""))), 0),
+            totalVAT: data?.reduce((sum, item) => sum + safeValue(parseFloat(item.paid.replace("£", "")) * 0.2), 0),
         };
-
         setSummary(summary);
+      }
     };
 
     const handleFilter = () => {
