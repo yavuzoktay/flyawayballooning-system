@@ -22,7 +22,7 @@ var con = mysql.createConnection({
     host: "trip-booking-backend.c9mqyasow9hg.us-east-1.rds.amazonaws.com",
     user: "admin",
     password: "tripbookingapp",
-    database: "trip-booking-backend",
+    database: "trip_booking",
 });
 
 
