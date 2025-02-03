@@ -22,10 +22,6 @@ var con = mysql.createConnection({
     database: "trip-booking-backend",
 });
 
-const _dirname = path.dirname("");
-const buildpath = path.join(_dirname, "../client/build");
-app.use(express.static(buildpath));
-
 // Catch-all route to serve React's index.html for any undefined routes
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
