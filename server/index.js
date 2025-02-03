@@ -14,10 +14,12 @@ app.use(express.urlencoded({ extended: true })); // To parse URL-encoded request
 
 // Serve React static files
 app.use(express.json());
-const _dirname = path.dirname("");
-const buildpath = path.join(_dirname, "/client/build");
-console.log('buildpath', buildpath);
-app.use(express.static(buildpath));
+// const _dirname = path.dirname("");
+// const buildpath = path.join(_dirname, "../client/build");
+// console.log('buildpath', buildpath);
+// app.use(express.static(buildpath));
+// Serve static files from the React app
+app.use(express.static(path.join(__dirname, 'client', 'build')));
 
 var con = mysql.createConnection({
     host: "trip-booking-backend.c9mqyasow9hg.us-east-1.rds.amazonaws.com",
@@ -191,7 +193,7 @@ app.post("/api/updateActivityData", (req, res) => {
 
 // Catch-all route to serve React's index.html for any undefined routes
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+    res.sendFile(path.join(__dirname, 'client', 'build', 'index.html'));
 });
 
 
