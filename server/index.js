@@ -51,7 +51,7 @@ app.get("/api/getfilteredBookings", (req, res) => {
 app.get("/api/getAllBookingData", (req, res) => {
     const sql = "SELECT * FROM all_booking";
     con.query(sql, (err, result) => {
-        if (result?.length > 0) {
+        if (result && result.length > 0) {
             res.send({ success: true, data: result });
         } else {
             res.send({ success: false, message: "No bookings found" });
@@ -120,9 +120,9 @@ app.post("/api/addAdminNotes", (req, res) => {
     var date = req?.body?.date;
     var note = req?.body?.note;
     var booking_id = req?.body?.booking_id;
-    var admin_note = 'INSERT INTO admin_notes (date, notes, booking_id) VALUES ("'+date+'","'+note+'","'+booking_id+'")';
+    var admin_note = 'INSERT INTO admin_notes (date, notes, booking_id) VALUES ("' + date + '","' + note + '","' + booking_id + '")';
     con.query(admin_note, (err, result) => {
-        res.send({result});
+        res.send({ result });
     })
 });
 
@@ -164,12 +164,12 @@ app.post("/api/addSpecificSlot", (req, res) => {
     var date = data.date;
     var seats = data.seats;
     var slot = data.slot;
-    var addSlot =  'INSERT INTO specific_availability (time_slot, date, seats, activity_id) VALUES ("'+slot+'","'+date+'","'+seats+'","'+activity_id+'")';
+    var addSlot = 'INSERT INTO specific_availability (time_slot, date, seats, activity_id) VALUES ("' + slot + '","' + date + '","' + seats + '","' + activity_id + '")';
     console.log('addSlot', addSlot);
 
     con.query(addSlot, (err, resp) => {
-        if(resp){
-            res.send({data: resp});
+        if (resp) {
+            res.send({ data: resp });
         }
     })
 });
@@ -181,10 +181,10 @@ app.post("/api/updateActivityData", (req, res) => {
     var location = update_data?.location;
     var timing_slot = update_data?.slot;
     var sku = update_data?.activityId;
-    var updateActivityData = 'UPDATE activity SET timing_slot="'+timing_slot+'", seats="'+seats+'", location="'+location+'" WHERE activity_sku="'+sku+'"';
+    var updateActivityData = 'UPDATE activity SET timing_slot="' + timing_slot + '", seats="' + seats + '", location="' + location + '" WHERE activity_sku="' + sku + '"';
     con.query(updateActivityData, (err, resp) => {
-        if(resp){
-            res.send({data: resp});
+        if (resp) {
+            res.send({ data: resp });
         }
     });
 });
@@ -198,5 +198,5 @@ app.get('*', (req, res) => {
 // Start the server
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server is running on port ${PORT}`);
+    console.log(`Server is running on port ${PORT}`);
 });
