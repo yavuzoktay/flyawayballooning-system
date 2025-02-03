@@ -8,12 +8,15 @@ const path = require("path");
 app.use(cors());
 app.use(express.json()); // To parse JSON-encoded request bodies
 app.use(express.urlencoded({ extended: true })); // To parse URL-encoded request bodies
-app.use(cors({
-  origin: 'http://flyawayballooning-system.com' // Replace with your actual frontend domain
-}));
+// app.use(cors({
+//   origin: 'http://flyawayballooning-system.com' // Replace with your actual frontend domain
+// }));
 
-// Serve static files from React
-app.use(express.static(path.join(__dirname, '../client/build')));
+// Serve React static files
+app.use(express.json());
+const _dirname = path.dirname("");
+const buildpath = path.join(_dirname, "../client/build");
+app.use(express.static(buildpath));
 
 var con = mysql.createConnection({
     host: "trip-booking-backend.c9mqyasow9hg.us-east-1.rds.amazonaws.com",
@@ -22,10 +25,6 @@ var con = mysql.createConnection({
     database: "trip-booking-backend",
 });
 
-// Catch-all route to serve React's index.html for any undefined routes
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
-});
 
 // Filtered Bookings Data
 app.get("/api/getfilteredBookings", (req, res) => {
@@ -189,5 +188,14 @@ app.post("/api/updateActivityData", (req, res) => {
     });
 });
 
+// Catch-all route to serve React's index.html for any undefined routes
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+});
 
-app.listen(3001, () => { console.log("Backend start on 3001") });
+
+// Start the server
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server is running on port ${PORT}`);
+});
