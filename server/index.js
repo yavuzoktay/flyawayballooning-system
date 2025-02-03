@@ -15,7 +15,8 @@ app.use(express.urlencoded({ extended: true })); // To parse URL-encoded request
 // Serve React static files
 app.use(express.json());
 const _dirname = path.dirname("");
-const buildpath = path.join(_dirname, "../client/build");
+const buildpath = path.join(_dirname, "/client/build");
+console.log('buildpath', buildpath);
 app.use(express.static(buildpath));
 
 var con = mysql.createConnection({
@@ -50,7 +51,7 @@ app.get("/api/getfilteredBookings", (req, res) => {
 app.get("/api/getAllBookingData", (req, res) => {
     const sql = "SELECT * FROM all_booking";
     con.query(sql, (err, result) => {
-        if (result.length > 0) {
+        if (result?.length > 0) {
             res.send({ success: true, data: result });
         } else {
             res.send({ success: false, message: "No bookings found" });
