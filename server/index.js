@@ -17,7 +17,7 @@ app.use(express.json());
 
 // Serve static files from the React app
 const _dirname = path.dirname("");
-const buildpath = path.join(_dirname, "../client/build");
+const buildpath = path.join(_dirname, "/client/build");
 console.log('buildpath', buildpath);
 app.use(express.static(buildpath));
 
@@ -194,7 +194,7 @@ app.post("/api/updateActivityData", (req, res) => {
 
 // Catch-all route to serve React's index.html for any undefined routes
 app.get("/*", function (req, res) {
-    res.sendFile(path.resolve(__dirname, '../client/build', 'index.html'));
+    res.sendFile(path.resolve(__dirname, '/client/build', 'index.html'));
 })
 
 
