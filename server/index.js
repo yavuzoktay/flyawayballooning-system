@@ -12,8 +12,6 @@ app.use(express.urlencoded({ extended: true })); // To parse URL-encoded request
 //   origin: 'http://flyawayballooning-system.com' // Replace with your actual frontend domain
 // }));
 
-// Serve React static files
-app.use(express.json());
 
 // Serve static files from the React app
 const _dirname = path.dirname("");
