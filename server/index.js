@@ -14,12 +14,13 @@ app.use(express.urlencoded({ extended: true })); // To parse URL-encoded request
 
 // Serve React static files
 app.use(express.json());
-// const _dirname = path.dirname("");
-// const buildpath = path.join(_dirname, "../client/build");
-// console.log('buildpath', buildpath);
-// app.use(express.static(buildpath));
+
 // Serve static files from the React app
-app.use(express.static(path.join(__dirname, 'client', 'build')));
+const _dirname = path.dirname("");
+const buildpath = path.join(_dirname, "../client/build");
+console.log('buildpath', buildpath);
+app.use(express.static(buildpath));
+
 
 var con = mysql.createConnection({
     host: "trip-booking-backend.c9mqyasow9hg.us-east-1.rds.amazonaws.com",
