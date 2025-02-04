@@ -192,9 +192,9 @@ app.post("/api/updateActivityData", (req, res) => {
 });
 
 // Catch-all route to serve React's index.html for any undefined routes
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'client', 'build', 'index.html'));
-});
+app.get("/*", function (req, res) {
+    res.sendFile(path.resolve(__dirname, '../client/build', 'index.html'));
+})
 
 
 // Start the server
