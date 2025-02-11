@@ -5,19 +5,17 @@ const app = express();
 const path = require("path");
 
 // Enable CORS
-app.use(cors());
+
 app.use(express.json()); // To parse JSON-encoded request bodies
 app.use(express.urlencoded({ extended: true })); // To parse URL-encoded request bodies
-// app.use(cors({
-//   origin: 'http://flyawayballooning-system.com' // Replace with your actual frontend domain
-// }));
-
-
-// Serve static files from the React app
 const _dirname = path.dirname("");
 const buildpath = path.join(_dirname, "../client/build");
 console.log('buildpath', buildpath);
 app.use(express.static(buildpath));
+app.use(cors());
+// app.use(cors({
+//   origin: 'http://flyawayballooning-system.com' // Replace with your actual frontend domain
+// }));
 
 
 var con = mysql.createConnection({
@@ -25,6 +23,11 @@ var con = mysql.createConnection({
     user: "admin",
     password: "tripbookingapp",
     database: "trip_booking",
+});
+
+// API routes
+app.get('/api/example', (req, res) => {
+    res.json({ message: 'Hello from the backend!' });
 });
 
 
