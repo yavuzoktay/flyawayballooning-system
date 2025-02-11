@@ -6,20 +6,20 @@ import axios from 'axios';
 const Index = () => {
     const [bookingData, setBookingData] = useState([]);
 
-    // function getAllBookingData() {
-    //     axios
-    //         .get(
-    //             `/api/getfilteredBookings`
-    //         )
-    //         .then((response) => {
-    //             var final_data = response.data.data;
-    //             setBookingData(final_data);
-    //         });
-    // }
+    function getAllBookingData() {
+        axios
+            .get(
+                `/api/getfilteredBookings`
+            )
+            .then((response) => {
+                var final_data = response.data.data;
+                setBookingData(final_data);
+            });
+    }
 
-    // useEffect(() => {
-    //     getAllBookingData();
-    // }, []);
+    useEffect(() => {
+        getAllBookingData();
+    }, []);
     return (
         <div className="home-page-wrap">
             <Container maxWidth="xl">
