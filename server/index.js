@@ -8,10 +8,6 @@ const path = require("path");
 
 app.use(express.json()); // To parse JSON-encoded request bodies
 app.use(express.urlencoded({ extended: true })); // To parse URL-encoded request bodies
-const _dirname = path.dirname("");
-const buildpath = path.join(_dirname, "../client/build");
-console.log('buildpath', buildpath);
-app.use(express.static(buildpath));
 app.use(cors());
 // app.use(cors({
 //   origin: 'http://flyawayballooning-system.com' // Replace with your actual frontend domain
@@ -192,6 +188,11 @@ app.post("/api/updateActivityData", (req, res) => {
         }
     });
 });
+
+// Serve static files after API routes
+const _dirname = path.dirname("");
+const buildpath = path.join(_dirname, "../client/build");
+app.use(express.static(buildpath));
 
 // Catch-all route to serve React's index.html for any undefined routes
 app.get("/*", function (req, res) {
