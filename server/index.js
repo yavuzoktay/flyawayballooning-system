@@ -15,10 +15,10 @@ app.use(express.urlencoded({ extended: true })); // To parse URL-encoded request
 
 // MySQL Connection with Reconnection Handling
 const con = mysql.createPool({
-    host: "your-db-host",
+    host: "trip-booking-backend.c9mqyasow9hg.us-east-1.rds.amazonaws.com",
     user: "admin",
-    password: "your-password",
-    database: "your-database",
+    password: "tripbookingapp",
+    database: "trip_booking",
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
