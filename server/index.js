@@ -5,14 +5,13 @@ const app = express();
 const path = require("path");
 
 // Enable CORS
-
+app.use(cors({
+    origin: 'https://flyawayballooning-system.com', // Ensure this matches your frontend domain
+    methods: "GET,POST,PUT,DELETE",
+    credentials: true
+}));
 app.use(express.json()); // To parse JSON-encoded request bodies
 app.use(express.urlencoded({ extended: true })); // To parse URL-encoded request bodies
-app.use(cors());
-// app.use(cors({
-//   origin: 'http://flyawayballooning-system.com' // Replace with your actual frontend domain
-// }));
-
 
 var con = mysql.createConnection({
     host: "trip-booking-backend.c9mqyasow9hg.us-east-1.rds.amazonaws.com",
@@ -196,6 +195,9 @@ app.use(express.static(buildpath));
 
 // Catch-all route to serve React's index.html for any undefined routes
 app.get("/*", function (req, res) {
+    if (req.path.startsWith("/api/")) {
+        return next(); // Skip React, go to API
+    }
     res.sendFile(path.resolve(__dirname, '../client/build', 'index.html'));
 })
 
