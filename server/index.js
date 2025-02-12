@@ -6,7 +6,7 @@ const path = require("path");
 
 // Enable CORS
 app.use(cors({
-    origin: 'https://flyawayballooning-system.com', // Ensure this matches your frontend domain
+    origin: '*', // Ensure this matches your frontend domain
     methods: "GET,POST,PUT,DELETE",
     credentials: true
 }));
