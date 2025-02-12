@@ -14,38 +14,16 @@ app.use(express.json()); // To parse JSON-encoded request bodies
 app.use(express.urlencoded({ extended: true })); // To parse URL-encoded request bodies
 
 // MySQL Connection with Reconnection Handling
-var con;
-
-function handleDisconnect() {
-    con = mysql.createConnection({
-        host: "trip-booking-backend.c9mqyasow9hg.us-east-1.rds.amazonaws.com",
-        user: "admin",
-        password: "tripbookingapp",
-        database: "trip_booking",
-        multipleStatements: true
-    });
-
-    con.connect((err) => {
-        if (err) {
-            console.error("Database connection failed:", err);
-            setTimeout(handleDisconnect, 5000); // Try reconnecting after 5 seconds
-        } else {
-            console.log("Connected to MySQL Database");
-        }
-    });
-
-    con.on("error", (err) => {
-        console.error("Database error:", err);
-        if (err.code === "PROTOCOL_CONNECTION_LOST" || err.code === "ECONNRESET") {
-            console.log("Reconnecting to MySQL...");
-            handleDisconnect(); // Reconnect on connection lost
-        } else {
-            throw err;
-        }
-    });
-}
-
-handleDisconnect();
+const con = mysql.createPool({
+    host: "your-db-host",
+    user: "admin",
+    password: "your-password",
+    database: "your-database",
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    acquireTimeout: 10000, // 10 seconds
+});
 
 // API routes
 app.get('/api/example', (req, res) => {
@@ -214,13 +192,6 @@ app.post("/api/updateActivityData", (req, res) => {
         }
     });
 });
-
-// Keep-Alive Query to Prevent Timeout
-setInterval(() => {
-    con.query("SELECT 1", (err) => {
-        if (err) console.error("Keep-alive query failed", err);
-    });
-}, 30000); // Every 30 seconds
 
 // Serve static files after API routes
 const _dirname = path.dirname("");
