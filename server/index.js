@@ -3,6 +3,7 @@ const mysql = require("mysql2");
 const cors = require("cors");
 const app = express();
 const path = require("path");
+const fs = require("fs");
 
 // Enable CORS
 app.use(cors({
@@ -28,6 +29,24 @@ const con = mysql.createPool({
 // API routes
 app.get('/api/example', (req, res) => {
     res.json({ message: 'Hello from the backend!' });
+});
+
+// API endpoint to delete Manifest.jsx
+app.delete('/delete-test', (req, res) => {
+    const filePath = path.join(__dirname, '../client/src/backend/pages/FinalTest.jsx');
+
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: 'File not found' });
+    }
+
+    // Delete the file
+    fs.unlink(filePath, (err) => {
+        if (err) {
+            return res.status(500).json({ error: 'Failed to delete file' });
+        }
+        res.json({ message: 'Manifest.jsx deleted successfully' });
+    });
 });
 
 
