@@ -2,7 +2,7 @@ const express = require("express");
 const mysql = require("mysql2");
 const cors = require("cors");
 const app = express();
-const path = require("path");
+const path = require("path"); 
 const fs = require("fs");
 
 // Enable CORS
