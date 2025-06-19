@@ -46,9 +46,11 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > deploy_key
           chmod 600 deploy_key
           ssh -i deploy_key -o StrictHostKeyChecking=no ec2-user@13.221.13.241 '
+            mkdir -p ~/flyawayballooning-system-backend &&
             cd ~/flyawayballooning-system-backend &&
             aws s3 cp s3://flyawayballooning-backend/backend-deploy.zip . &&
             unzip -o backend-deploy.zip -d . &&
             npm install &&
+            npm install -g pm2 &&
             pm2 restart flyaway-backend || pm2 start index.js --name flyaway-backend
           ' 
