@@ -1,0 +1,41 @@
+name: Deploy Backend to EC2
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'server/**'
+      - '.github/workflows/backend-deploy.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '18'
+          
+      - name: Install Dependencies
+        run: |
+          cd server
+          npm install
+          
+      - name: Create SSH key
+        run: |
+          mkdir -p ~/.ssh/
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          
+      - name: Deploy to EC2
+        run: |
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r server/* ubuntu@3.87.205.74:/home/ubuntu/flyawayballooning-system-backend/
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ubuntu@3.87.205.74 '
+            cd ~/flyawayballooning-system-backend &&
+            npm install &&
+            pm2 restart flyaway-backend || pm2 start server/index.js --name flyaway-backend
+          ' 
