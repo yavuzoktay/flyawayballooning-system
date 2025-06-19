@@ -1,0 +1,312 @@
+/* Add Font Familt */
+@import url('../../fonts/stylesheet.css');
+
+/* Start Global Styles */
+:root {
+    --background-color: #E8E3DD;
+    --heading-font: 'Gilroy', sans-serif;
+    --description-font: 'Gilroy', sans-serif;
+    --light-grey: #A6A6A6;
+    --light-blue: #3274b4;
+    --dark-blue: #1e4c7c;
+    --standard-text: #000000;
+    --white-text: #FFFFFF;
+    --light-green: #61D836;
+    --body-color: #f2f0ee;
+}
+
+* {
+    font-family: var(--heading-font) !important;
+}
+
+body {
+    background-color: var(--body-color);
+}
+/* End Gloabl Styles */
+
+/* Start Header */
+.topbar-wrap header {
+    background-color: var(--dark-blue);
+}
+.header-nav-wrap li.MuiButtonBase-root:not(:last-child):after {
+    position: absolute;
+    content: "";
+    width: 1px;
+    height: 100%;
+    right: 0;
+    top: 0;
+    background: #ffffff;
+}
+
+.header-nav-wrap li.MuiButtonBase-root {
+    position: relative;
+    padding: 6px 40px;
+}
+.topbar-wrap svg.MuiSvgIcon-root {
+    color: var(--dark-blue);
+}
+
+/* End Header */
+
+/* Start Home Page */
+
+.home-filter-data-wrap {
+    display: flex;
+    gap: 20px;
+}
+
+.home-filter-data-table {
+    flex: 1;
+}
+.home-filter-data-wrap>div {
+    background: rgb(235 235 235 / 52%);
+    padding: 20px;
+    box-shadow: 0 0 10px rgb(209 209 209 / 75%);
+    border-radius: 10px;
+}
+
+.home-filter-data-table h3 {
+    margin-top: 0;
+}
+
+.filter-data-right-card {
+    width: 20%;
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    gap: 15px;
+    justify-content: center;
+}
+
+.final-btn, .addition-add-on-btn button {
+    background: var(--light-blue);
+    text-decoration: none;
+    padding: 10px 30px;
+    min-width: 150px;
+    text-align: center;
+    color: #fff !important;
+    font-weight: 600;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgb(179 179 179 / 54%);
+    border: 1px solid var(--light-blue);
+    cursor: pointer;
+}
+
+.filter-range-btns button {
+    cursor: pointer;
+}
+
+/* End Home Page */
+
+/* Start Booking Page */
+
+.booking-top-wrap {
+    justify-content: space-between;
+}
+
+.booking-filter-wrap, .booking-top-wrap {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.booking-filter-heading {
+    flex: 1;
+}
+
+.booking-search-booking input {
+    padding: 10px 15px;
+}
+
+.booking-filter-field a {
+    color: var(--light-blue);
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.booking-filter-field a:hover {
+    color: var(--dark-blue);
+}
+
+/* End Booking page */
+
+
+/* Start Personal Detail Page */
+
+.personal-detail-card {
+    background: #f9f9f9;
+    padding: 20px;
+    border-radius: 20px;
+}
+
+.personal-detail-card h2 {
+    margin-top: 0;
+}
+
+.additional-fields textarea, .main-notes-field textarea {
+    width: 100%;
+    border-radius: 5px;
+}
+
+.additional-bt-wrap {
+    margin-top: 20px;
+}
+
+.passenger-list {
+    gap: 15px;
+}
+
+.passenger-info-wrap, .passenger-list, .current-booking-right {
+    display: flex;
+    align-items: center;
+}
+
+.passenger-list-right {
+    flex: 1;
+}
+
+.passenger-info-wrap p:first-child {
+    width: 20%;
+}
+
+.final-body-wrap {
+    padding-bottom: 60px;
+}
+
+.current-booking-wrap {
+    display: flex;
+    justify-content: space-between;
+}
+
+.current-booking-right {
+    flex-direction: column;
+    gap: 10px;
+}
+
+.current-booking-field p {
+    margin: 0;
+}
+
+.current-booking-left {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.history-field thead, .activity-list-wrap thead, .specific-card-wrap thead {
+    background: var(--light-blue);
+}
+
+.history-field thead tr th, .activity-list-wrap thead tr th, .specific-card-wrap thead tr th {
+    color: #fff;
+}
+
+.notes-card-wrap thead tr {
+    background-color: var(--light-blue);
+}
+
+.notes-card-wrap thead tr th {
+    color: #fff;
+}
+
+/* Notes Modal */
+.notes-modal-wrap.active-modal, .specific-slot-add {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 500px;
+    background: #f9f9f9;
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: 0 0 10px rgb(0 0 0 / 26%);
+}
+
+.notes-modal-wrap.active-modal h2 {
+    margin-top: 0;
+}
+
+.notes-modal-cont {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* End personal Detail Page */
+
+/* Start Activity Page */
+
+.edit-activity {
+    cursor: pointer;
+}
+.default-activity-wrap-edit, .specific-new-slot-edit {
+    background: rgb(249, 249, 249);
+    padding: 20px;
+    border-radius: 20px;
+    margin-top: 20px;
+}
+
+.default-activity-wrap-edit h2, .specific-new-slot-edit h2 {
+    margin-top: 0;
+}
+
+.default-card-wrap {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.specific-activity-fields {
+    flex: 1;
+}
+
+.specific-activity-fields>div {
+    width: 100%;
+    margin: 0;
+}
+.specific-activity-fields .MuiSelect-select, .specific-activity-fields .MuiInputBase-input {
+    padding: 10px 15px;
+}
+.default-activity-wrap-edit {
+    padding-bottom: 60px;
+}
+.add-slot-btn a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.add-slot-btn {
+    margin-top: -22px;
+    text-align: center;
+}
+
+/* Add Slot Modal */
+.specific-slot-add h3 {
+    margin-top: 0;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.specific-slot-field>div {
+    width: 100%;
+}
+.calender-slot-add>div {
+    flex-direction: column;
+    padding: 0;
+}
+.specific-slot-field {
+    margin-bottom: 15px;
+}
+.save-specific-details {
+    text-align: center;
+}
+.save-specific-details a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+a.edit-activity svg {
+    color: var(--dark-blue);
+}
+/* End Activity Page */
