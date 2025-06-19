@@ -46,6 +46,11 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > deploy_key
           chmod 600 deploy_key
           ssh -i deploy_key -o StrictHostKeyChecking=no ec2-user@13.221.13.241 '
+            # Node.js ve npm kurulu mu kontrol et, yoksa kur
+            if ! command -v node >/dev/null 2>&1; then
+              curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash - &&
+              sudo yum install -y nodejs
+            fi
             mkdir -p ~/flyawayballooning-system-backend &&
             cd ~/flyawayballooning-system-backend &&
             aws s3 cp s3://flyawayballooning-backend/backend-deploy.zip . &&
