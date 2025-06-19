@@ -250,3 +250,11 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
 });
+
+app.use(express.static(path.join(__dirname, '../client/build')));
+app.get('*', (req, res) => {
+    if (req.path.startsWith("/api/")) {
+        return res.status(404).json({ message: 'API route not found' });
+    }
+    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+});
