@@ -1,8 +1,8 @@
 const express = require("express");
 const mysql = require("mysql2");
 const cors = require("cors");
-const app = express(); 
-const path = require("path"); 
+const app = express();
+const path = require("path");
 const fs = require("fs");
 
 // Enable CORS
@@ -244,18 +244,6 @@ app.post("/api/updateActivityData", (req, res) => {
         }
     });
 });
-
-// Serve static files (React build)
-app.use(express.static(path.join(__dirname, '../client/build')));
-
-// Catch-all route to serve React for any undefined routes
-app.get('*', (req, res) => {
-    if (req.path.startsWith("/api/")) {
-        return res.status(404).json({ message: 'API route not found' });
-    }
-    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
-});
-
 
 // Start the server
 const PORT = process.env.PORT || 3001;
