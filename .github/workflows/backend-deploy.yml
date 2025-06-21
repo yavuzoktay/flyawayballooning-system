@@ -1,4 +1,4 @@
-name: Deploy Backend to EC2
+name: Deploy Backend to S3 and EC2
 
 on:
   push:
@@ -25,17 +25,36 @@ jobs:
           cd server
           npm install
           
-      - name: Create SSH key
+      - name: Create deployment package
         run: |
-          mkdir -p ~/.ssh/
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
+          cd server
+          zip -r ../backend-deploy.zip ./*
+          
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+          
+      - name: Upload to S3
+        run: |
+          aws s3 cp backend-deploy.zip s3://flyawayballooning-backend/backend-deploy.zip
           
       - name: Deploy to EC2
         run: |
-          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r server/* ubuntu@3.87.205.74:/home/ubuntu/flyawayballooning-system-backend/
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ubuntu@3.87.205.74 '
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > deploy_key
+          chmod 600 deploy_key
+          ssh -i deploy_key -o StrictHostKeyChecking=no ec2-user@13.221.13.241 '
+            if ! command -v node >/dev/null 2>&1; then
+              curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash - &&
+              sudo yum install -y nodejs
+            fi
+            mkdir -p ~/flyawayballooning-system-backend &&
             cd ~/flyawayballooning-system-backend &&
+            aws s3 cp s3://flyawayballooning-backend/backend-deploy.zip . &&
+            unzip -o backend-deploy.zip -d . &&
             npm install &&
-            pm2 restart flyaway-backend || pm2 start server/index.js --name flyaway-backend
+            sudo npm install -g pm2 &&
+            pm2 restart flyaway-backend || pm2 start index.js --name flyaway-backend
           ' 
