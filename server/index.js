@@ -23,6 +23,7 @@ const con = mysql.createPool({
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
+    multipleStatements: true
 });
 
 // API routes
@@ -328,7 +329,7 @@ app.post('/api/createBooking', (req, res) => {
 
 // Endpoint to create necessary tables
 app.get('/api/setup-database', (req, res) => {
-    const createAllBookingTable = `
+    const setupQueries = `
         CREATE TABLE IF NOT EXISTS all_booking (
             id INT AUTO_INCREMENT PRIMARY KEY,
             name VARCHAR(255),
@@ -341,9 +342,7 @@ app.get('/api/setup-database', (req, res) => {
             due DECIMAL(10, 2),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
-    `;
-
-    const createPassengerTable = `
+    
         CREATE TABLE IF NOT EXISTS passenger (
             id INT AUTO_INCREMENT PRIMARY KEY,
             booking_id INT,
@@ -352,9 +351,7 @@ app.get('/api/setup-database', (req, res) => {
             weight VARCHAR(255),
             FOREIGN KEY (booking_id) REFERENCES all_booking(id) ON DELETE CASCADE
         );
-    `;
-
-    const createAllVouchersTable = `
+    
         CREATE TABLE IF NOT EXISTS all_vouchers (
             id INT AUTO_INCREMENT PRIMARY KEY,
             voucher_code VARCHAR(255),
@@ -362,9 +359,7 @@ app.get('/api/setup-database', (req, res) => {
             status VARCHAR(50),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
-    `;
-
-    const createDateRequestTable = `
+    
         CREATE TABLE IF NOT EXISTS date_request (
             id INT AUTO_INCREMENT PRIMARY KEY,
             name VARCHAR(255),
@@ -375,37 +370,13 @@ app.get('/api/setup-database', (req, res) => {
         );
     `;
 
-    con.query(createAllBookingTable, (err, result) => {
+    con.query(setupQueries, (err, result) => {
         if (err) {
-            console.error('Error creating all_booking table:', err);
-            return res.status(500).json({ success: false, message: 'Failed to create all_booking table.' });
+            console.error('Error creating database tables:', err);
+            return res.status(500).json({ success: false, message: 'Failed to create database tables.' });
         }
-        console.log('all_booking table created or already exists.');
-
-        con.query(createPassengerTable, (err, result) => {
-            if (err) {
-                console.error('Error creating passenger table:', err);
-                return res.status(500).json({ success: false, message: 'Failed to create passenger table.' });
-            }
-            console.log('passenger table created or already exists.');
-
-            con.query(createAllVouchersTable, (err, result) => {
-                if (err) {
-                    console.error('Error creating all_vouchers table:', err);
-                    return res.status(500).json({ success: false, message: 'Failed to create all_vouchers table.' });
-                }
-                console.log('all_vouchers table created or already exists.');
-
-                con.query(createDateRequestTable, (err, result) => {
-                    if (err) {
-                        console.error('Error creating date_request table:', err);
-                        return res.status(500).json({ success: false, message: 'Failed to create date_request table.' });
-                    }
-                    console.log('date_request table created or already exists.');
-                    res.status(200).json({ success: true, message: 'Database tables created successfully!' });
-                });
-            });
-        });
+        console.log('Database tables created successfully or already exist.');
+        res.status(200).json({ success: true, message: 'Database tables created successfully!' });
     });
 });
 
