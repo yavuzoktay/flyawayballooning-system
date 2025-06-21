@@ -71,30 +71,14 @@ app.get("/api/getfilteredBookings", (req, res) => {
 
 // Get All Booking Data
 app.get("/api/getAllBookingData", (req, res) => {
-    const { flightType, location, status, search } = req.query;
+    const { flightType } = req.query;
 
-    let sql = "SELECT * FROM all_booking WHERE 1=1";
+    let sql = "SELECT * FROM all_booking";
     const values = [];
 
     if (flightType) {
-        sql += " AND flight_type = ?";
+        sql += " WHERE flight_type = ?";
         values.push(flightType);
-    }
-
-    if (location) {
-        sql += " AND location = ?";
-        values.push(location);
-    }
-    
-    if (status) {
-        sql += " AND status = ?";
-        values.push(status);
-    }
-    
-    if (search) {
-        sql += " AND (name LIKE ? OR email LIKE ?)";
-        values.push(`%${search}%`);
-        values.push(`%${search}%`);
     }
 
     con.query(sql, values, (err, result) => {
@@ -370,6 +354,27 @@ app.get('/api/setup-database', (req, res) => {
         );
     `;
 
+    const createAllVouchersTable = `
+        CREATE TABLE IF NOT EXISTS all_vouchers (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            voucher_code VARCHAR(255),
+            discount_percentage INT,
+            status VARCHAR(50),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    `;
+
+    const createDateRequestTable = `
+        CREATE TABLE IF NOT EXISTS date_request (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255),
+            email VARCHAR(255),
+            requested_date VARCHAR(255),
+            status VARCHAR(50),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    `;
+
     con.query(createAllBookingTable, (err, result) => {
         if (err) {
             console.error('Error creating all_booking table:', err);
@@ -383,7 +388,23 @@ app.get('/api/setup-database', (req, res) => {
                 return res.status(500).json({ success: false, message: 'Failed to create passenger table.' });
             }
             console.log('passenger table created or already exists.');
-            res.status(200).json({ success: true, message: 'Database tables created successfully!' });
+
+            con.query(createAllVouchersTable, (err, result) => {
+                if (err) {
+                    console.error('Error creating all_vouchers table:', err);
+                    return res.status(500).json({ success: false, message: 'Failed to create all_vouchers table.' });
+                }
+                console.log('all_vouchers table created or already exists.');
+
+                con.query(createDateRequestTable, (err, result) => {
+                    if (err) {
+                        console.error('Error creating date_request table:', err);
+                        return res.status(500).json({ success: false, message: 'Failed to create date_request table.' });
+                    }
+                    console.log('date_request table created or already exists.');
+                    res.status(200).json({ success: true, message: 'Database tables created successfully!' });
+                });
+            });
         });
     });
 });
