@@ -24,10 +24,13 @@ const BookingPage = () => {
     // Fetch data
     const bookingData = async () => {
         try {
-            const resp = await axios.get(`/api/getAllBookingData`);
+            console.log('BookingPage filters:', filters); // Debug log
+            const resp = await axios.get(`/api/getAllBookingData`, { params: filters });
             setBooking(resp.data.data || []);
+            setFilteredData(resp.data.data || []); // Also update filteredData directly
         } catch (err) {
-            console.error("Error fetching bookings:", err);
+            setBooking([]); // Clear data on error
+            setFilteredData([]);
         }
     };
 
@@ -57,76 +60,16 @@ const BookingPage = () => {
         }));
     };
 
-    // Apply Filters
-    const applyFilters = () => {
-        let data = [];
-        if (activeTab === "bookings") data = booking;
-        if (activeTab === "vouchers") data = voucher;
-        if (activeTab === "dateRequests") data = dateRequested;
-
-        let filtered = data;
-
-        // Apply search filter
-        if (filters.search) {
-            const searchLower = filters.search.toLowerCase();
-            filtered = filtered.filter((item) =>
-                Object.values(item)
-                    .join(" ")
-                    .toLowerCase()
-                    .includes(searchLower)
-            );
-        }
-
-        // Apply specific filters
-        if (activeTab === "bookings") {
-            if (filters.flightType) {
-                filtered = filtered.filter((item) => item.flight_type === filters.flightType);
-            }
-            if (filters.status) {
-                filtered = filtered.filter((item) => item.status === filters.status);
-            }
-            if (filters.location) {
-                filtered = filtered.filter((item) => item.location === filters.location);
-            }
-        }
-
-        if (activeTab === "vouchers") {
-            if (filters.voucherType) {
-                filtered = filtered.filter((item) => item.voucher_type === filters.voucherType);
-            }
-            if (filters.redeemedStatus) {
-                filtered = filtered.filter((item) => item.redeemed === filters.redeemedStatus);
-            }
-            if (filters.flightType) {
-                filtered = filtered.filter((item) => item.flight_type === filters.flightType);
-            }
-        }
-
-        setFilteredData(filtered);
-    };
-
     // Load data on component mount
     useEffect(() => {
-        bookingData();
         voucherData();
         dateRequestedData();
     }, []);
 
-    // Initialize filteredData when data is loaded or activeTab changes
+    // Fetch booking data when filters change
     useEffect(() => {
-        if (activeTab === "bookings") {
-            setFilteredData(booking);
-        } else if (activeTab === "vouchers") {
-            setFilteredData(voucher);
-        } else if (activeTab === "dateRequests") {
-            setFilteredData(dateRequested);
-        }
-    }, [booking, voucher, dateRequested, activeTab]);
-
-    // Apply filters whenever filters or activeTab changes
-    useEffect(() => {
-        applyFilters();
-    }, [filters, activeTab]);
+        bookingData();
+    }, [filters]);
 
     return (
         <div className="booking-page-wrap">
@@ -194,7 +137,7 @@ const BookingPage = () => {
                                     </div>
                                     <div className="booking-filter-wrap">
                                         <div className="booking-filter-field">
-                                            <FormControl sx={{ m: 1, minWidth: 120 }} size="small">
+                                            <FormControl sx={{ m: 1, minWidth: 120 }} size="small" className="booking-filter-field">
                                                 <InputLabel id="book-flight-type-label">Flight Type</InputLabel>
                                                 <Select
                                                     labelId="book-flight-type-label"
@@ -253,7 +196,17 @@ const BookingPage = () => {
                                 </div>
                                 <PaginatedTable
                                     data={filteredData}
-                                    columns={["created", "name", "flight_type", "flight_date", "pax", "email", "location", "status", "paid", "due", "voucher_code", "flight_attempts", "expires"]}
+                                    columns={[
+                                        "created_at",
+                                        "name",
+                                        "flight_type",
+                                        "flight_date",
+                                        "pax",
+                                        "location",
+                                        "status",
+                                        "paid",
+                                        "due",
+                                    ]}
                                 />
                             </>
                         )}
@@ -291,8 +244,8 @@ const BookingPage = () => {
                                                 <Select
                                                     labelId="book-flight-type-label"
                                                     value={filters.flightType}
-                                                    onChange={(e) => handleFilterChange("flightType", e.target.value)}
                                                     label="Flight Type"
+                                                    onChange={(e) => handleFilterChange("flightType", e.target.value)}
                                                 >
                                                     <MenuItem value="">
                                                         <em>Select</em>

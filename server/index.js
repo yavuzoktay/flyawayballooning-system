@@ -16,14 +16,13 @@ app.use(express.urlencoded({ extended: true })); // To parse URL-encoded request
 
 // MySQL Connection with Reconnection Handling
 const con = mysql.createPool({
-    host: "trip-booking-backend.c9mqyasow9hg.us-east-1.rds.amazonaws.com",
+    host: "trip-booking-database.c9mqyasow9hg.us-east-1.rds.amazonaws.com",
     user: "admin",
-    password: "tripbookingapp",
+    password: "qumton-jeghuz-doKxy3",
     database: "trip_booking",
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-    acquireTimeout: 10000, // 10 seconds
 });
 
 // API routes
@@ -72,8 +71,37 @@ app.get("/api/getfilteredBookings", (req, res) => {
 
 // Get All Booking Data
 app.get("/api/getAllBookingData", (req, res) => {
-    const sql = "SELECT * FROM all_booking";
-    con.query(sql, (err, result) => {
+    const { flightType, location, status, search } = req.query;
+
+    let sql = "SELECT * FROM all_booking WHERE 1=1";
+    const values = [];
+
+    if (flightType) {
+        sql += " AND flight_type = ?";
+        values.push(flightType);
+    }
+
+    if (location) {
+        sql += " AND location = ?";
+        values.push(location);
+    }
+    
+    if (status) {
+        sql += " AND status = ?";
+        values.push(status);
+    }
+    
+    if (search) {
+        sql += " AND (name LIKE ? OR email LIKE ?)";
+        values.push(`%${search}%`);
+        values.push(`%${search}%`);
+    }
+
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error("Error fetching booking data:", err);
+            return res.status(500).send({ success: false, message: "Database query failed" });
+        }
         if (result && result.length > 0) {
             res.send({ success: true, data: result });
         } else {
@@ -245,10 +273,122 @@ app.post("/api/updateActivityData", (req, res) => {
     });
 });
 
-// Serve static files (React build)
-app.use(express.static(path.join(__dirname, '../client/build')));
+// Add this new endpoint to handle booking creation
+app.post('/api/createBooking', (req, res) => {
+    const {
+        activitySelect,
+        chooseLocation,
+        chooseFlightType,
+        chooseAddOn,
+        passengerData,
+        additionalInfo,
+        recipientDetails,
+        selectedDate,
+        totalPrice
+    } = req.body;
 
-// Catch-all route to serve React for any undefined routes
+    // Basic validation
+    if (!chooseLocation || !chooseFlightType || !passengerData) {
+        return res.status(400).json({ success: false, message: 'Missing required booking information.' });
+    }
+
+    const passengerName = `${passengerData[0].firstName} ${passengerData[0].lastName}`;
+
+    const bookingSql = `
+        INSERT INTO all_booking (
+            name,
+            flight_type, 
+            flight_date, 
+            pax, 
+            location, 
+            status, 
+            paid, 
+            due,
+            created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+    `;
+
+    const bookingValues = [
+        passengerName,
+        chooseFlightType.type,
+        selectedDate,
+        chooseFlightType.passengerCount,
+        chooseLocation,
+        'Confirmed', // Default status
+        totalPrice,
+        0
+    ];
+
+    con.query(bookingSql, bookingValues, (err, result) => {
+        if (err) {
+            console.error('Error creating booking:', err);
+            return res.status(500).json({ success: false, error: 'Database query failed to create booking' });
+        }
+
+        const bookingId = result.insertId;
+
+        // Now, insert passengers
+        const passengerSql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight) VALUES ?';
+        const passengerValues = passengerData.map(p => [bookingId, p.firstName, p.lastName, p.weight]);
+
+        con.query(passengerSql, [passengerValues], (err, result) => {
+            if (err) {
+                console.error('Error creating passengers:', err);
+                // Optional: Delete the booking if passenger insertion fails
+                return res.status(500).json({ success: false, error: 'Database query failed to create passengers' });
+            }
+            res.status(201).json({ success: true, message: 'Booking created successfully!', bookingId: bookingId });
+        });
+    });
+});
+
+// Endpoint to create necessary tables
+app.get('/api/setup-database', (req, res) => {
+    const createAllBookingTable = `
+        CREATE TABLE IF NOT EXISTS all_booking (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255),
+            flight_type VARCHAR(255),
+            flight_date VARCHAR(255),
+            pax INT,
+            location VARCHAR(255),
+            status VARCHAR(255),
+            paid DECIMAL(10, 2),
+            due DECIMAL(10, 2),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    `;
+
+    const createPassengerTable = `
+        CREATE TABLE IF NOT EXISTS passenger (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            booking_id INT,
+            first_name VARCHAR(255),
+            last_name VARCHAR(255),
+            weight VARCHAR(255),
+            FOREIGN KEY (booking_id) REFERENCES all_booking(id) ON DELETE CASCADE
+        );
+    `;
+
+    con.query(createAllBookingTable, (err, result) => {
+        if (err) {
+            console.error('Error creating all_booking table:', err);
+            return res.status(500).json({ success: false, message: 'Failed to create all_booking table.' });
+        }
+        console.log('all_booking table created or already exists.');
+
+        con.query(createPassengerTable, (err, result) => {
+            if (err) {
+                console.error('Error creating passenger table:', err);
+                return res.status(500).json({ success: false, message: 'Failed to create passenger table.' });
+            }
+            console.log('passenger table created or already exists.');
+            res.status(200).json({ success: true, message: 'Database tables created successfully!' });
+        });
+    });
+});
+
+app.use(express.static(path.join(__dirname, '../client/build')));
 app.get('*', (req, res) => {
     if (req.path.startsWith("/api/")) {
         return res.status(404).json({ message: 'API route not found' });
@@ -256,9 +396,8 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
 });
 
-
 // Start the server
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
 });

@@ -9,7 +9,7 @@ const useBooking = () => {
     const fetchFlights = async () => {
       try {
         const response = await axios.get("/api/getAllBookingData");
-        setBooking(response.data.data);
+        setBooking(Array.isArray(response.data.data) ? response.data.data : []);
       } catch (error) {
         console.error("Error fetching flights:", error);
       } finally {

@@ -9,7 +9,7 @@ const useActivity = () => {
     const fetchActivity = async () => {
       try {
         const response = await axios.get("/api/getAllActivity");
-        setActivity(response.data.data);
+        setActivity(Array.isArray(response.data.data) ? response.data.data : []);
       } catch (error) {
         console.error("Error fetching flights:", error);
       } finally {

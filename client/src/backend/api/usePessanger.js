@@ -9,7 +9,7 @@ const usePessanger = () => {
     const fetchFlights = async () => {
       try {
         const response = await axios.get("/api/getAllPassengers");
-        setPassenger(response.data.data);
+        setPassenger(Array.isArray(response.data.data) ? response.data.data : []);
       } catch (error) {
         console.error("Error fetching flights:", error);
       } finally {
