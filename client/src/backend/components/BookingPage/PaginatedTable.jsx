@@ -6,11 +6,16 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10 }) => {
     // Function to format date
     const formatDate = (dateString) => {
         if (!dateString) return '';
-        const date = new Date(dateString);
+        // Eğer T yoksa, ekle
+        let isoString = dateString.includes('T') ? dateString : dateString.replace(' ', 'T');
+        const date = new Date(isoString);
+        if (isNaN(date.getTime())) return String(dateString); // Geçersizse raw göster
         const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-based
+        const month = String(date.getMonth() + 1).padStart(2, '0');
         const year = date.getFullYear();
-        return `${day}/${month}/${year}`;
+        const hour = String(date.getHours()).padStart(2, '0');
+        const min = String(date.getMinutes()).padStart(2, '0');
+        return `${day}/${month}/${year} ${hour}:${min}`;
     };
 
     // Pagination logic
@@ -44,18 +49,25 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10 }) => {
                         {mainHead.map((col, index) => (
                             <th key={index} style={{ padding: "8px" }}>{col}</th>
                         ))}
+                        <th style={{ padding: "8px" }}>Voucher/Booking ID</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {paginatedData.map((item, idx) => (                      
-                        <tr key={idx}>
-                            {columns.map((col) => (
-                                <td key={col} style={{ textAlign: "center", padding: "8px" }}>
-                                    {col === 'created_at' ? formatDate(item[col]) : item[col]}
+                    {paginatedData.map((item, idx) => {
+                        console.log('item:', item); // DEBUG
+                        return (
+                            <tr key={idx}>
+                                {columns.map((col) => (
+                                    <td key={col} style={{ textAlign: "center", padding: "8px" }}>
+                                        {col === 'created_at' ? formatDate(item[col]) : item[col]}
+                                    </td>
+                                ))}
+                                <td style={{ textAlign: "center", padding: "8px", fontWeight: 600 }}>
+                                    {item.voucher_code ? item.voucher_code : (item.booking_id || item.id || "-")}
                                 </td>
-                            ))}
-                        </tr>
-                    ))}
+                            </tr>
+                        );
+                    })}
                 </tbody>
             </table>
 

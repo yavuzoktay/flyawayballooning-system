@@ -71,6 +71,28 @@ const BookingPage = () => {
         bookingData();
     }, [filters]);
 
+    useEffect(() => {
+        console.log("booking state:", booking);
+        console.log("filteredData state:", filteredData);
+    }, [booking, filteredData]);
+
+    console.log("PaginatedTable data:", filteredData);
+    console.log("PaginatedTable columns:", [
+        "created_at",
+        "name",
+        "flight_type",
+        "flight_date",
+        "pax",
+        "email",
+        "location",
+        "status",
+        "paid",
+        "due",
+        "voucher_code",
+        "flight_attempts",
+        "expires"
+    ]);
+
     return (
         <div className="booking-page-wrap">
             <Container maxWidth="xl">
@@ -94,7 +116,7 @@ const BookingPage = () => {
                                 cursor: "pointer"
                             }}
                         >
-                            All Bookings
+                            All Bookings2
                         </button>
                         <button
                             onClick={() => setActiveTab("vouchers")}
@@ -129,7 +151,7 @@ const BookingPage = () => {
                             <>
                                 <div className="booking-top-wrap">
                                     <div className="booking-filter-heading">
-                                        <h3 style={{ fontFamily: "Gilroy Light" }}>All Bookings</h3>
+                                        <h3 style={{ fontFamily: "Gilroy Light" }}>All Bookings2</h3>
                                     </div>
                                     <div className="booking-search-booking">
                                         <OutlinedInput placeholder="Search here" value={filters.search}
@@ -148,8 +170,8 @@ const BookingPage = () => {
                                                     <MenuItem value="">
                                                         <em>Select</em>
                                                     </MenuItem>
-                                                    <MenuItem value="Private">Private</MenuItem>
-                                                    <MenuItem value="Shared">Shared</MenuItem>
+                                                    <MenuItem value="Private Flight">Private</MenuItem>
+                                                    <MenuItem value="Shared Flight">Shared</MenuItem>
                                                 </Select>
                                             </FormControl>
                                         </div>
@@ -202,10 +224,14 @@ const BookingPage = () => {
                                         "flight_type",
                                         "flight_date",
                                         "pax",
+                                        "email",
                                         "location",
                                         "status",
                                         "paid",
                                         "due",
+                                        "voucher_code",
+                                        "flight_attempts",
+                                        "expires"
                                     ]}
                                 />
                             </>
@@ -250,8 +276,8 @@ const BookingPage = () => {
                                                     <MenuItem value="">
                                                         <em>Select</em>
                                                     </MenuItem>
-                                                    <MenuItem value="Private">Private</MenuItem>
-                                                    <MenuItem value="Shared">Shared</MenuItem>
+                                                    <MenuItem value="Private Flight">Private</MenuItem>
+                                                    <MenuItem value="Shared Flight">Shared</MenuItem>
                                                 </Select>
                                             </FormControl>
                                         </div>
