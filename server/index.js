@@ -4,6 +4,7 @@ const cors = require("cors");
 const app = express();
 const path = require("path");
 const fs = require("fs");
+const moment = require('moment');
 
 // Enable CORS
 app.use(cors({
@@ -52,16 +53,13 @@ app.delete('/delete-test', (req, res) => {
 
 // Filtered Bookings Data
 app.get("/api/getfilteredBookings", (req, res) => {
-    var booking_data = "SELECT * FROM all_booking WHERE STR_TO_DATE(flight_date, '%d-%m-%Y') > CURDATE() AND status != 'Cancelled'";
-    console.log('booking_data', booking_data);
-
-    con.query(booking_data, (err, result) => { // Corrected the parameter order
+    var booking_data = "SELECT * FROM all_booking";
+    con.query(booking_data, (err, result) => {
         if (err) {
             console.error("Error occurred:", err);
             res.status(500).send({ success: false, error: "Database query failed" });
             return;
         }
-        console.log("result", result);
         if (result.length > 0) {
             res.send({ success: true, data: result });
         } else {
@@ -72,14 +70,32 @@ app.get("/api/getfilteredBookings", (req, res) => {
 
 // Get All Booking Data
 app.get("/api/getAllBookingData", (req, res) => {
-    const { flightType } = req.query;
+    const { flightType, location, search } = req.query;
 
     let sql = "SELECT * FROM all_booking";
     const values = [];
+    let whereClauses = [];
 
     if (flightType) {
-        sql += " WHERE flight_type = ?";
+        whereClauses.push("flight_type = ?");
         values.push(flightType);
+    }
+    if (location) {
+        whereClauses.push("location = ?");
+        values.push(location);
+    }
+    if (search) {
+        // Arama için name, id, voucher_code
+        whereClauses.push(`(
+            name LIKE ? OR
+            id LIKE ? OR
+            voucher_code LIKE ?
+        )`);
+        const likeSearch = `%${search}%`;
+        values.push(likeSearch, likeSearch, likeSearch);
+    }
+    if (whereClauses.length > 0) {
+        sql += " WHERE " + whereClauses.join(" AND ");
     }
 
     con.query(sql, values, (err, result) => {
@@ -269,7 +285,9 @@ app.post('/api/createBooking', (req, res) => {
         additionalInfo,
         recipientDetails,
         selectedDate,
-        totalPrice
+        totalPrice,
+        voucher_code,
+        flight_attempts // frontend'den geliyorsa, yoksa undefined
     } = req.body;
 
     // Basic validation
@@ -278,53 +296,112 @@ app.post('/api/createBooking', (req, res) => {
     }
 
     const passengerName = `${passengerData[0].firstName} ${passengerData[0].lastName}`;
+    const now = moment();
+    let expiresDate = null;
 
-    const bookingSql = `
-        INSERT INTO all_booking (
-            name,
-            flight_type, 
-            flight_date, 
-            pax, 
-            location, 
-            status, 
-            paid, 
-            due,
-            created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
-    `;
+    function insertBookingAndPassengers(expiresDateFinal) {
+        const nowDate = moment().format('YYYY-MM-DD HH:mm:ss');
+        const bookingSql = `
+            INSERT INTO all_booking (
+                name,
+                flight_type, 
+                flight_date, 
+                pax, 
+                location, 
+                status, 
+                paid, 
+                due,
+                voucher_code,
+                created_at,
+                expires
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
 
-    const bookingValues = [
-        passengerName,
-        chooseFlightType.type,
-        selectedDate,
-        chooseFlightType.passengerCount,
-        chooseLocation,
-        'Confirmed', // Default status
-        totalPrice,
-        0
-    ];
+        const bookingValues = [
+            passengerName,
+            chooseFlightType.type,
+            selectedDate,
+            chooseFlightType.passengerCount,
+            chooseLocation,
+            'Confirmed', // Default status
+            totalPrice,
+            0,
+            voucher_code || null,
+            nowDate,
+            expiresDateFinal
+        ];
 
-    con.query(bookingSql, bookingValues, (err, result) => {
-        if (err) {
-            console.error('Error creating booking:', err);
-            return res.status(500).json({ success: false, error: 'Database query failed to create booking' });
-        }
-
-        const bookingId = result.insertId;
-
-        // Now, insert passengers
-        const passengerSql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight) VALUES ?';
-        const passengerValues = passengerData.map(p => [bookingId, p.firstName, p.lastName, p.weight]);
-
-        con.query(passengerSql, [passengerValues], (err, result) => {
+        con.query(bookingSql, bookingValues, (err, result) => {
             if (err) {
-                console.error('Error creating passengers:', err);
-                // Optional: Delete the booking if passenger insertion fails
-                return res.status(500).json({ success: false, error: 'Database query failed to create passengers' });
+                console.error('Error creating booking:', err);
+                return res.status(500).json({ success: false, error: 'Database query failed to create booking' });
             }
-            res.status(201).json({ success: true, message: 'Booking created successfully!', bookingId: bookingId });
+
+            const bookingId = result.insertId;
+            const createdAt = nowDate;
+
+            function insertPassengers() {
+                const passengerSql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight) VALUES ?';
+                const passengerValues = passengerData.map(p => [bookingId, p.firstName, p.lastName, p.weight]);
+
+                con.query(passengerSql, [passengerValues], (err, result) => {
+                    if (err) {
+                        console.error('Error creating passengers:', err);
+                        return res.status(500).json({ success: false, error: 'Database query failed to create passengers' });
+                    }
+                    res.status(201).json({ success: true, message: 'Booking created successfully!', bookingId: bookingId, created_at: createdAt });
+                });
+            }
+
+            // Eğer voucher_code boşsa, booking'in kendi ID'sini voucher_code olarak güncelle
+            if (!voucher_code) {
+                const updateVoucherSql = 'UPDATE all_booking SET voucher_code = ? WHERE id = ?';
+                con.query(updateVoucherSql, [bookingId, bookingId], (err) => {
+                    if (err) {
+                        console.error('Error updating voucher_code:', err);
+                    }
+                    insertPassengers();
+                });
+            } else {
+                insertPassengers();
+            }
         });
-    });
+    }
+
+    // expires hesaplama akışı
+    if (voucher_code) {
+        // Voucher redeemed mi ve satın alma tarihi nedir?
+        const voucherQuery = 'SELECT created_at, status FROM all_vouchers WHERE voucher_code = ? LIMIT 1';
+        con.query(voucherQuery, [voucher_code], (err, voucherResult) => {
+            if (err) {
+                console.error('Error fetching voucher:', err);
+                return res.status(500).json({ success: false, error: 'Database query failed to fetch voucher' });
+            }
+            if (voucherResult.length > 0 && voucherResult[0].status === 'redeemed') {
+                // Redeemed voucher: expires = voucher satın alma tarihi + 24 ay
+                expiresDate = moment(voucherResult[0].created_at).add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+                insertBookingAndPassengers(expiresDate);
+            } else {
+                // Diğer durumlar: flight_attempts >= 10 ise 36 ay, yoksa 24 ay
+                const attempts = typeof flight_attempts === 'number' ? flight_attempts : 0;
+                if (attempts >= 10) {
+                    expiresDate = now.clone().add(36, 'months').format('YYYY-MM-DD HH:mm:ss');
+                } else {
+                    expiresDate = now.clone().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+                }
+                insertBookingAndPassengers(expiresDate);
+            }
+        });
+    } else {
+        // Voucher yoksa: flight_attempts >= 10 ise 36 ay, yoksa 24 ay
+        const attempts = typeof flight_attempts === 'number' ? flight_attempts : 0;
+        if (attempts >= 10) {
+            expiresDate = now.clone().add(36, 'months').format('YYYY-MM-DD HH:mm:ss');
+        } else {
+            expiresDate = now.clone().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+        }
+        insertBookingAndPassengers(expiresDate);
+    }
 });
 
 // Endpoint to create necessary tables
@@ -340,6 +417,7 @@ app.get('/api/setup-database', (req, res) => {
             status VARCHAR(255),
             paid DECIMAL(10, 2),
             due DECIMAL(10, 2),
+            voucher_code VARCHAR(255),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     
