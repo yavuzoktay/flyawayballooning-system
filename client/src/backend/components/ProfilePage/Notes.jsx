@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import NotesPopup from "./NotesPopup";
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from "@mui/material";
@@ -9,7 +9,7 @@ const Notes = ({ detail }) => {
     const [modal, setModal] = useState(false);
 
     // Fetch notes from the server
-    const fetchNotes = async () => {
+    const fetchNotes = useCallback(async () => {
         try {
             const response = await axios.get(`/api/getAdminNotes?booking_id=${detail?.booking_id}`);
             if (response.status === 200) {
@@ -18,12 +18,12 @@ const Notes = ({ detail }) => {
         } catch (error) {
             console.error("Error fetching notes:", error);
         }
-    };
+    }, [detail?.booking_id]);
 
     // Load notes on component mount
     useEffect(() => {
         fetchNotes();
-    }, [detail?.booking_id, fetchNotes]);
+    }, [fetchNotes]);
 
     // Handle Modal
     const handleModal = () => {
