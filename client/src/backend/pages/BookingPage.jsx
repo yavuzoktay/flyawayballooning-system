@@ -1,8 +1,7 @@
 import axios from "axios";
 import React, { useEffect, useState } from "react";
 import PaginatedTable from "../components/BookingPage/PaginatedTable";
-import { Container, FormControl, InputLabel, MenuItem, OutlinedInput, Select, TextField } from "@mui/material";
-import { Link } from "react-router-dom";
+import { Container, FormControl, InputLabel, MenuItem, OutlinedInput, Select } from "@mui/material";
 
 const BookingPage = () => {
     const [activeTab, setActiveTab] = useState("bookings");
@@ -69,7 +68,7 @@ const BookingPage = () => {
     // Fetch booking data when filters change
     useEffect(() => {
         bookingData();
-    }, [filters]);
+    }, [filters, bookingData]);
 
     // Status filtresini hem Confirmed hem Scheduled için uygula
     useEffect(() => {

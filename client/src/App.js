@@ -2,7 +2,6 @@ import React from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import Index from './backend/pages/Index';
 import MainLayout from './backend/layout/MainLayout';
-import List from './backend/pages/List';
 import '../src/assets/css/backend/style.css';
 import BookingPage from './backend/pages/BookingPage';
 import Manifest from './backend/pages/Manifest';

@@ -23,7 +23,7 @@ const Notes = ({ detail }) => {
     // Load notes on component mount
     useEffect(() => {
         fetchNotes();
-    }, [detail?.booking_id]);
+    }, [detail?.booking_id, fetchNotes]);
 
     // Handle Modal
     const handleModal = () => {
