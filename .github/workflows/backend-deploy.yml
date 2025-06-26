@@ -1,4 +1,4 @@
-name: Deploy Backend and Client to S3 and EC2
+name: Deploy Backend and Client to S3 and EC2 
 
 on:
   push:
