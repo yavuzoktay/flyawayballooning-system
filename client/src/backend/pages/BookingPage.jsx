@@ -57,9 +57,9 @@ const BookingPage = () => {
         (async () => {
             try {
                 console.log('BookingPage filters:', filters); // Debug log
-                const resp = await axios.get(`/api/getAllBookingData`, { params: filters });
-                setBooking(resp.data.data || []);
-                setFilteredData(resp.data.data || []); // Also update filteredData directly
+                const response = await axios.get(`/api/getAllBookingData`, { params: filters });
+                setBooking(response.data.data || []);
+                setFilteredData(response.data.data || []); // Also update filteredData directly
             } catch (err) {
                 setBooking([]); // Clear data on error
                 setFilteredData([]);
