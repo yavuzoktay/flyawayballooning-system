@@ -1,5 +1,5 @@
 import { TextareaAutosize } from "@mui/material";
-import React, { useState } from "react";
+import React from "react";
 
 const AdditionInfo = ({ detail, bookingNote, setBookingNote }) => {
 

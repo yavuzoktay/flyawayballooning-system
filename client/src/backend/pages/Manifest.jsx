@@ -19,10 +19,7 @@ import {
     Paper,
     Container,
 } from "@mui/material";
-import {
-    CalendarToday,
-    MoreVert as MoreVertIcon,
-} from "@mui/icons-material";
+import { MoreVert as MoreVertIcon } from "@mui/icons-material";
 import useBooking from "../api/useBooking";
 import usePessanger from "../api/usePessanger";
 import useActivity from "../api/useActivity";
@@ -37,7 +34,6 @@ const Manifest = () => {
 
     // HOOKLAR KOŞULSUZ OLARAK EN ÜSTE ALINDI
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
-    const [statusUpdate, setStatusUpdate] = useState(false);
     const [flights, setFlights] = useState([]);
     const [menuAnchorEl, setMenuAnchorEl] = useState(null);
     const [selectedFlightId, setSelectedFlightId] = useState(null);
@@ -278,7 +274,7 @@ const Manifest = () => {
                                 filteredFlights.length > 0 ? (
                                     filteredFlights.map((flight) => {
                                         const matchingActivity = activity && Array.isArray(activity)
-                                            ? activity.find((a) => a.activity_sku == flight.activity_id)
+                                            ? activity.find((a) => a.activity_sku === flight.activity_id)
                                             : null;
 
                                         const activityName = matchingActivity ? matchingActivity.activity_name : "N/A";

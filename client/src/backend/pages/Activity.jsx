@@ -1,5 +1,5 @@
 import { Container } from "@mui/material";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import ActivityList from "../components/ActivityPage/ActivityList";
 import useActivity from "../api/useActivity";
 

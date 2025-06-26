@@ -51,7 +51,7 @@ const SpecificActivityPage = ({ activityData }) => {
     // Fetch available slots when component mounts
     useEffect(() => {
         specificAvailableSlot();
-    }, [activityData]);
+    }, [activityData, specificAvailableSlot]);
 
 
     // Initialize default values when `activityData` changes
