@@ -6,7 +6,6 @@ import { Container, FormControl, InputLabel, MenuItem, OutlinedInput, Select } f
 const BookingPage = () => {
     const [activeTab, setActiveTab] = useState("bookings");
     const [booking, setBooking] = useState([]);
-    const [voucher, setVoucher] = useState([]);
     const [dateRequested, setDateRequested] = useState([]);
     const [filteredData, setFilteredData] = useState([]);
 
@@ -67,7 +66,7 @@ const BookingPage = () => {
 
     // Fetch booking data when filters change
     useEffect(() => {
-        const bookingData = async () => {
+        (async () => {
             try {
                 console.log('BookingPage filters:', filters); // Debug log
                 const resp = await axios.get(`/api/getAllBookingData`, { params: filters });
@@ -77,8 +76,7 @@ const BookingPage = () => {
                 setBooking([]); // Clear data on error
                 setFilteredData([]);
             }
-        };
-        bookingData();
+        })();
     }, [filters]);
 
     // Status filtresini hem Confirmed hem Scheduled için uygula
