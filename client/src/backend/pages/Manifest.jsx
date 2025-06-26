@@ -50,10 +50,6 @@ const Manifest = () => {
     const activity = Array.isArray(activityHook && activityHook.activity) ? activityHook.activity : [];
     const activityLoading = activityHook && typeof activityHook.loading === 'boolean' ? activityHook.loading : true;
 
-    console.log("bookingHook", bookingHook);
-    console.log("booking", booking);
-    console.log("passenger", passenger);
-
     // Hatalı veri durumunu kontrol et
     useEffect(() => {
         if (!Array.isArray(booking) || !Array.isArray(passenger)) {

@@ -1,6 +1,3 @@
-    import React from "react";
-import { Link } from "react-router-dom";
-
     const PersonalDetail = ({ detail, email }) => {
         var passenger = detail?.passengers;
         var filteredPassengers = passenger?.filter((passenger) => passenger.email === email);

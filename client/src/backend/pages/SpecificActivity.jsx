@@ -11,11 +11,10 @@ const SpecificActivity = () => {
 
     useEffect(() => {
         if(!activityLoading){
-            const data = activity.filter((item) => item.activity_sku == param?.id);
+            const data = activity.filter((item) => item.activity_sku === param?.id);
             setActivityData(data);
         }
-        
-    }, [activity, activityLoading])
+    }, [activity, activityLoading, param?.id]);
      
     return (
         <div className="specific-activity-page-wrap">
