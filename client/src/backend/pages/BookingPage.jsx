@@ -22,7 +22,7 @@ const BookingPage = () => {
     // Fetch data
     const voucherData = async () => {
         try {
-            const resp = await axios.get(`/api/getAllVoucherData`);
+            await axios.get(`/api/getAllVoucherData`);
             // setVoucher is not defined or used, so this line is removed
         } catch (err) {
             console.error("Error fetching vouchers:", err);
@@ -31,8 +31,8 @@ const BookingPage = () => {
 
     const dateRequestedData = async () => {
         try {
-            const resp = await axios.get(`/api/getDateRequestData`);
-            setDateRequested(resp.data.data || []);
+            const response = await axios.get(`/api/getDateRequestData`);
+            setDateRequested(response.data.data || []);
         } catch (err) {
             console.error("Error fetching date requests:", err);
         }
