@@ -25,17 +25,17 @@ jobs:
           cd server
           npm install
       
-      - name: Install Dependencies (Client)
+      - name: Install Dependencies and Build (Client)
         run: |
           if [ -d "client" ]; then
             cd client
             npm install
-            npm run build || echo "No build script"
+            npm run build
           fi
       
-      - name: Create deployment package (all code)
+      - name: Create deployment package (server + client/build)
         run: |
-          zip -r backend-deploy.zip . -x '*.git*' 'node_modules/*' 'client/node_modules/*' 'server/node_modules/*'
+          zip -r backend-deploy.zip server client/build
       
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -58,8 +58,6 @@ jobs:
             aws s3 cp s3://flyawayballooning-backend/backend-deploy.zip . &&
             unzip -o backend-deploy.zip -d . &&
             cd server && npm install &&
-            cd ../client && npm install && npm run build || echo "No build script" &&
-            cd .. &&
             sudo npm install -g pm2 &&
-            cd server && (pm2 restart flyaway-backend || pm2 start index.js --name flyaway-backend)
+            pm2 restart flyaway-backend || pm2 start index.js --name flyaway-backend
           ' 
