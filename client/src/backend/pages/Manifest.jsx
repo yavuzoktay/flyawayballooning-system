@@ -309,7 +309,7 @@ const Manifest = () => {
                                                                 onClose={handleMenuClose}
                                                             >
                                                                 <MenuItem onClick={() => toggleFlightStatus(flight.id)}>
-                                                                    {statusUpdate === true ? "Close Slot" : "Open Slot"}
+                                                                    {status === "Closed" ? "Open Slot" : "Close Slot"}
                                                                 </MenuItem>
                                                                 <MenuItem onClick={() => sendMessageToPassengers(flight.id)}>
                                                                     Send Message to Passengers
