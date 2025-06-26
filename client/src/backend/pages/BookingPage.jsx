@@ -35,7 +35,7 @@ const BookingPage = () => {
     const voucherData = async () => {
         try {
             const resp = await axios.get(`/api/getAllVoucherData`);
-            setVoucher(resp.data.data || []);
+            // setVoucher is not defined or used, so this line is removed
         } catch (err) {
             console.error("Error fetching vouchers:", err);
         }
