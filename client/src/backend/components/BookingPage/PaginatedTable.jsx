@@ -59,7 +59,8 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10 }) => {
                             <tr key={idx}>
                                 {columns.map((col) => (
                                     <td key={col} style={{ textAlign: "center", padding: "8px" }}>
-                                        {col === 'created_at' ? formatDate(item[col]) : item[col]}
+                                        {col === 'created_at' ? formatDate(item[col]) :
+                                            col === 'status' && item[col] === 'Confirmed' ? 'Scheduled' : item[col]}
                                     </td>
                                 ))}
                                 <td style={{ textAlign: "center", padding: "8px", fontWeight: 600 }}>
