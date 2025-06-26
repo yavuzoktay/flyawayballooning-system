@@ -20,6 +20,11 @@ const SpecificActivityPage = ({ activityData }) => {
 
     const navigate = useNavigate();
 
+    // Function to Show Snackbar with Dynamic Message
+    const showSnackbar = useCallback((message, severity) => {
+        setSnackbar({ open: true, message, severity, position: { vertical: "top", horizontal: "right" } });
+    }, []);
+
     // Get All Specific Available Slot
     const specificAvailableSlot = useCallback(async () => {
         if (!activityData?.[0]?.activity_sku) return;
@@ -101,11 +106,6 @@ const SpecificActivityPage = ({ activityData }) => {
             console.error("Error saving note:", error);
         }
     }
-
-    // Function to Show Snackbar with Dynamic Message
-    const showSnackbar = (message, severity) => {
-        setSnackbar({ open: true, message, severity, position: { vertical: "top", horizontal: "right" } });
-    };
 
     // Handle Snackbar Close
     const handleSnackbarClose = (event, reason) => {

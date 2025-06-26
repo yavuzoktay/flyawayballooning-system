@@ -34,7 +34,7 @@ const Manifest = () => {
 
     // HOOKLAR KOŞULSUZ OLARAK EN ÜSTE ALINDI
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
-    const [flights, setFlights] = useState([]);
+    const [flights, setFlights] = useState([]); // Used for state only, not as a variable
     const [menuAnchorEl, setMenuAnchorEl] = useState(null);
     const [selectedFlightId, setSelectedFlightId] = useState(null);
     const [error, setError] = useState(null);
