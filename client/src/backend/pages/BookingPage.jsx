@@ -71,6 +71,22 @@ const BookingPage = () => {
         bookingData();
     }, [filters]);
 
+    // Status filtresini hem Confirmed hem Scheduled için uygula
+    useEffect(() => {
+        if (filters.status) {
+            setFilteredData(
+                booking.filter((item) => {
+                    if (filters.status === 'Scheduled') {
+                        return item.status === 'Scheduled' || item.status === 'Confirmed';
+                    }
+                    return item.status === filters.status;
+                })
+            );
+        } else {
+            setFilteredData(booking);
+        }
+    }, [filters.status, booking]);
+
     useEffect(() => {
         console.log("booking state:", booking);
         console.log("filteredData state:", filteredData);
