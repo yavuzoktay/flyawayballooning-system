@@ -4,7 +4,7 @@ import ActivityList from "../components/ActivityPage/ActivityList";
 import useActivity from "../api/useActivity";
 
 const Activity = () => {
-    const {activity, loading: activityLoading} = useActivity();
+    const {activity} = useActivity();
 
     return (
         <div className="activity-page-wrap">

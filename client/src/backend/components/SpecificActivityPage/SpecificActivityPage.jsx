@@ -1,5 +1,5 @@
 import { Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField } from "@mui/material";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import TimeSlotSelect from "./TimeSlotSelect";
 import SpecificLocation from "./SpecificLocation";
 import { Link, useNavigate } from "react-router-dom";
@@ -21,7 +21,7 @@ const SpecificActivityPage = ({ activityData }) => {
     const navigate = useNavigate();
 
     // Get All Specific Available Slot
-    const specificAvailableSlot = async () => {
+    const specificAvailableSlot = useCallback(async () => {
         if (!activityData?.[0]?.activity_sku) return;
 
         try {
@@ -46,12 +46,12 @@ const SpecificActivityPage = ({ activityData }) => {
             console.error("Error fetching slots:", error);
             showSnackbar("Failed to fetch slots!", "error");
         }
-    };
+    }, [activityData, showSnackbar]);
 
     // Fetch available slots when component mounts
     useEffect(() => {
         specificAvailableSlot();
-    }, [activityData, specificAvailableSlot]);
+    }, [specificAvailableSlot]);
 
 
     // Initialize default values when `activityData` changes

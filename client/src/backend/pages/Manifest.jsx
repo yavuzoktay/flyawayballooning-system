@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
     Box,
     Grid,
@@ -39,9 +39,9 @@ const Manifest = () => {
     const [selectedFlightId, setSelectedFlightId] = useState(null);
     const [error, setError] = useState(null);
 
-    const booking = Array.isArray(bookingHook.booking) ? bookingHook.booking : [];
+    const booking = useMemo(() => Array.isArray(bookingHook.booking) ? bookingHook.booking : [], [bookingHook.booking]);
     const bookingLoading = typeof bookingHook.loading === 'boolean' ? bookingHook.loading : true;
-    const passenger = Array.isArray(pessangerHook.passenger) ? pessangerHook.passenger : [];
+    const passenger = useMemo(() => Array.isArray(pessangerHook.passenger) ? pessangerHook.passenger : [], [pessangerHook.passenger]);
     const passengerLoading = typeof pessangerHook.loading === 'boolean' ? pessangerHook.loading : true;
     const activity = Array.isArray(activityHook && activityHook.activity) ? activityHook.activity : [];
     const activityLoading = activityHook && typeof activityHook.loading === 'boolean' ? activityHook.loading : true;

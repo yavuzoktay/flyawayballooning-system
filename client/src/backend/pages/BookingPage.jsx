@@ -67,8 +67,19 @@ const BookingPage = () => {
 
     // Fetch booking data when filters change
     useEffect(() => {
+        const bookingData = async () => {
+            try {
+                console.log('BookingPage filters:', filters); // Debug log
+                const resp = await axios.get(`/api/getAllBookingData`, { params: filters });
+                setBooking(resp.data.data || []);
+                setFilteredData(resp.data.data || []); // Also update filteredData directly
+            } catch (err) {
+                setBooking([]); // Clear data on error
+                setFilteredData([]);
+            }
+        };
         bookingData();
-    }, [filters, bookingData]);
+    }, [filters]);
 
     // Status filtresini hem Confirmed hem Scheduled için uygula
     useEffect(() => {
