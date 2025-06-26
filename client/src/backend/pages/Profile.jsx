@@ -26,19 +26,19 @@ const Profile = () => {
     useEffect(() => {
         if (!bookingLoading && !passengerLoading && !activityLoading && !voucherLoading) {
             // Find the booking with the matching booking_id
-            const filteredBooking = booking.find((b) => b.booking_id == booking_id);
+            const filteredBooking = booking.find((b) => b.booking_id === booking_id);
             
             if (filteredBooking) {
                 // Filter passengers belonging to the specific booking_id
                 const filteredPassengers = passenger.filter(
-                    (p) => p.booking_id == booking_id
+                    (p) => p.booking_id === booking_id
                 );
 
                 // Filter Activity 
-                const filteredActivity = activity.filter((a) => a.activity_sku == filteredBooking.acitivity_id);
+                const filteredActivity = activity.filter((a) => a.activity_sku === filteredBooking.acitivity_id);
 
                 // Filter Voucher 
-                const filteredVoucher = voucher.filter((v) => v.voucher_ref == filteredBooking.voucher_code);
+                const filteredVoucher = voucher.filter((v) => v.voucher_ref === filteredBooking.voucher_code);
 
                 // Combine data
                 const combinedDetails = {
@@ -53,7 +53,7 @@ const Profile = () => {
             }
         }
         // Ensure the dependency array size and order remain constant
-    }, [booking, passenger, bookingLoading, passengerLoading, booking_id, activityLoading, activity]);
+    }, [booking, passenger, bookingLoading, passengerLoading, booking_id, activityLoading, activity, voucher, voucherLoading]);
     
 
 

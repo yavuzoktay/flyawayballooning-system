@@ -87,11 +87,6 @@ const BookingPage = () => {
         }
     }, [filters.status, booking]);
 
-    useEffect(() => {
-        console.log("booking state:", booking);
-        console.log("filteredData state:", filteredData);
-    }, [booking, filteredData]);
-
     console.log("PaginatedTable data:", filteredData);
     console.log("PaginatedTable columns:", [
         "created_at",
