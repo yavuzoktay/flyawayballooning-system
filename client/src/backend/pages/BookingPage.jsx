@@ -175,7 +175,7 @@ const BookingPage = () => {
         } else {
             setFilteredData(booking);
         }
-    }, [filters, booking]);
+    }, [filters.status, booking]);
 
     console.log("PaginatedTable data:", filteredData);
     console.log("PaginatedTable columns:", [
