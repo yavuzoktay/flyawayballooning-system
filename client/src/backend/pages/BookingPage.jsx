@@ -1,13 +1,14 @@
 import axios from "axios";
 import React, { useEffect, useState } from "react";
 import PaginatedTable from "../components/BookingPage/PaginatedTable";
-import { Container, FormControl, InputLabel, MenuItem, OutlinedInput, Select } from "@mui/material";
+import { Container, FormControl, InputLabel, MenuItem, OutlinedInput, Select, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField } from "@mui/material";
 
 const BookingPage = () => {
     const [activeTab, setActiveTab] = useState("bookings");
     const [booking, setBooking] = useState([]);
     const [dateRequested, setDateRequested] = useState([]);
     const [filteredData, setFilteredData] = useState([]);
+    const [voucher, setVoucher] = useState([]);
 
     // Filters
     const [filters, setFilters] = useState({
@@ -19,11 +20,25 @@ const BookingPage = () => {
         redeemedStatus: "",
     });
 
+    const [voucherDialogOpen, setVoucherDialogOpen] = useState(false);
+    const [voucherForm, setVoucherForm] = useState({
+        name: '',
+        flight_type: '',
+        voucher_type: '',
+        email: '',
+        phone: '',
+        expires: '',
+        redeemed: 'No',
+        paid: '',
+        offer_code: '',
+        voucher_ref: ''
+    });
+
     // Fetch data
     const voucherData = async () => {
         try {
-            await axios.get(`/api/getAllVoucherData`);
-            // setVoucher is not defined or used, so this line is removed
+            const resp = await axios.get(`/api/getAllVoucherData`);
+            setVoucher(resp.data.data || []);
         } catch (err) {
             console.error("Error fetching vouchers:", err);
         }
@@ -46,26 +61,105 @@ const BookingPage = () => {
         }));
     };
 
+    const handleVoucherFormChange = (field, value) => {
+        setVoucherForm((prev) => ({ ...prev, [field]: value }));
+    };
+
+    const handleVoucherCreate = async () => {
+        if (!voucherForm.name || voucherForm.name.trim() === '') {
+            alert('Name alanı zorunludur. Lütfen yolcu adını giriniz.');
+            return;
+        }
+        try {
+            await axios.post('/api/createVoucher', voucherForm);
+            setVoucherDialogOpen(false);
+            voucherData(); // Tabloyu güncelle
+        } catch (err) {
+            alert('Error creating voucher');
+        }
+    };
+
     // Load data on component mount
     useEffect(() => {
         voucherData();
         dateRequestedData();
     }, []);
 
-    // Fetch booking data when filters change
+    // Tab değiştiğinde ilgili veriyi sunucudan çek
     useEffect(() => {
-        (async () => {
-            try {
-                console.log('BookingPage filters:', filters); // Debug log
-                const response = await axios.get(`/api/getAllBookingData`, { params: filters });
-                setBooking(response.data.data || []);
-                setFilteredData(response.data.data || []); // Also update filteredData directly
-            } catch (err) {
-                setBooking([]); // Clear data on error
-                setFilteredData([]);
-            }
-        })();
-    }, [filters]);
+        if (activeTab === "bookings") {
+            (async () => {
+                try {
+                    const response = await axios.get(`/api/getAllBookingData`, { params: filters });
+                    setBooking(response.data.data || []);
+                    setFilteredData(response.data.data || []);
+                } catch (err) {
+                    setBooking([]);
+                    setFilteredData([]);
+                }
+            })();
+        } else if (activeTab === "vouchers") {
+            (async () => {
+                try {
+                    const resp = await axios.get(`/api/getAllVoucherData`);
+                    setVoucher(resp.data.data || []);
+                    setFilteredData((resp.data.data || []).map(item => ({
+                        created: item.created_at || '',
+                        name: item.name || '',
+                        flight_type: item.flight_type || '',
+                        voucher_type: item.voucher_type || '',
+                        email: item.email || '',
+                        phone: item.phone || '',
+                        expires: item.expires || '',
+                        redeemed: item.redeemed || '',
+                        paid: item.paid || '',
+                        offer_code: item.offer_code || '',
+                        voucher_ref: item.voucher_ref || ''
+                    })));
+                } catch (err) {
+                    setVoucher([]);
+                    setFilteredData([]);
+                }
+            })();
+        } else if (activeTab === "dateRequests") {
+            (async () => {
+                try {
+                    const response = await axios.get(`/api/getDateRequestData`);
+                    setDateRequested(response.data.data || []);
+                    setFilteredData((response.data.data || []).map((item) => ({
+                        name: item.name || "",
+                        number: item.number || item.phone || item.mobile || "",
+                        email: item.email || "",
+                        location: item.location || "",
+                        date_requested: item.date_requested || item.requested_date || item.created_at || item.created || "",
+                        voucher_booking_id: item.voucher_code || item.booking_id || item.id || ""
+                    })));
+                } catch (err) {
+                    setDateRequested([]);
+                    setFilteredData([]);
+                }
+            })();
+        }
+    }, [activeTab]);
+
+    // filteredData'yı voucher tablosu için backend key'lerine göre map'le
+    useEffect(() => {
+        if (activeTab === "vouchers") {
+            setFilteredData(voucher.map(item => ({
+                created: item.created_at || '',
+                name: item.name || '',
+                flight_type: item.flight_type || '',
+                voucher_type: item.voucher_type || '',
+                email: item.email || '',
+                phone: item.phone || '',
+                expires: item.expires || '',
+                redeemed: item.redeemed || '',
+                paid: item.paid || '',
+                offer_code: item.offer_code || '',
+                voucher_ref: item.voucher_ref || ''
+            })));
+        }
+    }, [voucher, activeTab]);
 
     // Status filtresini hem Confirmed hem Scheduled için uygula
     useEffect(() => {
@@ -305,12 +399,40 @@ const BookingPage = () => {
                                                 </Select>
                                             </FormControl>
                                         </div>
+                                        <Button variant="contained" color="primary" onClick={() => setVoucherDialogOpen(true)} style={{ marginLeft: 16 }}>
+                                            + Add Voucher
+                                        </Button>
                                     </div>
                                 </div>
                                 <PaginatedTable
                                     data={filteredData}
                                     columns={["created", "name", "flight_type", "voucher_type", "email", "phone", "expires", "redeemed", "paid", "offer_code", "voucher_ref"]}
                                 />
+                                <Dialog open={voucherDialogOpen} onClose={() => setVoucherDialogOpen(false)}>
+                                    <DialogTitle>Add Voucher</DialogTitle>
+                                    <DialogContent>
+                                        <TextField label="Name" value={voucherForm.name} onChange={e => handleVoucherFormChange('name', e.target.value)} fullWidth margin="dense" required />
+                                        <TextField label="Flight Type" value={voucherForm.flight_type} onChange={e => handleVoucherFormChange('flight_type', e.target.value)} select fullWidth margin="dense">
+                                            <MenuItem value="Shared Flight">Shared Flight</MenuItem>
+                                            <MenuItem value="Private Flight">Private Flight</MenuItem>
+                                        </TextField>
+                                        <TextField label="Voucher Type" value={voucherForm.voucher_type} onChange={e => handleVoucherFormChange('voucher_type', e.target.value)} select fullWidth margin="dense">
+                                            <MenuItem value="Flight">Flight Voucher</MenuItem>
+                                            <MenuItem value="Gift">Gift Voucher</MenuItem>
+                                            <MenuItem value="Redeem">Redeem Voucher</MenuItem>
+                                        </TextField>
+                                        <TextField label="Email" value={voucherForm.email} onChange={e => handleVoucherFormChange('email', e.target.value)} fullWidth margin="dense" />
+                                        <TextField label="Phone" value={voucherForm.phone} onChange={e => handleVoucherFormChange('phone', e.target.value)} fullWidth margin="dense" />
+                                        <TextField label="Expires" value={voucherForm.expires} onChange={e => handleVoucherFormChange('expires', e.target.value)} fullWidth margin="dense" />
+                                        <TextField label="Paid" value={voucherForm.paid} onChange={e => handleVoucherFormChange('paid', e.target.value)} fullWidth margin="dense" />
+                                        <TextField label="Offer Code" value={voucherForm.offer_code} onChange={e => handleVoucherFormChange('offer_code', e.target.value)} fullWidth margin="dense" />
+                                        <TextField label="Voucher Ref" value={voucherForm.voucher_ref} onChange={e => handleVoucherFormChange('voucher_ref', e.target.value)} fullWidth margin="dense" />
+                                    </DialogContent>
+                                    <DialogActions>
+                                        <Button onClick={() => setVoucherDialogOpen(false)}>Cancel</Button>
+                                        <Button onClick={handleVoucherCreate} variant="contained" color="primary">Create</Button>
+                                    </DialogActions>
+                                </Dialog>
                             </>
                         )}
                         {activeTab === "dateRequests" && (
