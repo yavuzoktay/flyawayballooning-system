@@ -29,6 +29,10 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10 }) => {
       var final_head;
       if (item === 'created_at' || item === 'created') {
         final_head = 'Created';
+      } else if (item === 'voucher_booking_id') {
+        final_head = 'Voucher/Booking ID';
+      } else if (item === 'date_requested') {
+        final_head = 'Date requested';
       } else {
         final_head = item.replace(/_/g, " ");
         final_head = final_head.charAt(0).toUpperCase() + final_head.slice(1).toLowerCase();
@@ -47,7 +51,6 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10 }) => {
                         {mainHead.map((col, index) => (
                             <th key={index} style={{ padding: "8px" }}>{col}</th>
                         ))}
-                        <th style={{ padding: "8px" }}>Voucher/Booking ID</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -57,13 +60,10 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10 }) => {
                             <tr key={idx}>
                                 {columns.map((col) => (
                                     <td key={col} style={{ textAlign: "center", padding: "8px" }}>
-                                        {(col === 'created_at' || col === 'created' || col === 'flight_date' || col === 'expires') ? formatDate(item[col]) :
+                                        {(col === 'created_at' || col === 'created' || col === 'flight_date' || col === 'expires' || col === 'date_requested') ? formatDate(item[col]) :
                                             col === 'status' && item[col] === 'Confirmed' ? 'Scheduled' : item[col]}
                                     </td>
                                 ))}
-                                <td style={{ textAlign: "center", padding: "8px", fontWeight: 600 }}>
-                                    {item.voucher_code ? item.voucher_code : (item.booking_id || item.id || "-")}
-                                </td>
                             </tr>
                         );
                     })}
