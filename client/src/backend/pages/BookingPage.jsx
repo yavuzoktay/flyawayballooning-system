@@ -316,9 +316,20 @@ const BookingPage = () => {
                         {activeTab === "dateRequests" && (
                             <>
                                 <h3 style={{ fontFamily: "Gilroy Light" }}>Date Requests</h3>
+                                {console.log('DateRequests API data:', dateRequested)}
                                 <PaginatedTable
-                                    data={dateRequested}
-                                    columns={["name", "number", "email", "location", "date_requested"]}
+                                    data={dateRequested.map((item) => {
+                                        console.log('DateRequest item:', item);
+                                        return {
+                                            name: item.name || "",
+                                            number: item.number || item.phone || item.mobile || "",
+                                            email: item.email || "",
+                                            location: item.location || "",
+                                            date_requested: item.date_requested || item.requested_date || item.created_at || item.created || "",
+                                            voucher_booking_id: item.voucher_code || item.booking_id || item.id || ""
+                                        }
+                                    })}
+                                    columns={["name", "number", "email", "location", "date_requested", "voucher_booking_id"]}
                                 />
                             </>
                         )}

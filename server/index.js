@@ -128,10 +128,10 @@ app.get('/api/getAllVoucherData', (req, res) => {
     });
 });
 
-// Get Date Requested Data
+// Get Date Requested Data (from all_booking)
 app.get('/api/getDateRequestData', (req, res) => {
-    var date_request = 'SELECT * FROM date_request';
-    con.query(date_request, (err, result) => {
+    const sql = 'SELECT id, name, location, flight_date AS date_requested, voucher_code FROM all_booking';
+    con.query(sql, (err, result) => {
         if (err) {
             console.error("Error occurred:", err);
             res.status(500).send({ success: false, error: "Database query failed" });
@@ -140,7 +140,7 @@ app.get('/api/getDateRequestData', (req, res) => {
         if (result && result.length > 0) {
             res.send({ success: true, data: result });
         } else {
-            res.send({ success: false, message: "No date requests found" });
+            res.send({ success: false, message: "No bookings found" });
         }
     });
 });
