@@ -13,9 +13,7 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10 }) => {
         const day = String(date.getDate()).padStart(2, '0');
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const year = date.getFullYear();
-        const hour = String(date.getHours()).padStart(2, '0');
-        const min = String(date.getMinutes()).padStart(2, '0');
-        return `${day}/${month}/${year} ${hour}:${min}`;
+        return `${day}/${month}/${year}`;
     };
 
     // Pagination logic
@@ -29,7 +27,7 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10 }) => {
     var mainHead = [];
     columns.forEach((item) => {
       var final_head;
-      if (item === 'created_at') {
+      if (item === 'created_at' || item === 'created') {
         final_head = 'Created';
       } else {
         final_head = item.replace(/_/g, " ");
@@ -59,7 +57,7 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10 }) => {
                             <tr key={idx}>
                                 {columns.map((col) => (
                                     <td key={col} style={{ textAlign: "center", padding: "8px" }}>
-                                        {col === 'created_at' ? formatDate(item[col]) :
+                                        {(col === 'created_at' || col === 'created' || col === 'flight_date' || col === 'expires') ? formatDate(item[col]) :
                                             col === 'status' && item[col] === 'Confirmed' ? 'Scheduled' : item[col]}
                                     </td>
                                 ))}
