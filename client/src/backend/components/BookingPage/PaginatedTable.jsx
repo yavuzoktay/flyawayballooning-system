@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-const PaginatedTable = ({ data, columns, itemsPerPage = 10 }) => {
+const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick }) => {
     const [currentPage, setCurrentPage] = useState(1);
 
     // Function to format date
@@ -60,8 +60,15 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10 }) => {
                             <tr key={idx}>
                                 {columns.map((col) => (
                                     <td key={col} style={{ textAlign: "center", padding: "8px" }}>
-                                        {(col === 'created_at' || col === 'created' || col === 'flight_date' || col === 'expires' || col === 'date_requested') ? formatDate(item[col]) :
-                                            col === 'status' && item[col] === 'Confirmed' ? 'Scheduled' : item[col]}
+                                        {col === 'name' ? (
+                                            <span
+                                                style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer' }}
+                                                onClick={() => onNameClick && onNameClick(item)}
+                                            >
+                                                {item[col]}
+                                            </span>
+                                        ) : ( (col === 'created_at' || col === 'created' || col === 'flight_date' || col === 'expires' || col === 'date_requested') ? formatDate(item[col]) :
+                                            col === 'status' && item[col] === 'Confirmed' ? 'Scheduled' : item[col])}
                                     </td>
                                 ))}
                             </tr>

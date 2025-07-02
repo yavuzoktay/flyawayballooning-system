@@ -104,7 +104,22 @@ app.get("/api/getAllBookingData", (req, res) => {
             return res.status(500).send({ success: false, message: "Database query failed" });
         }
         if (result && result.length > 0) {
-            res.send({ success: true, data: result });
+            // Parse choose_add_on and add chooseAddOnNames array
+            const formatted = result.map(row => {
+                let chooseAddOnNames = [];
+                if (row.choose_add_on) {
+                    try {
+                        const parsed = JSON.parse(row.choose_add_on);
+                        if (Array.isArray(parsed)) {
+                            chooseAddOnNames = parsed.map(addOn => addOn.name).filter(Boolean);
+                        }
+                    } catch (e) {
+                        // ignore parse error
+                    }
+                }
+                return { ...row, chooseAddOnNames };
+            });
+            res.send({ success: true, data: formatted });
         } else {
             res.send({ success: false, message: "No bookings found" });
         }
@@ -305,6 +320,9 @@ app.post('/api/createBooking', (req, res) => {
         flight_attempts // frontend'den geliyorsa, yoksa undefined
     } = req.body;
 
+    // Debug log for chooseAddOn
+    console.log('chooseAddOn received:', chooseAddOn, 'Type:', typeof chooseAddOn);
+
     // Basic validation
     if (!chooseLocation || !chooseFlightType || !passengerData) {
         return res.status(400).json({ success: false, message: 'Missing required booking information.' });
@@ -316,6 +334,7 @@ app.post('/api/createBooking', (req, res) => {
 
     function insertBookingAndPassengers(expiresDateFinal) {
         const nowDate = moment().format('YYYY-MM-DD HH:mm:ss');
+        const mainPassenger = passengerData[0] || {};
         const bookingSql = `
             INSERT INTO all_booking (
                 name,
@@ -328,10 +347,20 @@ app.post('/api/createBooking', (req, res) => {
                 due,
                 voucher_code,
                 created_at,
-                expires
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                expires,
+                additional_notes,
+                hear_about_us,
+                ballooning_reason,
+                prefer,
+                weight,
+                email,
+                phone,
+                choose_add_on
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
+        // Debug log for chooseAddOn and bookingValues
+        console.log('chooseAddOn before insert:', chooseAddOn);
         const bookingValues = [
             passengerName,
             chooseFlightType.type,
@@ -343,8 +372,19 @@ app.post('/api/createBooking', (req, res) => {
             0,
             voucher_code || null,
             nowDate,
-            expiresDateFinal
+            expiresDateFinal,
+            (additionalInfo && additionalInfo.notes) || null,
+            (additionalInfo && additionalInfo.hearAboutUs) || null,
+            (additionalInfo && additionalInfo.reason) || null,
+            (additionalInfo && additionalInfo.prefer && typeof additionalInfo.prefer === 'object' && Object.keys(additionalInfo.prefer).length > 0
+                ? Object.keys(additionalInfo.prefer).filter(k => additionalInfo.prefer[k]).join(', ')
+                : (typeof additionalInfo?.prefer === 'string' && additionalInfo.prefer ? additionalInfo.prefer : null)),
+            mainPassenger.weight || null,
+            mainPassenger.email || null,
+            mainPassenger.phone || null,
+            (chooseAddOn && chooseAddOn.length > 0 ? JSON.stringify(chooseAddOn) : null)
         ];
+        console.log('bookingValues:', bookingValues);
 
         con.query(bookingSql, bookingValues, (err, result) => {
             if (err) {
@@ -356,9 +396,17 @@ app.post('/api/createBooking', (req, res) => {
             const createdAt = nowDate;
 
             function insertPassengers() {
-                const passengerSql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight) VALUES ?';
-                const passengerValues = passengerData.map(p => [bookingId, p.firstName, p.lastName, p.weight]);
-
+                const passengerSql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund) VALUES ?';
+                const passengerValues = passengerData.map(p => [
+                    bookingId,
+                    p.firstName,
+                    p.lastName,
+                    p.weight,
+                    p.email || null,
+                    p.phone || null,
+                    p.ticketType || null,
+                    p.weatherRefund ? 1 : 0
+                ]);
                 con.query(passengerSql, [passengerValues], (err, result) => {
                     if (err) {
                         console.error('Error creating passengers:', err);
@@ -515,6 +563,110 @@ app.post('/api/createVoucher', (req, res) => {
             return res.status(500).json({ success: false, error: 'Database query failed to create voucher' });
         }
         res.status(201).json({ success: true, message: 'Voucher created successfully!', voucherId: result.insertId });
+    });
+});
+
+// Get Booking Detail (all info for popup)
+app.get('/api/getBookingDetail', async (req, res) => {
+    const booking_id = req.query.booking_id;
+    if (!booking_id) {
+        return res.status(400).json({ success: false, message: 'booking_id is required' });
+    }
+    try {
+        // 1. Booking ana bilgileri
+        const [bookingRows] = await new Promise((resolve, reject) => {
+            con.query('SELECT * FROM all_booking WHERE id = ?', [booking_id], (err, rows) => {
+                if (err) reject(err);
+                else resolve([rows]);
+            });
+        });
+        if (!bookingRows || bookingRows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Booking not found' });
+        }
+        const booking = bookingRows[0];
+
+        // 2. Passenger bilgileri
+        const [passengerRows] = await new Promise((resolve, reject) => {
+            con.query('SELECT * FROM passenger WHERE booking_id = ?', [booking_id], (err, rows) => {
+                if (err) reject(err);
+                else resolve([rows]);
+            });
+        });
+
+        // 3. Notes (admin_notes)
+        const [notesRows] = await new Promise((resolve, reject) => {
+            con.query('SELECT * FROM admin_notes WHERE booking_id = ?', [booking_id], (err, rows) => {
+                if (err) reject(err);
+                else resolve([rows]);
+            });
+        });
+
+        // 4. Add On (varsayım: all_booking tablosunda veya ayrı bir tablo varsa ekle)
+        // Şimdilik booking tablosunda chooseAddOn alanı varsa onu döndür
+        // 5. Additional Info (varsayım: all_booking tablosunda veya ayrı bir tablo varsa ekle)
+        // Şimdilik booking tablosunda additionalInfo alanı varsa onu döndür
+
+        res.json({
+            success: true,
+            booking,
+            passengers: passengerRows,
+            notes: notesRows,
+            // addOn: booking.chooseAddOn || null, // Eğer varsa
+            // additional: booking.additionalInfo || null // Eğer varsa
+        });
+    } catch (err) {
+        console.error('Error fetching booking detail:', err);
+        res.status(500).json({ success: false, message: 'Database error', error: err.message });
+    }
+});
+
+// Add Passenger (Guest) to booking
+app.post('/api/addPassenger', (req, res) => {
+    const { booking_id, first_name, last_name, email, phone, ticket_type } = req.body;
+    if (!booking_id || !first_name || !last_name) {
+        return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+    // passenger tablosunda email, phone, ticket_type yoksa sadece temel alanları ekle
+    const sql = 'INSERT INTO passenger (booking_id, first_name, last_name) VALUES (?, ?, ?)';
+    const values = [booking_id, first_name, last_name];
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error adding passenger:', err);
+            return res.status(500).json({ success: false, message: 'Database error' });
+        }
+        res.status(201).json({ success: true, passengerId: result.insertId });
+    });
+});
+
+// Update Booking Status (manual_status_override)
+app.post('/api/updateBookingStatus', (req, res) => {
+    const { booking_id, manual_status_override } = req.body;
+    if (typeof booking_id === 'undefined' || typeof manual_status_override === 'undefined') {
+        return res.status(400).json({ success: false, message: 'booking_id and manual_status_override are required' });
+    }
+    const sql = 'UPDATE all_booking SET manual_status_override = ? WHERE id = ?';
+    con.query(sql, [manual_status_override, booking_id], (err, result) => {
+        if (err) {
+            console.error('Error updating booking status:', err);
+            return res.status(500).json({ success: false, message: 'Database error' });
+        }
+        res.json({ success: true, message: 'Booking status updated' });
+    });
+});
+
+app.patch('/api/updateBookingField', (req, res) => {
+    const { booking_id, field, value } = req.body;
+    const allowedFields = ['name', 'phone', 'email'];
+    if (!booking_id || !field || !allowedFields.includes(field)) {
+        return res.status(400).json({ success: false, message: 'Invalid request' });
+    }
+    const sql = `UPDATE all_booking SET ${field} = ? WHERE id = ?`;
+    con.query(sql, [value, booking_id], (err, result) => {
+        if (err) {
+            console.error('Error updating booking field:', err);
+            return res.status(500).json({ success: false, message: 'Database error' });
+        }
+        res.json({ success: true });
     });
 });
 
