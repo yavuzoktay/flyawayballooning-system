@@ -670,6 +670,215 @@ app.patch('/api/updateBookingField', (req, res) => {
     });
 });
 
+// Analytics endpoint
+app.get('/api/analytics', async (req, res) => {
+    const { start_date, end_date } = req.query;
+    // Helper for date filter
+    const dateFilter = (field = 'flight_date') => {
+        let sql = '';
+        if (start_date) sql += ` AND ${field} >= '${start_date}'`;
+        if (end_date) sql += ` AND ${field} <= '${end_date}'`;
+        return sql;
+    };
+    // 1. Booking Attempts
+    const attemptsSql = `
+        SELECT flight_attempts
+        FROM all_booking
+        WHERE flight_date IS NOT NULL
+        AND status IN ('Flown', 'Confirmed', 'Scheduled')
+        ${dateFilter()}
+    `;
+    con.query(attemptsSql, [], (err, rows) => {
+        if (err) return res.status(500).json({ error: 'Failed to fetch booking attempts' });
+        const total = rows.length;
+        let first=0, second=0, third=0, fourth=0, fifth=0, sixthPlus=0;
+        rows.forEach(r => {
+            // Fallback: if flight_attempts is undefined/null, treat as 1
+            const att = Number((r.flight_attempts !== undefined && r.flight_attempts !== null) ? r.flight_attempts : 1);
+            if (att === 1) first++;
+            else if (att === 2) second++;
+            else if (att === 3) third++;
+            else if (att === 4) fourth++;
+            else if (att === 5) fifth++;
+            else sixthPlus++;
+        });
+        const pct = n => total ? Math.round((n/total)*100) : 0;
+        const bookingAttempts = {
+            first: pct(first),
+            second: pct(second),
+            third: pct(third),
+            fourth: pct(fourth),
+            fifth: pct(fifth),
+            sixthPlus: pct(sixthPlus)
+        };
+        // 2. Sales by Source
+        const sourceSql = `
+            SELECT hear_about_us, COUNT(*) as count
+            FROM all_booking
+            WHERE flight_date IS NOT NULL
+            AND status IN ('Flown', 'Confirmed', 'Scheduled')
+            ${dateFilter()}
+            GROUP BY hear_about_us
+        `;
+        con.query(sourceSql, [], (err2, srcRows) => {
+            if (err2) return res.status(500).json({ error: 'Failed to fetch sales by source' });
+            const totalSrc = srcRows.reduce((sum, r) => sum + r.count, 0);
+            const salesBySource = srcRows.map(r => ({
+                source: r.hear_about_us || 'Other',
+                percent: totalSrc ? Math.round((r.count/totalSrc)*100) : 0
+            }));
+            // 3. Non Redemption (expired, not flown or not redeemed)
+            const nonRedemptionSql = `
+                SELECT COUNT(*) as total, SUM(CASE WHEN status = 'Expired' THEN 1 ELSE 0 END) as expired
+                FROM all_booking
+                WHERE 1=1 ${dateFilter('expires')}
+            `;
+            con.query(nonRedemptionSql, [], (err3, nonRows) => {
+                if (err3) return res.status(500).json({ error: 'Failed to fetch non redemption' });
+                const total = nonRows[0]?.total || 0;
+                const expired = nonRows[0]?.expired || 0;
+                const nonRedemption = {
+                    value: expired,
+                    percent: total ? Math.round((expired/total)*100) : 0
+                };
+                // 4. Add Ons (sum revenue by add on name)
+                const addOnSql = `
+                    SELECT choose_add_on
+                    FROM all_booking
+                    WHERE choose_add_on IS NOT NULL AND choose_add_on != '' ${dateFilter()}
+                `;
+                con.query(addOnSql, [], (err4, addOnRows) => {
+                    if (err4) return res.status(500).json({ error: 'Failed to fetch add ons' });
+                    const addOnMap = {};
+                    addOnRows.forEach(row => {
+                        try {
+                            if (!row.choose_add_on || typeof row.choose_add_on !== 'string' || row.choose_add_on.trim() === '') return;
+                            const arr = JSON.parse(row.choose_add_on);
+                            if (Array.isArray(arr)) {
+                                arr.forEach(a => {
+                                    if (!a.name || !a.price) return;
+                                    if (!addOnMap[a.name]) addOnMap[a.name] = 0;
+                                    addOnMap[a.name] += Number(a.price);
+                                });
+                            }
+                        } catch (e) { console.error('AddOn JSON parse error:', e); }
+                    });
+                    const addOns = Object.entries(addOnMap).map(([name, value]) => ({ name, value: Math.round(value) }));
+                    // 5. Sales by Location
+                    const locSql = `
+                        SELECT location, COUNT(*) as count
+                        FROM all_booking
+                        WHERE flight_date IS NOT NULL AND status IN ('Flown', 'Confirmed', 'Scheduled') ${dateFilter()}
+                        GROUP BY location
+                    `;
+                    con.query(locSql, [], (err5, locRows) => {
+                        if (err5) return res.status(500).json({ error: 'Failed to fetch sales by location' });
+                        const totalLoc = locRows.reduce((sum, r) => sum + r.count, 0);
+                        const salesByLocation = locRows.map(r => ({
+                            location: r.location || 'Other',
+                            percent: totalLoc ? Math.round((r.count/totalLoc)*100) : 0
+                        }));
+                        // 6. Sales by Booking Type
+                        const typeSql = `
+                            SELECT flight_type, COUNT(*) as count
+                            FROM all_booking
+                            WHERE flight_date IS NOT NULL AND status IN ('Flown', 'Confirmed', 'Scheduled') ${dateFilter()}
+                            GROUP BY flight_type
+                        `;
+                        con.query(typeSql, [], (err6, typeRows) => {
+                            if (err6) return res.status(500).json({ error: 'Failed to fetch sales by booking type' });
+                            const totalType = typeRows.reduce((sum, r) => sum + r.count, 0);
+                            const salesByBookingType = typeRows.map(r => ({
+                                type: r.flight_type || 'Other',
+                                percent: totalType ? Math.round((r.count/totalType)*100) : 0
+                            }));
+                            // 7. Liability by Location
+                            const liabilityLocSql = `
+                                SELECT location, SUM(paid) as value
+                                FROM all_booking
+                                WHERE paid IS NOT NULL AND paid > 0 ${dateFilter()}
+                                GROUP BY location
+                            `;
+                            con.query(liabilityLocSql, [], (err7, liabLocRows) => {
+                                if (err7) return res.status(500).json({ error: 'Failed to fetch liability by location' });
+                                const liabilityByLocation = liabLocRows.map(r => ({
+                                    location: r.location || 'Other',
+                                    value: Math.round(r.value || 0)
+                                }));
+                                // 8. Liability by Flight Type
+                                const liabilityTypeSql = `
+                                    SELECT flight_type, SUM(paid) as value
+                                    FROM all_booking
+                                    WHERE paid IS NOT NULL AND paid > 0 ${dateFilter()}
+                                    GROUP BY flight_type
+                                `;
+                                con.query(liabilityTypeSql, [], (err8, liabTypeRows) => {
+                                    if (err8) return res.status(500).json({ error: 'Failed to fetch liability by flight type' });
+                                    const liabilityByFlightType = liabTypeRows.map(r => ({
+                                        type: r.flight_type || 'Other',
+                                        value: Math.round(r.value || 0)
+                                    }));
+                                    // 9. Refundable Liability (paid for WX Refundable, not expired)
+                                    const refundableSql = `
+                                        SELECT choose_add_on, paid, status
+                                        FROM all_booking
+                                        WHERE paid IS NOT NULL AND paid > 0 AND status != 'Expired' ${dateFilter()}
+                                    `;
+                                    con.query(refundableSql, [], (err9, refRows) => {
+                                        if (err9) return res.status(500).json({ error: 'Failed to fetch refundable liability' });
+                                        let refundableLiability = 0;
+                                        refRows.forEach(row => {
+                                            try {
+                                                if (!row.choose_add_on || typeof row.choose_add_on !== 'string' || row.choose_add_on.trim() === '') return;
+                                                const arr = JSON.parse(row.choose_add_on);
+                                                if (Array.isArray(arr)) {
+                                                    arr.forEach(a => {
+                                                        if (a.name && a.name.toLowerCase().includes('wx')) {
+                                                            refundableLiability += Number(row.paid) - (Number(a.price) || 47.5);
+                                                        }
+                                                    });
+                                                }
+                                            } catch (e) { console.error('Refundable JSON parse error:', e); }
+                                        });
+                                        // 10. Flown Flights by Location
+                                        const flownSql = `
+                                            SELECT location, COUNT(*) as count
+                                            FROM all_booking
+                                            WHERE status = 'Flown' ${dateFilter()}
+                                            GROUP BY location
+                                        `;
+                                        con.query(flownSql, [], (err10, flownRows) => {
+                                            if (err10) return res.status(500).json({ error: 'Failed to fetch flown flights by location' });
+                                            const flownFlightsByLocation = flownRows.map(r => ({
+                                                location: r.location || 'Other',
+                                                count: r.count
+                                            }));
+                                            // Return all real analytics
+                                            res.json({
+                                                bookingAttempts,
+                                                salesBySource,
+                                                nonRedemption,
+                                                addOns,
+                                                salesByLocation,
+                                                salesByBookingType,
+                                                liabilityByLocation,
+                                                liabilityByFlightType,
+                                                refundableLiability: Math.round(refundableLiability),
+                                                flownFlightsByLocation
+                                            });
+                                        });
+                                    });
+                                });
+                            });
+                        });
+                    });
+                });
+            });
+        });
+    });
+});
+
+// Place this at the very end, after all API endpoints:
 app.use(express.static(path.join(__dirname, '../client/build')));
 app.get('*', (req, res) => {
     if (req.path.startsWith("/api/")) {

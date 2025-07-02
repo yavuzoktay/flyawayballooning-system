@@ -2,9 +2,11 @@ import { Container } from "@mui/material";
 import React, { useEffect, useState } from "react";
 import DateRangeSelector from "../components/Home/DateRangeSelector";
 import axios from 'axios';
+import AnalyticsDashboard from '../components/Home/AnalyticsDashboard';
 
 const Index = () => {
     const [bookingData, setBookingData] = useState([]);
+    const [dateRange, setDateRange] = useState({ start: null, end: null });
 
     function getAllBookingData() {
         axios
@@ -30,7 +32,8 @@ const Index = () => {
                     <hr />
                 </div>
                 <div className="home-body-wrap">
-                    <DateRangeSelector bookingData={bookingData} />
+                    <DateRangeSelector bookingData={bookingData} onDateRangeChange={setDateRange} />
+                    <AnalyticsDashboard dateRange={dateRange} />
                 </div>
             </Container>
         </div>
