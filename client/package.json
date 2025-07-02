@@ -21,6 +21,7 @@
     "react-pro-sidebar": "^1.1.0",
     "react-router-dom": "^7.1.1",
     "react-scripts": "5.0.1",
+    "sisteransi": "^1.0.5",
     "web-vitals": "^4.2.4",
     "yup": "^1.6.1"
   },
@@ -30,7 +31,7 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
-  "proxy": "http://localhost:3002",
+  "proxy": "http://localhost:3000",
   "eslintConfig": {
     "extends": [
       "react-app",
