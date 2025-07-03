@@ -33,9 +33,9 @@ jobs:
             CI=false npm run build
           fi
       
-      - name: Create deployment package (server + client/build)
+      - name: Create deployment package (server + client)
         run: |
-          zip -r backend-deploy.zip server client/build
+          zip -r backend-deploy.zip server client
       
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
