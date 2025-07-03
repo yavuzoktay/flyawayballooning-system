@@ -160,7 +160,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
 
 // Get Date Requested Data (from all_booking)
 app.get('/api/getDateRequestData', (req, res) => {
-    const sql = 'SELECT id, name, location, flight_date AS date_requested, voucher_code FROM all_booking';
+    const sql = 'SELECT id, name, location, flight_date AS date_requested, voucher_code, phone, email FROM all_booking';
     con.query(sql, (err, result) => {
         if (err) {
             console.error("Error occurred:", err);

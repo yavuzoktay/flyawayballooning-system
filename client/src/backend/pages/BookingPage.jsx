@@ -152,11 +152,12 @@ const BookingPage = () => {
                     setDateRequested(response.data.data || []);
                     setFilteredData((response.data.data || []).map((item) => ({
                         name: item.name || "",
-                        number: item.number || item.phone || item.mobile || "",
-                        email: item.email || "",
+                        number: item.number || item.phone || item.mobile || item.booking_phone || "",
+                        email: item.email || item.booking_email || item.contact_email || "",
                         location: item.location || "",
                         date_requested: item.date_requested || item.requested_date || item.created_at || item.created || "",
-                        voucher_booking_id: item.voucher_code || item.booking_id || item.id || ""
+                        voucher_booking_id: item.voucher_code || item.booking_id || item.id || "",
+                        id: item.id || item.voucher_code || item.booking_id || item.voucher_booking_id || ""
                     })));
                 } catch (err) {
                     setDateRequested([]);
@@ -188,18 +189,35 @@ const BookingPage = () => {
     // Status filtresini hem Confirmed hem Scheduled için uygula
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
+        let filtered = booking;
         if (filters.status) {
-            setFilteredData(
-                booking.filter((item) => {
-                    if (filters.status === 'Scheduled') {
-                        return item.status === 'Scheduled' || item.status === 'Confirmed';
-                    }
-                    return item.status === filters.status;
-                })
-            );
-        } else {
-            setFilteredData(booking);
+            filtered = filtered.filter((item) => {
+                if (filters.status === 'Scheduled') {
+                    return item.status === 'Scheduled' || item.status === 'Confirmed';
+                }
+                return item.status === filters.status;
+            });
         }
+        if (filters.flightType) {
+            filtered = filtered.filter((item) => item.flight_type === filters.flightType);
+        }
+        if (filters.location) {
+            filtered = filtered.filter((item) => item.location === filters.location);
+        }
+        // Search filter: Name, Booking ID, Telephone, Email, Voucher Code
+        if (filters.search && filters.search.trim() !== "") {
+            const searchLower = filters.search.trim().toLowerCase();
+            filtered = filtered.filter((item) => {
+                return (
+                    (item.name && item.name.toLowerCase().includes(searchLower)) ||
+                    (item.id && String(item.id).toLowerCase().includes(searchLower)) ||
+                    (item.phone && item.phone.toLowerCase().includes(searchLower)) ||
+                    (item.email && item.email.toLowerCase().includes(searchLower)) ||
+                    (item.voucher_code && item.voucher_code.toLowerCase().includes(searchLower))
+                );
+            });
+        }
+        setFilteredData(filtered);
     }, [filters, booking]);
 
     // Name tıklanınca detayları çek
@@ -297,6 +315,10 @@ const BookingPage = () => {
             // Tabloyu anında güncelle
             setBooking(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, [editField]: editValue } : b));
             setFilteredData(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, [editField]: editValue } : b));
+            // Eğer aktif tab dateRequests ise, dateRequestedData ile tabloyu güncelle
+            if (activeTab === 'dateRequests') {
+                await dateRequestedData();
+            }
             setEditField(null);
             setEditValue('');
         } catch (err) {
@@ -322,6 +344,16 @@ const BookingPage = () => {
             alert('Note eklenemedi');
         } finally {
             setAddingNote(false);
+        }
+    };
+
+    // Date Requests için isim tıklanınca detayları çek
+    const handleDateRequestNameClick = (item) => {
+        // booking_id veya voucher_booking_id veya id'den birini kullan
+        const bookingId = item.voucher_booking_id || item.id || item.booking_id;
+        if (bookingId) {
+            setSelectedBookingId(bookingId);
+            setDetailDialogOpen(true);
         }
     };
 
@@ -587,33 +619,31 @@ const BookingPage = () => {
                         {activeTab === "dateRequests" && (
                             <>
                                 <h3 style={{ fontFamily: "Gilroy Light" }}>Date Requests</h3>
-                                {console.log('DateRequests API data:', dateRequested)}
                                 <PaginatedTable
-                                    data={dateRequested.map((item) => {
-                                        console.log('DateRequest item:', item);
-                                        return {
-                                            name: item.name || "",
-                                            number: item.number || item.phone || item.mobile || "",
-                                            email: item.email || "",
-                                            location: item.location || "",
-                                            date_requested: item.date_requested || item.requested_date || item.created_at || item.created || "",
-                                            voucher_booking_id: item.voucher_code || item.booking_id || item.id || ""
-                                        }
-                                    })}
+                                    data={dateRequested.map((item) => ({
+                                        name: item.name || "",
+                                        number: item.number || item.phone || item.mobile || item.booking_phone || "",
+                                        email: item.email || item.booking_email || item.contact_email || "",
+                                        location: item.location || "",
+                                        date_requested: item.date_requested || item.requested_date || item.created_at || item.created || "",
+                                        voucher_booking_id: item.voucher_code || item.booking_id || item.id || "",
+                                        id: item.id || item.voucher_code || item.booking_id || item.voucher_booking_id || ""
+                                    }))}
                                     columns={["name", "number", "email", "location", "date_requested", "voucher_booking_id"]}
+                                    onNameClick={handleDateRequestNameClick}
                                 />
                             </>
                         )}
                     </div>
                 </div>
-                <Dialog open={detailDialogOpen} onClose={() => setDetailDialogOpen(false)} maxWidth="md" fullWidth>
+                <Dialog open={detailDialogOpen} onClose={() => { setDetailDialogOpen(false); setSelectedBookingId(null); }} maxWidth="md" fullWidth>
                     <DialogTitle style={{ background: '#2d4263', color: '#fff', fontWeight: 700, fontSize: 22 }}>Booking Details</DialogTitle>
                     <DialogContent style={{ background: '#f7f7f7', minHeight: 500 }}>
                         {loadingDetail ? (
                             <Typography>Loading...</Typography>
                         ) : detailError ? (
                             <Typography color="error">{detailError}</Typography>
-                        ) : bookingDetail && bookingDetail.success ? (
+                        ) : (bookingDetail && bookingDetail.success) ? (
                             <Box>
                                 <Grid container spacing={2}>
                                     {/* Personal Details */}
@@ -664,7 +694,7 @@ const BookingPage = () => {
                                         {/* Additional */}
                                         <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
                                             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Additional</Typography>
-                                            <Typography><b>Booking Notes:</b> -</Typography>
+                                            <Typography><b>Booking Notes:</b> {bookingDetail.booking.additional_notes || '-'}</Typography>
                                         </Box>
                                         {/* Add On */}
                                         <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
@@ -741,7 +771,7 @@ const BookingPage = () => {
                         ) : null}
                     </DialogContent>
                     <DialogActions sx={{ background: '#f7f7f7' }}>
-                        <Button onClick={() => setDetailDialogOpen(false)} color="primary" variant="contained">Close</Button>
+                        <Button onClick={() => { setDetailDialogOpen(false); setSelectedBookingId(null); }} color="primary" variant="contained">Close</Button>
                     </DialogActions>
                 </Dialog>
                 <Dialog open={addGuestDialogOpen} onClose={() => setAddGuestDialogOpen(false)} maxWidth="sm" fullWidth>
