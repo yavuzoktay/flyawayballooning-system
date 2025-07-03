@@ -56,6 +56,7 @@ jobs:
             mkdir -p ~/flyawayballooning-system-backend &&
             cd ~/flyawayballooning-system-backend &&
             aws s3 cp s3://flyawayballooning-backend/backend-deploy.zip . &&
+            rm -rf client/build && \
             unzip -o backend-deploy.zip -d . &&
             cd server && npm install &&
             sudo npm install -g pm2 &&
