@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-const DateRangeSelector = ({ bookingData }) => {
+const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
     const [summary, setSummary] = useState({});
@@ -14,14 +14,32 @@ const DateRangeSelector = ({ bookingData }) => {
     const filterData = (start, end) => {
         setStartDate(start);
         setEndDate(end);
+        if (onDateRangeChange) {
+            onDateRangeChange({ start, end });
+        }
         const startDateObj = new Date(start);
         const endDateObj = new Date(end);
 
         // Filter the data based on the date range
         const filtered = bookingData.filter((item) => {
-            const createdDate = new Date(item.created.split("-").reverse().join("-"));
-
-            // Check if the created date is within the specified range
+            // Güvenli şekilde tarih alanı seç
+            let dateStr = item.created || item.created_at || null;
+            if (!dateStr) return false;
+            // Tarih formatı: dd-mm-yyyy veya yyyy-mm-dd olabilir, otomatik algıla
+            let createdDate;
+            if (dateStr.includes("-")) {
+                const parts = dateStr.split("-");
+                if (parts[0].length === 4) {
+                    // yyyy-mm-dd
+                    createdDate = new Date(dateStr);
+                } else {
+                    // dd-mm-yyyy
+                    createdDate = new Date(parts.reverse().join("-"));
+                }
+            } else {
+                createdDate = new Date(dateStr);
+            }
+            if (isNaN(createdDate.getTime())) return false;
             return createdDate >= startDateObj && createdDate <= endDateObj;
         });
 
@@ -33,17 +51,41 @@ const DateRangeSelector = ({ bookingData }) => {
         allTime: () => {
             setStartDate("");
             setEndDate("");
+            if (onDateRangeChange) {
+                onDateRangeChange({ start: null, end: null });
+            }
             calculateSummary(bookingData);
         },
         last12Months: () => {
             const today = new Date();
-            const lastYear = new Date(today.setFullYear(today.getFullYear() - 1));
-            filterData(lastYear.toISOString().split("T")[0], new Date().toISOString().split("T")[0]);
+            const lastYear = new Date(today);
+            lastYear.setFullYear(today.getFullYear() - 1);
+            const start = lastYear.toISOString().split("T")[0];
+            const end = new Date().toISOString().split("T")[0];
+            setStartDate(start);
+            setEndDate(end);
+            filterData(start, end);
         },
-        quarter1: () => filterData("2025-01-01", "2025-03-31"), // Updated to 'yyyy-mm-dd'
-        quarter2: () => filterData("2025-04-01", "2025-06-30"), // Updated to 'yyyy-mm-dd'
-        quarter3: () => filterData("2025-07-01", "2025-09-30"), // Updated to 'yyyy-mm-dd'
-        quarter4: () => filterData("2025-10-01", "2025-12-31"), // Updated to 'yyyy-mm-dd'
+        quarter1: () => {
+            setStartDate("2025-01-01");
+            setEndDate("2025-03-31");
+            filterData("2025-01-01", "2025-03-31");
+        },
+        quarter2: () => {
+            setStartDate("2025-04-01");
+            setEndDate("2025-06-30");
+            filterData("2025-04-01", "2025-06-30");
+        },
+        quarter3: () => {
+            setStartDate("2025-07-01");
+            setEndDate("2025-09-30");
+            filterData("2025-07-01", "2025-09-30");
+        },
+        quarter4: () => {
+            setStartDate("2025-10-01");
+            setEndDate("2025-12-31");
+            filterData("2025-10-01", "2025-12-31");
+        },
     };
 
     // Add All Values Result
