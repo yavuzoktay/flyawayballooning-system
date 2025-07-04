@@ -191,6 +191,7 @@ const ActivityList = ({ activity }) => {
                             <TableCell>Status</TableCell>
                             <TableCell>Action</TableCell>
                             <TableCell>Availabilities</TableCell>
+                            <TableCell>Resources</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -204,6 +205,9 @@ const ActivityList = ({ activity }) => {
                                         <TableCell><Link to="#" className="edit-activity" onClick={() => openEditModal(item.id)}><EditNoteIcon /></Link></TableCell>
                                         <TableCell>
                                             <EditIcon style={{ cursor: 'pointer' }} onClick={() => handleOpenAvailModal(item)} />
+                                        </TableCell>
+                                        <TableCell>
+                                            <EditIcon style={{ cursor: 'pointer' }} onClick={() => alert(`Resources for activity: ${item.activity_name}`)} />
                                         </TableCell>
                                     </TableRow>
                                 )

@@ -418,6 +418,34 @@ app.post('/api/createBooking', (req, res) => {
             const bookingId = result.insertId;
             const createdAt = nowDate;
 
+            // --- Availability güncelleme ---
+            // selectedDate ve selectedTime ile availability güncellenir
+            if (selectedDate && chooseFlightType && chooseFlightType.passengerCount && chooseLocation) {
+                // selectedTime frontend'den gelmiyorsa, selectedDate'in saat kısmı kullanılabilir
+                let bookingDate = moment(selectedDate).format('YYYY-MM-DD');
+                let bookingTime = null;
+                if (typeof selectedDate === 'string' && selectedDate.includes('T')) {
+                    // ISO string ise saat kısmını al
+                    bookingTime = moment(selectedDate).format('HH:mm');
+                } else if (selectedDate instanceof Date) {
+                    bookingTime = moment(selectedDate).format('HH:mm');
+                } else if (typeof selectedDate === 'string' && selectedDate.length === 10) {
+                    // Sadece tarih geliyorsa, saat zorunlu değil
+                    bookingTime = null;
+                }
+                if (bookingTime) {
+                    // Sadece saat ve tarih ile güncelle
+                    const updateAvailSql = `UPDATE activity_availability SET available = available - ? WHERE date = ? AND time = ? AND activity_id = (SELECT id FROM activity WHERE location = ? AND status = 'Live' LIMIT 1) AND available >= ?`;
+                    con.query(updateAvailSql, [chooseFlightType.passengerCount, bookingDate, bookingTime, chooseLocation, chooseFlightType.passengerCount], (err2, result2) => {
+                        if (err2) {
+                            console.error('Error updating availability:', err2);
+                            // Hata olsa bile booking devam etsin
+                        }
+                    });
+                }
+            }
+            // --- Availability güncelleme sonu ---
+
             function insertPassengers() {
                 const passengerSql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund) VALUES ?';
                 const passengerValues = passengerData.map(p => [
