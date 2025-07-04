@@ -6,10 +6,12 @@ const path = require("path");
 const fs = require("fs");
 const moment = require('moment');
 const multer = require('multer');
+const dotenv = require('dotenv');
+dotenv.config();
 
 // Enable CORS
 app.use(cors({
-    origin: '*', // Ensure this matches your frontend domain
+    origin: process.env.FRONTEND_URL || '*', // Environment'a göre frontend domaini
     methods: "GET,POST,PUT,DELETE",
     credentials: true
 }));
