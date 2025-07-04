@@ -5,16 +5,16 @@ import useActivity from "../api/useActivity";
 import SpecificActivityPage from "../components/SpecificActivityPage/SpecificActivityPage";
 
 const SpecificActivity = () => {
-    const param = useParams();
+    const { name, location, type } = useParams();
     const {activity, loading: activityLoading} = useActivity();
     const [activityData, setActivityData] = useState(null);
 
     useEffect(() => {
         if(!activityLoading){
-            const data = activity.filter((item) => item.activity_sku === param?.id);
+            const data = activity.filter((item) => item.activity_name === name && item.location === location && item.flight_type === type);
             setActivityData(data);
         }
-    }, [activity, activityLoading, param?.id]);
+    }, [activity, activityLoading, name, location, type]);
      
     return (
         <div className="specific-activity-page-wrap">

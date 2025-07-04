@@ -5,6 +5,7 @@ const app = express();
 const path = require("path");
 const fs = require("fs");
 const moment = require('moment');
+const multer = require('multer');
 
 // Enable CORS
 app.use(cors({
@@ -26,6 +27,21 @@ const con = mysql.createPool({
     queueLimit: 0,
     multipleStatements: true
 });
+
+// Multer storage config for activities
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, path.join(__dirname, 'uploads/activities'));
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + '-' + file.originalname.replace(/\s+/g, '_'));
+    }
+});
+const upload = multer({ storage });
+
+// Statik olarak uploads klasörünü sun
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // API routes
 app.get('/api/example', (req, res) => {
@@ -104,21 +120,11 @@ app.get("/api/getAllBookingData", (req, res) => {
             return res.status(500).send({ success: false, message: "Database query failed" });
         }
         if (result && result.length > 0) {
-            // Parse choose_add_on and add chooseAddOnNames array
-            const formatted = result.map(row => {
-                let chooseAddOnNames = [];
-                if (row.choose_add_on) {
-                    try {
-                        const parsed = JSON.parse(row.choose_add_on);
-                        if (Array.isArray(parsed)) {
-                            chooseAddOnNames = parsed.map(addOn => addOn.name).filter(Boolean);
-                        }
-                    } catch (e) {
-                        // ignore parse error
-                    }
-                }
-                return { ...row, chooseAddOnNames };
-            });
+            // choose_add_on'u doğrudan string olarak döndür
+            const formatted = result.map(row => ({
+                ...row,
+                choose_add_on: row.choose_add_on || ''
+            }));
             res.send({ success: true, data: formatted });
         } else {
             res.send({ success: false, message: "No bookings found" });
@@ -291,26 +297,27 @@ app.post("/api/addSpecificSlot", (req, res) => {
 
 // Edit Save Activity Data
 app.post("/api/updateActivityData", (req, res) => {
-    var update_data = req.body;
-    var seats = update_data?.seats;
-    var location = update_data?.location;
-    var timing_slot = update_data?.slot;
-    var sku = update_data?.activityId;
-    var updateActivityData = 'UPDATE activity SET timing_slot="' + timing_slot + '", seats="' + seats + '", location="' + location + '" WHERE activity_sku="' + sku + '"';
-    con.query(updateActivityData, (err, resp) => {
-        if (resp) {
-            res.send({ data: resp });
+    const { activity_name, location, flight_type, status } = req.body;
+    if (!activity_name || !location || !flight_type) {
+        return res.status(400).json({ success: false, message: "Eksik bilgi!" });
+    }
+    const sql = 'UPDATE activity SET status = ? WHERE activity_name = ? AND location = ? AND flight_type = ?';
+    con.query(sql, [status, activity_name, location, flight_type], (err, resp) => {
+        if (err) {
+            return res.status(500).json({ success: false, message: "Database error" });
         }
+        res.json({ success: true, data: resp });
     });
 });
 
 // Add this new endpoint to handle booking creation
 app.post('/api/createBooking', (req, res) => {
-    const {
+    let {
         activitySelect,
         chooseLocation,
         chooseFlightType,
-        chooseAddOn,
+        chooseAddOn, // legacy or frontend field
+        choose_add_on, // preferred field
         passengerData,
         additionalInfo,
         recipientDetails,
@@ -320,8 +327,19 @@ app.post('/api/createBooking', (req, res) => {
         flight_attempts // frontend'den geliyorsa, yoksa undefined
     } = req.body;
 
-    // Debug log for chooseAddOn
-    console.log('chooseAddOn received:', chooseAddOn, 'Type:', typeof chooseAddOn);
+    // Unify add-on field: always use choose_add_on as array of {name, price}
+    if (!choose_add_on && chooseAddOn) {
+        choose_add_on = chooseAddOn;
+    }
+    if (!Array.isArray(choose_add_on)) {
+        choose_add_on = [];
+    } else {
+        // Ensure each add-on has name and price
+        choose_add_on = choose_add_on.filter(a => a && a.name);
+    }
+
+    // Debug log for choose_add_on
+    console.log('choose_add_on received:', choose_add_on, 'Type:', typeof choose_add_on);
 
     // Basic validation
     if (!chooseLocation || !chooseFlightType || !passengerData) {
@@ -359,8 +377,13 @@ app.post('/api/createBooking', (req, res) => {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
-        // Debug log for chooseAddOn and bookingValues
-        console.log('chooseAddOn before insert:', chooseAddOn);
+        // Debug log for choose_add_on and bookingValues
+        let choose_add_on_str = '';
+        if (Array.isArray(choose_add_on) && choose_add_on.length > 0) {
+            choose_add_on_str = choose_add_on.map(a => a && a.name ? a.name : '').filter(Boolean).join(', ');
+        }
+        console.log('DEBUG choose_add_on:', choose_add_on);
+        console.log('DEBUG choose_add_on_str:', choose_add_on_str);
         const bookingValues = [
             passengerName,
             chooseFlightType.type,
@@ -382,7 +405,7 @@ app.post('/api/createBooking', (req, res) => {
             mainPassenger.weight || null,
             mainPassenger.email || null,
             mainPassenger.phone || null,
-            (chooseAddOn && chooseAddOn.length > 0 ? JSON.stringify(chooseAddOn) : null)
+            choose_add_on_str
         ];
         console.log('bookingValues:', bookingValues);
 
@@ -878,6 +901,180 @@ app.get('/api/analytics', async (req, res) => {
     });
 });
 
+// Create Activity endpoint (with image upload)
+app.post("/api/createActivity", upload.single('image'), (req, res) => {
+    const { activity_name, price, capacity, start_date, end_date, event_time, location, flight_type, status } = req.body;
+    let image = null;
+    if (req.file) {
+        // Sunucuya göre path'i düzelt
+        image = `/uploads/activities/${req.file.filename}`;
+    }
+    if (!activity_name || !price || !capacity || !start_date || !end_date || !event_time || !location || !flight_type || !status) {
+        return res.status(400).json({ success: false, message: "Eksik bilgi!" });
+    }
+    const sql = `
+        INSERT INTO activity (activity_name, price, capacity, start_date, end_date, event_time, location, flight_type, status, image)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    con.query(sql, [activity_name, price, capacity, start_date, end_date, event_time, location, flight_type, status, image], (err, result) => {
+        if (err) {
+            return res.status(500).json({ success: false, message: "Database error" });
+        }
+        res.json({ success: true, data: result });
+    });
+});
+
+// Get single activity by id
+app.get("/api/activity/:id", (req, res) => {
+    const { id } = req.params;
+    con.query("SELECT * FROM activity WHERE id = ?", [id], (err, result) => {
+        if (err) return res.status(500).json({ success: false, message: "Database error" });
+        if (!result || result.length === 0) return res.status(404).json({ success: false, message: "Not found" });
+        res.json({ success: true, data: result[0] });
+    });
+});
+
+// Update activity by id (with image upload)
+app.put("/api/activity/:id", upload.single('image'), (req, res) => {
+    const { id } = req.params;
+    const { activity_name, price, capacity, start_date, end_date, event_time, location, flight_type, status } = req.body;
+    let image = null;
+    if (req.file) {
+        image = `/uploads/activities/${req.file.filename}`;
+    }
+    // Eğer yeni fotoğraf yoksa, mevcut image değerini koru
+    const getImageSql = "SELECT image FROM activity WHERE id = ?";
+    con.query(getImageSql, [id], (err, result) => {
+        if (err) return res.status(500).json({ success: false, message: "Database error" });
+        const currentImage = result && result[0] ? result[0].image : null;
+        const finalImage = image || currentImage;
+        const sql = `
+            UPDATE activity SET activity_name=?, price=?, capacity=?, start_date=?, end_date=?, event_time=?, location=?, flight_type=?, status=?, image=?
+            WHERE id=?
+        `;
+        con.query(sql, [activity_name, price, capacity, start_date, end_date, event_time, location, flight_type, status, finalImage, id], (err, result) => {
+            if (err) return res.status(500).json({ success: false, message: "Database error" });
+            res.json({ success: true, data: result });
+        });
+    });
+});
+
+// Get unique live locations from activity table (with image)
+app.get('/api/activeLocations', (req, res) => {
+    const sql = `
+        SELECT a.id, a.location, a.image
+        FROM activity a
+        INNER JOIN (
+            SELECT MIN(id) as min_id
+            FROM activity
+            WHERE status = 'Live'
+            GROUP BY location
+        ) b ON a.id = b.min_id
+    `;
+    con.query(sql, (err, result) => {
+        if (err) return res.status(500).json({ success: false, message: "Database error" });
+        res.json({ success: true, data: result });
+    });
+});
+
+// Create Availabilities for an activity
+app.post('/api/activity/:id/availabilities', (req, res) => {
+    const { id } = req.params;
+    let availabilities = req.body.availabilities;
+    if (!Array.isArray(availabilities)) {
+        availabilities = [req.body];
+    }
+    if (!id || !availabilities.length) {
+        return res.status(400).json({ success: false, message: 'Eksik bilgi!' });
+    }
+    const values = availabilities.map(a => [
+        id,
+        a.schedule || null,
+        a.date,
+        a.day_of_week,
+        a.time,
+        a.capacity,
+        a.available,
+        a.status,
+        a.channels || 'All'
+    ]);
+    const sql = `
+        INSERT INTO activity_availability
+        (activity_id, schedule, date, day_of_week, time, capacity, available, status, channels)
+        VALUES ?
+    `;
+    con.query(sql, [values], (err, result) => {
+        if (err) {
+            return res.status(500).json({ success: false, message: 'Database error', error: err });
+        }
+        res.json({ success: true, data: result });
+    });
+});
+
+// Get Availabilities for an activity
+app.get('/api/activity/:id/availabilities', (req, res) => {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ success: false, message: 'Eksik bilgi!' });
+    // Tüm availabilities'i döndür
+    const sql = 'SELECT * FROM activity_availability WHERE activity_id = ? ORDER BY date, time';
+    con.query(sql, [id], (err, result) => {
+        if (err) return res.status(500).json({ success: false, message: 'Database error', error: err });
+        res.json({ success: true, data: result });
+    });
+});
+
+// Get all activities (id, activity_name)
+app.get('/api/activities', (req, res) => {
+    const sql = 'SELECT id, activity_name FROM activity ORDER BY activity_name';
+    con.query(sql, (err, result) => {
+        if (err) return res.status(500).json({ success: false, message: 'Database error', error: err });
+        res.json({ success: true, data: result });
+    });
+});
+
+// Update a single availability (only date)
+app.put('/api/availability/:id', (req, res) => {
+    const { id } = req.params;
+    const { date } = req.body;
+    if (!id || !date) return res.status(400).json({ success: false, message: 'Eksik bilgi!' });
+    const sql = 'UPDATE activity_availability SET date = ? WHERE id = ?';
+    con.query(sql, [date, id], (err, result) => {
+        if (err) return res.status(500).json({ success: false, message: 'Database error', error: err });
+        res.json({ success: true, data: result });
+    });
+});
+
+// Delete a single availability
+app.delete('/api/availability/:id', (req, res) => {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ success: false, message: 'Eksik bilgi!' });
+    const sql = 'DELETE FROM activity_availability WHERE id = ?';
+    con.query(sql, [id], (err, result) => {
+        if (err) return res.status(500).json({ success: false, message: 'Database error', error: err });
+        res.json({ success: true, data: result });
+    });
+});
+
+// Get activity open availabilities
+app.get('/api/activity/:id/open-availabilities', (req, res) => {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ success: false, message: 'Eksik bilgi!' });
+    // Sadece status = 'Open' olanları al
+    const sql = 'SELECT date, time FROM activity_availability WHERE activity_id = ? AND status = "Open" ORDER BY date, time';
+    con.query(sql, [id], (err, result) => {
+        if (err) return res.status(500).json({ success: false, message: 'Database error', error: err });
+        // Gün ve saatleri grupla
+        const grouped = {};
+        result.forEach(row => {
+            if (!grouped[row.date]) grouped[row.date] = [];
+            grouped[row.date].push(row.time);
+        });
+        // { date: '2025-07-03', times: ['09:00', '18:00'] } formatına çevir
+        const data = Object.entries(grouped).map(([date, times]) => ({ date, times }));
+        res.json({ success: true, data });
+    });
+});
+
 // Place this at the very end, after all API endpoints:
 app.use(express.static(path.join(__dirname, '../client/build')));
 app.get('*', (req, res) => {
@@ -891,4 +1088,28 @@ app.get('*', (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
+});
+
+app.post("/api/getActivityId", (req, res) => {
+    const { location } = req.body;
+    if (!location) {
+        return res.status(400).json({ success: false, message: "Eksik bilgi!" });
+    }
+    const sql = 'SELECT * FROM activity WHERE location = ? AND status = "Live"';
+    con.query(sql, [location], (err, activities) => {
+        if (err) return res.status(500).json({ success: false, message: "Database error" });
+        if (!activities || activities.length === 0) return res.status(404).json({ success: false, message: "No activities found" });
+        const activity = activities[0];
+        // Şimdi availability'leri çek
+        const availSql = 'SELECT id, DATE_FORMAT(date, "%Y-%m-%d") as date, time, capacity, available, status FROM activity_availability WHERE activity_id = ? AND status = "Open" AND date >= CURDATE() ORDER BY date, time';
+        con.query(availSql, [activity.id], (err2, availabilities) => {
+            if (err2) return res.status(500).json({ success: false, message: "Database error (availability)" });
+            // date alanını DD/MM/YYYY formatına çevir
+            const formattedAvail = availabilities.map(a => ({
+                ...a,
+                date: moment(a.date, "YYYY-MM-DD").format("DD/MM/YYYY")
+            }));
+            res.json({ success: true, activity, availabilities: formattedAvail });
+        });
+    });
 });

@@ -8,6 +8,9 @@ import Manifest from './backend/pages/Manifest';
 import Profile from './backend/pages/Profile';
 import Activity from './backend/pages/Activity';
 import SpecificActivity from './backend/pages/SpecificActivity';
+import ActivityAvailabilitiesPage from './backend/components/ActivityPage/ActivityAvailabilitiesPage';
+
+const Settings = () => <div style={{ padding: 40, textAlign: 'center' }}><h2>Settings page coming soon.</h2></div>;
 
 function App() {
   return (
@@ -21,6 +24,8 @@ function App() {
                 <Route path="/profile/:booking_id/:email" element={<Profile />} />
                 <Route path="/activity" element={<Activity />} />
                 <Route path="/specificActivity/:id" element={<SpecificActivity />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/activity/:id/availabilities" element={<ActivityAvailabilitiesPage />} />
             </Route>
           </Routes>
       </BrowserRouter>
