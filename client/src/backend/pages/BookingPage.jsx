@@ -374,6 +374,39 @@ const BookingPage = () => {
         "expires"
     ]);
 
+    // CSV export fonksiyonu
+    function handleExportCSV() {
+        if (!filteredData.length) {
+            alert('Export edilecek veri yok!');
+            return;
+        }
+        // Tüm kolonları otomatik al
+        const columns = Object.keys(filteredData[0]);
+        const csvRows = [columns.join(",")];
+        filteredData.forEach(row => {
+            const values = columns.map(col => {
+                let val = row[col];
+                if (val === null || val === undefined) return '';
+                val = String(val).replace(/"/g, '""');
+                if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+                    val = `"${val}"`;
+                }
+                return val;
+            });
+            csvRows.push(values.join(","));
+        });
+        const csvString = csvRows.join("\n");
+        const blob = new Blob([csvString], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = activeTab === 'vouchers' ? 'vouchers_export.csv' : 'bookings_export.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    }
+
     return (
         <div className="booking-page-wrap">
             <Container maxWidth="xl">
@@ -434,7 +467,10 @@ const BookingPage = () => {
                                     <div className="booking-filter-heading">
                                         <h3 style={{ fontFamily: "Gilroy Light" }}>All Bookings2</h3>
                                     </div>
-                                    <div className="booking-search-booking">
+                                    <div className="booking-search-booking" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <Button variant="outlined" color="primary" onClick={handleExportCSV} style={{ height: 40 }}>
+                                            Export
+                                        </Button>
                                         <OutlinedInput placeholder="Search here" value={filters.search}
                                             onChange={(e) => handleFilterChange("search", e.target.value)} />
                                     </div>
@@ -524,7 +560,10 @@ const BookingPage = () => {
                                     <div className="booking-filter-heading">
                                         <h3 style={{ fontFamily: "Gilroy Light" }}>All Vouchers</h3>
                                     </div>
-                                    <div className="booking-search-booking">
+                                    <div className="booking-search-booking" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <Button variant="outlined" color="primary" onClick={handleExportCSV} style={{ height: 40 }}>
+                                            Export
+                                        </Button>
                                         <OutlinedInput placeholder="Search here" value={filters.search}
                                             onChange={(e) => handleFilterChange("search", e.target.value)} />
                                     </div>
@@ -580,40 +619,12 @@ const BookingPage = () => {
                                                 </Select>
                                             </FormControl>
                                         </div>
-                                        <Button variant="contained" color="primary" onClick={() => setVoucherDialogOpen(true)} style={{ marginLeft: 16 }}>
-                                            + Add Voucher
-                                        </Button>
                                     </div>
                                 </div>
                                 <PaginatedTable
                                     data={filteredData}
                                     columns={["created", "name", "flight_type", "voucher_type", "email", "phone", "expires", "redeemed", "paid", "offer_code", "voucher_ref"]}
                                 />
-                                <Dialog open={voucherDialogOpen} onClose={() => setVoucherDialogOpen(false)}>
-                                    <DialogTitle>Add Voucher</DialogTitle>
-                                    <DialogContent>
-                                        <TextField label="Name" value={voucherForm.name} onChange={e => handleVoucherFormChange('name', e.target.value)} fullWidth margin="dense" required />
-                                        <TextField label="Flight Type" value={voucherForm.flight_type} onChange={e => handleVoucherFormChange('flight_type', e.target.value)} select fullWidth margin="dense">
-                                            <MenuItem value="Shared Flight">Shared Flight</MenuItem>
-                                            <MenuItem value="Private Flight">Private Flight</MenuItem>
-                                        </TextField>
-                                        <TextField label="Voucher Type" value={voucherForm.voucher_type} onChange={e => handleVoucherFormChange('voucher_type', e.target.value)} select fullWidth margin="dense">
-                                            <MenuItem value="Flight">Flight Voucher</MenuItem>
-                                            <MenuItem value="Gift">Gift Voucher</MenuItem>
-                                            <MenuItem value="Redeem">Redeem Voucher</MenuItem>
-                                        </TextField>
-                                        <TextField label="Email" value={voucherForm.email} onChange={e => handleVoucherFormChange('email', e.target.value)} fullWidth margin="dense" />
-                                        <TextField label="Phone" value={voucherForm.phone} onChange={e => handleVoucherFormChange('phone', e.target.value)} fullWidth margin="dense" />
-                                        <TextField label="Expires" value={voucherForm.expires} onChange={e => handleVoucherFormChange('expires', e.target.value)} fullWidth margin="dense" />
-                                        <TextField label="Paid" value={voucherForm.paid} onChange={e => handleVoucherFormChange('paid', e.target.value)} fullWidth margin="dense" />
-                                        <TextField label="Offer Code" value={voucherForm.offer_code} onChange={e => handleVoucherFormChange('offer_code', e.target.value)} fullWidth margin="dense" />
-                                        <TextField label="Voucher Ref" value={voucherForm.voucher_ref} onChange={e => handleVoucherFormChange('voucher_ref', e.target.value)} fullWidth margin="dense" />
-                                    </DialogContent>
-                                    <DialogActions>
-                                        <Button onClick={() => setVoucherDialogOpen(false)}>Cancel</Button>
-                                        <Button onClick={handleVoucherCreate} variant="contained" color="primary">Create</Button>
-                                    </DialogActions>
-                                </Dialog>
                             </>
                         )}
                         {activeTab === "dateRequests" && (
