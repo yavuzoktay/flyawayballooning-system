@@ -711,9 +711,10 @@ const BookingPage = () => {
                                         <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
                                             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Add On's</Typography>
                                             <Typography><b>Fab Cap:</b> N/A</Typography>
-                                            <Typography><b>WX Refundable:</b> N/A</Typography>
-                                            <Typography><b>Marketing:</b> N/A</Typography>
-                                            <Typography><b>Reason for Ballooning:</b> N/A</Typography>
+                                            <Typography><b>WX Refundable:</b> {bookingDetail.passengers && bookingDetail.passengers.some(p => p.weather_refund === 1) ? 'Yes' : 'No'}</Typography>
+                                            <Typography><b>Marketing:</b> {bookingDetail.booking.hear_about_us || 'N/A'}</Typography>
+                                            <Typography><b>Reason for Ballooning:</b> {bookingDetail.booking.ballooning_reason || 'N/A'}</Typography>
+                                            <Button variant="outlined" color="primary" style={{ marginTop: 8 }} onClick={() => alert('Add Add On clicked!')}>Add Add On</Button>
                                         </Box>
                                     </Grid>
                                     {/* Main Details */}
