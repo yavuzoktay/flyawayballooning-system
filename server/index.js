@@ -1143,3 +1143,20 @@ app.post("/api/getActivityId", (req, res) => {
         });
     });
 });
+
+// Delete an activity and its availabilities
+app.delete('/api/activity/:id', (req, res) => {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ success: false, message: 'Eksik bilgi!' });
+    // Önce ilişkili availabilities silinsin
+    const deleteAvailSql = 'DELETE FROM activity_availability WHERE activity_id = ?';
+    con.query(deleteAvailSql, [id], (err) => {
+        if (err) return res.status(500).json({ success: false, message: 'Database error (availabilities)' });
+        // Sonra activity silinsin
+        const deleteActivitySql = 'DELETE FROM activity WHERE id = ?';
+        con.query(deleteActivitySql, [id], (err2) => {
+            if (err2) return res.status(500).json({ success: false, message: 'Database error (activity)' });
+            res.json({ success: true });
+        });
+    });
+});

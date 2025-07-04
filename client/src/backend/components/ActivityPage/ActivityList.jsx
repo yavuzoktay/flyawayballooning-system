@@ -12,6 +12,7 @@ import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
 import dayjs from 'dayjs';
 import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 const ActivityList = ({ activity }) => {
     const [open, setOpen] = useState(false);
@@ -144,6 +145,24 @@ const ActivityList = ({ activity }) => {
         }
         setEditSaving(false);
     };
+    const handleDeleteActivity = async () => {
+        if (!window.confirm('Are you sure you want to delete this activity? This action cannot be undone.')) return;
+        setEditSaving(true);
+        setEditError('');
+        try {
+            const res = await fetch(`/api/activity/${editId}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) {
+                setEditOpen(false);
+                window.location.reload();
+            } else {
+                setEditError(data.message || 'Error deleting activity');
+            }
+        } catch (err) {
+            setEditError('Error deleting activity');
+        }
+        setEditSaving(false);
+    };
     const handleOpenAvailModal = (activity) => {
         navigate(`/activity/${activity.id}/availabilities`);
     };
@@ -240,6 +259,9 @@ const ActivityList = ({ activity }) => {
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setEditOpen(false)} disabled={editSaving}>Cancel</Button>
+                    <Button onClick={handleDeleteActivity} color="error" startIcon={<DeleteIcon />} disabled={editSaving} style={{marginRight: 'auto'}}>
+                        Delete
+                    </Button>
                     <Button onClick={handleEditSave} variant="contained" color="primary" disabled={editSaving}>Save</Button>
                 </DialogActions>
             </Dialog>
