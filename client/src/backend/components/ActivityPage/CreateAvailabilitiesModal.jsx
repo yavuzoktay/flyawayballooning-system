@@ -34,6 +34,8 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
     const [repeatTime, setRepeatTime] = useState('hour');
     const [visibility, setVisibility] = useState('open');
     const [name, setName] = useState('Weekdays 9am - 5pm');
+    const [capacity, setCapacity] = useState(20);
+    const [available, setAvailable] = useState(20);
 
     useEffect(() => {
         if (open) {
@@ -53,8 +55,8 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
             date: startDate,
             day_of_week: dayOfWeek,
             time: startTime,
-            capacity: 20, // örnek sabit, ileride formdan alınabilir
-            available: 20, // örnek sabit
+            capacity: Number(capacity),
+            available: Number(available),
             status: visibility === 'open' ? 'Open' : 'Closed',
             channels: 'All',
         };
@@ -153,6 +155,24 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
                             onChange={e => setEndTime(e.target.value)}
                             InputLabelProps={{ shrink: true }}
                             fullWidth
+                        />
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                        <TextField
+                            label="Capacity"
+                            type="number"
+                            value={capacity}
+                            onChange={e => setCapacity(e.target.value)}
+                            fullWidth
+                            margin="dense"
+                        />
+                        <TextField
+                            label="Available"
+                            type="number"
+                            value={available}
+                            onChange={e => setAvailable(e.target.value)}
+                            fullWidth
+                            margin="dense"
                         />
                     </Box>
                     <FormControl fullWidth margin="dense">
