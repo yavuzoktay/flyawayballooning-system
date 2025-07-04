@@ -30,7 +30,7 @@ jobs:
           if [ -d "client" ]; then
             cd client
             npm install
-            npm run build
+            CI=false npm run build
           fi
       
       - name: Create deployment package (server + client/build)
