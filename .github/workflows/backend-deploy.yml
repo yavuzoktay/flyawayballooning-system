@@ -1,4 +1,4 @@
-name: Deploy Backend and Client to S3 and EC2 
+name: Deploy Backend and Client to S3 and EC2
 
 on:
   push:
@@ -30,12 +30,12 @@ jobs:
           if [ -d "client" ]; then
             cd client
             npm install
-            CI=false npm run build
+            npm run build
           fi
       
-      - name: Create deployment package (server + client)
+      - name: Create deployment package (server + client/build)
         run: |
-          zip -r backend-deploy.zip server client
+          zip -r backend-deploy.zip server client/build
       
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -56,9 +56,13 @@ jobs:
             mkdir -p ~/flyawayballooning-system-backend &&
             cd ~/flyawayballooning-system-backend &&
             aws s3 cp s3://flyawayballooning-backend/backend-deploy.zip . &&
-            rm -rf client/build && \
             unzip -o backend-deploy.zip -d . &&
+            if [ -d "client/build" ]; then
+              rm -rf server/public
+              mkdir -p server/public
+              cp -r client/build/* server/public/
+            fi
             cd server && npm install &&
-            sudo npm install -g pm2 &&
+            if ! command -v pm2 > /dev/null; then sudo npm install -g pm2; fi &&
             pm2 restart flyaway-backend || pm2 start index.js --name flyaway-backend
           ' 
