@@ -64,5 +64,5 @@ jobs:
             fi
             cd server && npm install &&
             if ! command -v pm2 > /dev/null; then sudo npm install -g pm2; fi &&
-            pm2 restart flyaway-backend || pm2 start index.js --name flyaway-backend
+            pm2 restart flyaway-backend || PORT=3002 pm2 start index.js --name flyaway-backend
           ' 
