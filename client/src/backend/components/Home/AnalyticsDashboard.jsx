@@ -2,13 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { Box, Grid, Card, CardContent, Typography } from '@mui/material';
 import axios from 'axios';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL;
+
+
 const AnalyticsDashboard = ({ dateRange }) => {
     const [analytics, setAnalytics] = useState(null);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         setLoading(true);
-        axios.get('http://localhost:3000/api/analytics', {
+        axios.get(`${API_BASE_URL}/api/analytics`, {
             params: {
                 start_date: dateRange.start,
                 end_date: dateRange.end
