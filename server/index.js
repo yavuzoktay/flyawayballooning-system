@@ -23,7 +23,7 @@ const con = mysql.createPool({
     host: "trip-booking-database.c9mqyasow9hg.us-east-1.rds.amazonaws.com",
     user: "admin",
     password: "qumton-jeghuz-doKxy3",
-    database: "trip_booking",
+    database: "",
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
