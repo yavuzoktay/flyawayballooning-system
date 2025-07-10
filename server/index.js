@@ -71,7 +71,7 @@ app.delete('/delete-test', (req, res) => {
 
 // Filtered Bookings Data
 app.get("/api/getfilteredBookings", (req, res) => {
-    var booking_data = "SELECT * FROM all_booking";
+    var booking_data = "SELECT * FROM all_booking ORDER BY created_at DESC";
     con.query(booking_data, (err, result) => {
         if (err) {
             console.error("Error occurred:", err);
@@ -79,7 +79,13 @@ app.get("/api/getfilteredBookings", (req, res) => {
             return;
         }
         if (result.length > 0) {
-            res.send({ success: true, data: result });
+            const formatted = result.map(row => ({
+                ...row,
+                created_at: row.created_at ? moment(row.created_at).format('YYYY-MM-DD') : '',
+                created_at_display: row.created_at ? moment(row.created_at).format('DD/MM/YYYY') : '',
+                choose_add_on: row.choose_add_on || ''
+            }));
+            res.send({ success: true, data: formatted });
         } else {
             res.send({ success: false, message: "No bookings found" });
         }
@@ -88,7 +94,7 @@ app.get("/api/getfilteredBookings", (req, res) => {
 
 // Get All Booking Data
 app.get("/api/getAllBookingData", (req, res) => {
-    const { flightType, location, search } = req.query;
+    const { flightType, location, search, status } = req.query;
 
     let sql = "SELECT * FROM all_booking";
     const values = [];
@@ -102,29 +108,76 @@ app.get("/api/getAllBookingData", (req, res) => {
         whereClauses.push("location = ?");
         values.push(location);
     }
+    if (status) {
+        if (status === 'Scheduled') {
+            whereClauses.push("(status = 'Scheduled' OR status = 'Confirmed')");
+        } else {
+            whereClauses.push("status = ?");
+            values.push(status);
+        }
+    }
     if (search) {
-        // Arama için name, id, voucher_code
-        whereClauses.push(`(
-            name LIKE ? OR
-            id LIKE ? OR
-            voucher_code LIKE ?
-        )`);
-        const likeSearch = `%${search}%`;
-        values.push(likeSearch, likeSearch, likeSearch);
+        console.log('Search term:', search);
+        
+        // Eğer DD/MM/YYYY formatındaysa, DATE() sorgularını da ekle
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(search)) {
+            const [d, m, y] = search.split('/');
+            const dateSearch = `${y}-${m}-${d}`;
+            console.log('Converted date:', dateSearch);
+            
+            whereClauses.push(`(
+                name LIKE ? OR
+                id LIKE ? OR
+                voucher_code LIKE ? OR
+                created_at LIKE ? OR
+                DATE_FORMAT(created_at, '%d/%m/%Y') LIKE ? OR
+                DATE(created_at) = ? OR
+                DATE(CONVERT_TZ(created_at, '+00:00', '+03:00')) = ?
+            )`);
+            const likeSearch = `%${search}%`;
+            values.push(likeSearch, likeSearch, likeSearch, likeSearch, likeSearch, dateSearch, dateSearch);
+        } else {
+            // Sadece LIKE aramaları yap, DATE() fonksiyonlarını kullanma
+            whereClauses.push(`(
+                name LIKE ? OR
+                id LIKE ? OR
+                voucher_code LIKE ? OR
+                created_at LIKE ? OR
+                DATE_FORMAT(created_at, '%d/%m/%Y') LIKE ?
+            )`);
+            const likeSearch = `%${search}%`;
+            values.push(likeSearch, likeSearch, likeSearch, likeSearch, likeSearch);
+        }
+        
+        console.log('SQL values:', values);
     }
     if (whereClauses.length > 0) {
         sql += " WHERE " + whereClauses.join(" AND ");
     }
+    sql += " ORDER BY created_at DESC";
+    
+    console.log('Final SQL:', sql);
+    console.log('Final values:', values);
 
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error("Error fetching booking data:", err);
             return res.status(500).send({ success: false, message: "Database query failed" });
         }
+        
+        // Debug: İlk birkaç kaydın created_at değerlerini göster
+        if (result && result.length > 0) {
+            console.log('Sample created_at values:');
+            result.slice(0, 3).forEach((row, index) => {
+                console.log(`Row ${index + 1}:`, row.created_at);
+            });
+        }
         if (result && result.length > 0) {
             // choose_add_on'u doğrudan string olarak döndür
             const formatted = result.map(row => ({
                 ...row,
+                created_at: row.created_at ? moment(row.created_at).format('YYYY-MM-DD') : '',
+                created_at_display: row.created_at ? moment(row.created_at).format('DD/MM/YYYY') : '',
                 choose_add_on: row.choose_add_on || ''
             }));
             res.send({ success: true, data: formatted });
@@ -136,7 +189,7 @@ app.get("/api/getAllBookingData", (req, res) => {
 
 // Get All Voucher Data
 app.get('/api/getAllVoucherData', (req, res) => {
-    var voucher = "SELECT * FROM all_vouchers";
+    var voucher = "SELECT * FROM all_vouchers ORDER BY created_at DESC";
     con.query(voucher, (err, result) => {
         if (err) {
             console.error("Error occurred:", err);
@@ -162,6 +215,23 @@ app.get('/api/getAllVoucherData', (req, res) => {
             res.send({ success: true, data: formatted });
         } else {
             res.send({ success: false, message: "No bookings found" });
+        }
+    });
+});
+
+// Get All Voucher Data (alternate)
+app.get('/api/getAllVoucher', (req, res) => {
+    var date_request = 'SELECT * FROM all_vouchers ORDER BY created_at DESC';
+    con.query(date_request, (err, result) => {
+        if (err) {
+            console.error("Error occurred:", err);
+            res.status(500).send({ success: false, error: "Database query failed" });
+            return;
+        }
+        if (result && result.length > 0) {
+            res.send({ success: true, data: result });
+        } else {
+            res.send({ success: false, message: "No vouchers found" });
         }
     });
 });
