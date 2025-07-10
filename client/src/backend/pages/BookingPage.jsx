@@ -116,7 +116,7 @@ const BookingPage = () => {
         dateRequestedData();
     }, []);
 
-    // Tab değiştiğinde ilgili veriyi sunucudan çek
+    // Tab değiştiğinde veya filters değiştiğinde ilgili veriyi sunucudan çek
     useEffect(() => {
         if (activeTab === "bookings") {
             (async () => {
@@ -172,7 +172,7 @@ const BookingPage = () => {
                 }
             })();
         }
-    }, [activeTab]);
+    }, [activeTab, filters]);
 
     // filteredData'yı voucher tablosu için backend key'lerine göre map'le
     useEffect(() => {
@@ -193,39 +193,7 @@ const BookingPage = () => {
         }
     }, [voucher, activeTab]);
 
-    // Status filtresini hem Confirmed hem Scheduled için uygula
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    useEffect(() => {
-        let filtered = booking;
-        if (filters.status) {
-            filtered = filtered.filter((item) => {
-                if (filters.status === 'Scheduled') {
-                    return item.status === 'Scheduled' || item.status === 'Confirmed';
-                }
-                return item.status === filters.status;
-            });
-        }
-        if (filters.flightType) {
-            filtered = filtered.filter((item) => item.flight_type === filters.flightType);
-        }
-        if (filters.location) {
-            filtered = filtered.filter((item) => item.location === filters.location);
-        }
-        // Search filter: Name, Booking ID, Telephone, Email, Voucher Code
-        if (filters.search && filters.search.trim() !== "") {
-            const searchLower = filters.search.trim().toLowerCase();
-            filtered = filtered.filter((item) => {
-                return (
-                    (item.name && item.name.toLowerCase().includes(searchLower)) ||
-                    (item.id && String(item.id).toLowerCase().includes(searchLower)) ||
-                    (item.phone && item.phone.toLowerCase().includes(searchLower)) ||
-                    (item.email && item.email.toLowerCase().includes(searchLower)) ||
-                    (item.voucher_code && item.voucher_code.toLowerCase().includes(searchLower))
-                );
-            });
-        }
-        setFilteredData(filtered);
-    }, [filters, booking]);
+    // Client-side filtering kaldırıldı çünkü artık backend'de yapılıyor
 
     // Name tıklanınca detayları çek
     const handleNameClick = (item) => {
