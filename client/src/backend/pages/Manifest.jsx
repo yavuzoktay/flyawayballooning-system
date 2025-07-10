@@ -18,6 +18,7 @@ import {
     TableRow,
     Paper,
     Container,
+    Select,
 } from "@mui/material";
 import { MoreVert as MoreVertIcon, Edit as EditIcon } from "@mui/icons-material";
 import useBooking from "../api/useBooking";
@@ -30,6 +31,8 @@ import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
 import Button from "@mui/material/Button";
 import dayjs from 'dayjs';
+import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 
 const Manifest = () => {
@@ -186,7 +189,7 @@ const Manifest = () => {
 
     useEffect(() => {
         if (guestCount > 0) {
-            setGuestForms(Array.from({ length: guestCount }, (_, i) => ({ firstName: '', lastName: '', email: '', phone: '', ticketType: guestType })));
+            setGuestForms(Array.from({ length: guestCount }, (_, i) => ({ firstName: '', lastName: '', email: '', phone: '', ticketType: guestType, weight: '' })));
         } else {
             setGuestForms([]);
         }
@@ -205,7 +208,8 @@ const Manifest = () => {
                 last_name: g.lastName,
                 email: g.email,
                 phone: g.phone,
-                ticket_type: g.ticketType
+                ticket_type: g.ticketType,
+                weight: g.weight
             });
         }
         setAddGuestDialogOpen(false);
@@ -244,24 +248,28 @@ const Manifest = () => {
                 field: editField,
                 value: editValue
             });
-            await fetchBookingDetail(bookingDetail.booking.id);
+            if (editField === 'weight' && bookingDetail.passengers && bookingDetail.passengers.length > 0) {
+                // Local state güncelle
+                setBookingDetail(prev => ({
+                    ...prev,
+                    passengers: prev.passengers.map((p, i) => i === 0 ? { ...p, weight: editValue } : p)
+                }));
+                // flights state'ini de güncelle
+                setFlights(prevFlights => prevFlights.map(f => {
+                    if (f.id === bookingDetail.booking.id && Array.isArray(f.passengers) && f.passengers.length > 0) {
+                        return {
+                            ...f,
+                            passengers: f.passengers.map((p, i) => i === 0 ? { ...p, weight: editValue } : p)
+                        };
+                    }
+                    return f;
+                }));
+            } else {
+                await fetchBookingDetail(bookingDetail.booking.id);
+            }
             if (typeof bookingHook.refetch === 'function') {
                 await bookingHook.refetch();
             }
-            // Update flights state directly for instant UI update
-            setFlights(prevFlights => prevFlights.map(f => {
-                if (f.id === bookingDetail.booking.id) {
-                    let updated = { ...f, [editField]: editValue };
-                    // If editing name, also update the first passenger's name in passengers array for instant table update
-                    if (editField === 'name' && Array.isArray(updated.passengers) && updated.passengers.length > 0) {
-                        const [firstName, ...rest] = editValue.split(' ');
-                        const lastName = rest.join(' ');
-                        updated.passengers = updated.passengers.map((p, idx) => idx === 0 ? { ...p, first_name: firstName, last_name: lastName } : p);
-                    }
-                    return updated;
-                }
-                return f;
-            }));
             setEditField(null);
             setEditValue('');
         } catch (err) {
@@ -412,7 +420,28 @@ const Manifest = () => {
                                                                 })()}
                                                             </TableCell>
                                                             <TableCell>{flight.additional_notes || ''}</TableCell>
-                                                            <TableCell>{(flight.status === 'Confirmed' ? 'Scheduled' : flight.status) || ''}</TableCell>
+                                                            <TableCell>
+                                                                <Select
+                                                                    value={flight.status || 'Scheduled'}
+                                                                    onChange={async (e) => {
+                                                                        const newStatus = e.target.value;
+                                                                        await axios.patch('/api/updateBookingField', {
+                                                                            booking_id: flight.id,
+                                                                            field: 'status',
+                                                                            value: newStatus
+                                                                        });
+                                                                        setFlights(prev => prev.map(f => f.id === flight.id ? { ...f, status: newStatus } : f));
+                                                                    }}
+                                                                    size="small"
+                                                                    variant="standard"
+                                                                    sx={{ minWidth: 120 }}
+                                                                >
+                                                                    <MenuItem value="Scheduled">Scheduled</MenuItem>
+                                                                    <MenuItem value="Checked In">Checked In</MenuItem>
+                                                                    <MenuItem value="Flown">Flown</MenuItem>
+                                                                    <MenuItem value="No Show">No Show</MenuItem>
+                                                                </Select>
+                                                            </TableCell>
                                                         </TableRow>
                                                     ))}
                                                 </TableBody>
@@ -484,8 +513,36 @@ const Manifest = () => {
                                             </>
                                         )}</Typography>
                                         <Typography><b>Flight Attempts:</b> -</Typography>
-                                        <Typography><b>Expires:</b> {bookingDetail.booking.expires ? dayjs(bookingDetail.booking.expires).format('DD/MM/YYYY') : '-'}</Typography>
+                                        <Typography><b>Expires:</b> {editField === 'expires' ? (
+  <LocalizationProvider dateAdapter={AdapterDayjs}>
+    <DatePicker
+      value={editValue ? dayjs(editValue) : null}
+      onChange={date => setEditValue(date ? date.format('YYYY-MM-DD') : '')}
+      format="DD/MM/YYYY"
+      slotProps={{ textField: { size: 'small' } }}
+    />
+    <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+    <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+  </LocalizationProvider>
+) : (
+  <>
+    {bookingDetail.booking.expires ? dayjs(bookingDetail.booking.expires).format('DD/MM/YYYY') : '-'}
+    <IconButton size="small" onClick={() => handleEditClick('expires', bookingDetail.booking.expires)}><EditIcon fontSize="small" /></IconButton>
+  </>
+)}</Typography>
                                         <Typography><b>Paid:</b> £{bookingDetail.booking.paid}</Typography>
+                                        <Typography><b>Weight:</b> {editField === 'weight' ? (
+  <>
+    <input value={editValue} onChange={e => setEditValue(e.target.value)} style={{marginRight: 8}} />
+    <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+    <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+  </>
+) : (
+  <>
+    {bookingDetail.passengers && bookingDetail.passengers[0]?.weight ? bookingDetail.passengers[0].weight + 'kg' : '-'}
+    <IconButton size="small" onClick={() => handleEditClick('weight', bookingDetail.passengers && bookingDetail.passengers[0]?.weight)}><EditIcon fontSize="small" /></IconButton>
+  </>
+)}</Typography>
                                     </Box>
                                     {/* Additional */}
                                     <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
@@ -525,7 +582,7 @@ const Manifest = () => {
                                         <Box sx={{ mb: 2 }}>
                                             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Passenger Details</Typography>
                                             {bookingDetail.passengers && bookingDetail.passengers.length > 0 ? bookingDetail.passengers.map((p, i) => (
-                                                <Typography key={i}>Passenger {i + 1}: {p.first_name || '-'} {p.last_name || '-'} {p.weight ? `(${p.weight}kg)` : ''}</Typography>
+                                                <Typography key={i}>Passenger {i + 1}: {p.first_name || '-'} {p.last_name || '-'}{p.weight ? ` (${p.weight}kg)` : ''}</Typography>
                                             )) : null}
                                         </Box>
                                         <Divider sx={{ my: 2 }} />
@@ -587,6 +644,7 @@ const Manifest = () => {
                             <TextField label="Last Name" value={g.lastName} onChange={e => handleGuestFormChange(idx, 'lastName', e.target.value)} fullWidth margin="dense" />
                             <TextField label="Email" value={g.email} onChange={e => handleGuestFormChange(idx, 'email', e.target.value)} fullWidth margin="dense" />
                             <TextField label="Phone" value={g.phone} onChange={e => handleGuestFormChange(idx, 'phone', e.target.value)} fullWidth margin="dense" />
+                            <TextField label="Weight (kg)" value={g.weight} onChange={e => handleGuestFormChange(idx, 'weight', e.target.value)} fullWidth margin="dense" />
                             <TextField label="Ticket Type" value={g.ticketType} select fullWidth margin="dense" onChange={e => handleGuestFormChange(idx, 'ticketType', e.target.value)}>
                                 <MenuItem value="Shared Flight">Shared Flight</MenuItem>
                                 <MenuItem value="Private Flight">Private Flight</MenuItem>
