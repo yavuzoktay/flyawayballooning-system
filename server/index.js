@@ -675,13 +675,13 @@ app.get('/api/getBookingDetail', async (req, res) => {
 
 // Add Passenger (Guest) to booking
 app.post('/api/addPassenger', (req, res) => {
-    const { booking_id, first_name, last_name, email, phone, ticket_type } = req.body;
+    const { booking_id, first_name, last_name, email, phone, ticket_type, weight } = req.body;
     if (!booking_id || !first_name || !last_name) {
         return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
-    // passenger tablosunda email, phone, ticket_type yoksa sadece temel alanları ekle
-    const sql = 'INSERT INTO passenger (booking_id, first_name, last_name) VALUES (?, ?, ?)';
-    const values = [booking_id, first_name, last_name];
+    // passenger tablosunda email, phone, ticket_type, weight varsa ekle
+    const sql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone, ticket_type) VALUES (?, ?, ?, ?, ?, ?, ?)';
+    const values = [booking_id, first_name, last_name, weight || null, email || null, phone || null, ticket_type || null];
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error adding passenger:', err);
@@ -709,14 +709,40 @@ app.post('/api/updateBookingStatus', (req, res) => {
 
 app.patch('/api/updateBookingField', (req, res) => {
     const { booking_id, field, value } = req.body;
-    const allowedFields = ['name', 'phone', 'email'];
+    const allowedFields = ['name', 'phone', 'email', 'expires', 'weight', 'status']; // status eklendi
     if (!booking_id || !field || !allowedFields.includes(field)) {
         return res.status(400).json({ success: false, message: 'Invalid request' });
     }
-    const sql = `UPDATE all_booking SET ${field} = ? WHERE id = ?`;
-    con.query(sql, [value, booking_id], (err, result) => {
+    let sql;
+    let params;
+    if (field === 'weight') {
+        // passenger tablosunda ana yolcunun weight bilgisini güncelle
+        sql = `UPDATE passenger SET weight = ? WHERE booking_id = ? LIMIT 1`;
+        params = [value, booking_id];
+    } else {
+        sql = `UPDATE all_booking SET ${field} = ? WHERE id = ?`;
+        params = [value, booking_id];
+    }
+    con.query(sql, params, (err, result) => {
         if (err) {
             console.error('Error updating booking field:', err);
+            return res.status(500).json({ success: false, message: 'Database error' });
+        }
+        res.json({ success: true });
+    });
+});
+
+// Passenger tablosunda herhangi bir yolcunun weight bilgisini güncellemek için
+app.patch('/api/updatePassengerField', (req, res) => {
+    const { passenger_id, field, value } = req.body;
+    const allowedFields = ['weight'];
+    if (!passenger_id || !field || !allowedFields.includes(field)) {
+        return res.status(400).json({ success: false, message: 'Invalid request' });
+    }
+    const sql = `UPDATE passenger SET ${field} = ? WHERE id = ?`;
+    con.query(sql, [value, passenger_id], (err, result) => {
+        if (err) {
+            console.error('Error updating passenger field:', err);
             return res.status(500).json({ success: false, message: 'Database error' });
         }
         res.json({ success: true });
