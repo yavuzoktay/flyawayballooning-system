@@ -6,6 +6,7 @@ import dayjs from 'dayjs';
 import EditIcon from '@mui/icons-material/Edit';
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import RebookAvailabilityModal from '../components/BookingPage/RebookAvailabilityModal';
 
 const BookingPage = () => {
     const [activeTab, setActiveTab] = useState("bookings");
@@ -64,6 +65,10 @@ const BookingPage = () => {
     const [editExpiresField, setEditExpiresField] = useState(null);
     const [editExpiresValue, setEditExpiresValue] = useState('');
     const [savingExpiresEdit, setSavingExpiresEdit] = useState(false);
+
+    // Rebook modal state
+    const [rebookModalOpen, setRebookModalOpen] = useState(false);
+    const [rebookLoading, setRebookLoading] = useState(false);
 
     // Fetch data
     const voucherData = async () => {
@@ -446,6 +451,55 @@ const BookingPage = () => {
         }
     };
 
+    const handleRebook = () => {
+        setRebookModalOpen(true);
+    };
+
+    const handleRebookSlotSelect = async (date, time, activityId) => {
+        if (!bookingDetail || !bookingDetail.booking) return;
+        setRebookLoading(true);
+        try {
+            // Yeni booking için gerekli verileri hazırla
+            const payload = {
+                activitySelect: bookingDetail.booking.flight_type,
+                chooseLocation: bookingDetail.booking.location,
+                chooseFlightType: { type: bookingDetail.booking.flight_type, passengerCount: bookingDetail.booking.pax },
+                activity_id: activityId, // Modal'dan gelen activity_id kullan
+                passengerData: [
+                    {
+                        firstName: bookingDetail.booking.name?.split(' ')[0] || '',
+                        lastName: bookingDetail.booking.name?.split(' ').slice(1).join(' ') || '',
+                        weight: bookingDetail.passengers?.[0]?.weight || '',
+                        email: bookingDetail.booking.email || '',
+                        phone: bookingDetail.booking.phone || '',
+                        ticketType: bookingDetail.booking.flight_type || '',
+                        weatherRefund: bookingDetail.passengers?.[0]?.weather_refund || false
+                    }
+                ],
+                selectedDate: dayjs(date).format('YYYY-MM-DD') + ' ' + time,
+                totalPrice: bookingDetail.booking.paid || 0,
+                additionalInfo: { notes: bookingDetail.booking.additional_notes || '' },
+                voucher_code: bookingDetail.booking.voucher_code || null
+            };
+            console.log('Rebook payload:', payload); // Debug için
+            await axios.post('/api/createBooking', payload);
+            setRebookModalOpen(false);
+            setDetailDialogOpen(false);
+            // Tabloyu güncelle
+            if (activeTab === 'bookings') {
+                const response = await axios.get(`/api/getAllBookingData`, { params: filters });
+                setBooking(response.data.data || []);
+                setFilteredData(response.data.data || []);
+            }
+            alert('Rebooking successful!');
+        } catch (err) {
+            console.error('Rebooking error:', err);
+            alert('Rebooking failed!');
+        } finally {
+            setRebookLoading(false);
+        }
+    };
+
     return (
         <div className="booking-page-wrap">
             <Container maxWidth="xl">
@@ -797,7 +851,30 @@ const BookingPage = () => {
                                         {/* Add On */}
                                         <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
                                             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Add On's</Typography>
-                                            <Typography><b>Fab Cap:</b> N/A</Typography>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                <Typography><b>Fab Cap:</b> {bookingDetail.booking.choose_add_on && bookingDetail.booking.choose_add_on.includes('Fab Cap') ? 'Yes' : 'No'}</Typography>
+                                                <Button variant="outlined" size="small" onClick={async () => {
+                                                    // Fab Cap ekle
+                                                    let newAddOn = bookingDetail.booking.choose_add_on || [];
+                                                    if (typeof newAddOn === 'string') {
+                                                        try { newAddOn = JSON.parse(newAddOn); } catch { newAddOn = []; }
+                                                    }
+                                                    if (!Array.isArray(newAddOn)) newAddOn = [];
+                                                    if (!newAddOn.includes('Fab Cap')) newAddOn.push('Fab Cap');
+                                                    await axios.patch('/api/updateBookingField', {
+                                                        booking_id: bookingDetail.booking.id,
+                                                        field: 'choose_add_on',
+                                                        value: JSON.stringify(newAddOn)
+                                                    });
+                                                    setBookingDetail(prev => ({
+                                                        ...prev,
+                                                        booking: {
+                                                            ...prev.booking,
+                                                            choose_add_on: newAddOn
+                                                        }
+                                                    }));
+                                                }}>FAB Add On</Button>
+                                            </Box>
                                             <Typography><b>WX Refundable:</b> {activeTab === 'vouchers' ? '-' : (bookingDetail.passengers && bookingDetail.passengers.some(p => p.weather_refund === 1) ? 'Yes' : 'No')}</Typography>
                                             <Typography><b>Marketing:</b> {activeTab === 'vouchers' ? (bookingDetail.booking.marketing || 'N/A') : (bookingDetail.booking.hear_about_us || 'N/A')}</Typography>
                                             <Typography><b>Reason for Ballooning:</b> {activeTab === 'vouchers' ? (bookingDetail.booking.reason_for_ballooning || 'N/A') : (bookingDetail.booking.ballooning_reason || 'N/A')}</Typography>
@@ -833,7 +910,7 @@ const BookingPage = () => {
                                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 140 }}>
                                                     {/* Butonlar sadece booking için aktif, voucher için gizli */}
                                                     {activeTab !== 'vouchers' && <>
-                                                        <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }}>Rebook</Button>
+                                                        <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleRebook}>Rebook</Button>
                                                         <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleAddGuestClick}>Add Guest</Button>
                                                         <Button variant="contained" color="info" sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d' }} onClick={handleCancelFlight}>Cancel Flight</Button>
                                                     </>}
@@ -906,6 +983,12 @@ const BookingPage = () => {
                         <Button onClick={handleSaveGuests} variant="contained" color="primary">Save</Button>
                     </DialogActions>
                 </Dialog>
+                <RebookAvailabilityModal
+                    open={rebookModalOpen}
+                    onClose={() => setRebookModalOpen(false)}
+                    location={bookingDetail?.booking?.location}
+                    onSlotSelect={handleRebookSlotSelect}
+                />
             </Container>
         </div>
     );

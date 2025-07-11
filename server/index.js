@@ -493,10 +493,23 @@ app.post('/api/createBooking', (req, res) => {
             // --- Availability güncelleme ---
             // selectedDate ve selectedTime ile availability güncellenir
             if (selectedDate && chooseFlightType && chooseFlightType.passengerCount && chooseLocation) {
+                console.log('=== AVAILABILITY UPDATE DEBUG ===');
+                console.log('selectedDate:', selectedDate, 'Type:', typeof selectedDate);
+                console.log('chooseFlightType:', chooseFlightType);
+                console.log('chooseLocation:', chooseLocation);
+                console.log('req.body.activity_id:', req.body.activity_id);
+                
                 // selectedTime frontend'den gelmiyorsa, selectedDate'in saat kısmı kullanılabilir
                 let bookingDate = moment(selectedDate).format('YYYY-MM-DD');
                 let bookingTime = null;
-                if (typeof selectedDate === 'string' && selectedDate.includes('T')) {
+                
+                // selectedDate formatını kontrol et
+                if (typeof selectedDate === 'string' && selectedDate.includes(' ')) {
+                    // "YYYY-MM-DD HH:mm" formatı
+                    const parts = selectedDate.split(' ');
+                    bookingDate = parts[0];
+                    bookingTime = parts[1];
+                } else if (typeof selectedDate === 'string' && selectedDate.includes('T')) {
                     // ISO string ise saat kısmını al
                     bookingTime = moment(selectedDate).format('HH:mm');
                 } else if (selectedDate instanceof Date) {
@@ -505,13 +518,33 @@ app.post('/api/createBooking', (req, res) => {
                     // Sadece tarih geliyorsa, saat zorunlu değil
                     bookingTime = null;
                 }
-                if (bookingTime) {
-                    // Sadece saat ve tarih ile güncelle
-                    const updateAvailSql = `UPDATE activity_availability SET available = available - ? WHERE date = ? AND time = ? AND activity_id = (SELECT id FROM activity WHERE location = ? AND status = 'Live' LIMIT 1) AND available >= ?`;
-                    con.query(updateAvailSql, [chooseFlightType.passengerCount, bookingDate, bookingTime, chooseLocation, chooseFlightType.passengerCount], (err2, result2) => {
+                
+                console.log('Parsed bookingDate:', bookingDate);
+                console.log('Parsed bookingTime:', bookingTime);
+                if (bookingTime && req.body.activity_id) {
+                    // Doğrudan activity_id ile güncelle
+                    const updateAvailSql = `UPDATE activity_availability SET available = available - ? WHERE date = ? AND time = ? AND activity_id = ? AND available >= ?`;
+                    console.log('=== REBOOK AVAILABILITY UPDATE ===');
+                    console.log('UPDATE AVAILABILITY PARAMS:', chooseFlightType.passengerCount, bookingDate, bookingTime, req.body.activity_id, chooseFlightType.passengerCount);
+                    console.log('Request body activity_id:', req.body.activity_id);
+                    console.log('Request body:', req.body);
+                    con.query(updateAvailSql, [chooseFlightType.passengerCount, bookingDate, bookingTime, req.body.activity_id, chooseFlightType.passengerCount], (err2, result2) => {
                         if (err2) {
                             console.error('Error updating availability:', err2);
-                            // Hata olsa bile booking devam etsin
+                        } else {
+                            console.log('Availability updated successfully:', result2.affectedRows, 'rows affected');
+                            console.log('=== END REBOOK AVAILABILITY UPDATE ===');
+                        }
+                    });
+                } else if (bookingTime) {
+                    // Eski yöntem: alt sorgu ile activity_id bul
+                    const updateAvailSql = `UPDATE activity_availability SET available = available - ? WHERE date = ? AND time = ? AND activity_id = (SELECT id FROM activity WHERE location = ? AND status = 'Live' LIMIT 1) AND available >= ?`;
+                    console.log('UPDATE AVAILABILITY PARAMS (alt sorgu):', chooseFlightType.passengerCount, bookingDate, bookingTime, chooseLocation, chooseFlightType.passengerCount);
+                    con.query(updateAvailSql, [chooseFlightType.passengerCount, bookingDate, bookingTime, chooseLocation, chooseFlightType.passengerCount], (err2, result2) => {
+                        if (err2) {
+                            console.error('Error updating availability (alt sorgu):', err2);
+                        } else {
+                            console.log('Availability updated (alt sorgu):', result2.affectedRows, 'rows');
                         }
                     });
                 }
@@ -779,7 +812,7 @@ app.post('/api/updateBookingStatus', (req, res) => {
 
 app.patch('/api/updateBookingField', (req, res) => {
     const { booking_id, field, value } = req.body;
-    const allowedFields = ['name', 'phone', 'email', 'expires', 'weight', 'status', 'flight_attempts']; // flight_attempts eklendi
+    const allowedFields = ['name', 'phone', 'email', 'expires', 'weight', 'status', 'flight_attempts', 'choose_add_on']; // choose_add_on eklendi
     if (!booking_id || !field || !allowedFields.includes(field)) {
         return res.status(400).json({ success: false, message: 'Invalid request' });
     }
