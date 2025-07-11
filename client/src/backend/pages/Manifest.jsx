@@ -155,7 +155,7 @@ const Manifest = () => {
     };
 
     const filteredFlights = flights.filter(flight => 
-        flight.flight_date && flight.flight_date.split('T')[0] === selectedDate
+        flight.flight_date && flight.flight_date.split('T')[0] === selectedDate && flight.status !== 'Cancelled'
     );
 
     const handleNameClick = (bookingId) => {
@@ -294,6 +294,39 @@ const Manifest = () => {
             alert('Note eklenemedi');
         } finally {
             setAddingNote(false);
+        }
+    };
+
+    const handleCancelFlight = async () => {
+        if (!bookingDetail?.booking?.id) return;
+        try {
+            // flight_attempts +1
+            const newAttempts = (parseInt(bookingDetail.booking.flight_attempts || 0, 10) + 1).toString();
+            // Status'u Cancelled yap
+            await axios.patch('/api/updateBookingField', {
+                booking_id: bookingDetail.booking.id,
+                field: 'status',
+                value: 'Cancelled'
+            });
+            // flight_attempts güncelle
+            await axios.patch('/api/updateBookingField', {
+                booking_id: bookingDetail.booking.id,
+                field: 'flight_attempts',
+                value: newAttempts
+            });
+            // Local state güncelle
+            setBookingDetail(prev => ({
+                ...prev,
+                booking: {
+                    ...prev.booking,
+                    status: 'Cancelled',
+                    flight_attempts: newAttempts
+                }
+            }));
+            // flights state'ini güncelle
+            setFlights(prev => prev.map(f => f.id === bookingDetail.booking.id ? { ...f, status: 'Cancelled', flight_attempts: newAttempts } : f));
+        } catch (err) {
+            alert('Cancel işlemi başarısız!');
         }
     };
 
@@ -574,7 +607,7 @@ const Manifest = () => {
                                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 140 }}>
                                                 <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }}>Rebook</Button>
                                                 <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleAddGuestClick}>Add Guest</Button>
-                                                <Button variant="contained" color="info" sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d' }}>Cancel Flight</Button>
+                                                <Button variant="contained" color="info" sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d' }} onClick={handleCancelFlight}>Cancel Flight</Button>
                                             </Box>
                                         </Box>
                                         <Divider sx={{ my: 2 }} />
