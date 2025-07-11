@@ -1174,8 +1174,8 @@ app.post('/api/activity/:id/availabilities', (req, res) => {
 app.get('/api/activity/:id/availabilities', (req, res) => {
     const { id } = req.params;
     if (!id) return res.status(400).json({ success: false, message: 'Eksik bilgi!' });
-    // Tüm availabilities'i döndür
-    const sql = 'SELECT * FROM activity_availability WHERE activity_id = ? ORDER BY date, time';
+    // Join with activity to get location and flight_type
+    const sql = `SELECT aa.*, a.location, a.flight_type FROM activity_availability aa JOIN activity a ON aa.activity_id = a.id WHERE aa.activity_id = ? ORDER BY aa.date, aa.time`;
     con.query(sql, [id], (err, result) => {
         if (err) return res.status(500).json({ success: false, message: 'Database error', error: err });
         res.json({ success: true, data: result });
