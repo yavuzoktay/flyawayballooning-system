@@ -72,6 +72,26 @@ const Manifest = () => {
     const activity = Array.isArray(activityHook && activityHook.activity) ? activityHook.activity : [];
     const activityLoading = activityHook && typeof activityHook.loading === 'boolean' ? activityHook.loading : true;
 
+    // Helper: fetch capacity for a slot
+    const [availabilities, setAvailabilities] = useState([]);
+    useEffect(() => {
+        // Fetch all availabilities for all activities on mount
+        async function fetchAllAvailabilities() {
+            if (!Array.isArray(activity)) return;
+            let all = [];
+            for (const act of activity) {
+                try {
+                    const res = await axios.get(`/api/activity/${act.id}/availabilities`);
+                    if (res.data.success && Array.isArray(res.data.data)) {
+                        all = all.concat(res.data.data.map(a => ({ ...a, activity_id: act.id, location: act.location, flight_type: act.flight_type })));
+                    }
+                } catch {}
+            }
+            setAvailabilities(all);
+        }
+        fetchAllAvailabilities();
+    }, [activity]);
+
     // Hatalı veri durumunu kontrol et
     useEffect(() => {
         if (!Array.isArray(booking) || !Array.isArray(passenger)) {
@@ -417,7 +437,20 @@ const Manifest = () => {
                             const first = groupFlights[0];
                             const activityName = first.location + ' - ' + first.flight_type;
                             const paxBooked = groupFlights.reduce((sum, f) => sum + (f.passengers?.length || 0), 0);
-                            const paxTotal = groupFlights.reduce((sum, f) => sum + (parseInt(f.pax) || 0), 0);
+                            // Find matching availability for this group (activity_id, date, time)
+                            let slotCapacity = null;
+                            if (availabilities.length > 0) {
+                                const dateStr = first.flight_date ? first.flight_date.substring(0,10) : null;
+                                const timeStr = first.time_slot || (first.flight_date && first.flight_date.length >= 16 ? first.flight_date.substring(11,16) : null);
+                                const found = availabilities.find(a => {
+                                    // Compare by activity_id, date, and time
+                                    const aDate = a.date && a.date.length >= 10 ? a.date.substring(0,10) : null;
+                                    const aTime = a.time && a.time.length >= 5 ? a.time.substring(0,5) : null;
+                                    return a.activity_id == first.activity_id && aDate === dateStr && aTime === timeStr;
+                                });
+                                if (found) slotCapacity = found.capacity;
+                            }
+                            const paxTotal = slotCapacity ? parseInt(slotCapacity) : groupFlights.reduce((sum, f) => sum + (parseInt(f.pax) || 0), 0);
                             const status = getFlightStatus(first);
                             const balloonResource = first.balloon_resources || 'N/A';
                             const timeSlot = first.time_slot || 'N/A';
