@@ -19,6 +19,7 @@ import {
     Paper,
     Container,
     Select,
+    Button,
 } from "@mui/material";
 import { MoreVert as MoreVertIcon, Edit as EditIcon } from "@mui/icons-material";
 import useBooking from "../api/useBooking";
@@ -29,7 +30,6 @@ import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
-import Button from "@mui/material/Button";
 import dayjs from 'dayjs';
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -155,8 +155,18 @@ const Manifest = () => {
     };
 
     const filteredFlights = flights.filter(flight => 
-        flight.flight_date && flight.flight_date.split('T')[0] === selectedDate && flight.status !== 'Cancelled'
+        flight.flight_date && flight.flight_date.substring(0, 10) === selectedDate && flight.status !== 'Cancelled'
     );
+
+    // flights'i location ve flight_date bazında grupla
+    const groupBy = (arr, keyFn) => arr.reduce((acc, item) => {
+        const key = keyFn(item);
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(item);
+        return acc;
+    }, {});
+
+    const groupedFlights = groupBy(filteredFlights, f => `${f.location}||${f.flight_date.substring(0,10)}`);
 
     const handleNameClick = (bookingId) => {
         setSelectedBookingId(bookingId);
@@ -356,54 +366,58 @@ const Manifest = () => {
                     ) : error ? (
                         <Typography color="error">{error}</Typography>
                     ) : filteredFlights.length > 0 ? (
-                        filteredFlights.map((flight) => {
-                            const matchingActivity = activity && Array.isArray(activity)
-                                ? activity.find((a) => a.activity_sku === flight.activity_id)
-                                : null;
-                            const activityName = matchingActivity ? matchingActivity.activity_name : `${flight.location} - ${flight.flight_type}`;
-                            const timeSlot = flight.time_slot || "N/A";
-                            const status = getFlightStatus(flight);
+                        Object.entries(groupedFlights).map(([groupKey, groupFlights]) => {
+                            // Ortak başlık bilgileri
+                            const first = groupFlights[0];
+                            const activityName = first.location + ' - ' + first.flight_type;
+                            const paxBooked = groupFlights.reduce((sum, f) => sum + (f.passengers?.length || 0), 0);
+                            const paxTotal = groupFlights.reduce((sum, f) => sum + (parseInt(f.pax) || 0), 0);
+                            const status = getFlightStatus(first);
+                            const balloonResource = first.balloon_resources || 'N/A';
+                            const timeSlot = first.time_slot || 'N/A';
                             return (
-                                <Card key={flight.id} sx={{ marginBottom: 2 }}>
+                                <Card key={groupKey} sx={{ marginBottom: 2 }}>
                                     <CardContent>
                                         <Grid container spacing={2} alignItems="center">
-                                            {/* Flight Details */}
                                             <Grid item xs={12} md={3}>
-                                                <Typography variant="h6">{activityName} - {timeSlot}</Typography>
+                                                <Typography variant="h6">{activityName}</Typography>
+                                            </Grid>
+                                            <Grid item xs={12} md={3}>
+                                                <Typography>Pax Booked: {paxBooked} / {paxTotal}</Typography>
+                                                <Typography>Balloon Resource: {balloonResource}</Typography>
                                             </Grid>
                                             <Grid item xs={12} md={3}>
                                                 <Typography>
-                                                    Pax Booked: {flight.passengers.length} / {flight.pax}
+                                                    Status: <span style={{color: status === 'Open' ? 'green' : 'red', fontWeight: 'bold'}}>{status}</span>
+                                                    <Button
+                                                        size="small"
+                                                        variant="outlined"
+                                                        sx={{ ml: 2 }}
+                                                        onClick={async () => {
+                                                            // Yeni status'ü belirle
+                                                            const newStatus = status === 'Open' ? 0 : 1; // 1: Open, 0: Closed
+                                                            // Tüm booking'ler için güncelle
+                                                            await Promise.all(groupFlights.map(async (flight) => {
+                                                                await axios.post('/api/updateBookingStatus', {
+                                                                    booking_id: flight.id,
+                                                                    manual_status_override: newStatus
+                                                                });
+                                                            }));
+                                                            // Local state'i güncelle
+                                                            setFlights(prev => prev.map(f =>
+                                                                groupFlights.some(gf => gf.id === f.id)
+                                                                    ? { ...f, manual_status_override: newStatus }
+                                                                    : f
+                                                            ));
+                                                        }}
+                                                    >
+                                                        {status === 'Open' ? 'Close Slot' : 'Open Slot'}
+                                                    </Button>
                                                 </Typography>
-                                                <Typography>Balloon Resource: {flight.balloon_resources || "N/A"}</Typography>
-                                            </Grid>
-                                            <Grid item xs={12} md={3}>
-                                                <Typography>Status: <span style={{color: status === 'Open' ? 'green' : 'red', fontWeight: 'bold'}}>{status}</span></Typography>
-                                                <Typography>Type: {flight.flight_type}</Typography>
-                                            </Grid>
-                                            <Grid item xs={12} md={3} display="flex" justifyContent="flex-end">
-                                                <IconButton onClick={(event) => handleMenuOpen(event, flight.id)}>
-                                                    <MoreVertIcon />
-                                                </IconButton>
-                                                <Menu
-                                                    anchorEl={menuAnchorEl}
-                                                    open={Boolean(menuAnchorEl && selectedFlightId === flight.id)}
-                                                    onClose={handleMenuClose}
-                                                >
-                                                    <MenuItem onClick={() => toggleFlightStatus(flight.id)}>
-                                                        {status === "Closed" ? "Open Slot" : "Close Slot"}
-                                                    </MenuItem>
-                                                    <MenuItem onClick={() => sendMessageToPassengers(flight.id)}>
-                                                        Send Message to Passengers
-                                                    </MenuItem>
-                                                    <MenuItem onClick={() => alert('Send Message to All Guests (not implemented)')}>Send Message to All Guests</MenuItem>
-                                                    <MenuItem onClick={() => alert('Change all passenger statuses (not implemented)')}>Change all passenger statuses</MenuItem>
-                                                    <MenuItem onClick={() => cancelFlight(flight.id)}>Cancel Flight</MenuItem>
-                                                </Menu>
+                                                <Typography>Type: {first.flight_type}</Typography>
                                             </Grid>
                                         </Grid>
                                         <Divider sx={{ marginY: 2 }} />
-                                        {/* Passenger Details Table */}
                                         <TableContainer component={Paper} sx={{ marginTop: 2 }}>
                                             <Table>
                                                 <TableHead sx={{ marginTop: 2, background: "#d3d3d3", color: "#000" }}>
@@ -413,7 +427,7 @@ const Manifest = () => {
                                                         <TableCell>Weight</TableCell>
                                                         <TableCell>Mobile</TableCell>
                                                         <TableCell>Email</TableCell>
-                                                        <TableCell>Flight Time</TableCell> {/* Yeni kolon */}
+                                                        <TableCell>Flight Time</TableCell>
                                                         <TableCell>WX Ins</TableCell>
                                                         <TableCell>Add On's</TableCell>
                                                         <TableCell>Notes</TableCell>
@@ -421,71 +435,89 @@ const Manifest = () => {
                                                     </TableRow>
                                                 </TableHead>
                                                 <TableBody>
-                                                    {flight.passengers.map((passenger, index) => (
-                                                        <TableRow key={index}>
-                                                            <TableCell>{passenger.booking_id || ''}</TableCell>
-                                                            <TableCell>
-                                                                <span style={{ color: '#3274b4', cursor: 'pointer', textDecoration: 'underline' }}
-                                                                    onClick={() => handleNameClick(passenger.booking_id)}>
-                                                                    {flight.name || ''}
-                                                                </span>
-                                                            </TableCell>
-                                                            <TableCell>{passenger.weight || ''}</TableCell>
-                                                            <TableCell>{flight.phone || ''}</TableCell>
-                                                            <TableCell>{flight.email || ''}</TableCell>
-                                                            <TableCell>{flight.time_slot || ''}</TableCell> {/* Yeni kolonun verisi */}
-                                                            <TableCell>{passenger.weatherRefund || passenger.weather_refund ? 'Yes' : 'No'}</TableCell>
-                                                            <TableCell>
-                                                                {(() => {
-                                                                    if (Array.isArray(flight.choose_add_on)) {
-                                                                        return flight.choose_add_on.join(', ');
-                                                                    }
-                                                                    if (typeof flight.choose_add_on === 'string') {
-                                                                        try {
-                                                                            const parsed = JSON.parse(flight.choose_add_on);
-                                                                            if (Array.isArray(parsed)) {
-                                                                                return parsed.join(', ');
-                                                                            }
-                                                                            return flight.choose_add_on;
-                                                                        } catch {
-                                                                            return flight.choose_add_on;
+                                                    {groupFlights.map((flight, idx) => (
+                                                        <React.Fragment key={flight.id}>
+                                                            {flight.passengers.map((passenger, index) => (
+                                                                <TableRow key={index}>
+                                                                    <TableCell>
+                                                                        <span style={{ color: '#3274b4', cursor: 'pointer', textDecoration: 'underline' }}
+                                                                            onClick={() => handleNameClick(passenger.booking_id)}>
+                                                                            {passenger.booking_id || ''}
+                                                                        </span>
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <span style={{ color: '#3274b4', cursor: 'pointer', textDecoration: 'underline' }}
+                                                                            onClick={() => handleNameClick(passenger.booking_id)}>
+                                                                            {flight.name || ''}
+                                                                        </span>
+                                                                    </TableCell>
+                                                                    <TableCell>{passenger.weight || ''}</TableCell>
+                                                                    <TableCell>{flight.phone || ''}</TableCell>
+                                                                    <TableCell>{flight.email || ''}</TableCell>
+                                                                    <TableCell>{(() => {
+                                                                        if (flight.time_slot) return flight.time_slot;
+                                                                        if (flight.flight_date && flight.flight_date.length >= 16) {
+                                                                            return flight.flight_date.substring(11, 16);
                                                                         }
-                                                                    }
-                                                                    return '';
-                                                                })()}
-                                                            </TableCell>
-                                                            <TableCell>{flight.additional_notes || ''}</TableCell>
-                                                            <TableCell>
-                                                                <Select
-                                                                    value={flight.status || 'Scheduled'}
-                                                                    onChange={async (e) => {
-                                                                        const newStatus = e.target.value;
-                                                                        await axios.patch('/api/updateBookingField', {
-                                                                            booking_id: flight.id,
-                                                                            field: 'status',
-                                                                            value: newStatus
-                                                                        });
-                                                                        setFlights(prev => prev.map(f => f.id === flight.id ? { ...f, status: newStatus } : f));
-                                                                    }}
-                                                                    size="small"
-                                                                    variant="standard"
-                                                                    sx={{ minWidth: 120 }}
-                                                                >
-                                                                    <MenuItem value="Scheduled">Scheduled</MenuItem>
-                                                                    <MenuItem value="Checked In">Checked In</MenuItem>
-                                                                    <MenuItem value="Flown">Flown</MenuItem>
-                                                                    <MenuItem value="No Show">No Show</MenuItem>
-                                                                </Select>
-                                                            </TableCell>
-                                                        </TableRow>
+                                                                        return '';
+                                                                    })()}</TableCell>
+                                                                    <TableCell>{passenger.weatherRefund || passenger.weather_refund ? 'Yes' : 'No'}</TableCell>
+                                                                    <TableCell>{(() => {
+                                                                        if (Array.isArray(flight.choose_add_on)) {
+                                                                            return flight.choose_add_on.join(', ');
+                                                                        }
+                                                                        if (typeof flight.choose_add_on === 'string') {
+                                                                            try {
+                                                                                const parsed = JSON.parse(flight.choose_add_on);
+                                                                                if (Array.isArray(parsed)) {
+                                                                                    return parsed.join(', ');
+                                                                                }
+                                                                                return flight.choose_add_on;
+                                                                            } catch {
+                                                                                return flight.choose_add_on;
+                                                                            }
+                                                                        }
+                                                                        return '';
+                                                                    })()}</TableCell>
+                                                                    <TableCell>{flight.additional_notes || ''}</TableCell>
+                                                                    <TableCell>
+                                                                        <Select
+                                                                            value={flight.status || 'Scheduled'}
+                                                                            onChange={async (e) => {
+                                                                                const newStatus = e.target.value;
+                                                                                await axios.patch('/api/updateBookingField', {
+                                                                                    booking_id: flight.id,
+                                                                                    field: 'status',
+                                                                                    value: newStatus
+                                                                                });
+                                                                                setFlights(prev => prev.map(f => f.id === flight.id ? { ...f, status: newStatus } : f));
+                                                                            }}
+                                                                            size="small"
+                                                                            variant="standard"
+                                                                            sx={{ minWidth: 120 }}
+                                                                        >
+                                                                            <MenuItem value="Scheduled">Scheduled</MenuItem>
+                                                                            <MenuItem value="Checked In">Checked In</MenuItem>
+                                                                            <MenuItem value="Flown">Flown</MenuItem>
+                                                                            <MenuItem value="No Show">No Show</MenuItem>
+                                                                        </Select>
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            ))}
+                                                            {/* Toplam ağırlık satırı */}
+                                                            <TableRow>
+                                                                <TableCell colSpan={10} style={{ textAlign: 'right', fontWeight: 600, background: '#f5f5f5' }}>
+                                                                    Total Weight: {flight.passengers.reduce((sum, p) => sum + (parseFloat(p.weight) || 0), 0)} kg
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        </React.Fragment>
                                                     ))}
                                                 </TableBody>
                                             </Table>
                                         </TableContainer>
-                                        {/* Summary */}
                                         <Divider sx={{ marginY: 2 }} />
                                         <Box display="flex" justifyContent="flex-end">
-                                            <Typography variant="h6">{flight.paid}</Typography>
+                                            <Typography variant="h6">{groupFlights.reduce((sum, f) => sum + (parseFloat(f.paid) || 0), 0)}</Typography>
                                         </Box>
                                     </CardContent>
                                 </Card>
@@ -587,7 +619,30 @@ const Manifest = () => {
                                     {/* Add On */}
                                     <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
                                         <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Add On's</Typography>
-                                        <Typography><b>Fab Cap:</b> N/A</Typography>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                            <Typography><b>Fab Cap:</b> {bookingDetail.booking.choose_add_on && bookingDetail.booking.choose_add_on.includes('Fab Cap') ? 'Yes' : 'No'}</Typography>
+                                            <Button variant="outlined" size="small" onClick={async () => {
+                                                let newAddOn = bookingDetail.booking.choose_add_on || [];
+                                                if (typeof newAddOn === 'string') {
+                                                    try { newAddOn = JSON.parse(newAddOn); } catch { newAddOn = []; }
+                                                }
+                                                if (!Array.isArray(newAddOn)) newAddOn = [];
+                                                if (!newAddOn.includes('Fab Cap')) newAddOn.push('Fab Cap');
+                                                await axios.patch('/api/updateBookingField', {
+                                                    booking_id: bookingDetail.booking.id,
+                                                    field: 'choose_add_on',
+                                                    value: JSON.stringify(newAddOn)
+                                                });
+                                                setBookingDetail(prev => ({
+                                                    ...prev,
+                                                    booking: {
+                                                        ...prev.booking,
+                                                        choose_add_on: newAddOn
+                                                    }
+                                                }));
+                                                setFlights(prev => prev.map(f => f.id === bookingDetail.booking.id ? { ...f, choose_add_on: newAddOn } : f));
+                                            }}>FAB Add On</Button>
+                                        </Box>
                                         <Typography><b>WX Refundable:</b> {bookingDetail.passengers && bookingDetail.passengers.some(p => p.weather_refund === 1) ? 'Yes' : 'No'}</Typography>
                                         <Typography><b>Marketing:</b> {bookingDetail.booking.hear_about_us || 'N/A'}</Typography>
                                         <Typography><b>Reason for Ballooning:</b> {bookingDetail.booking.ballooning_reason || 'N/A'}</Typography>
