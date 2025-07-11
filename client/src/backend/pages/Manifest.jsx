@@ -413,6 +413,7 @@ const Manifest = () => {
                                                         <TableCell>Weight</TableCell>
                                                         <TableCell>Mobile</TableCell>
                                                         <TableCell>Email</TableCell>
+                                                        <TableCell>Flight Time</TableCell> {/* Yeni kolon */}
                                                         <TableCell>WX Ins</TableCell>
                                                         <TableCell>Add On's</TableCell>
                                                         <TableCell>Notes</TableCell>
@@ -432,6 +433,7 @@ const Manifest = () => {
                                                             <TableCell>{passenger.weight || ''}</TableCell>
                                                             <TableCell>{flight.phone || ''}</TableCell>
                                                             <TableCell>{flight.email || ''}</TableCell>
+                                                            <TableCell>{flight.time_slot || ''}</TableCell> {/* Yeni kolonun verisi */}
                                                             <TableCell>{passenger.weatherRefund || passenger.weather_refund ? 'Yes' : 'No'}</TableCell>
                                                             <TableCell>
                                                                 {(() => {
