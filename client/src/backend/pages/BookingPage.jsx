@@ -196,9 +196,21 @@ const BookingPage = () => {
     // Client-side filtering kaldırıldı çünkü artık backend'de yapılıyor
 
     // Name tıklanınca detayları çek
-    const handleNameClick = (item) => {
-        setSelectedBookingId(item.id);
-        setDetailDialogOpen(true);
+    const handleNameClick = async (item) => {
+        if (activeTab === 'vouchers') {
+            setBookingDetail({
+                success: true,
+                booking: item, // sadece booking olarak set edildi
+                passengers: [],
+                notes: []
+            });
+            setDetailDialogOpen(true);
+            setLoadingDetail(false);
+            setDetailError(null);
+        } else {
+            setSelectedBookingId(item.id);
+            setDetailDialogOpen(true);
+        }
     };
 
     useEffect(() => {
@@ -536,6 +548,7 @@ const BookingPage = () => {
                                                     <MenuItem value="Expired">Expired</MenuItem>
                                                     <MenuItem value="Flown">Flown</MenuItem>
                                                     <MenuItem value="No Show">No Show</MenuItem>
+                                                    <MenuItem value="Cancelled">Cancelled</MenuItem>
                                                 </Select>
                                             </FormControl>
                                         </div>
@@ -651,6 +664,7 @@ const BookingPage = () => {
                                 <PaginatedTable
                                     data={filteredData}
                                     columns={["created", "name", "flight_type", "voucher_type", "email", "phone", "expires", "redeemed", "paid", "offer_code", "voucher_ref"]}
+                                    onNameClick={handleNameClick}
                                 />
                             </>
                         )}
@@ -681,96 +695,112 @@ const BookingPage = () => {
                             <Typography>Loading...</Typography>
                         ) : detailError ? (
                             <Typography color="error">{detailError}</Typography>
-                        ) : (bookingDetail && bookingDetail.success) ? (
+                        ) : bookingDetail && bookingDetail.success ? (
                             <Box>
                                 <Grid container spacing={2}>
                                     {/* Personal Details */}
                                     <Grid item xs={12} md={4}>
                                         <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
                                             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Personal Details</Typography>
-                                            <Typography><b>Booking Name:</b> {editField === 'name' ? (
+                                            {activeTab === 'vouchers' ? (
                                                 <>
-                                                    <input value={editValue} onChange={e => setEditValue(e.target.value)} style={{marginRight: 8}} />
-                                                    <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
-                                                    <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                    <Typography><b>Name:</b> {bookingDetail.booking.name || '-'}</Typography>
+                                                    <Typography><b>Email:</b> {bookingDetail.booking.email || '-'}</Typography>
+                                                    <Typography><b>Phone:</b> {bookingDetail.booking.phone || '-'}</Typography>
+                                                    <Typography><b>Voucher Type:</b> {bookingDetail.booking.voucher_type || '-'}</Typography>
+                                                    <Typography><b>Created:</b> {bookingDetail.booking.created_at || '-'}</Typography>
+                                                    <Typography><b>Expires:</b> {bookingDetail.booking.expires || '-'}</Typography>
+                                                    <Typography><b>Paid:</b> £{bookingDetail.booking.paid || '0.00'}</Typography>
+                                                    <Typography><b>Redeemed:</b> {bookingDetail.booking.redeemed || '-'}</Typography>
+                                                    <Typography><b>Offer Code:</b> {bookingDetail.booking.offer_code || '-'}</Typography>
+                                                    <Typography><b>Voucher Ref:</b> {bookingDetail.booking.voucher_ref || '-'}</Typography>
                                                 </>
                                             ) : (
                                                 <>
-                                                    {bookingDetail.booking.name || '-'}
-                                                    <IconButton size="small" onClick={() => handleEditClick('name', bookingDetail.booking.name)}><EditIcon fontSize="small" /></IconButton>
+                                                    <Typography><b>Booking Name:</b> {editField === 'name' ? (
+                                                        <>
+                                                            <input value={editValue} onChange={e => setEditValue(e.target.value)} style={{marginRight: 8}} />
+                                                            <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                            <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            {bookingDetail.booking.name || '-'}
+                                                            <IconButton size="small" onClick={() => handleEditClick('name', bookingDetail.booking.name)}><EditIcon fontSize="small" /></IconButton>
+                                                        </>
+                                                    )}</Typography>
+                                                    <Typography><b>Booking Created:</b> {bookingDetail.booking.created_at ? dayjs(bookingDetail.booking.created_at).format('DD/MM/YYYY') : '-'}</Typography>
+                                                    <Typography><b>Phone:</b> {editField === 'phone' ? (
+                                                        <>
+                                                            <input value={editValue} onChange={e => setEditValue(e.target.value)} style={{marginRight: 8}} />
+                                                            <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                            <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            {bookingDetail.booking.phone || '-'}
+                                                            <IconButton size="small" onClick={() => handleEditClick('phone', bookingDetail.booking.phone)}><EditIcon fontSize="small" /></IconButton>
+                                                        </>
+                                                    )}</Typography>
+                                                    <Typography><b>Email:</b> {editField === 'email' ? (
+                                                        <>
+                                                            <input value={editValue} onChange={e => setEditValue(e.target.value)} style={{marginRight: 8}} />
+                                                            <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                            <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            {bookingDetail.booking.email || '-'}
+                                                            <IconButton size="small" onClick={() => handleEditClick('email', bookingDetail.booking.email)}><EditIcon fontSize="small" /></IconButton>
+                                                        </>
+                                                    )}</Typography>
+                                                    <Typography><b>Weight:</b> {editField === 'weight' ? (
+                                                        <>
+                                                            <input value={editValue} onChange={e => setEditValue(e.target.value)} style={{marginRight: 8}} />
+                                                            <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                            <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            {bookingDetail.passengers && bookingDetail.passengers[0]?.weight ? bookingDetail.passengers[0].weight + 'kg' : '-'}
+                                                            <IconButton size="small" onClick={() => handleEditClick('weight', bookingDetail.passengers && bookingDetail.passengers[0]?.weight)}><EditIcon fontSize="small" /></IconButton>
+                                                        </>
+                                                    )}</Typography>
+                                                    <Typography><b>Paid:</b> £{bookingDetail.booking.paid}</Typography>
+                                                    <Typography><b>Expires:</b> {editField === 'expires' ? (
+                                                        <>
+                                                            <LocalizationProvider dateAdapter={AdapterDayjs}>
+                                                                <DatePicker
+                                                                    value={editValue ? dayjs(editValue) : null}
+                                                                    onChange={date => setEditValue(date ? date.format('YYYY-MM-DD') : '')}
+                                                                    format="DD/MM/YYYY"
+                                                                    slotProps={{ textField: { size: 'small' } }}
+                                                                />
+                                                                <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                                <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                            </LocalizationProvider>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            {bookingDetail.booking.expires ? dayjs(bookingDetail.booking.expires).format('DD/MM/YYYY') : '-'}
+                                                            <IconButton size="small" onClick={() => handleEditClick('expires', bookingDetail.booking.expires)}><EditIcon fontSize="small" /></IconButton>
+                                                        </>
+                                                    )}</Typography>
                                                 </>
-                                            )}</Typography>
-                                            <Typography><b>Booking Created:</b> {bookingDetail.booking.created_at ? dayjs(bookingDetail.booking.created_at).format('DD/MM/YYYY') : '-'}</Typography>
-                                            <Typography><b>Phone:</b> {editField === 'phone' ? (
-                                                <>
-                                                    <input value={editValue} onChange={e => setEditValue(e.target.value)} style={{marginRight: 8}} />
-                                                    <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
-                                                    <Button size="small" onClick={handleEditCancel}>Cancel</Button>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    {bookingDetail.booking.phone || '-'}
-                                                    <IconButton size="small" onClick={() => handleEditClick('phone', bookingDetail.booking.phone)}><EditIcon fontSize="small" /></IconButton>
-                                                </>
-                                            )}</Typography>
-                                            <Typography><b>Email:</b> {editField === 'email' ? (
-                                                <>
-                                                    <input value={editValue} onChange={e => setEditValue(e.target.value)} style={{marginRight: 8}} />
-                                                    <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
-                                                    <Button size="small" onClick={handleEditCancel}>Cancel</Button>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    {bookingDetail.booking.email || '-'}
-                                                    <IconButton size="small" onClick={() => handleEditClick('email', bookingDetail.booking.email)}><EditIcon fontSize="small" /></IconButton>
-                                                </>
-                                            )}</Typography>
-                                            <Typography><b>Weight:</b> {editField === 'weight' ? (
-                                                <>
-                                                    <input value={editValue} onChange={e => setEditValue(e.target.value)} style={{marginRight: 8}} />
-                                                    <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
-                                                    <Button size="small" onClick={handleEditCancel}>Cancel</Button>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    {bookingDetail.passengers && bookingDetail.passengers[0]?.weight ? bookingDetail.passengers[0].weight + 'kg' : '-'}
-                                                    <IconButton size="small" onClick={() => handleEditClick('weight', bookingDetail.passengers && bookingDetail.passengers[0]?.weight)}><EditIcon fontSize="small" /></IconButton>
-                                                </>
-                                            )}</Typography>
-                                            <Typography><b>Paid:</b> £{bookingDetail.booking.paid}</Typography>
-                                            <Typography><b>Expires:</b> {editField === 'expires' ? (
-                                                <>
-                                                    <LocalizationProvider dateAdapter={AdapterDayjs}>
-                                                        <DatePicker
-                                                            value={editValue ? dayjs(editValue) : null}
-                                                            onChange={date => setEditValue(date ? date.format('YYYY-MM-DD') : '')}
-                                                            format="DD/MM/YYYY"
-                                                            slotProps={{ textField: { size: 'small' } }}
-                                                        />
-                                                        <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
-                                                        <Button size="small" onClick={handleEditCancel}>Cancel</Button>
-                                                    </LocalizationProvider>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    {bookingDetail.booking.expires ? dayjs(bookingDetail.booking.expires).format('DD/MM/YYYY') : '-'}
-                                                    <IconButton size="small" onClick={() => handleEditClick('expires', bookingDetail.booking.expires)}><EditIcon fontSize="small" /></IconButton>
-                                                </>
-                                            )}</Typography>
+                                            )}
                                         </Box>
                                         {/* Additional */}
                                         <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
                                             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Additional</Typography>
-                                            <Typography><b>Booking Notes:</b> {bookingDetail.booking.additional_notes || '-'}</Typography>
+                                            <Typography><b>Booking Notes:</b> {activeTab === 'vouchers' ? (bookingDetail.booking.additional_notes || '-') : (bookingDetail.booking.additional_notes || '-')}</Typography>
                                         </Box>
                                         {/* Add On */}
                                         <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
                                             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Add On's</Typography>
                                             <Typography><b>Fab Cap:</b> N/A</Typography>
-                                            <Typography><b>WX Refundable:</b> {bookingDetail.passengers && bookingDetail.passengers.some(p => p.weather_refund === 1) ? 'Yes' : 'No'}</Typography>
-                                            <Typography><b>Marketing:</b> {bookingDetail.booking.hear_about_us || 'N/A'}</Typography>
-                                            <Typography><b>Reason for Ballooning:</b> {bookingDetail.booking.ballooning_reason || 'N/A'}</Typography>
-                                            <Button variant="outlined" color="primary" style={{ marginTop: 8 }} onClick={() => alert('Add Add On clicked!')}>Add Add On</Button>
+                                            <Typography><b>WX Refundable:</b> {activeTab === 'vouchers' ? '-' : (bookingDetail.passengers && bookingDetail.passengers.some(p => p.weather_refund === 1) ? 'Yes' : 'No')}</Typography>
+                                            <Typography><b>Marketing:</b> {activeTab === 'vouchers' ? (bookingDetail.booking.marketing || 'N/A') : (bookingDetail.booking.hear_about_us || 'N/A')}</Typography>
+                                            <Typography><b>Reason for Ballooning:</b> {activeTab === 'vouchers' ? (bookingDetail.booking.reason_for_ballooning || 'N/A') : (bookingDetail.booking.ballooning_reason || 'N/A')}</Typography>
                                         </Box>
                                     </Grid>
                                     {/* Main Details */}
@@ -780,57 +810,61 @@ const BookingPage = () => {
                                             <Box sx={{ mb: 2, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                                                 <Box>
                                                     <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Current Booking</Typography>
-                                                    <Typography><b>Activity:</b> {bookingDetail.booking.flight_type} - {bookingDetail.booking.location}</Typography>
-                                                    <Typography><b>Booked For:</b> {bookingDetail.booking.flight_date ? dayjs(bookingDetail.booking.flight_date).format('DD/MM/YYYY HH:mm') : '-'}</Typography>
-                                                    <Typography>
-                                                        <b>Redeemed Voucher:</b> {bookingDetail.booking.voucher_code ? <span style={{ color: 'green', fontWeight: 600 }}>Yes</span> : <span style={{ color: 'red', fontWeight: 600 }}>No</span>} <span style={{ fontWeight: 500 }}>{bookingDetail.booking.voucher_code || ''}</span>
-                                                    </Typography>
+                                                    {activeTab === 'vouchers' ? (
+                                                        <>
+                                                            <Typography><b>Flight Type:</b> {bookingDetail.booking.flight_type || '-'}</Typography>
+                                                            <Typography><b>Voucher Type:</b> {bookingDetail.booking.voucher_type || '-'}</Typography>
+                                                            <Typography><b>Paid:</b> £{bookingDetail.booking.paid || '0.00'}</Typography>
+                                                            <Typography><b>Redeemed:</b> {bookingDetail.booking.redeemed || '-'}</Typography>
+                                                            <Typography><b>Offer Code:</b> {bookingDetail.booking.offer_code || '-'}</Typography>
+                                                            <Typography><b>Voucher Ref:</b> {bookingDetail.booking.voucher_ref || '-'}</Typography>
+                                                            <Typography><b>Expires:</b> {bookingDetail.booking.expires || '-'}</Typography>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Typography><b>Activity:</b> {bookingDetail.booking.flight_type} - {bookingDetail.booking.location}</Typography>
+                                                            <Typography><b>Booked For:</b> {bookingDetail.booking.flight_date ? dayjs(bookingDetail.booking.flight_date).format('DD/MM/YYYY HH:mm') : '-'}</Typography>
+                                                            <Typography>
+                                                                <b>Redeemed Voucher:</b> {bookingDetail.booking.voucher_code ? <span style={{ color: 'green', fontWeight: 600 }}>Yes</span> : <span style={{ color: 'red', fontWeight: 600 }}>No</span>} <span style={{ fontWeight: 500 }}>{bookingDetail.booking.voucher_code || ''}</span>
+                                                            </Typography>
+                                                        </>
+                                                    )}
                                                 </Box>
                                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 140 }}>
-                                                    <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }}>Rebook</Button>
-                                                    <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleAddGuestClick}>Add Guest</Button>
-                                                    <Button variant="contained" color="info" sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d' }} onClick={handleCancelFlight}>Cancel Flight</Button>
+                                                    {/* Butonlar sadece booking için aktif, voucher için gizli */}
+                                                    {activeTab !== 'vouchers' && <>
+                                                        <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }}>Rebook</Button>
+                                                        <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleAddGuestClick}>Add Guest</Button>
+                                                        <Button variant="contained" color="info" sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d' }} onClick={handleCancelFlight}>Cancel Flight</Button>
+                                                    </>}
                                                 </Box>
                                             </Box>
                                             <Divider sx={{ my: 2 }} />
                                             {/* Passenger Details */}
                                             <Box sx={{ mb: 2 }}>
                                                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Passenger Details</Typography>
-                                                {bookingDetail.passengers && bookingDetail.passengers.length > 0 ? bookingDetail.passengers.map((p, i) => (
-                                                    <Typography key={i}>Passenger {i + 1}: {p.first_name || '-'} {p.last_name || '-'}{p.weight ? ` (${p.weight}kg)` : ''}</Typography>
-                                                )) : null}
+                                                {activeTab === 'vouchers' ? (
+                                                    <Typography>-</Typography>
+                                                ) : (
+                                                    bookingDetail.passengers && bookingDetail.passengers.length > 0 ? bookingDetail.passengers.map((p, i) => (
+                                                        <Typography key={i}>Passenger {i + 1}: {p.first_name || '-'} {p.last_name || '-'}{p.weight ? ` (${p.weight}kg)` : ''}</Typography>
+                                                    )) : null
+                                                )}
                                             </Box>
                                             <Divider sx={{ my: 2 }} />
                                             {/* Notes */}
                                             <Box>
                                                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Notes</Typography>
-                                                <Box sx={{ mb: 2, background: '#f7f7f7', p: 2, borderRadius: 2 }}>
-                                                    <TextField
-                                                        multiline
-                                                        minRows={2}
-                                                        maxRows={6}
-                                                        fullWidth
-                                                        placeholder="Type your message here..."
-                                                        value={newNote}
-                                                        onChange={e => setNewNote(e.target.value)}
-                                                        disabled={addingNote}
-                                                    />
-                                                    <Button
-                                                        variant="contained"
-                                                        color="primary"
-                                                        sx={{ mt: 1 }}
-                                                        onClick={handleAddNote}
-                                                        disabled={addingNote || !newNote.trim()}
-                                                    >
-                                                        {addingNote ? 'Adding...' : 'Add Note'}
-                                                    </Button>
-                                                </Box>
-                                                {bookingDetail.notes && bookingDetail.notes.length > 0 ? bookingDetail.notes.map((n, i) => (
-                                                    <Box key={i} sx={{ mb: 1, p: 1, background: '#fff', borderRadius: 1, boxShadow: 0 }}>
-                                                        <Typography variant="body2" sx={{ color: '#888', fontSize: 12 }}>{n.date ? dayjs(n.date).format('DD/MM/YYYY HH:mm') : ''}</Typography>
-                                                        <Typography>{n.notes}</Typography>
-                                                    </Box>
-                                                )) : <Typography>No notes</Typography>}
+                                                {activeTab === 'vouchers' ? (
+                                                    <Typography>No notes</Typography>
+                                                ) : (
+                                                    bookingDetail.notes && bookingDetail.notes.length > 0 ? bookingDetail.notes.map((n, i) => (
+                                                        <Box key={i} sx={{ mb: 1, p: 1, background: '#fff', borderRadius: 1, boxShadow: 0 }}>
+                                                            <Typography variant="body2" sx={{ color: '#888', fontSize: 12 }}>{n.date ? dayjs(n.date).format('DD/MM/YYYY HH:mm') : ''}</Typography>
+                                                            <Typography>{n.notes}</Typography>
+                                                        </Box>
+                                                    )) : <Typography>No notes</Typography>
+                                                )}
                                             </Box>
                                         </Box>
                                     </Grid>
