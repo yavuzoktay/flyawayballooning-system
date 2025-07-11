@@ -399,6 +399,41 @@ const BookingPage = () => {
         window.URL.revokeObjectURL(url);
     }
 
+    const handleCancelFlight = async () => {
+        if (!bookingDetail?.booking?.id) return;
+        try {
+            // flight_attempts +1
+            const newAttempts = (parseInt(bookingDetail.booking.flight_attempts || 0, 10) + 1).toString();
+            // Status'u Cancelled yap
+            await axios.patch('/api/updateBookingField', {
+                booking_id: bookingDetail.booking.id,
+                field: 'status',
+                value: 'Cancelled'
+            });
+            // flight_attempts güncelle
+            await axios.patch('/api/updateBookingField', {
+                booking_id: bookingDetail.booking.id,
+                field: 'flight_attempts',
+                value: newAttempts
+            });
+            // Local state güncelle
+            setBookingDetail(prev => ({
+                ...prev,
+                booking: {
+                    ...prev.booking,
+                    status: 'Cancelled',
+                    flight_attempts: newAttempts
+                }
+            }));
+            // Tabloyu güncellemek için tekrar veri çek
+            // (veya setBooking ile localde güncelle)
+            setBooking(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, status: 'Cancelled', flight_attempts: newAttempts } : b));
+            setFilteredData(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, status: 'Cancelled', flight_attempts: newAttempts } : b));
+        } catch (err) {
+            alert('Cancel işlemi başarısız!');
+        }
+    };
+
     return (
         <div className="booking-page-wrap">
             <Container maxWidth="xl">
@@ -703,6 +738,25 @@ const BookingPage = () => {
                                                 </>
                                             )}</Typography>
                                             <Typography><b>Paid:</b> £{bookingDetail.booking.paid}</Typography>
+                                            <Typography><b>Expires:</b> {editField === 'expires' ? (
+                                                <>
+                                                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                                                        <DatePicker
+                                                            value={editValue ? dayjs(editValue) : null}
+                                                            onChange={date => setEditValue(date ? date.format('YYYY-MM-DD') : '')}
+                                                            format="DD/MM/YYYY"
+                                                            slotProps={{ textField: { size: 'small' } }}
+                                                        />
+                                                        <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                        <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                    </LocalizationProvider>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    {bookingDetail.booking.expires ? dayjs(bookingDetail.booking.expires).format('DD/MM/YYYY') : '-'}
+                                                    <IconButton size="small" onClick={() => handleEditClick('expires', bookingDetail.booking.expires)}><EditIcon fontSize="small" /></IconButton>
+                                                </>
+                                            )}</Typography>
                                         </Box>
                                         {/* Additional */}
                                         <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
@@ -735,7 +789,7 @@ const BookingPage = () => {
                                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 140 }}>
                                                     <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }}>Rebook</Button>
                                                     <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleAddGuestClick}>Add Guest</Button>
-                                                    <Button variant="contained" color="info" sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d' }}>Cancel Flight</Button>
+                                                    <Button variant="contained" color="info" sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d' }} onClick={handleCancelFlight}>Cancel Flight</Button>
                                                 </Box>
                                             </Box>
                                             <Divider sx={{ my: 2 }} />
