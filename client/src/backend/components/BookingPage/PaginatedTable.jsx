@@ -45,7 +45,12 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick }) => {
 
     return (
         <>
-            <table border="1" style={{ width: "100%", background: "#FFF", marginTop: "10px", borderCollapse: "collapse" }}>
+            <table border="1" style={{ width: "100%", background: "#FFF", marginTop: "10px", borderCollapse: "collapse", tableLayout: "fixed" }}>
+                <colgroup>
+                    {columns.map((col) => (
+                        <col key={col} style={{ width: col === 'email' ? '240px' : col === 'name' ? '180px' : col === 'status' ? '120px' : 'auto', minWidth: col === 'email' ? '240px' : col === 'name' ? '180px' : col === 'status' ? '120px' : '80px', maxWidth: col === 'email' ? '240px' : undefined }} />
+                    ))}
+                </colgroup>
                 <thead style={{ background: "#3274b4", color: "#FFF" }}>
                     <tr>
                         {mainHead.map((col, index) => (
@@ -59,7 +64,7 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick }) => {
                         return (
                             <tr key={idx}>
                                 {columns.map((col) => (
-                                    <td key={col} style={{ textAlign: "center", padding: "8px" }}>
+                                    <td key={col} style={{ textAlign: "center", padding: "8px", wordBreak: "break-all", overflowWrap: "break-word" }}>
                                         {col === 'name' ? (
                                             <span
                                                 style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer' }}

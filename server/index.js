@@ -1256,3 +1256,64 @@ app.delete('/api/activity/:id', (req, res) => {
         });
     });
 });
+
+app.get('/api/getVoucherDetail', async (req, res) => {
+    const { voucher_ref, id } = req.query;
+    if (!voucher_ref && !id) {
+        return res.status(400).json({ success: false, message: 'voucher_ref or id is required' });
+    }
+    try {
+        // 1. Voucher ana bilgileri
+        const [voucherRows] = await new Promise((resolve, reject) => {
+            con.query('SELECT * FROM all_vouchers WHERE ' + (voucher_ref ? 'voucher_ref = ?' : 'id = ?'), [voucher_ref || id], (err, rows) => {
+                if (err) reject(err);
+                else resolve([rows]);
+            });
+        });
+        if (!voucherRows || voucherRows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Voucher not found' });
+        }
+        const voucher = voucherRows[0];
+        // 2. İlgili booking (varsa)
+        let booking = null;
+        let passengers = [];
+        let notes = [];
+        if (voucher.voucher_ref) {
+            const [bookingRows] = await new Promise((resolve, reject) => {
+                con.query('SELECT * FROM all_booking WHERE voucher_code = ?', [voucher.voucher_ref], (err, rows) => {
+                    if (err) reject(err);
+                    else resolve([rows]);
+                });
+            });
+            if (bookingRows && bookingRows.length > 0) {
+                booking = bookingRows[0];
+                // 3. Passenger bilgileri
+                const [passengerRows] = await new Promise((resolve, reject) => {
+                    con.query('SELECT * FROM passenger WHERE booking_id = ?', [booking.id], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
+                });
+                passengers = passengerRows;
+                // 4. Notes (admin_notes)
+                const [notesRows] = await new Promise((resolve, reject) => {
+                    con.query('SELECT * FROM admin_notes WHERE booking_id = ?', [booking.id], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
+                });
+                notes = notesRows;
+            }
+        }
+        res.json({
+            success: true,
+            voucher,
+            booking,
+            passengers,
+            notes
+        });
+    } catch (err) {
+        console.error('Error fetching voucher detail:', err);
+        res.status(500).json({ success: false, message: 'Database error', error: err.message });
+    }
+});
