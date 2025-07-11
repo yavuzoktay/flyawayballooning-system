@@ -33,6 +33,7 @@ import DialogActions from "@mui/material/DialogActions";
 import dayjs from 'dayjs';
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import RebookAvailabilityModal from '../components/BookingPage/RebookAvailabilityModal';
 
 
 const Manifest = () => {
@@ -61,6 +62,8 @@ const Manifest = () => {
     const [savingEdit, setSavingEdit] = useState(false);
     const [newNote, setNewNote] = useState('');
     const [addingNote, setAddingNote] = useState(false);
+    const [rebookModalOpen, setRebookModalOpen] = useState(false);
+    const [rebookLoading, setRebookLoading] = useState(false);
 
     const booking = useMemo(() => Array.isArray(bookingHook.booking) ? bookingHook.booking : [], [bookingHook.booking]);
     const bookingLoading = typeof bookingHook.loading === 'boolean' ? bookingHook.loading : true;
@@ -337,6 +340,49 @@ const Manifest = () => {
             setFlights(prev => prev.map(f => f.id === bookingDetail.booking.id ? { ...f, status: 'Cancelled', flight_attempts: newAttempts } : f));
         } catch (err) {
             alert('Cancel işlemi başarısız!');
+        }
+    };
+
+    const handleRebook = () => {
+        setRebookModalOpen(true);
+    };
+
+    const handleRebookSlotSelect = async (date, time, activityId) => {
+        if (!bookingDetail || !bookingDetail.booking) return;
+        setRebookLoading(true);
+        try {
+            const payload = {
+                activitySelect: bookingDetail.booking.flight_type,
+                chooseLocation: bookingDetail.booking.location,
+                chooseFlightType: { type: bookingDetail.booking.flight_type, passengerCount: bookingDetail.booking.pax },
+                activity_id: activityId,
+                passengerData: [
+                    {
+                        firstName: bookingDetail.booking.name?.split(' ')[0] || '',
+                        lastName: bookingDetail.booking.name?.split(' ').slice(1).join(' ') || '',
+                        weight: bookingDetail.passengers?.[0]?.weight || '',
+                        email: bookingDetail.booking.email || '',
+                        phone: bookingDetail.booking.phone || '',
+                        ticketType: bookingDetail.booking.flight_type || '',
+                        weatherRefund: bookingDetail.passengers?.[0]?.weather_refund || false
+                    }
+                ],
+                selectedDate: dayjs(date).format('YYYY-MM-DD') + ' ' + time,
+                totalPrice: bookingDetail.booking.paid || 0,
+                additionalInfo: { notes: bookingDetail.booking.additional_notes || '' },
+                voucher_code: bookingDetail.booking.voucher_code || null
+            };
+            await axios.post('/api/createBooking', payload);
+            setRebookModalOpen(false);
+            setDetailDialogOpen(false);
+            // Tabloyu güncelle
+            if (typeof bookingHook.refetch === 'function') {
+                await bookingHook.refetch();
+            }
+        } catch (err) {
+            alert('Rebooking failed!');
+        } finally {
+            setRebookLoading(false);
         }
     };
 
@@ -662,7 +708,7 @@ const Manifest = () => {
                                                 </Typography>
                                             </Box>
                                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 140 }}>
-                                                <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }}>Rebook</Button>
+                                                <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleRebook}>Rebook</Button>
                                                 <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleAddGuestClick}>Add Guest</Button>
                                                 <Button variant="contained" color="info" sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d' }} onClick={handleCancelFlight}>Cancel Flight</Button>
                                             </Box>
@@ -747,6 +793,12 @@ const Manifest = () => {
                     <Button onClick={handleSaveGuests} variant="contained" color="primary">Save</Button>
                 </DialogActions>
             </Dialog>
+            <RebookAvailabilityModal
+                open={rebookModalOpen}
+                onClose={() => setRebookModalOpen(false)}
+                location={bookingDetail?.booking?.location}
+                onSlotSelect={handleRebookSlotSelect}
+            />
         </div>
     );
 };
