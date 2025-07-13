@@ -1,7 +1,7 @@
 import axios from "axios";
 import React, { useEffect, useState } from "react";
 import PaginatedTable from "../components/BookingPage/PaginatedTable";
-import { Container, FormControl, InputLabel, MenuItem, OutlinedInput, Select, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Grid, Typography, Box, Divider, IconButton } from "@mui/material";
+import { Container, FormControl, InputLabel, MenuItem, OutlinedInput, Select, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Grid, Typography, Box, Divider, IconButton, Table, TableHead, TableRow, TableCell, TableBody } from "@mui/material";
 import dayjs from 'dayjs';
 import EditIcon from '@mui/icons-material/Edit';
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
@@ -45,6 +45,7 @@ const BookingPage = () => {
     const [bookingDetail, setBookingDetail] = useState(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
     const [detailError, setDetailError] = useState(null);
+    const [bookingHistory, setBookingHistory] = useState([]);
 
     // Add Guest dialog state
     const [addGuestDialogOpen, setAddGuestDialogOpen] = useState(false);
@@ -225,6 +226,11 @@ const BookingPage = () => {
             axios.get(`/api/getBookingDetail?booking_id=${selectedBookingId}`)
                 .then(res => {
                     setBookingDetail(res.data);
+                    // Ayrıca booking history'yi çek
+                    return axios.get(`/api/getBookingHistory?booking_id=${selectedBookingId}`);
+                })
+                .then(res => {
+                    setBookingHistory(res.data.history || []);
                 })
                 .catch(err => {
                     setDetailError('Detaylar alınamadı');
@@ -232,6 +238,7 @@ const BookingPage = () => {
                 .finally(() => setLoadingDetail(false));
         } else {
             setBookingDetail(null);
+            setBookingHistory([]);
         }
     }, [detailDialogOpen, selectedBookingId]);
 
@@ -749,7 +756,7 @@ const BookingPage = () => {
                             <Typography>Loading...</Typography>
                         ) : detailError ? (
                             <Typography color="error">{detailError}</Typography>
-                        ) : bookingDetail && bookingDetail.success ? (
+                        ) : bookingDetail && bookingDetail.success && (
                             <Box>
                                 <Grid container spacing={2}>
                                     {/* Personal Details */}
@@ -932,45 +939,73 @@ const BookingPage = () => {
                                             {/* Notes */}
                                             <Box>
                                                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Notes</Typography>
-                                                {activeTab === 'vouchers' ? (
-                                                    <Typography>No notes</Typography>
-                                                ) : (
-                                                    <>
-                                                        <Box sx={{ mb: 2, background: '#f7f7f7', p: 2, borderRadius: 2 }}>
-                                                            <TextField
-                                                                multiline
-                                                                minRows={2}
-                                                                maxRows={6}
-                                                                fullWidth
-                                                                placeholder="Type your message here..."
-                                                                value={newNote}
-                                                                onChange={e => setNewNote(e.target.value)}
-                                                                disabled={addingNote}
-                                                            />
-                                                            <Button
-                                                                variant="contained"
-                                                                color="primary"
-                                                                sx={{ mt: 1 }}
-                                                                onClick={handleAddNote}
-                                                                disabled={addingNote || !newNote.trim()}
-                                                            >
-                                                                {addingNote ? 'Adding...' : 'Add Note'}
-                                                            </Button>
-                                                        </Box>
-                                                        {bookingDetail.notes && bookingDetail.notes.length > 0 ? bookingDetail.notes.map((n, i) => (
-                                                            <Box key={i} sx={{ mb: 1, p: 1, background: '#fff', borderRadius: 1, boxShadow: 0 }}>
-                                                                <Typography variant="body2" sx={{ color: '#888', fontSize: 12 }}>{n.date ? dayjs(n.date).format('DD/MM/YYYY HH:mm') : ''}</Typography>
-                                                                <Typography>{n.notes}</Typography>
-                                                            </Box>
-                                                        )) : <Typography>No notes</Typography>}
-                                                    </>
-                                                )}
+                                                <Box sx={{ mb: 2, background: '#f7f7f7', p: 2, borderRadius: 2 }}>
+                                                    <TextField
+                                                        multiline
+                                                        minRows={2}
+                                                        maxRows={6}
+                                                        fullWidth
+                                                        placeholder="Type your message here..."
+                                                        value={newNote}
+                                                        onChange={e => setNewNote(e.target.value)}
+                                                        disabled={addingNote}
+                                                    />
+                                                    <Button
+                                                        variant="contained"
+                                                        color="primary"
+                                                        sx={{ mt: 1 }}
+                                                        onClick={handleAddNote}
+                                                        disabled={addingNote || !newNote.trim()}
+                                                    >
+                                                        {addingNote ? 'Adding...' : 'Add Note'}
+                                                    </Button>
+                                                </Box>
+                                                {bookingDetail.notes && bookingDetail.notes.length > 0 ? bookingDetail.notes.map((n, i) => (
+                                                    <Box key={i} sx={{ mb: 1, p: 1, background: '#fff', borderRadius: 1, boxShadow: 0 }}>
+                                                        <Typography variant="body2" sx={{ color: '#888', fontSize: 12 }}>{n.date ? dayjs(n.date).format('DD/MM/YYYY HH:mm') : ''}</Typography>
+                                                        <Typography>{n.notes}</Typography>
+                                                    </Box>
+                                                )) : <Typography>No notes</Typography>}
+                                            </Box>
+                                            <Divider sx={{ my: 2 }} />
+                                            {/* HISTORY SECTION - visually separated */}
+                                            <Box sx={{ background: '#e0e0e0', borderRadius: 2, p: 2, mt: 2, mb: 2 }}>
+                                                <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>History</Typography>
+                                                <Table>
+                                                    <TableHead>
+                                                        <TableRow>
+                                                            <TableCell>Booking Date</TableCell>
+                                                            <TableCell>Booking ID</TableCell>
+                                                            <TableCell>Activity Type</TableCell>
+                                                            <TableCell>Location</TableCell>
+                                                            <TableCell>Status</TableCell>
+                                                        </TableRow>
+                                                    </TableHead>
+                                                    <TableBody>
+                                                        <TableRow>
+                                                            <TableCell>{bookingDetail.booking.created_at ? dayjs(bookingDetail.booking.created_at).format('DD/MM/YYYY HH:mm') : '-'}</TableCell>
+                                                            <TableCell>{bookingDetail.booking.id || '-'}</TableCell>
+                                                            <TableCell>{bookingDetail.booking.flight_type || '-'}</TableCell>
+                                                            <TableCell>{bookingDetail.booking.location || '-'}</TableCell>
+                                                            <TableCell>Scheduled</TableCell>
+                                                        </TableRow>
+                                                        {bookingHistory.map((h, i) => (
+                                                            <TableRow key={i}>
+                                                                <TableCell>{h.changed_at ? dayjs(h.changed_at).format('DD/MM/YYYY HH:mm') : '-'}</TableCell>
+                                                                <TableCell>{bookingDetail.booking.id || '-'}</TableCell>
+                                                                <TableCell>{bookingDetail.booking.flight_type || '-'}</TableCell>
+                                                                <TableCell>{bookingDetail.booking.location || '-'}</TableCell>
+                                                                <TableCell>{h.status}</TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
                                             </Box>
                                         </Box>
                                     </Grid>
                                 </Grid>
                             </Box>
-                        ) : null}
+                        )}
                     </DialogContent>
                     <DialogActions sx={{ background: '#f7f7f7' }}>
                         <Button onClick={() => { setDetailDialogOpen(false); setSelectedBookingId(null); }} color="primary" variant="contained">Close</Button>
