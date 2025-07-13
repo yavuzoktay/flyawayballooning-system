@@ -65,6 +65,47 @@ const Manifest = () => {
     const [rebookModalOpen, setRebookModalOpen] = useState(false);
     const [rebookLoading, setRebookLoading] = useState(false);
 
+    // Add state for global menu anchor
+    const [globalMenuAnchorEl, setGlobalMenuAnchorEl] = useState(null);
+    // Add state for the current group (first) for which the menu is open
+    const [globalMenuGroup, setGlobalMenuGroup] = useState(null);
+    // Add state for the current group's flights
+    const [globalMenuGroupFlights, setGlobalMenuGroupFlights] = useState([]);
+    const handleGlobalMenuOpen = (event, group, groupFlights) => {
+      setGlobalMenuAnchorEl(event.currentTarget);
+      setGlobalMenuGroup(group);
+      setGlobalMenuGroupFlights(groupFlights);
+    };
+    const handleGlobalMenuClose = () => {
+      setGlobalMenuAnchorEl(null);
+      setGlobalMenuGroup(null);
+    };
+    const handleGlobalMenuAction = async (action) => {
+      if (action === 'cancelAllGuests') {
+        if (!globalMenuGroup?.id) return;
+        try {
+          // Find all booking IDs in the group
+          const groupBookingIds = globalMenuGroupFlights.map(f => f.id);
+          // Cancel all bookings in parallel
+          await Promise.all(groupBookingIds.map(id =>
+            axios.patch('/api/updateBookingField', {
+              booking_id: id,
+              field: 'status',
+              value: 'Cancelled'
+            })
+          ));
+          // Remove all group bookings from UI
+          setFlights(prev => prev.filter(f => !groupBookingIds.includes(f.id)));
+        } catch (err) {
+          alert('Failed to cancel all guests: ' + (err.message || 'Unknown error'));
+        }
+        handleGlobalMenuClose();
+        return;
+      }
+      console.log('Action:', action);
+      handleGlobalMenuClose();
+    };
+
     const booking = useMemo(() => Array.isArray(bookingHook.booking) ? bookingHook.booking : [], [bookingHook.booking]);
     const bookingLoading = typeof bookingHook.loading === 'boolean' ? bookingHook.loading : true;
     const passenger = useMemo(() => Array.isArray(pessangerHook.passenger) ? pessangerHook.passenger : [], [pessangerHook.passenger]);
@@ -298,7 +339,7 @@ const Manifest = () => {
                     return f;
                 }));
             } else {
-                await fetchBookingDetail(bookingDetail.booking.id);
+            await fetchBookingDetail(bookingDetail.booking.id);
             }
             if (typeof bookingHook.refetch === 'function') {
                 await bookingHook.refetch();
@@ -457,45 +498,33 @@ const Manifest = () => {
                             return (
                                 <Card key={groupKey} sx={{ marginBottom: 2 }}>
                                     <CardContent>
-                                        <Grid container spacing={2} alignItems="center">
-                                            <Grid item xs={12} md={3}>
+                                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                                            <Box display="flex" flexDirection="column" alignItems="flex-start">
                                                 <Typography variant="h6">{activityName}</Typography>
-                                            </Grid>
-                                            <Grid item xs={12} md={3}>
-                                                <Typography>Pax Booked: {paxBooked} / {paxTotal}</Typography>
-                                                <Typography>Balloon Resource: {balloonResource}</Typography>
-                                            </Grid>
-                                            <Grid item xs={12} md={3}>
-                                                <Typography>
-                                                    Status: <span style={{color: status === 'Open' ? 'green' : 'red', fontWeight: 'bold'}}>{status}</span>
-                                                    <Button
-                                                        size="small"
-                                                        variant="outlined"
-                                                        sx={{ ml: 2 }}
-                                                        onClick={async () => {
-                                                            // Yeni status'ü belirle
-                                                            const newStatus = status === 'Open' ? 0 : 1; // 1: Open, 0: Closed
-                                                            // Tüm booking'ler için güncelle
-                                                            await Promise.all(groupFlights.map(async (flight) => {
-                                                                await axios.post('/api/updateBookingStatus', {
-                                                                    booking_id: flight.id,
-                                                                    manual_status_override: newStatus
-                                                                });
-                                                            }));
-                                                            // Local state'i güncelle
-                                                            setFlights(prev => prev.map(f =>
-                                                                groupFlights.some(gf => gf.id === f.id)
-                                                                    ? { ...f, manual_status_override: newStatus }
-                                                                    : f
-                                                            ));
-                                                        }}
-                                                    >
-                                                        {status === 'Open' ? 'Close Slot' : 'Open Slot'}
-                                                    </Button>
-                                                </Typography>
-                                                <Typography>Type: {first.flight_type}</Typography>
-                                            </Grid>
-                                        </Grid>
+                                                <Box display="flex" alignItems="center" gap={3} mt={1}>
+                                                    <Typography>Pax Booked: {paxBooked} / {paxTotal}</Typography>
+                                                    <Typography>Balloon Resource: {balloonResource}</Typography>
+                                                    <Typography>Status: <span style={{ color: status === 'Closed' ? 'red' : 'green', fontWeight: 600 }}>{status}</span></Typography>
+                                                    <Typography>Type: {first.flight_type}</Typography>
+                                                </Box>
+                                            </Box>
+                                            <IconButton size="large" onClick={e => handleGlobalMenuOpen(e, first, groupFlights)}>
+                                                <MoreVertIcon />
+                                            </IconButton>
+                                            <Menu
+                                                anchorEl={globalMenuAnchorEl}
+                                                open={Boolean(globalMenuAnchorEl)}
+                                                onClose={handleGlobalMenuClose}
+                                                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                                                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                                            >
+                                                <MenuItem onClick={() => handleGlobalMenuAction('cancelAllGuests')}>Cancel All Guests</MenuItem>
+                                                <MenuItem onClick={() => handleGlobalMenuAction('sendMessageAllGuests')}>Send Message to All Guests</MenuItem>
+                                                <MenuItem onClick={() => handleGlobalMenuAction('changeTimeSlotStatus')}>Change Time Slot Status</MenuItem>
+                                                <MenuItem onClick={() => handleGlobalMenuAction('bookCustomerOntoFlight')}>Book Customer onto Flight</MenuItem>
+                                                <MenuItem onClick={() => handleGlobalMenuAction('changeAllPassengerStatuses')}>Change all passenger statuses</MenuItem>
+                                            </Menu>
+                                        </Box>
                                         <Divider sx={{ marginY: 2 }} />
                                         <TableContainer component={Paper} sx={{ marginTop: 2 }}>
                                             <Table>
@@ -516,23 +545,23 @@ const Manifest = () => {
                                                 <TableBody>
                                                     {groupFlights.map((flight, idx) => (
                                                         <React.Fragment key={flight.id}>
-                                                            {flight.passengers.map((passenger, index) => (
-                                                                <TableRow key={index}>
+                                                    {flight.passengers.map((passenger, index) => (
+                                                        <TableRow key={index}>
                                                                     <TableCell>
                                                                         <span style={{ color: '#3274b4', cursor: 'pointer', textDecoration: 'underline' }}
                                                                             onClick={() => handleNameClick(passenger.booking_id)}>
                                                                             {passenger.booking_id || ''}
                                                                         </span>
                                                                     </TableCell>
-                                                                    <TableCell>
-                                                                        <span style={{ color: '#3274b4', cursor: 'pointer', textDecoration: 'underline' }}
-                                                                            onClick={() => handleNameClick(passenger.booking_id)}>
-                                                                            {flight.name || ''}
-                                                                        </span>
-                                                                    </TableCell>
-                                                                    <TableCell>{passenger.weight || ''}</TableCell>
-                                                                    <TableCell>{flight.phone || ''}</TableCell>
-                                                                    <TableCell>{flight.email || ''}</TableCell>
+                                                            <TableCell>
+                                                                <span style={{ color: '#3274b4', cursor: 'pointer', textDecoration: 'underline' }}
+                                                                    onClick={() => handleNameClick(passenger.booking_id)}>
+                                                                    {flight.name || ''}
+                                                                </span>
+                                                            </TableCell>
+                                                            <TableCell>{passenger.weight || ''}</TableCell>
+                                                            <TableCell>{flight.phone || ''}</TableCell>
+                                                            <TableCell>{flight.email || ''}</TableCell>
                                                                     <TableCell>{(() => {
                                                                         if (flight.time_slot) return flight.time_slot;
                                                                         if (flight.flight_date && flight.flight_date.length >= 16) {
@@ -540,23 +569,23 @@ const Manifest = () => {
                                                                         }
                                                                         return '';
                                                                     })()}</TableCell>
-                                                                    <TableCell>{passenger.weatherRefund || passenger.weather_refund ? 'Yes' : 'No'}</TableCell>
+                                                            <TableCell>{passenger.weatherRefund || passenger.weather_refund ? 'Yes' : 'No'}</TableCell>
                                                                     <TableCell>{(() => {
-                                                                        if (Array.isArray(flight.choose_add_on)) {
-                                                                            return flight.choose_add_on.join(', ');
-                                                                        }
-                                                                        if (typeof flight.choose_add_on === 'string') {
-                                                                            try {
-                                                                                const parsed = JSON.parse(flight.choose_add_on);
-                                                                                if (Array.isArray(parsed)) {
-                                                                                    return parsed.join(', ');
-                                                                                }
-                                                                                return flight.choose_add_on;
-                                                                            } catch {
-                                                                                return flight.choose_add_on;
+                                                                    if (Array.isArray(flight.choose_add_on)) {
+                                                                        return flight.choose_add_on.join(', ');
+                                                                    }
+                                                                    if (typeof flight.choose_add_on === 'string') {
+                                                                        try {
+                                                                            const parsed = JSON.parse(flight.choose_add_on);
+                                                                            if (Array.isArray(parsed)) {
+                                                                                return parsed.join(', ');
                                                                             }
+                                                                            return flight.choose_add_on;
+                                                                        } catch {
+                                                                            return flight.choose_add_on;
                                                                         }
-                                                                        return '';
+                                                                    }
+                                                                    return '';
                                                                     })()}</TableCell>
                                                                     <TableCell>{flight.additional_notes || ''}</TableCell>
                                                                     <TableCell>
@@ -587,8 +616,8 @@ const Manifest = () => {
                                                             <TableRow>
                                                                 <TableCell colSpan={10} style={{ textAlign: 'right', fontWeight: 600, background: '#f5f5f5' }}>
                                                                     Total Weight: {flight.passengers.reduce((sum, p) => sum + (parseFloat(p.weight) || 0), 0)} kg
-                                                                </TableCell>
-                                                            </TableRow>
+                                                            </TableCell>
+                                                        </TableRow>
                                                         </React.Fragment>
                                                     ))}
                                                 </TableBody>

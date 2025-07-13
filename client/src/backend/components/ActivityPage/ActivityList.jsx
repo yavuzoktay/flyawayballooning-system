@@ -214,7 +214,7 @@ const ActivityList = ({ activity }) => {
                     <TextField margin="dense" label="Price" name="price" value={form.price} onChange={handleChange} type="number" fullWidth required />
                     <TextField margin="dense" label="Capacity" name="capacity" value={form.capacity} onChange={handleChange} type="number" fullWidth required />
                     <div style={{ display: 'flex', gap: 16 }}>
-                        <TextField margin="dense" label="Start Date" name="start_date" value={form.start_date} onChange={handleChange} type="date" fullWidth required InputLabelProps={{ shrink: true }} />
+                    <TextField margin="dense" label="Start Date" name="start_date" value={form.start_date} onChange={handleChange} type="date" fullWidth required InputLabelProps={{ shrink: true }} />
                         <TextField
                             margin="dense"
                             label="How often to repeat"
@@ -234,7 +234,7 @@ const ActivityList = ({ activity }) => {
                     </div>
                     {/* Hide End Date if 'just once' is selected */}
                     {form.repeat_option !== 'once' && (
-                        <TextField margin="dense" label="End Date" name="end_date" value={form.end_date} onChange={handleChange} type="date" fullWidth required InputLabelProps={{ shrink: true }} />
+                    <TextField margin="dense" label="End Date" name="end_date" value={form.end_date} onChange={handleChange} type="date" fullWidth required InputLabelProps={{ shrink: true }} />
                     )}
                     <TextField margin="dense" label="Event Time" name="event_time" value={form.event_time} onChange={handleChange} type="time" fullWidth required InputLabelProps={{ shrink: true }} />
                     <TextField margin="dense" label="Location" name="location" value={form.location} onChange={handleChange} fullWidth required />
@@ -312,11 +312,11 @@ const ActivityList = ({ activity }) => {
                             <MenuItem value="weekdays">Weekdays</MenuItem>
                             <MenuItem value="weekends">Weekends</MenuItem>
                         </TextField>
-                        <TextField margin="dense" label="Start Date" name="start_date" value={editForm.start_date || ''} onChange={handleEditChange} type="date" fullWidth required InputLabelProps={{ shrink: true }} />
+                    <TextField margin="dense" label="Start Date" name="start_date" value={editForm.start_date || ''} onChange={handleEditChange} type="date" fullWidth required InputLabelProps={{ shrink: true }} />
                     </div>
                     {/* Hide End Date if 'just once' is selected */}
                     {(editForm.repeat_option || 'custom') !== 'once' && (
-                        <TextField margin="dense" label="End Date" name="end_date" value={editForm.end_date || ''} onChange={handleEditChange} type="date" fullWidth required InputLabelProps={{ shrink: true }} />
+                    <TextField margin="dense" label="End Date" name="end_date" value={editForm.end_date || ''} onChange={handleEditChange} type="date" fullWidth required InputLabelProps={{ shrink: true }} />
                     )}
                     <TextField margin="dense" label="Event Time" name="event_time" value={editForm.event_time || ''} onChange={handleEditChange} type="time" fullWidth required InputLabelProps={{ shrink: true }} />
                     <TextField margin="dense" label="Location" name="location" value={editForm.location || ''} onChange={handleEditChange} fullWidth required />
