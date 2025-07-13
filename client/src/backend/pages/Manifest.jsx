@@ -64,6 +64,7 @@ const Manifest = () => {
     const [addingNote, setAddingNote] = useState(false);
     const [rebookModalOpen, setRebookModalOpen] = useState(false);
     const [rebookLoading, setRebookLoading] = useState(false);
+    const [bookingHistory, setBookingHistory] = useState([]);
 
     // Add state for global menu anchor
     const [globalMenuAnchorEl, setGlobalMenuAnchorEl] = useState(null);
@@ -244,6 +245,11 @@ const Manifest = () => {
             axios.get(`/api/getBookingDetail?booking_id=${selectedBookingId}`)
                 .then(res => {
                     setBookingDetail(res.data);
+                    // Ayrıca booking history'yi çek
+                    return axios.get(`/api/getBookingHistory?booking_id=${selectedBookingId}`);
+                })
+                .then(res => {
+                    setBookingHistory(res.data.history || []);
                 })
                 .catch(err => {
                     setDetailError('Detaylar alınamadı');
@@ -251,6 +257,7 @@ const Manifest = () => {
                 .finally(() => setLoadingDetail(false));
         } else {
             setBookingDetail(null);
+            setBookingHistory([]);
         }
     }, [detailDialogOpen, selectedBookingId]);
 
@@ -590,7 +597,7 @@ const Manifest = () => {
                                                                     <TableCell>{flight.additional_notes || ''}</TableCell>
                                                                     <TableCell>
                                                                         <Select
-                                                                            value={flight.status || 'Scheduled'}
+                                                                            value={['Scheduled','Checked In','Flown','No Show'].includes(flight.status) ? flight.status : 'Scheduled'}
                                                                             onChange={async (e) => {
                                                                                 const newStatus = e.target.value;
                                                                                 await axios.patch('/api/updateBookingField', {
@@ -612,20 +619,21 @@ const Manifest = () => {
                                                                     </TableCell>
                                                                 </TableRow>
                                                             ))}
-                                                            {/* Toplam ağırlık satırı */}
-                                                            <TableRow>
-                                                                <TableCell colSpan={10} style={{ textAlign: 'right', fontWeight: 600, background: '#f5f5f5' }}>
-                                                                    Total Weight: {flight.passengers.reduce((sum, p) => sum + (parseFloat(p.weight) || 0), 0)} kg
-                                                            </TableCell>
-                                                        </TableRow>
                                                         </React.Fragment>
                                                     ))}
                                                 </TableBody>
                                             </Table>
                                         </TableContainer>
                                         <Divider sx={{ marginY: 2 }} />
+                                        {/* Toplamlar tek satırda */}
                                         <Box display="flex" justifyContent="flex-end">
-                                            <Typography variant="h6">{groupFlights.reduce((sum, f) => sum + (parseFloat(f.paid) || 0), 0)}</Typography>
+                                            <TableRow>
+                                                <TableCell colSpan={10} style={{ textAlign: 'right', fontWeight: 600, background: '#f5f5f5' }}>
+                                                    Total Price: £{groupFlights.reduce((sum, f) => sum + (parseFloat(f.paid) || 0), 0)} &nbsp;&nbsp;|
+                                                    Total Weight: {groupFlights.reduce((sum, f) => sum + (f.passengers ? f.passengers.reduce((s, p) => s + (parseFloat(p.weight) || 0), 0) : 0), 0)} kg &nbsp;&nbsp;|
+                                                    Total Pax: {groupFlights.reduce((sum, f) => sum + (f.passengers ? f.passengers.length : 0), 0)}
+                                                </TableCell>
+                                            </TableRow>
                                         </Box>
                                     </CardContent>
                                 </Card>
@@ -814,6 +822,40 @@ const Manifest = () => {
                                                     <Typography>{n.notes}</Typography>
                                                 </Box>
                                             )) : <Typography>No notes</Typography>}
+                                        </Box>
+                                        <Divider sx={{ my: 2 }} />
+                                        {/* HISTORY SECTION - visually separated */}
+                                        <Box sx={{ background: '#e0e0e0', borderRadius: 2, p: 2, mt: 2, mb: 2 }}>
+                                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>History</Typography>
+                                            <Table>
+                                                <TableHead>
+                                                    <TableRow>
+                                                        <TableCell>Booking Date</TableCell>
+                                                        <TableCell>Booking ID</TableCell>
+                                                        <TableCell>Activity Type</TableCell>
+                                                        <TableCell>Location</TableCell>
+                                                        <TableCell>Status</TableCell>
+                                                    </TableRow>
+                                                </TableHead>
+                                                <TableBody>
+                                                    <TableRow>
+                                                        <TableCell>{bookingDetail.booking.created_at ? dayjs(bookingDetail.booking.created_at).format('DD/MM/YYYY HH:mm') : '-'}</TableCell>
+                                                        <TableCell>{bookingDetail.booking.id || '-'}</TableCell>
+                                                        <TableCell>{bookingDetail.booking.flight_type || '-'}</TableCell>
+                                                        <TableCell>{bookingDetail.booking.location || '-'}</TableCell>
+                                                        <TableCell>Scheduled</TableCell>
+                                                    </TableRow>
+                                                    {bookingHistory.map((h, i) => (
+                                                        <TableRow key={i}>
+                                                            <TableCell>{h.changed_at ? dayjs(h.changed_at).format('DD/MM/YYYY HH:mm') : '-'}</TableCell>
+                                                            <TableCell>{bookingDetail.booking.id || '-'}</TableCell>
+                                                            <TableCell>{bookingDetail.booking.flight_type || '-'}</TableCell>
+                                                            <TableCell>{bookingDetail.booking.location || '-'}</TableCell>
+                                                            <TableCell>{h.status}</TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
                                         </Box>
                                     </Box>
                                 </Grid>

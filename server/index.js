@@ -842,7 +842,27 @@ app.patch('/api/updateBookingField', (req, res) => {
             console.error('Error updating booking field:', err);
             return res.status(500).json({ success: false, message: 'Database error' });
         }
-        res.json({ success: true });
+        // If status is updated, also insert into booking_status_history
+        if (field === 'status') {
+            const historySql = 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
+            con.query(historySql, [booking_id, value], (err2) => {
+                if (err2) console.error('History insert error:', err2);
+                // Do not block main response
+                res.json({ success: true });
+            });
+        } else {
+            res.json({ success: true });
+        }
+    });
+});
+
+// Get booking status history for a booking
+app.get('/api/getBookingHistory', (req, res) => {
+    const booking_id = req.query.booking_id;
+    if (!booking_id) return res.status(400).json({ success: false, message: 'booking_id is required' });
+    con.query('SELECT * FROM booking_status_history WHERE booking_id = ? ORDER BY changed_at ASC', [booking_id], (err, rows) => {
+        if (err) return res.status(500).json({ success: false, message: 'DB error' });
+        res.json({ success: true, history: rows });
     });
 });
 
