@@ -125,16 +125,16 @@ app.get("/api/getAllBookingData", (req, res) => {
             const dateSearch = `${y}-${m}-${d}`;
             console.log('Converted date:', dateSearch);
             
-            whereClauses.push(`(
-                name LIKE ? OR
-                id LIKE ? OR
+        whereClauses.push(`(
+            name LIKE ? OR
+            id LIKE ? OR
                 voucher_code LIKE ? OR
                 created_at LIKE ? OR
                 DATE_FORMAT(created_at, '%d/%m/%Y') LIKE ? OR
                 DATE(created_at) = ? OR
                 DATE(CONVERT_TZ(created_at, '+00:00', '+03:00')) = ?
-            )`);
-            const likeSearch = `%${search}%`;
+        )`);
+        const likeSearch = `%${search}%`;
             values.push(likeSearch, likeSearch, likeSearch, likeSearch, likeSearch, dateSearch, dateSearch);
         } else {
             // Sadece LIKE aramaları yap, DATE() fonksiyonlarını kullanma
@@ -187,9 +187,16 @@ app.get("/api/getAllBookingData", (req, res) => {
     });
 });
 
-// Get All Voucher Data
+// Get All Voucher Data (with booking and passenger info)
 app.get('/api/getAllVoucherData', (req, res) => {
-    var voucher = "SELECT * FROM all_vouchers ORDER BY created_at DESC";
+    // Join all_vouchers with all_booking and passenger (if available)
+    const voucher = `
+        SELECT v.*, b.email as booking_email, b.phone as booking_phone, b.id as booking_id, p.weight as passenger_weight
+        FROM all_vouchers v
+        LEFT JOIN all_booking b ON v.voucher_ref = b.voucher_code
+        LEFT JOIN passenger p ON b.id = p.booking_id
+        ORDER BY v.created_at DESC
+    `;
     con.query(voucher, (err, result) => {
         if (err) {
             console.error("Error occurred:", err);
@@ -210,7 +217,11 @@ app.get('/api/getAllVoucherData', (req, res) => {
                 paid: row.paid ?? '',
                 offer_code: row.offer_code ?? '',
                 voucher_ref: row.voucher_ref ?? '',
-                created_at: row.created_at ? moment(row.created_at).format('DD/MM/YYYY HH:mm') : ''
+                created_at: row.created_at ? moment(row.created_at).format('DD/MM/YYYY HH:mm') : '',
+                booking_email: row.booking_email ?? '',
+                booking_phone: row.booking_phone ?? '',
+                booking_id: row.booking_id ?? '',
+                passenger_weight: row.passenger_weight ?? ''
             }));
             res.send({ success: true, data: formatted });
         } else {
