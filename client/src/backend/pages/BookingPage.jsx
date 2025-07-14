@@ -87,6 +87,11 @@ const BookingPage = () => {
     const [editingNoteId, setEditingNoteId] = useState(null);
     const [editingNoteText, setEditingNoteText] = useState("");
 
+    // Add to component state:
+    const [editPrefField, setEditPrefField] = useState(null);
+    const [editPrefValue, setEditPrefValue] = useState("");
+    const [savingPref, setSavingPref] = useState(false);
+
     // Fetch data
     const voucherData = async () => {
         try {
@@ -639,6 +644,39 @@ const BookingPage = () => {
       setBookingDetail(prev => ({ ...prev, notes: res.data.notes }));
     };
 
+    // Add handlers for preferences:
+    const handleEditPref = (field, value) => {
+        setEditPrefField(field);
+        setEditPrefValue(value || "");
+    };
+    const handleCancelPref = () => {
+        setEditPrefField(null);
+        setEditPrefValue("");
+    };
+    const handleSavePref = async (field) => {
+        setSavingPref(true);
+        try {
+            await axios.patch('/api/updateBookingField', {
+                booking_id: bookingDetail.booking.id,
+                field,
+                value: editPrefValue
+            });
+            setBookingDetail(prev => ({
+                ...prev,
+                booking: {
+                    ...prev.booking,
+                    [field]: editPrefValue
+                }
+            }));
+            setEditPrefField(null);
+            setEditPrefValue("");
+        } catch (err) {
+            alert('Failed to update preference.');
+        } finally {
+            setSavingPref(false);
+        }
+    };
+
     return (
         <div className="booking-page-wrap">
             <Container maxWidth="xl">
@@ -1049,9 +1087,72 @@ const BookingPage = () => {
                                         {/* Preferences Section - always visible */}
                                         <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
                                             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Preferences</Typography>
-                                            <Typography><b>Preferred Day:</b> {bookingDetail.booking.preferred_day || '-'}</Typography>
-                                            <Typography><b>Preferred Location:</b> {bookingDetail.booking.preferred_location || '-'}</Typography>
-                                            <Typography><b>Preferred Time:</b> {bookingDetail.booking.preferred_time || '-'}</Typography>
+                                            {/* Preferred Day */}
+                                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                                <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Day:</b></Typography>
+                                                {editPrefField === 'preferred_day' ? (
+                                                    <>
+                                                        <TextField
+                                                            size="small"
+                                                            value={editPrefValue}
+                                                            onChange={e => setEditPrefValue(e.target.value)}
+                                                            sx={{ mr: 1, width: 220 }}
+                                                            disabled={savingPref}
+                                                        />
+                                                        <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_day')} disabled={savingPref}>Save</Button>
+                                                        <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Typography sx={{ mr: 1 }}>{bookingDetail.booking.preferred_day || '-'}</Typography>
+                                                        <Button size="small" onClick={() => handleEditPref('preferred_day', bookingDetail.booking.preferred_day)}>Edit</Button>
+                                                    </>
+                                                )}
+                                            </Box>
+                                            {/* Preferred Location */}
+                                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                                <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Location:</b></Typography>
+                                                {editPrefField === 'preferred_location' ? (
+                                                    <>
+                                                        <TextField
+                                                            size="small"
+                                                            value={editPrefValue}
+                                                            onChange={e => setEditPrefValue(e.target.value)}
+                                                            sx={{ mr: 1, width: 220 }}
+                                                            disabled={savingPref}
+                                                        />
+                                                        <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_location')} disabled={savingPref}>Save</Button>
+                                                        <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Typography sx={{ mr: 1 }}>{bookingDetail.booking.preferred_location || '-'}</Typography>
+                                                        <Button size="small" onClick={() => handleEditPref('preferred_location', bookingDetail.booking.preferred_location)}>Edit</Button>
+                                                    </>
+                                                )}
+                                            </Box>
+                                            {/* Preferred Time */}
+                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Time:</b></Typography>
+                                                {editPrefField === 'preferred_time' ? (
+                                                    <>
+                                                        <TextField
+                                                            size="small"
+                                                            value={editPrefValue}
+                                                            onChange={e => setEditPrefValue(e.target.value)}
+                                                            sx={{ mr: 1, width: 220 }}
+                                                            disabled={savingPref}
+                                                        />
+                                                        <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_time')} disabled={savingPref}>Save</Button>
+                                                        <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Typography sx={{ mr: 1 }}>{bookingDetail.booking.preferred_time || '-'}</Typography>
+                                                        <Button size="small" onClick={() => handleEditPref('preferred_time', bookingDetail.booking.preferred_time)}>Edit</Button>
+                                                    </>
+                                                )}
+                                            </Box>
                                         </Box>
                                     </Grid>
                                     {/* Main Details */}

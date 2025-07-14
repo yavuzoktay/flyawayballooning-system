@@ -853,7 +853,7 @@ app.post('/api/updateBookingStatus', (req, res) => {
 
 app.patch('/api/updateBookingField', (req, res) => {
     const { booking_id, field, value } = req.body;
-    const allowedFields = ['name', 'phone', 'email', 'expires', 'weight', 'status', 'flight_attempts', 'choose_add_on', 'additional_notes']; // additional_notes eklendi
+    const allowedFields = ['name', 'phone', 'email', 'expires', 'weight', 'status', 'flight_attempts', 'choose_add_on', 'additional_notes', 'preferred_day', 'preferred_location', 'preferred_time']; // preferred fields added
     if (!booking_id || !field || !allowedFields.includes(field)) {
         return res.status(400).json({ success: false, message: 'Invalid request' });
     }
