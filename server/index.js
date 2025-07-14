@@ -174,12 +174,29 @@ app.get("/api/getAllBookingData", (req, res) => {
         }
         if (result && result.length > 0) {
             // choose_add_on'u doğrudan string olarak döndür
-            const formatted = result.map(row => ({
-                ...row,
-                created_at: row.created_at ? moment(row.created_at).format('YYYY-MM-DD') : '',
-                created_at_display: row.created_at ? moment(row.created_at).format('DD/MM/YYYY') : '',
-                choose_add_on: row.choose_add_on || ''
-            }));
+            const formatted = result.map(row => {
+                // Format flight_date as DD/MM/YYYY AM/PM if time exists
+                let flightDateFormatted = '';
+                if (row.flight_date) {
+                    // Try to parse as date+time
+                    const dateTime = moment(row.flight_date, ["YYYY-MM-DD HH:mm", "YYYY-MM-DDTHH:mm", "YYYY-MM-DD", "DD/MM/YYYY HH:mm", "DD/MM/YYYY"]);
+                    if (dateTime.isValid()) {
+                        const hour = dateTime.hour();
+                        const ampm = hour < 12 ? 'AM' : 'PM';
+                        flightDateFormatted = dateTime.format('DD/MM/YYYY') + (row.flight_date.length > 10 ? ' ' + ampm : '');
+                    } else {
+                        // Fallback: just show as is
+                        flightDateFormatted = row.flight_date;
+                    }
+                }
+                return {
+                    ...row,
+                    created_at: row.created_at ? moment(row.created_at).format('YYYY-MM-DD') : '',
+                    created_at_display: row.created_at ? moment(row.created_at).format('DD/MM/YYYY') : '',
+                    choose_add_on: row.choose_add_on || '',
+                    flight_date_display: flightDateFormatted
+                };
+            });
             res.send({ success: true, data: formatted });
         } else {
             res.send({ success: false, message: "No bookings found" });
@@ -204,25 +221,30 @@ app.get('/api/getAllVoucherData', (req, res) => {
             return;
         }
         if (result && result.length > 0) {
-            // Null veya undefined alanları boş string olarak döndür
-            const formatted = result.map(row => ({
-                ...row,
-                name: row.name ?? '',
-                flight_type: row.flight_type ?? '',
-                voucher_type: row.voucher_type ?? '',
-                email: row.email ?? '',
-                phone: row.phone ?? '',
-                expires: row.expires ?? '',
-                redeemed: row.redeemed ?? '',
-                paid: row.paid ?? '',
-                offer_code: row.offer_code ?? '',
-                voucher_ref: row.voucher_ref ?? '',
-                created_at: row.created_at ? moment(row.created_at).format('DD/MM/YYYY HH:mm') : '',
-                booking_email: row.booking_email ?? '',
-                booking_phone: row.booking_phone ?? '',
-                booking_id: row.booking_id ?? '',
-                passenger_weight: row.passenger_weight ?? ''
-            }));
+            const formatted = result.map(row => {
+                let expiresVal = row.expires;
+                if (!expiresVal && row.created_at) {
+                    expiresVal = moment(row.created_at).add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+                }
+                return {
+                    ...row,
+                    name: row.name ?? '',
+                    flight_type: row.flight_type ?? '',
+                    voucher_type: row.voucher_type ?? '',
+                    email: row.email ?? '',
+                    phone: row.phone ?? '',
+                    expires: expiresVal ? moment(expiresVal).format('DD/MM/YYYY') : '',
+                    redeemed: row.redeemed ?? '',
+                    paid: row.paid ?? '',
+                    offer_code: row.offer_code ?? '',
+                    voucher_ref: row.voucher_ref ?? '',
+                    created_at: row.created_at ? moment(row.created_at).format('DD/MM/YYYY HH:mm') : '',
+                    booking_email: row.booking_email ?? '',
+                    booking_phone: row.booking_phone ?? '',
+                    booking_id: row.booking_id ?? '',
+                    passenger_weight: row.passenger_weight ?? ''
+                };
+            });
             res.send({ success: true, data: formatted });
         } else {
             res.send({ success: false, message: "No bookings found" });
@@ -690,7 +712,6 @@ app.get('/api/setup-database', (req, res) => {
 
 // Create Voucher (Flight Voucher veya Redeem Voucher)
 app.post('/api/createVoucher', (req, res) => {
-    // Boş stringleri null'a çeviren yardımcı fonksiyon
     function emptyToNull(val) {
         return (val === '' || val === undefined) ? null : val;
     }
@@ -708,6 +729,9 @@ app.post('/api/createVoucher', (req, res) => {
     } = req.body;
 
     const now = moment().format('YYYY-MM-DD HH:mm:ss');
+    // If expires is not provided, set to 24 months after now
+    let expiresFinal = expires && expires !== '' ? expires : moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+
     const insertSql = `INSERT INTO all_vouchers 
         (name, flight_type, voucher_type, email, phone, expires, redeemed, paid, offer_code, voucher_ref, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
@@ -717,7 +741,7 @@ app.post('/api/createVoucher', (req, res) => {
         emptyToNull(voucher_type),
         emptyToNull(email),
         emptyToNull(phone),
-        emptyToNull(expires),
+        emptyToNull(expiresFinal),
         emptyToNull(redeemed),
         paid,
         emptyToNull(offer_code),
@@ -823,7 +847,7 @@ app.post('/api/updateBookingStatus', (req, res) => {
 
 app.patch('/api/updateBookingField', (req, res) => {
     const { booking_id, field, value } = req.body;
-    const allowedFields = ['name', 'phone', 'email', 'expires', 'weight', 'status', 'flight_attempts', 'choose_add_on']; // choose_add_on eklendi
+    const allowedFields = ['name', 'phone', 'email', 'expires', 'weight', 'status', 'flight_attempts', 'choose_add_on', 'additional_notes']; // additional_notes eklendi
     if (!booking_id || !field || !allowedFields.includes(field)) {
         return res.status(400).json({ success: false, message: 'Invalid request' });
     }
@@ -869,7 +893,7 @@ app.get('/api/getBookingHistory', (req, res) => {
 // Passenger tablosunda herhangi bir yolcunun weight bilgisini güncellemek için
 app.patch('/api/updatePassengerField', (req, res) => {
     const { passenger_id, field, value } = req.body;
-    const allowedFields = ['weight'];
+    const allowedFields = ['weight', 'first_name', 'last_name'];
     if (!passenger_id || !field || !allowedFields.includes(field)) {
         return res.status(400).json({ success: false, message: 'Invalid request' });
     }

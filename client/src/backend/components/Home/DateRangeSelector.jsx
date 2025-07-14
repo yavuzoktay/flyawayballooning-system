@@ -180,13 +180,6 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                             <p>No data found for the selected range.</p>
                         )}
                     </div>
-                    <div className="filter-data-right-card">
-                        <a href="http://localhost:3002/" target="_blank" rel="noopener noreferrer">
-                            <button style={{ background: '#3274b4', color: '#fff', border: 'none', borderRadius: 6, padding: '12px 32px', fontWeight: 600, fontSize: 18, cursor: 'pointer' }}>
-                                Manual Booking
-                            </button>
-                        </a>
-                    </div>
                 </div>
             </div>
         </div>
