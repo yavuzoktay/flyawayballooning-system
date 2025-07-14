@@ -181,7 +181,7 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                                 <p>No data found for the selected range.</p>
                             )}
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 320, marginLeft: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 180, marginLeft: 0 }}>
                             <a
                                 href="http://54.174.214.16/"
                                 target="_blank"
@@ -192,15 +192,15 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                                     color: '#fff',
                                     border: 'none',
                                     borderRadius: 8,
-                                    padding: '16px 32px',
-                                    fontSize: 24,
+                                    padding: '10px 24px',
+                                    fontSize: 18,
                                     fontWeight: 600,
                                     textAlign: 'center',
                                     textDecoration: 'none',
                                     cursor: 'pointer',
                                     boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
                                     width: '100%',
-                                    maxWidth: 320
+                                    maxWidth: 200
                                 }}
                             >
                                 Manual Booking
