@@ -86,8 +86,6 @@ const ActivityAvailabilitiesPage = () => {
                                 {row.date ? (
                                     <a
                                         href={`http://44.202.155.45:3002/manifest?date=${dayjs(row.date).format('YYYY-MM-DD')}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
                                         style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
                                         onClick={e => e.stopPropagation()}
                                     >
