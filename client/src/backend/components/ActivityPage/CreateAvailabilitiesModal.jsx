@@ -6,10 +6,7 @@ import dayjs from 'dayjs';
 import axios from 'axios';
 
 const repeatOptions = [
-    { value: 'everyday', label: 'Every Day' },
-    { value: 'weekdays', label: 'Weekdays' },
-    { value: 'weekends', label: 'Weekends' },
-    // Diğer seçenekler eklenebilir
+    { value: 'once', label: 'Just Once' }
 ];
 
 const visibilityOptions = [
@@ -17,25 +14,17 @@ const visibilityOptions = [
     { value: 'closed', label: 'Closed' },
 ];
 
-const repeatTimeOptions = [
-    { value: 'hour', label: 'Every hour' },
-    { value: '2hours', label: 'Every 2 hours' },
-    // Diğer seçenekler eklenebilir
-];
-
 const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, onCreated }) => {
     const [activities, setActivities] = useState([]);
     const [selectedActivity, setSelectedActivity] = useState(activityId || '');
-    const [repeat, setRepeat] = useState('everyday');
+    const [repeat, setRepeat] = useState('once');
     const [startDate, setStartDate] = useState(dayjs().format('YYYY-MM-DD'));
     const [endDate, setEndDate] = useState(dayjs().add(6, 'month').format('YYYY-MM-DD'));
     const [startTime, setStartTime] = useState('09:00');
-    const [endTime, setEndTime] = useState('16:00');
-    const [repeatTime, setRepeatTime] = useState('hour');
     const [visibility, setVisibility] = useState('open');
-    const [name, setName] = useState('Weekdays 9am - 5pm');
-    const [capacity, setCapacity] = useState(20);
-    const [available, setAvailable] = useState(20);
+    const [name, setName] = useState('');
+    const [capacity, setCapacity] = useState(8);
+    const [available, setAvailable] = useState(8);
 
     useEffect(() => {
         if (open) {
@@ -135,24 +124,6 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
                             type="time"
                             value={startTime}
                             onChange={e => setStartTime(e.target.value)}
-                            InputLabelProps={{ shrink: true }}
-                            fullWidth
-                        />
-                        <FormControl fullWidth>
-                            <InputLabel>Repeating</InputLabel>
-                            <Select
-                                value={repeatTime}
-                                onChange={e => setRepeatTime(e.target.value)}
-                                label="Repeating"
-                            >
-                                {repeatTimeOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
-                            </Select>
-                        </FormControl>
-                        <TextField
-                            label="And ending at"
-                            type="time"
-                            value={endTime}
-                            onChange={e => setEndTime(e.target.value)}
                             InputLabelProps={{ shrink: true }}
                             fullWidth
                         />

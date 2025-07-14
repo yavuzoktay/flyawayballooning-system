@@ -82,7 +82,19 @@ const ActivityAvailabilitiesPage = () => {
                     {availabilities.map(row => (
                         <TableRow key={row.id} hover style={{ cursor: 'pointer' }} onClick={() => handleRowClick(row)}>
                             <TableCell>{row.schedule || ''}</TableCell>
-                            <TableCell>{row.date ? new Date(row.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' }) : ''}</TableCell>
+                            <TableCell>
+                                {row.date ? (
+                                    <a
+                                        href={`http://44.202.155.45:3002/manifest?date=${dayjs(row.date).format('YYYY-MM-DD')}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
+                                        onClick={e => e.stopPropagation()}
+                                    >
+                                        {new Date(row.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' })}
+                                    </a>
+                                ) : ''}
+                            </TableCell>
                             <TableCell>{row.day_of_week}</TableCell>
                             <TableCell>{row.time ? row.time.slice(0,5) : ''}</TableCell>
                             <TableCell>{row.capacity}</TableCell>
