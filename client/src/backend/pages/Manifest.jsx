@@ -508,54 +508,47 @@ const Manifest = () => {
     };
 
     // Add state and handlers for passenger edit at the top of the component
-    const [editingPassenger, setEditingPassenger] = useState(false);
+    const [editingPassenger, setEditingPassenger] = useState(null);
     const [editPassengerFirstName, setEditPassengerFirstName] = useState("");
     const [editPassengerLastName, setEditPassengerLastName] = useState("");
     const [editPassengerWeight, setEditPassengerWeight] = useState("");
     const [savingPassengerEdit, setSavingPassengerEdit] = useState(false);
 
-    const handleEditPassengerClick = () => {
-        if (!bookingDetail.passengers || bookingDetail.passengers.length === 0) return;
-        setEditPassengerFirstName(bookingDetail.passengers[0].first_name || "");
-        setEditPassengerLastName(bookingDetail.passengers[0].last_name || "");
-        setEditPassengerWeight(bookingDetail.passengers[0].weight || "");
-        setEditingPassenger(true);
+    const handleEditPassengerClick = (p) => {
+        setEditPassengerFirstName(p.first_name || "");
+        setEditPassengerLastName(p.last_name || "");
+        setEditPassengerWeight(p.weight || "");
+        setEditingPassenger(p.id);
     };
     const handleCancelPassengerEdit = () => {
-        setEditingPassenger(false);
+        setEditingPassenger(null);
     };
-    const handleSavePassengerEdit = async () => {
-        if (!bookingDetail.passengers || bookingDetail.passengers.length === 0) return;
-        const passengerId = bookingDetail.passengers[0].id;
+    const handleSavePassengerEdit = async (p) => {
         setSavingPassengerEdit(true);
         try {
-            // Update first_name
-            if (editPassengerFirstName !== bookingDetail.passengers[0].first_name) {
+            if (editPassengerFirstName !== p.first_name) {
                 await axios.patch('/api/updatePassengerField', {
-                    passenger_id: passengerId,
+                    passenger_id: p.id,
                     field: 'first_name',
                     value: editPassengerFirstName
                 });
             }
-            // Update last_name
-            if (editPassengerLastName !== bookingDetail.passengers[0].last_name) {
+            if (editPassengerLastName !== p.last_name) {
                 await axios.patch('/api/updatePassengerField', {
-                    passenger_id: passengerId,
+                    passenger_id: p.id,
                     field: 'last_name',
                     value: editPassengerLastName
                 });
             }
-            // Update weight
-            if (editPassengerWeight !== bookingDetail.passengers[0].weight) {
+            if (editPassengerWeight !== p.weight) {
                 await axios.patch('/api/updatePassengerField', {
-                    passenger_id: passengerId,
+                    passenger_id: p.id,
                     field: 'weight',
                     value: editPassengerWeight
                 });
             }
-            // Refresh booking detail
             await fetchBookingDetail(bookingDetail.booking.id);
-            setEditingPassenger(false);
+            setEditingPassenger(null);
         } catch (err) {
             alert('Failed to update passenger details');
         } finally {
@@ -935,13 +928,11 @@ const Manifest = () => {
                                             <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Day:</b></Typography>
                                             {editPrefField === 'preferred_day' ? (
                                                 <>
-                                                    <TextField
-                                                        size="small"
-                                                        value={editPrefValue}
-                                                        onChange={e => setEditPrefValue(e.target.value)}
-                                                        sx={{ mr: 1, width: 220 }}
-                                                        disabled={savingPref}
-                                                    />
+                                                    <select value={editPrefValue} onChange={e => setEditPrefValue(e.target.value)} style={{ marginRight: 8, width: 220 }} disabled={savingPref}>
+                                                        <option value="">Select...</option>
+                                                        <option value="Weekend Only">Weekend Only</option>
+                                                        <option value="Weekday & Weekend">Weekday & Weekend</option>
+                                                    </select>
                                                     <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_day')} disabled={savingPref}>Save</Button>
                                                     <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
                                                 </>
@@ -957,13 +948,12 @@ const Manifest = () => {
                                             <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Location:</b></Typography>
                                             {editPrefField === 'preferred_location' ? (
                                                 <>
-                                                    <TextField
-                                                        size="small"
-                                                        value={editPrefValue}
-                                                        onChange={e => setEditPrefValue(e.target.value)}
-                                                        sx={{ mr: 1, width: 220 }}
-                                                        disabled={savingPref}
-                                                    />
+                                                    <select value={editPrefValue} onChange={e => setEditPrefValue(e.target.value)} style={{ marginRight: 8, width: 220 }} disabled={savingPref}>
+                                                        <option value="">Select...</option>
+                                                        <option value="Bath">Bath</option>
+                                                        <option value="Taunton & South Somerset">Taunton & South Somerset</option>
+                                                        <option value="Exeter & Tiverton">Exeter & Tiverton</option>
+                                                    </select>
                                                     <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_location')} disabled={savingPref}>Save</Button>
                                                     <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
                                                 </>
@@ -979,13 +969,11 @@ const Manifest = () => {
                                             <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Time:</b></Typography>
                                             {editPrefField === 'preferred_time' ? (
                                                 <>
-                                                    <TextField
-                                                        size="small"
-                                                        value={editPrefValue}
-                                                        onChange={e => setEditPrefValue(e.target.value)}
-                                                        sx={{ mr: 1, width: 220 }}
-                                                        disabled={savingPref}
-                                                    />
+                                                    <select value={editPrefValue} onChange={e => setEditPrefValue(e.target.value)} style={{ marginRight: 8, width: 220 }} disabled={savingPref}>
+                                                        <option value="">Select...</option>
+                                                        <option value="Morning">Morning</option>
+                                                        <option value="Afternoon & Evening">Afternoon & Evening</option>
+                                                    </select>
                                                     <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_time')} disabled={savingPref}>Save</Button>
                                                     <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
                                                 </>
@@ -1006,7 +994,9 @@ const Manifest = () => {
                                             <Box>
                                                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Current Booking</Typography>
                                                 <Typography><b>Activity:</b> {bookingDetail.booking.flight_type} - {bookingDetail.booking.location}</Typography>
-                                                <Typography><b>Booked For:</b> {bookingDetail.booking.flight_date ? dayjs(bookingDetail.booking.flight_date).format('DD/MM/YYYY HH:mm') : '-'}</Typography>
+                                                {bookingDetail.booking.status !== 'Cancelled' && (
+                                                    <Typography><b>Booked For:</b> {bookingDetail.booking.flight_date ? dayjs(bookingDetail.booking.flight_date).format('DD/MM/YYYY HH:mm') : '-'}</Typography>
+                                                )}
                                                 <Typography>
                                                     <b>Redeemed Voucher:</b> {bookingDetail.booking.voucher_code ? <span style={{ color: 'green', fontWeight: 600 }}>Yes</span> : <span style={{ color: 'red', fontWeight: 600 }}>No</span>} <span style={{ fontWeight: 500 }}>{bookingDetail.booking.voucher_code || ''}</span>
                                                 </Typography>
@@ -1023,41 +1013,38 @@ const Manifest = () => {
                                             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Passenger Details</Typography>
                                             {bookingDetail.passengers && bookingDetail.passengers.length > 0 ? (
                                                 <Box>
-                                                    {/* Passenger 1 Editable */}
-                                                    <Typography>
-                                                        Passenger 1: {editingPassenger ? (
-                                                            <>
-                                                                <input
-                                                                    value={editPassengerFirstName}
-                                                                    onChange={e => setEditPassengerFirstName(e.target.value)}
-                                                                    placeholder="First Name"
-                                                                    style={{ marginRight: 4, width: 90 }}
-                                                                />
-                                                                <input
-                                                                    value={editPassengerLastName}
-                                                                    onChange={e => setEditPassengerLastName(e.target.value)}
-                                                                    placeholder="Last Name"
-                                                                    style={{ marginRight: 4, width: 90 }}
-                                                                />
-                                                                <input
-                                                                    value={editPassengerWeight}
-                                                                    onChange={e => setEditPassengerWeight(e.target.value.replace(/[^0-9.]/g, ''))}
-                                                                    placeholder="Weight (kg)"
-                                                                    style={{ marginRight: 4, width: 70 }}
-                                                                />
-                                                                <Button size="small" onClick={handleSavePassengerEdit} disabled={savingPassengerEdit}>Save</Button>
-                                                                <Button size="small" onClick={handleCancelPassengerEdit} disabled={savingPassengerEdit}>Cancel</Button>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                {bookingDetail.passengers[0].first_name || '-'} {bookingDetail.passengers[0].last_name || '-'}{bookingDetail.passengers[0].weight ? ` (${bookingDetail.passengers[0].weight}kg)` : ''}
-                                                                <IconButton size="small" onClick={handleEditPassengerClick}><EditIcon fontSize="small" /></IconButton>
-                                                            </>
-                                                        )}
-                                                    </Typography>
-                                                    {/* Diğer yolcular sadece okunur */}
-                                                    {bookingDetail.passengers.slice(1).map((p, i) => (
-                                                        <Typography key={i+1}>Passenger {i + 2}: {p.first_name || '-'} {p.last_name || '-'}{p.weight ? ` (${p.weight}kg)` : ''}</Typography>
+                                                    {bookingDetail.passengers.map((p, i) => (
+                                                        <Typography key={p.id}>
+                                                            Passenger {i + 1}: {editingPassenger === p.id ? (
+                                                                <>
+                                                                    <input
+                                                                        value={editPassengerFirstName}
+                                                                        onChange={e => setEditPassengerFirstName(e.target.value)}
+                                                                        placeholder="First Name"
+                                                                        style={{ marginRight: 4, width: 90 }}
+                                                                    />
+                                                                    <input
+                                                                        value={editPassengerLastName}
+                                                                        onChange={e => setEditPassengerLastName(e.target.value)}
+                                                                        placeholder="Last Name"
+                                                                        style={{ marginRight: 4, width: 90 }}
+                                                                    />
+                                                                    <input
+                                                                        value={editPassengerWeight}
+                                                                        onChange={e => setEditPassengerWeight(e.target.value.replace(/[^0-9.]/g, ''))}
+                                                                        placeholder="Weight (kg)"
+                                                                        style={{ marginRight: 4, width: 70 }}
+                                                                    />
+                                                                    <Button size="small" onClick={() => handleSavePassengerEdit(p)} disabled={savingPassengerEdit}>Save</Button>
+                                                                    <Button size="small" onClick={handleCancelPassengerEdit} disabled={savingPassengerEdit}>Cancel</Button>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    {p.first_name || '-'} {p.last_name || '-'}{p.weight ? ` (${p.weight}kg)` : ''}
+                                                                    <IconButton size="small" onClick={() => handleEditPassengerClick(p)}><EditIcon fontSize="small" /></IconButton>
+                                                                </>
+                                                            )}
+                                                        </Typography>
                                                     ))}
                                                 </Box>
                                             ) : null}
