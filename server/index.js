@@ -853,7 +853,7 @@ app.post('/api/updateBookingStatus', (req, res) => {
 
 app.patch('/api/updateBookingField', (req, res) => {
     const { booking_id, field, value } = req.body;
-    const allowedFields = ['name', 'phone', 'email', 'expires', 'weight', 'status', 'flight_attempts', 'choose_add_on', 'additional_notes', 'preferred_day', 'preferred_location', 'preferred_time']; // preferred fields added
+    const allowedFields = ['name', 'phone', 'email', 'expires', 'weight', 'status', 'flight_attempts', 'choose_add_on', 'additional_notes', 'preferred_day', 'preferred_location', 'preferred_time', 'paid']; // Add 'paid'
     if (!booking_id || !field || !allowedFields.includes(field)) {
         return res.status(400).json({ success: false, message: 'Invalid request' });
     }
@@ -899,7 +899,7 @@ app.get('/api/getBookingHistory', (req, res) => {
 // Passenger tablosunda herhangi bir yolcunun weight bilgisini güncellemek için
 app.patch('/api/updatePassengerField', (req, res) => {
     const { passenger_id, field, value } = req.body;
-    const allowedFields = ['weight', 'first_name', 'last_name'];
+    const allowedFields = ['weight', 'first_name', 'last_name', 'price']; // Add 'price'
     if (!passenger_id || !field || !allowedFields.includes(field)) {
         return res.status(400).json({ success: false, message: 'Invalid request' });
     }
