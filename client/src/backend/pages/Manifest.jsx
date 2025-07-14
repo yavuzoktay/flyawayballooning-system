@@ -46,6 +46,14 @@ const Manifest = () => {
 
     // HOOKLAR KOŞULSUZ OLARAK EN ÜSTE ALINDI
     const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
+    // On mount, check for date param in URL and set selectedDate
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const dateParam = params.get('date');
+        if (dateParam && dayjs(dateParam, 'YYYY-MM-DD', true).isValid()) {
+            setSelectedDate(dateParam);
+        }
+    }, []);
     const [flights, setFlights] = useState([]);
     const [menuAnchorEl, setMenuAnchorEl] = useState(null);
     const [selectedFlightId, setSelectedFlightId] = useState(null);
