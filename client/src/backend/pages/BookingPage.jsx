@@ -1042,9 +1042,16 @@ const BookingPage = () => {
                                                     }));
                                                 }}>FAB Add On</Button>
                                             </Box>
-                                            <Typography><b>WX Refundable:</b> {activeTab === 'vouchers' ? '-' : (bookingDetail.passengers && bookingDetail.passengers.some(p => p.weather_refund === 1) ? 'Yes' : 'No')}</Typography>
-                                            <Typography><b>Marketing:</b> {activeTab === 'vouchers' ? (bookingDetail.booking.marketing || 'N/A') : (bookingDetail.booking.hear_about_us || 'N/A')}</Typography>
-                                            <Typography><b>Reason for Ballooning:</b> {activeTab === 'vouchers' ? (bookingDetail.booking.reason_for_ballooning || 'N/A') : (bookingDetail.booking.ballooning_reason || 'N/A')}</Typography>
+                                            <Typography><b>WX Refundable:</b> {bookingDetail.passengers && bookingDetail.passengers.some(p => p.weather_refund === 1) ? 'Yes' : 'No'}</Typography>
+                                            <Typography><b>Marketing:</b> {bookingDetail.booking.hear_about_us || 'N/A'}</Typography>
+                                            <Typography><b>Reason for Ballooning:</b> {bookingDetail.booking.ballooning_reason || 'N/A'}</Typography>
+                                        </Box>
+                                        {/* Preferences Section - always visible */}
+                                        <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
+                                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Preferences</Typography>
+                                            <Typography><b>Preferred Day:</b> {bookingDetail.booking.preferred_day || '-'}</Typography>
+                                            <Typography><b>Preferred Location:</b> {bookingDetail.booking.preferred_location || '-'}</Typography>
+                                            <Typography><b>Preferred Time:</b> {bookingDetail.booking.preferred_time || '-'}</Typography>
                                         </Box>
                                     </Grid>
                                     {/* Main Details */}
