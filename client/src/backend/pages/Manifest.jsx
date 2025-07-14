@@ -987,7 +987,6 @@ const Manifest = () => {
                                                 <TableHead>
                                                     <TableRow>
                                                         <TableCell>Booking Date</TableCell>
-                                                        <TableCell>Booking ID</TableCell>
                                                         <TableCell>Activity Type</TableCell>
                                                         <TableCell>Location</TableCell>
                                                         <TableCell>Status</TableCell>
@@ -996,7 +995,6 @@ const Manifest = () => {
                                                 <TableBody>
                                                     <TableRow>
                                                         <TableCell>{bookingDetail.booking.created_at ? dayjs(bookingDetail.booking.created_at).format('DD/MM/YYYY HH:mm') : '-'}</TableCell>
-                                                        <TableCell>{bookingDetail.booking.id || '-'}</TableCell>
                                                         <TableCell>{bookingDetail.booking.flight_type || '-'}</TableCell>
                                                         <TableCell>{bookingDetail.booking.location || '-'}</TableCell>
                                                         <TableCell>Scheduled</TableCell>
@@ -1004,7 +1002,6 @@ const Manifest = () => {
                                                     {bookingHistory.map((h, i) => (
                                                         <TableRow key={i}>
                                                             <TableCell>{h.changed_at ? dayjs(h.changed_at).format('DD/MM/YYYY HH:mm') : '-'}</TableCell>
-                                                            <TableCell>{bookingDetail.booking.id || '-'}</TableCell>
                                                             <TableCell>{bookingDetail.booking.flight_type || '-'}</TableCell>
                                                             <TableCell>{bookingDetail.booking.location || '-'}</TableCell>
                                                             <TableCell>{h.status}</TableCell>
