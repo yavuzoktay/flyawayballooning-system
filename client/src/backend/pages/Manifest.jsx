@@ -34,6 +34,8 @@ import dayjs from 'dayjs';
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import RebookAvailabilityModal from '../components/BookingPage/RebookAvailabilityModal';
+import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
+import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 
 
 const Manifest = () => {
@@ -43,7 +45,7 @@ const Manifest = () => {
     const activityHook = useActivity();
 
     // HOOKLAR KOŞULSUZ OLARAK EN ÜSTE ALINDI
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
+    const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
     const [flights, setFlights] = useState([]);
     const [menuAnchorEl, setMenuAnchorEl] = useState(null);
     const [selectedFlightId, setSelectedFlightId] = useState(null);
@@ -454,6 +456,105 @@ const Manifest = () => {
         }
     };
 
+    // 1. Add state for editing booking notes
+    const [editingNotes, setEditingNotes] = useState(false);
+    const [notesValue, setNotesValue] = useState("");
+    const [savingNotes, setSavingNotes] = useState(false);
+
+    // 2. When opening the dialog, set notesValue to the current notes
+    useEffect(() => {
+        if (detailDialogOpen && bookingDetail?.booking) {
+            setNotesValue(bookingDetail.booking.additional_notes || "");
+            setEditingNotes(false);
+        }
+    }, [detailDialogOpen, bookingDetail]);
+
+    // 3. Add save/cancel logic for notes
+    const handleEditNotes = () => setEditingNotes(true);
+    const handleCancelNotes = () => {
+        setNotesValue(bookingDetail.booking.additional_notes || "");
+        setEditingNotes(false);
+    };
+    const handleSaveNotes = async () => {
+        if (!bookingDetail?.booking?.id) return;
+        setSavingNotes(true);
+        try {
+            await axios.patch('/api/updateBookingField', {
+                booking_id: bookingDetail.booking.id,
+                field: 'additional_notes',
+                value: notesValue
+            });
+            setBookingDetail(prev => ({
+                ...prev,
+                booking: {
+                    ...prev.booking,
+                    additional_notes: notesValue
+                }
+            }));
+            setEditingNotes(false);
+        } catch (err) {
+            alert('Failed to update booking notes');
+        } finally {
+            setSavingNotes(false);
+        }
+    };
+
+    // Add state and handlers for passenger edit at the top of the component
+    const [editingPassenger, setEditingPassenger] = useState(false);
+    const [editPassengerFirstName, setEditPassengerFirstName] = useState("");
+    const [editPassengerLastName, setEditPassengerLastName] = useState("");
+    const [editPassengerWeight, setEditPassengerWeight] = useState("");
+    const [savingPassengerEdit, setSavingPassengerEdit] = useState(false);
+
+    const handleEditPassengerClick = () => {
+        if (!bookingDetail.passengers || bookingDetail.passengers.length === 0) return;
+        setEditPassengerFirstName(bookingDetail.passengers[0].first_name || "");
+        setEditPassengerLastName(bookingDetail.passengers[0].last_name || "");
+        setEditPassengerWeight(bookingDetail.passengers[0].weight || "");
+        setEditingPassenger(true);
+    };
+    const handleCancelPassengerEdit = () => {
+        setEditingPassenger(false);
+    };
+    const handleSavePassengerEdit = async () => {
+        if (!bookingDetail.passengers || bookingDetail.passengers.length === 0) return;
+        const passengerId = bookingDetail.passengers[0].id;
+        setSavingPassengerEdit(true);
+        try {
+            // Update first_name
+            if (editPassengerFirstName !== bookingDetail.passengers[0].first_name) {
+                await axios.patch('/api/updatePassengerField', {
+                    passenger_id: passengerId,
+                    field: 'first_name',
+                    value: editPassengerFirstName
+                });
+            }
+            // Update last_name
+            if (editPassengerLastName !== bookingDetail.passengers[0].last_name) {
+                await axios.patch('/api/updatePassengerField', {
+                    passenger_id: passengerId,
+                    field: 'last_name',
+                    value: editPassengerLastName
+                });
+            }
+            // Update weight
+            if (editPassengerWeight !== bookingDetail.passengers[0].weight) {
+                await axios.patch('/api/updatePassengerField', {
+                    passenger_id: passengerId,
+                    field: 'weight',
+                    value: editPassengerWeight
+                });
+            }
+            // Refresh booking detail
+            await fetchBookingDetail(bookingDetail.booking.id);
+            setEditingPassenger(false);
+        } catch (err) {
+            alert('Failed to update passenger details');
+        } finally {
+            setSavingPassengerEdit(false);
+        }
+    };
+
     return (
         <div className="final-menifest-wrap">
             <Container maxWidth="xl">
@@ -465,13 +566,26 @@ const Manifest = () => {
                     {/* Header Section */}
                     <Box sx={{ marginBottom: 3 }}>
                         <Box display="flex" alignItems="center" gap={2}>
-                            <TextField
-                                type="date"
-                                value={selectedDate}
-                                onChange={handleDateChange}
-                                label="Select Date"
-                                InputLabelProps={{ shrink: true }}
-                            />
+                            <IconButton onClick={() => setSelectedDate(dayjs(selectedDate).subtract(1, 'day').format('YYYY-MM-DD'))}>
+                                <ArrowBackIosNewIcon />
+                            </IconButton>
+                            <LocalizationProvider dateAdapter={AdapterDayjs}>
+                                <DatePicker
+                                    label="Select Date"
+                                    value={dayjs(selectedDate)}
+                                    onChange={date => setSelectedDate(date ? date.format('YYYY-MM-DD') : selectedDate)}
+                                    format="DD.MM.YYYY"
+                                    views={["year", "month", "day"]}
+                                    slotProps={{ textField: { size: 'small', sx: { minWidth: 180, background: '#fff', borderRadius: 1 } } }}
+                                    componentsProps={{
+                                        // Hide default calendar arrows
+                                        popper: { style: { zIndex: 1300 } },
+                                    }}
+                                />
+                            </LocalizationProvider>
+                            <IconButton onClick={() => setSelectedDate(dayjs(selectedDate).add(1, 'day').format('YYYY-MM-DD'))}>
+                                <ArrowForwardIosIcon />
+                            </IconButton>
                         </Box>
                     </Box>
 
@@ -621,20 +735,17 @@ const Manifest = () => {
                                                             ))}
                                                         </React.Fragment>
                                                     ))}
+                                                    {/* Move the summary row here, inside TableBody */}
+                                                    <TableRow>
+                                                        <TableCell colSpan={10} style={{ textAlign: 'right', fontWeight: 600, background: '#f5f5f5' }}>
+                                                            Total Price: £{groupFlights.reduce((sum, f) => sum + (parseFloat(f.paid) || 0), 0)} &nbsp;&nbsp;|
+                                                            Total Weight: {groupFlights.reduce((sum, f) => sum + (f.passengers ? f.passengers.reduce((s, p) => s + (parseFloat(p.weight) || 0), 0) : 0), 0)} kg &nbsp;&nbsp;|
+                                                            Total Pax: {groupFlights.reduce((sum, f) => sum + (f.passengers ? f.passengers.length : 0), 0)}
+                                                        </TableCell>
+                                                    </TableRow>
                                                 </TableBody>
                                             </Table>
                                         </TableContainer>
-                                        <Divider sx={{ marginY: 2 }} />
-                                        {/* Toplamlar tek satırda */}
-                                        <Box display="flex" justifyContent="flex-end">
-                                            <TableRow>
-                                                <TableCell colSpan={10} style={{ textAlign: 'right', fontWeight: 600, background: '#f5f5f5' }}>
-                                                    Total Price: £{groupFlights.reduce((sum, f) => sum + (parseFloat(f.paid) || 0), 0)} &nbsp;&nbsp;|
-                                                    Total Weight: {groupFlights.reduce((sum, f) => sum + (f.passengers ? f.passengers.reduce((s, p) => s + (parseFloat(p.weight) || 0), 0) : 0), 0)} kg &nbsp;&nbsp;|
-                                                    Total Pax: {groupFlights.reduce((sum, f) => sum + (f.passengers ? f.passengers.length : 0), 0)}
-                                                </TableCell>
-                                            </TableRow>
-                                        </Box>
                                     </CardContent>
                                 </Card>
                             );
@@ -714,23 +825,31 @@ const Manifest = () => {
   </>
 )}</Typography>
                                         <Typography><b>Paid:</b> £{bookingDetail.booking.paid}</Typography>
-                                        <Typography><b>Weight:</b> {editField === 'weight' ? (
-  <>
-    <input value={editValue} onChange={e => setEditValue(e.target.value)} style={{marginRight: 8}} />
-    <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
-    <Button size="small" onClick={handleEditCancel}>Cancel</Button>
-  </>
-) : (
-  <>
-    {bookingDetail.passengers && bookingDetail.passengers[0]?.weight ? bookingDetail.passengers[0].weight + 'kg' : '-'}
-    <IconButton size="small" onClick={() => handleEditClick('weight', bookingDetail.passengers && bookingDetail.passengers[0]?.weight)}><EditIcon fontSize="small" /></IconButton>
-  </>
-)}</Typography>
                                     </Box>
                                     {/* Additional */}
                                     <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
                                         <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Additional</Typography>
-                                        <Typography><b>Booking Notes:</b> {bookingDetail.booking.additional_notes ? bookingDetail.booking.additional_notes : ''}</Typography>
+                                        {editingNotes ? (
+                                            <>
+                                                <TextField
+                                                    multiline
+                                                    minRows={2}
+                                                    maxRows={6}
+                                                    fullWidth
+                                                    value={notesValue}
+                                                    onChange={e => setNotesValue(e.target.value)}
+                                                    disabled={savingNotes}
+                                                    sx={{ mb: 1 }}
+                                                />
+                                                <Button variant="contained" color="primary" onClick={handleSaveNotes} disabled={savingNotes || notesValue === (bookingDetail.booking.additional_notes || "")}>Save</Button>
+                                                <Button variant="outlined" onClick={handleCancelNotes} sx={{ ml: 1 }} disabled={savingNotes}>Cancel</Button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Typography><b>Booking Notes:</b> {bookingDetail.booking.additional_notes || '-'}</Typography>
+                                                <Button variant="text" size="small" onClick={handleEditNotes} sx={{ mt: 1 }}>Edit</Button>
+                                            </>
+                                        )}
                                     </Box>
                                     {/* Add On */}
                                     <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
@@ -787,9 +906,46 @@ const Manifest = () => {
                                         {/* Passenger Details */}
                                         <Box sx={{ mb: 2 }}>
                                             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Passenger Details</Typography>
-                                            {bookingDetail.passengers && bookingDetail.passengers.length > 0 ? bookingDetail.passengers.map((p, i) => (
-                                                <Typography key={i}>Passenger {i + 1}: {p.first_name || '-'} {p.last_name || '-'}{p.weight ? ` (${p.weight}kg)` : ''}</Typography>
-                                            )) : null}
+                                            {bookingDetail.passengers && bookingDetail.passengers.length > 0 ? (
+                                                <Box>
+                                                    {/* Passenger 1 Editable */}
+                                                    <Typography>
+                                                        Passenger 1: {editingPassenger ? (
+                                                            <>
+                                                                <input
+                                                                    value={editPassengerFirstName}
+                                                                    onChange={e => setEditPassengerFirstName(e.target.value)}
+                                                                    placeholder="First Name"
+                                                                    style={{ marginRight: 4, width: 90 }}
+                                                                />
+                                                                <input
+                                                                    value={editPassengerLastName}
+                                                                    onChange={e => setEditPassengerLastName(e.target.value)}
+                                                                    placeholder="Last Name"
+                                                                    style={{ marginRight: 4, width: 90 }}
+                                                                />
+                                                                <input
+                                                                    value={editPassengerWeight}
+                                                                    onChange={e => setEditPassengerWeight(e.target.value.replace(/[^0-9.]/g, ''))}
+                                                                    placeholder="Weight (kg)"
+                                                                    style={{ marginRight: 4, width: 70 }}
+                                                                />
+                                                                <Button size="small" onClick={handleSavePassengerEdit} disabled={savingPassengerEdit}>Save</Button>
+                                                                <Button size="small" onClick={handleCancelPassengerEdit} disabled={savingPassengerEdit}>Cancel</Button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                {bookingDetail.passengers[0].first_name || '-'} {bookingDetail.passengers[0].last_name || '-'}{bookingDetail.passengers[0].weight ? ` (${bookingDetail.passengers[0].weight}kg)` : ''}
+                                                                <IconButton size="small" onClick={handleEditPassengerClick}><EditIcon fontSize="small" /></IconButton>
+                                                            </>
+                                                        )}
+                                                    </Typography>
+                                                    {/* Diğer yolcular sadece okunur */}
+                                                    {bookingDetail.passengers.slice(1).map((p, i) => (
+                                                        <Typography key={i+1}>Passenger {i + 2}: {p.first_name || '-'} {p.last_name || '-'}{p.weight ? ` (${p.weight}kg)` : ''}</Typography>
+                                                    ))}
+                                                </Box>
+                                            ) : null}
                                         </Box>
                                         <Divider sx={{ my: 2 }} />
                                         {/* Notes */}

@@ -72,8 +72,21 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick }) => {
                                             >
                                                 {item[col]}
                                             </span>
-                                        ) : ( (col === 'created_at' || col === 'created' || col === 'flight_date' || col === 'expires' || col === 'date_requested') ? formatDate(item[col]) :
-                                            col === 'status' && item[col] === 'Confirmed' ? 'Scheduled' : item[col])}
+                                        ) : ( col === 'flight_date' ? (
+                                            (() => {
+                                                if (!item[col]) return '';
+                                                let isoString = item[col].includes('T') ? item[col] : item[col].replace(' ', 'T');
+                                                const date = new Date(isoString);
+                                                if (isNaN(date.getTime())) return String(item[col]);
+                                                const day = String(date.getDate()).padStart(2, '0');
+                                                const month = String(date.getMonth() + 1).padStart(2, '0');
+                                                const year = date.getFullYear();
+                                                let hours = date.getHours();
+                                                const ampm = hours < 12 ? 'AM' : 'PM';
+                                                return `${day}/${month}/${year} ${ampm}`;
+                                            })()
+                                        ) : ( (col === 'created_at' || col === 'created' || col === 'expires' || col === 'date_requested') ? formatDate(item[col]) :
+                                            col === 'status' && item[col] === 'Confirmed' ? 'Scheduled' : item[col]))}
                                     </td>
                                 ))}
                             </tr>
