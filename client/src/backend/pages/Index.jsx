@@ -34,13 +34,6 @@ const Index = () => {
                 <div className="home-body-wrap">
                     <DateRangeSelector bookingData={bookingData} onDateRangeChange={setDateRange} />
                     <AnalyticsDashboard dateRange={dateRange} />
-                    <div style={{ marginTop: 24 }}>
-                      <a href="http://localhost:3002/" target="_blank" rel="noopener noreferrer">
-                        <button style={{ background: '#3274b4', color: '#fff', border: 'none', borderRadius: 6, padding: '12px 32px', fontWeight: 600, fontSize: 18, cursor: 'pointer' }}>
-                          Manual Booking
-                        </button>
-                      </a>
-                    </div>
                 </div>
             </Container>
         </div>
