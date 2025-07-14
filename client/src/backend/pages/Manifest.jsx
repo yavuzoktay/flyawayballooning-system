@@ -334,6 +334,25 @@ const Manifest = () => {
         if (!bookingDetail?.booking?.id || !editField) return;
         setSavingEdit(true);
         try {
+            if (editField === 'paid') {
+                await axios.patch('/api/updateBookingField', {
+                    booking_id: bookingDetail.booking.id,
+                    field: 'paid',
+                    value: editValue
+                });
+                setBookingDetail(prev => ({
+                    ...prev,
+                    booking: {
+                        ...prev.booking,
+                        paid: editValue
+                    }
+                }));
+                setFlights(prev => prev.map(f => f.id === bookingDetail.booking.id ? { ...f, paid: editValue } : f));
+                setEditField(null);
+                setEditValue('');
+                setSavingEdit(false);
+                return;
+            }
             await axios.patch('/api/updateBookingField', {
                 booking_id: bookingDetail.booking.id,
                 field: editField,
@@ -512,16 +531,19 @@ const Manifest = () => {
     const [editPassengerFirstName, setEditPassengerFirstName] = useState("");
     const [editPassengerLastName, setEditPassengerLastName] = useState("");
     const [editPassengerWeight, setEditPassengerWeight] = useState("");
+    const [editPassengerPrice, setEditPassengerPrice] = useState("");
     const [savingPassengerEdit, setSavingPassengerEdit] = useState(false);
 
     const handleEditPassengerClick = (p) => {
         setEditPassengerFirstName(p.first_name || "");
         setEditPassengerLastName(p.last_name || "");
         setEditPassengerWeight(p.weight || "");
+        setEditPassengerPrice(p.price || "");
         setEditingPassenger(p.id);
     };
     const handleCancelPassengerEdit = () => {
         setEditingPassenger(null);
+        setEditPassengerPrice("");
     };
     const handleSavePassengerEdit = async (p) => {
         setSavingPassengerEdit(true);
@@ -545,6 +567,13 @@ const Manifest = () => {
                     passenger_id: p.id,
                     field: 'weight',
                     value: editPassengerWeight
+                });
+            }
+            if (editPassengerPrice !== p.price) {
+                await axios.patch('/api/updatePassengerField', {
+                    passenger_id: p.id,
+                    field: 'price',
+                    value: editPassengerPrice
                 });
             }
             await fetchBookingDetail(bookingDetail.booking.id);
@@ -862,7 +891,18 @@ const Manifest = () => {
     <IconButton size="small" onClick={() => handleEditClick('expires', bookingDetail.booking.expires)}><EditIcon fontSize="small" /></IconButton>
   </>
 )}</Typography>
-                                        <Typography><b>Paid:</b> £{bookingDetail.booking.paid}</Typography>
+                                        <Typography><b>Paid:</b> {editField === 'paid' ? (
+  <>
+    <input value={editValue} onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} style={{marginRight: 8}} />
+    <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+    <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+  </>
+) : (
+  <>
+    £{bookingDetail.booking.paid}
+    <IconButton size="small" onClick={() => handleEditClick('paid', bookingDetail.booking.paid)}><EditIcon fontSize="small" /></IconButton>
+  </>
+)}</Typography>
                                     </Box>
                                     {/* Additional */}
                                     <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
@@ -1035,12 +1075,18 @@ const Manifest = () => {
                                                                         placeholder="Weight (kg)"
                                                                         style={{ marginRight: 4, width: 70 }}
                                                                     />
+                                                                    <input
+                                                                        value={editPassengerPrice}
+                                                                        onChange={e => setEditPassengerPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+                                                                        placeholder="Price (£)"
+                                                                        style={{ marginRight: 4, width: 70 }}
+                                                                    />
                                                                     <Button size="small" onClick={() => handleSavePassengerEdit(p)} disabled={savingPassengerEdit}>Save</Button>
                                                                     <Button size="small" onClick={handleCancelPassengerEdit} disabled={savingPassengerEdit}>Cancel</Button>
                                                                 </>
                                                             ) : (
                                                                 <>
-                                                                    {p.first_name || '-'} {p.last_name || '-'}{p.weight ? ` (${p.weight}kg)` : ''}
+                                                                    {p.first_name || '-'} {p.last_name || '-'}{p.weight ? ` (${p.weight}kg${p.price ? ' £' + p.price : ''})` : ''}
                                                                     <IconButton size="small" onClick={() => handleEditPassengerClick(p)}><EditIcon fontSize="small" /></IconButton>
                                                                 </>
                                                             )}

@@ -92,6 +92,9 @@ const BookingPage = () => {
     const [editPrefValue, setEditPrefValue] = useState("");
     const [savingPref, setSavingPref] = useState(false);
 
+    // Add state for passenger price editing
+    const [editPassengerPrice, setEditPassengerPrice] = useState("");
+
     // Fetch data
     const voucherData = async () => {
         try {
@@ -335,6 +338,26 @@ const BookingPage = () => {
         if (!bookingDetail?.booking?.id || !editField) return;
         setSavingEdit(true);
         try {
+            if (editField === 'paid') {
+                await axios.patch('/api/updateBookingField', {
+                    booking_id: bookingDetail.booking.id,
+                    field: 'paid',
+                    value: editValue
+                });
+                setBookingDetail(prev => ({
+                    ...prev,
+                    booking: {
+                        ...prev.booking,
+                        paid: editValue
+                    }
+                }));
+                setBooking(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, paid: editValue } : b));
+                setFilteredData(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, paid: editValue } : b));
+                setEditField(null);
+                setEditValue('');
+                setSavingEdit(false);
+                return;
+            }
             await axios.patch('/api/updateBookingField', {
                 booking_id: bookingDetail.booking.id,
                 field: editField,
@@ -571,10 +594,12 @@ const BookingPage = () => {
         setEditPassengerFirstName(p.first_name || "");
         setEditPassengerLastName(p.last_name || "");
         setEditPassengerWeight(p.weight || "");
+        setEditPassengerPrice(p.price || "");
         setEditingPassenger(p.id);
     };
     const handleCancelPassengerEdit = () => {
         setEditingPassenger(null);
+        setEditPassengerPrice("");
     };
     const handleSavePassengerEdit = async (p) => {
         setSavingPassengerEdit(true);
@@ -598,6 +623,13 @@ const BookingPage = () => {
                     passenger_id: p.id,
                     field: 'weight',
                     value: editPassengerWeight
+                });
+            }
+            if (editPassengerPrice !== p.price) {
+                await axios.patch('/api/updatePassengerField', {
+                    passenger_id: p.id,
+                    field: 'price',
+                    value: editPassengerPrice
                 });
             }
             await fetchPassengers(bookingDetail.booking.id);
@@ -954,7 +986,18 @@ const BookingPage = () => {
                                                     <Typography><b>Voucher Type:</b> {bookingDetail.booking.voucher_type || '-'}</Typography>
                                                     <Typography><b>Created:</b> {bookingDetail.booking.created_at || '-'}</Typography>
                                                     <Typography><b>Expires:</b> {bookingDetail.booking.expires || '-'}</Typography>
-                                                    <Typography><b>Paid:</b> £{bookingDetail.booking.paid || '0.00'}</Typography>
+                                                    <Typography><b>Paid:</b> {editField === 'paid' ? (
+                                                        <>
+                                                            <input value={editValue} onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} style={{marginRight: 8}} />
+                                                            <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                            <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            £{bookingDetail.booking.paid}
+                                                            <IconButton size="small" onClick={() => handleEditClick('paid', bookingDetail.booking.paid)}><EditIcon fontSize="small" /></IconButton>
+                                                        </>
+                                                    )}</Typography>
                                                     <Typography><b>Redeemed:</b> {bookingDetail.booking.redeemed || '-'}</Typography>
                                                     <Typography><b>Offer Code:</b> {bookingDetail.booking.offer_code || '-'}</Typography>
                                                     <Typography><b>Voucher Ref:</b> {bookingDetail.booking.voucher_ref || '-'}</Typography>
@@ -998,7 +1041,18 @@ const BookingPage = () => {
                                                     <IconButton size="small" onClick={() => handleEditClick('email', bookingDetail.booking.email)}><EditIcon fontSize="small" /></IconButton>
                                                 </>
                                             )}</Typography>
-                                            <Typography><b>Paid:</b> £{bookingDetail.booking.paid}</Typography>
+                                            <Typography><b>Paid:</b> {editField === 'paid' ? (
+                                                <>
+                                                    <input value={editValue} onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} style={{marginRight: 8}} />
+                                                    <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                    <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    £{bookingDetail.booking.paid}
+                                                    <IconButton size="small" onClick={() => handleEditClick('paid', bookingDetail.booking.paid)}><EditIcon fontSize="small" /></IconButton>
+                                                </>
+                                            )}</Typography>
                                                     <Typography><b>Expires:</b> {editField === 'expires' ? (
                                                         <>
                                                             <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -1221,12 +1275,18 @@ const BookingPage = () => {
                                                                                 placeholder="Weight (kg)"
                                                                                 style={{ marginRight: 4, width: 70 }}
                                                                             />
+                                                                            <input
+                                                                                value={editPassengerPrice}
+                                                                                onChange={e => setEditPassengerPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+                                                                                placeholder="Price (£)"
+                                                                                style={{ marginRight: 4, width: 70 }}
+                                                                            />
                                                                             <Button size="small" onClick={() => handleSavePassengerEdit(p)} disabled={savingPassengerEdit}>Save</Button>
                                                                             <Button size="small" onClick={handleCancelPassengerEdit} disabled={savingPassengerEdit}>Cancel</Button>
                                                                         </>
                                                                     ) : (
                                                                         <>
-                                                                            {p.first_name || '-'} {p.last_name || '-'}{p.weight ? ` (${p.weight}kg)` : ''}
+                                                                            {p.first_name || '-'} {p.last_name || '-'}{p.weight ? ` (${p.weight}kg${p.price ? ' £' + p.price : ''})` : ''}
                                                                             <IconButton size="small" onClick={() => handleEditPassengerClick(p)}><EditIcon fontSize="small" /></IconButton>
                                                                         </>
                                                                     )}
