@@ -151,34 +151,61 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
             {/* Display Filtered Data */}
             <div style={{ marginTop: "20px" }}>
                 <div className="home-filter-data-wrap">
-                    <div className="home-filter-data-table">
-                        <h3 style={{ fontFamily: "Gilroy Light" }}>Totals:</h3>
-                        {Object.keys(summary).length > 0 ? (
-                            <table border="1" style={{ width: "100%", background: "#FFF", marginTop: "10px", borderCollapse: "collapse" }}>
-                                <thead style={{ background: "#3274b4", color: "#FFF" }}>
-                                    <tr>
-                                        <th>Flown Flights</th>
-                                        <th>Pax Flown</th>
-                                        <th>Flights Completed</th>
-                                        <th>Sales</th>
-                                        <th>Total Liability</th>
-                                        <th>VAT</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td style={{ textAlign: "center", padding: "8px" }}>{summary.totalFlights}</td>
-                                        <td style={{ textAlign: "center", padding: "8px" }}>{summary.totalPax}</td>
-                                        <td style={{ textAlign: "center", padding: "8px" }}>£{summary.completedFlights}</td>
-                                        <td style={{ textAlign: "center", padding: "8px" }}>£{summary.totalSales.toFixed(2)}</td>
-                                        <td style={{ textAlign: "center", padding: "8px" }}>£{summary.totalLiability.toFixed(2)}</td>
-                                        <td style={{ textAlign: "center", padding: "8px" }}>£{summary.totalVAT.toFixed(2)}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        ) : (
-                            <p>No data found for the selected range.</p>
-                        )}
+                    <div style={{ display: 'flex', flexDirection: 'row', width: '100%' }}>
+                        <div className="home-filter-data-table" style={{ flex: 1 }}>
+                            <h3 style={{ fontFamily: "Gilroy Light" }}>Totals:</h3>
+                            {Object.keys(summary).length > 0 ? (
+                                <table border="1" style={{ width: "100%", background: "#FFF", marginTop: "10px", borderCollapse: "collapse" }}>
+                                    <thead style={{ background: "#3274b4", color: "#FFF" }}>
+                                        <tr>
+                                            <th>Flown Flights</th>
+                                            <th>Pax Flown</th>
+                                            <th>Flights Completed</th>
+                                            <th>Sales</th>
+                                            <th>Total Liability</th>
+                                            <th>VAT</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td style={{ textAlign: "center", padding: "8px" }}>{summary.totalFlights}</td>
+                                            <td style={{ textAlign: "center", padding: "8px" }}>{summary.totalPax}</td>
+                                            <td style={{ textAlign: "center", padding: "8px" }}>£{summary.completedFlights}</td>
+                                            <td style={{ textAlign: "center", padding: "8px" }}>£{summary.totalSales.toFixed(2)}</td>
+                                            <td style={{ textAlign: "center", padding: "8px" }}>£{summary.totalLiability.toFixed(2)}</td>
+                                            <td style={{ textAlign: "center", padding: "8px" }}>£{summary.totalVAT.toFixed(2)}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <p>No data found for the selected range.</p>
+                            )}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 320, marginLeft: 0 }}>
+                            <a
+                                href="http://54.174.214.16/"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                    display: 'inline-block',
+                                    background: '#3274b4',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: 8,
+                                    padding: '16px 32px',
+                                    fontSize: 24,
+                                    fontWeight: 600,
+                                    textAlign: 'center',
+                                    textDecoration: 'none',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+                                    width: '100%',
+                                    maxWidth: 320
+                                }}
+                            >
+                                Manual Booking
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
