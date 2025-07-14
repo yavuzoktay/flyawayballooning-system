@@ -1405,3 +1405,35 @@ app.get('/api/getVoucherDetail', async (req, res) => {
         res.status(500).json({ success: false, message: 'Database error', error: err.message });
     }
 });
+
+// Edit Admin Note
+app.patch("/api/updateAdminNote", (req, res) => {
+    const { id, note } = req.body;
+    if (!id || !note) {
+        return res.status(400).json({ success: false, message: "Missing id or note" });
+    }
+    const sql = "UPDATE admin_notes SET notes = ? WHERE id = ?";
+    con.query(sql, [note, id], (err, result) => {
+        if (err) {
+            console.error("Error updating note:", err);
+            return res.status(500).json({ success: false, message: "Database error" });
+        }
+        res.json({ success: true });
+    });
+});
+
+// Delete Admin Note
+app.delete("/api/deleteAdminNote", (req, res) => {
+    const { id } = req.body;
+    if (!id) {
+        return res.status(400).json({ success: false, message: "Missing id" });
+    }
+    const sql = "DELETE FROM admin_notes WHERE id = ?";
+    con.query(sql, [id], (err, result) => {
+        if (err) {
+            console.error("Error deleting note:", err);
+            return res.status(500).json({ success: false, message: "Database error" });
+        }
+        res.json({ success: true });
+    });
+});

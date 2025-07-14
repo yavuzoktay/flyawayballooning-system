@@ -83,6 +83,10 @@ const BookingPage = () => {
     const [editPassengerWeight, setEditPassengerWeight] = useState("");
     const [savingPassengerEdit, setSavingPassengerEdit] = useState(false);
 
+    // Add to component state:
+    const [editingNoteId, setEditingNoteId] = useState(null);
+    const [editingNoteText, setEditingNoteText] = useState("");
+
     // Fetch data
     const voucherData = async () => {
         try {
@@ -607,6 +611,34 @@ const BookingPage = () => {
         }
     };
 
+
+
+    // Add these handlers:
+    const handleEditNoteClick = (id, text) => {
+      setEditingNoteId(id);
+      setEditingNoteText(text);
+    };
+    const handleCancelNoteEdit = () => {
+      setEditingNoteId(null);
+      setEditingNoteText("");
+    };
+    const handleSaveNoteEdit = async (id) => {
+      if (!editingNoteText.trim()) return;
+      await axios.patch('/api/updateAdminNote', { id, note: editingNoteText });
+      // Refresh notes (or update local state)
+      const res = await axios.get(`/api/getBookingDetail?booking_id=${bookingDetail.booking.id}`);
+      setBookingDetail(prev => ({ ...prev, notes: res.data.notes }));
+      setEditingNoteId(null);
+      setEditingNoteText("");
+    };
+    const handleDeleteNote = async (id) => {
+      if (!window.confirm('Are you sure you want to delete this note?')) return;
+      await axios.delete('/api/deleteAdminNote', { data: { id } });
+      // Refresh notes (or update local state)
+      const res = await axios.get(`/api/getBookingDetail?booking_id=${bookingDetail.booking.id}`);
+      setBookingDetail(prev => ({ ...prev, notes: res.data.notes }));
+    };
+
     return (
         <div className="booking-page-wrap">
             <Container maxWidth="xl">
@@ -741,9 +773,9 @@ const BookingPage = () => {
                                         "name",
                                         "flight_type",
                                         "flight_date",
+                                        "location", // moved here
                                         "pax",
                                         "email",
-                                        "location",
                                         "status",
                                         "paid",
                                         "due",
@@ -1126,9 +1158,29 @@ const BookingPage = () => {
                                                     </Button>
                                                 </Box>
                                                 {bookingDetail.notes && bookingDetail.notes.length > 0 ? bookingDetail.notes.map((n, i) => (
-                                                    <Box key={i} sx={{ mb: 1, p: 1, background: '#fff', borderRadius: 1, boxShadow: 0 }}>
+                                                    <Box key={n.id || i} sx={{ mb: 1, p: 1, background: '#fff', borderRadius: 1, boxShadow: 0, position: 'relative' }}>
                                                         <Typography variant="body2" sx={{ color: '#888', fontSize: 12 }}>{n.date ? dayjs(n.date).format('DD/MM/YYYY HH:mm') : ''}</Typography>
-                                                        <Typography>{n.notes}</Typography>
+                                                        {editingNoteId === n.id ? (
+                                                            <>
+                                                                <TextField
+                                                                    multiline
+                                                                    minRows={2}
+                                                                    maxRows={6}
+                                                                    fullWidth
+                                                                    value={editingNoteText}
+                                                                    onChange={e => setEditingNoteText(e.target.value)}
+                                                                    sx={{ mb: 1 }}
+                                                                />
+                                                                <Button size="small" color="primary" variant="contained" sx={{ mr: 1 }} onClick={() => handleSaveNoteEdit(n.id)}>Save</Button>
+                                                                <Button size="small" variant="outlined" onClick={handleCancelNoteEdit}>Cancel</Button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Typography>{n.notes}</Typography>
+                                                                <Button size="small" sx={{ position: 'absolute', right: 60, top: 8 }} onClick={() => handleEditNoteClick(n.id, n.notes)}>Edit</Button>
+                                                                <Button size="small" color="error" sx={{ position: 'absolute', right: 8, top: 8 }} onClick={() => handleDeleteNote(n.id)}>Delete</Button>
+                                                            </>
+                                                        )}
                                                     </Box>
                                                 )) : <Typography>No notes</Typography>}
                                             </Box>
@@ -1140,7 +1192,6 @@ const BookingPage = () => {
                                                     <TableHead>
                                                         <TableRow>
                                                             <TableCell>Booking Date</TableCell>
-                                                            <TableCell>Booking ID</TableCell>
                                                             <TableCell>Activity Type</TableCell>
                                                             <TableCell>Location</TableCell>
                                                             <TableCell>Status</TableCell>
@@ -1149,7 +1200,6 @@ const BookingPage = () => {
                                                     <TableBody>
                                                         <TableRow>
                                                             <TableCell>{bookingDetail.booking.created_at ? dayjs(bookingDetail.booking.created_at).format('DD/MM/YYYY HH:mm') : '-'}</TableCell>
-                                                            <TableCell>{bookingDetail.booking.id || '-'}</TableCell>
                                                             <TableCell>{bookingDetail.booking.flight_type || '-'}</TableCell>
                                                             <TableCell>{bookingDetail.booking.location || '-'}</TableCell>
                                                             <TableCell>Scheduled</TableCell>
@@ -1157,7 +1207,6 @@ const BookingPage = () => {
                                                         {bookingHistory.map((h, i) => (
                                                             <TableRow key={i}>
                                                                 <TableCell>{h.changed_at ? dayjs(h.changed_at).format('DD/MM/YYYY HH:mm') : '-'}</TableCell>
-                                                                <TableCell>{bookingDetail.booking.id || '-'}</TableCell>
                                                                 <TableCell>{bookingDetail.booking.flight_type || '-'}</TableCell>
                                                                 <TableCell>{bookingDetail.booking.location || '-'}</TableCell>
                                                                 <TableCell>{h.status}</TableCell>
