@@ -1067,7 +1067,16 @@ const BookingPage = () => {
                                                     ) : (
                                                         <>
                                                     <Typography><b>Activity:</b> {bookingDetail.booking.flight_type} - {bookingDetail.booking.location}</Typography>
-                                                    <Typography><b>Booked For:</b> {bookingDetail.booking.flight_date ? dayjs(bookingDetail.booking.flight_date).format('DD/MM/YYYY HH:mm') : '-'}</Typography>
+                                                    <Typography><b>Booked For:</b> {bookingDetail.booking.flight_date ? (
+  <a
+    href={`http://localhost:3001/manifest?date=${dayjs(bookingDetail.booking.flight_date).format('YYYY-MM-DD')}&time=${dayjs(bookingDetail.booking.flight_date).format('HH:mm')}`}
+    target="_blank"
+    rel="noopener noreferrer"
+    style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
+  >
+    {dayjs(bookingDetail.booking.flight_date).format('DD/MM/YYYY HH:mm')}
+  </a>
+) : '-'}</Typography>
                                                     <Typography>
                                                         <b>Redeemed Voucher:</b> {bookingDetail.booking.voucher_code ? <span style={{ color: 'green', fontWeight: 600 }}>Yes</span> : <span style={{ color: 'red', fontWeight: 600 }}>No</span>} <span style={{ fontWeight: 500 }}>{bookingDetail.booking.voucher_code || ''}</span>
                                                     </Typography>
