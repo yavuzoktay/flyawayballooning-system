@@ -1069,7 +1069,7 @@ const BookingPage = () => {
                                                     <Typography><b>Activity:</b> {bookingDetail.booking.flight_type} - {bookingDetail.booking.location}</Typography>
                                                     <Typography><b>Booked For:</b> {bookingDetail.booking.flight_date ? (
   <a
-    href={`http://localhost:3001/manifest?date=${dayjs(bookingDetail.booking.flight_date).format('YYYY-MM-DD')}&time=${dayjs(bookingDetail.booking.flight_date).format('HH:mm')}`}
+    href={`http://44.205.155.45:3002/manifest?date=${dayjs(bookingDetail.booking.flight_date).format('YYYY-MM-DD')}&time=${dayjs(bookingDetail.booking.flight_date).format('HH:mm')}`}
     target="_blank"
     rel="noopener noreferrer"
     style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
