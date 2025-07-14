@@ -890,6 +890,13 @@ const Manifest = () => {
                                         <Typography><b>Marketing:</b> {bookingDetail.booking.hear_about_us || 'N/A'}</Typography>
                                         <Typography><b>Reason for Ballooning:</b> {bookingDetail.booking.ballooning_reason || 'N/A'}</Typography>
                                     </Box>
+                                    {/* Preferences Section - always visible */}
+                                    <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
+                                        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Preferences</Typography>
+                                        <Typography><b>Preferred Day:</b> {bookingDetail.booking.preferred_day || '-'}</Typography>
+                                        <Typography><b>Preferred Location:</b> {bookingDetail.booking.preferred_location || '-'}</Typography>
+                                        <Typography><b>Preferred Time:</b> {bookingDetail.booking.preferred_time || '-'}</Typography>
+                                    </Box>
                                 </Grid>
                                 {/* Main Details */}
                                 <Grid item xs={12} md={8}>

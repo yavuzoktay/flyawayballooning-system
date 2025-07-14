@@ -194,7 +194,10 @@ app.get("/api/getAllBookingData", (req, res) => {
                     created_at: row.created_at ? moment(row.created_at).format('YYYY-MM-DD') : '',
                     created_at_display: row.created_at ? moment(row.created_at).format('DD/MM/YYYY') : '',
                     choose_add_on: row.choose_add_on || '',
-                    flight_date_display: flightDateFormatted
+                    flight_date_display: flightDateFormatted,
+                    preferred_location: row.preferred_location || null,
+                    preferred_time: row.preferred_time || null,
+                    preferred_day: row.preferred_day || null
                 };
             });
             res.send({ success: true, data: formatted });
@@ -429,7 +432,10 @@ app.post('/api/createBooking', (req, res) => {
         selectedDate,
         totalPrice,
         voucher_code,
-        flight_attempts // frontend'den geliyorsa, yoksa undefined
+        flight_attempts, // frontend'den geliyorsa, yoksa undefined
+        preferred_location,
+        preferred_time,
+        preferred_day
     } = req.body;
 
     // Unify add-on field: always use choose_add_on as array of {name, price}
@@ -478,8 +484,11 @@ app.post('/api/createBooking', (req, res) => {
                 weight,
                 email,
                 phone,
-                choose_add_on
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                choose_add_on,
+                preferred_location,
+                preferred_time,
+                preferred_day
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         // Debug log for choose_add_on and bookingValues
@@ -510,7 +519,10 @@ app.post('/api/createBooking', (req, res) => {
             mainPassenger.weight || null,
             mainPassenger.email || null,
             mainPassenger.phone || null,
-            choose_add_on_str
+            choose_add_on_str,
+            preferred_location || null,
+            preferred_time || null,
+            preferred_day || null
         ];
         console.log('bookingValues:', bookingValues);
 
@@ -775,7 +787,10 @@ app.get('/api/getBookingDetail', async (req, res) => {
             return res.status(404).json({ success: false, message: 'Booking not found' });
         }
         const booking = bookingRows[0];
-
+        // Ensure preferred fields are always present and not null
+        booking.preferred_location = booking.preferred_location || '';
+        booking.preferred_time = booking.preferred_time || '';
+        booking.preferred_day = booking.preferred_day || '';
         // 2. Passenger bilgileri
         const [passengerRows] = await new Promise((resolve, reject) => {
             con.query('SELECT * FROM passenger WHERE booking_id = ?', [booking_id], (err, rows) => {
@@ -783,7 +798,6 @@ app.get('/api/getBookingDetail', async (req, res) => {
                 else resolve([rows]);
             });
         });
-
         // 3. Notes (admin_notes)
         const [notesRows] = await new Promise((resolve, reject) => {
             con.query('SELECT * FROM admin_notes WHERE booking_id = ?', [booking_id], (err, rows) => {
@@ -791,19 +805,11 @@ app.get('/api/getBookingDetail', async (req, res) => {
                 else resolve([rows]);
             });
         });
-
-        // 4. Add On (varsayım: all_booking tablosunda veya ayrı bir tablo varsa ekle)
-        // Şimdilik booking tablosunda chooseAddOn alanı varsa onu döndür
-        // 5. Additional Info (varsayım: all_booking tablosunda veya ayrı bir tablo varsa ekle)
-        // Şimdilik booking tablosunda additionalInfo alanı varsa onu döndür
-
         res.json({
             success: true,
             booking,
             passengers: passengerRows,
             notes: notesRows,
-            // addOn: booking.chooseAddOn || null, // Eğer varsa
-            // additional: booking.additionalInfo || null // Eğer varsa
         });
     } catch (err) {
         console.error('Error fetching booking detail:', err);
