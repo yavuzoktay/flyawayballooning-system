@@ -1295,6 +1295,34 @@ app.get('/api/activity/:id/open-availabilities', (req, res) => {
     });
 });
 
+// Add Date Request (POST)
+app.post('/api/date-request', (req, res) => {
+    const { name, phone, email, location, flight_type, requested_date } = req.body;
+    if (!name || !email || !location || !flight_type || !requested_date) {
+        return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+    const sql = 'INSERT INTO date_requests (name, phone, email, location, flight_type, requested_date) VALUES (?, ?, ?, ?, ?, ?)';
+    con.query(sql, [name, phone, email, location, flight_type, requested_date], (err, result) => {
+        if (err) {
+            console.error('Error inserting date request:', err);
+            return res.status(500).json({ success: false, message: 'Database error' });
+        }
+        res.json({ success: true, id: result.insertId });
+    });
+});
+
+// List Date Requests (GET)
+app.get('/api/date-requests', (req, res) => {
+    const sql = 'SELECT * FROM date_requests ORDER BY created_at DESC';
+    con.query(sql, (err, result) => {
+        if (err) {
+            console.error('Error fetching date requests:', err);
+            return res.status(500).json({ success: false, message: 'Database error' });
+        }
+        res.json({ success: true, data: result });
+    });
+});
+
 // Place this at the very end, after all API endpoints:
 app.use(express.static(path.join(__dirname, '../client/build')));
 app.get('*', (req, res) => {
