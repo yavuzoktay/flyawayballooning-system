@@ -95,6 +95,9 @@ const BookingPage = () => {
     // Add state for passenger price editing
     const [editPassengerPrice, setEditPassengerPrice] = useState("");
 
+    // Add state for tracking passenger prices in edit mode
+    const [editPassengerPrices, setEditPassengerPrices] = useState([]);
+
     // Fetch data
     const voucherData = async () => {
         try {
@@ -299,7 +302,7 @@ const BookingPage = () => {
     // Add Guest kaydetme fonksiyonunu güncelle
     const handleSaveGuests = async () => {
         if (!selectedBookingId) return;
-        // Her guest için API'ye kaydet
+        // Add each guest
         for (const g of guestForms) {
             await axios.post('/api/addPassenger', {
                 booking_id: selectedBookingId,
@@ -311,10 +314,24 @@ const BookingPage = () => {
                 weight: g.weight
             });
         }
-        // Guest dialogu kapat
+        // Fetch updated passengers
+        const res = await axios.get(`/api/getBookingDetail?booking_id=${selectedBookingId}`);
+        const updatedPassengers = res.data.passengers;
+        // Recalculate prices
+        const paid = parseFloat(res.data.booking.paid) || 0;
+        const n = updatedPassengers.length;
+        const perPassenger = n > 0 ? parseFloat((paid / n).toFixed(2)) : 0;
+        // Update all passenger prices in backend
+        await Promise.all(updatedPassengers.map((p) =>
+            axios.patch('/api/updatePassengerField', {
+                passenger_id: p.id,
+                field: 'price',
+                value: perPassenger
+            })
+        ));
+        // Refetch passengers to update UI
+        await fetchPassengers(selectedBookingId);
         setAddGuestDialogOpen(false);
-        // Passenger listesini tekrar çek
-        fetchPassengers(selectedBookingId);
     };
 
     // Passenger listesini güncelleyen fonksiyon
@@ -702,6 +719,13 @@ const BookingPage = () => {
         }
     };
 
+    // When opening dialog, initialize editPassengerPrices
+    useEffect(() => {
+        if (detailDialogOpen && bookingDetail?.passengers) {
+            setEditPassengerPrices(bookingDetail.passengers.map(p => p.price ? parseFloat(p.price) : 0));
+        }
+    }, [detailDialogOpen, bookingDetail]);
+
     return (
         <div className="booking-page-wrap">
             <Container maxWidth="xl">
@@ -989,7 +1013,35 @@ const BookingPage = () => {
                                                     <Typography><b>Paid:</b> {editField === 'paid' ? (
                                                         <>
                                                             <input value={editValue} onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} style={{marginRight: 8}} />
-                                                            <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                            <Button size="small" onClick={async () => {
+                                                                // Split paid equally among passengers
+                                                                const paid = parseFloat(editValue) || 0;
+                                                                const n = bookingDetail.passengers.length;
+                                                                const perPassenger = n > 0 ? parseFloat((paid / n).toFixed(2)) : 0;
+                                                                // Update all passengers in backend
+                                                                await Promise.all(bookingDetail.passengers.map((p, idx) =>
+                                                                    axios.patch('/api/updatePassengerField', {
+                                                                        passenger_id: p.id,
+                                                                        field: 'price',
+                                                                        value: perPassenger
+                                                                    })
+                                                                ));
+                                                                // Update paid in backend
+                                                                await axios.patch('/api/updateBookingField', {
+                                                                    booking_id: bookingDetail.booking.id,
+                                                                    field: 'paid',
+                                                                    value: paid
+                                                                });
+                                                                // Update UI
+                                                                setBookingDetail(prev => ({
+                                                                    ...prev,
+                                                                    booking: { ...prev.booking, paid },
+                                                                    passengers: prev.passengers.map(p => ({ ...p, price: perPassenger }))
+                                                                }));
+                                                                setEditPassengerPrices(bookingDetail.passengers.map(() => perPassenger));
+                                                                setEditField(null);
+                                                                setEditValue('');
+                                                            }} disabled={savingEdit}>Save</Button>
                                                             <Button size="small" onClick={handleEditCancel}>Cancel</Button>
                                                         </>
                                                     ) : (
@@ -1042,17 +1094,17 @@ const BookingPage = () => {
                                                 </>
                                             )}</Typography>
                                             <Typography><b>Paid:</b> {editField === 'paid' ? (
-                                                <>
+                                                        <>
                                                     <input value={editValue} onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} style={{marginRight: 8}} />
-                                                    <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
-                                                    <Button size="small" onClick={handleEditCancel}>Cancel</Button>
-                                                </>
-                                            ) : (
-                                                <>
+                                                            <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                            <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                        </>
+                                                    ) : (
+                                                        <>
                                                     £{bookingDetail.booking.paid}
                                                     <IconButton size="small" onClick={() => handleEditClick('paid', bookingDetail.booking.paid)}><EditIcon fontSize="small" /></IconButton>
-                                                </>
-                                            )}</Typography>
+                                                        </>
+                                                    )}</Typography>
                                                     <Typography><b>Expires:</b> {editField === 'expires' ? (
                                                         <>
                                                             <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -1221,8 +1273,6 @@ const BookingPage = () => {
   <Typography><b>Booked For:</b> {bookingDetail.booking.flight_date ? (
     <a
       href={`http://44.202.155.45:3002/manifest?date=${dayjs(bookingDetail.booking.flight_date).format('YYYY-MM-DD')}&time=${dayjs(bookingDetail.booking.flight_date).format('HH:mm')}`}
-      target="_blank"
-      rel="noopener noreferrer"
       style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
     >
       {dayjs(bookingDetail.booking.flight_date).format('DD/MM/YYYY HH:mm')}
@@ -1281,7 +1331,36 @@ const BookingPage = () => {
                                                                                 placeholder="Price (£)"
                                                                                 style={{ marginRight: 4, width: 70 }}
                                                                             />
-                                                                            <Button size="small" onClick={() => handleSavePassengerEdit(p)} disabled={savingPassengerEdit}>Save</Button>
+                                                                            <Button size="small" onClick={async () => {
+                                                                                // Save passenger price
+                                                                                const newPrice = parseFloat(editPassengerPrice) || 0;
+                                                                                await axios.patch('/api/updatePassengerField', {
+                                                                                    passenger_id: p.id,
+                                                                                    field: 'price',
+                                                                                    value: newPrice
+                                                                                });
+                                                                                // Update local state
+                                                                                const updatedPrices = bookingDetail.passengers.map((pp, idx) =>
+                                                                                    pp.id === p.id ? newPrice : (pp.price ? parseFloat(pp.price) : 0)
+                                                                                );
+                                                                                // Update paid in backend
+                                                                                const newPaid = updatedPrices.reduce((sum, v) => sum + v, 0);
+                                                                                await axios.patch('/api/updateBookingField', {
+                                                                                    booking_id: bookingDetail.booking.id,
+                                                                                    field: 'paid',
+                                                                                    value: newPaid
+                                                                                });
+                                                                                setBookingDetail(prev => ({
+                                                                                    ...prev,
+                                                                                    booking: { ...prev.booking, paid: newPaid },
+                                                                                    passengers: prev.passengers.map(pp =>
+                                                                                        pp.id === p.id ? { ...pp, price: newPrice } : pp
+                                                                                    )
+                                                                                }));
+                                                                                setEditPassengerPrices(updatedPrices);
+                                                                                setEditingPassenger(null);
+                                                                                setEditPassengerPrice("");
+                                                                            }} disabled={savingPassengerEdit}>Save</Button>
                                                                             <Button size="small" onClick={handleCancelPassengerEdit} disabled={savingPassengerEdit}>Cancel</Button>
                                                                         </>
                                                                     ) : (
@@ -1340,7 +1419,7 @@ const BookingPage = () => {
                                                             </>
                                                         ) : (
                                                             <>
-                                                                <Typography>{n.notes}</Typography>
+                                                        <Typography>{n.notes}</Typography>
                                                                 <Button size="small" sx={{ position: 'absolute', right: 60, top: 8 }} onClick={() => handleEditNoteClick(n.id, n.notes)}>Edit</Button>
                                                                 <Button size="small" color="error" sx={{ position: 'absolute', right: 8, top: 8 }} onClick={() => handleDeleteNote(n.id)}>Delete</Button>
                                                             </>
