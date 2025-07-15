@@ -188,16 +188,15 @@ const BookingPage = () => {
         } else if (activeTab === "dateRequests") {
             (async () => {
                 try {
-                    const response = await axios.get(`/api/getDateRequestData`);
+                    const response = await axios.get(`/api/date-requests`);
                     setDateRequested(response.data.data || []);
                     setFilteredData((response.data.data || []).map((item) => ({
                         name: item.name || "",
-                        number: item.number || item.phone || item.mobile || item.booking_phone || "",
-                        email: item.email || item.booking_email || item.contact_email || "",
+                        number: item.phone || "",
+                        email: item.email || "",
                         location: item.location || "",
-                        date_requested: item.date_requested || item.requested_date || item.created_at || item.created || "",
-                        voucher_booking_id: item.voucher_code || item.booking_id || item.id || "",
-                        id: item.id || item.voucher_code || item.booking_id || item.voucher_booking_id || ""
+                        date_requested: item.requested_date || item.created_at || "",
+                        id: item.id || ""
                     })));
                 } catch (err) {
                     setDateRequested([]);
@@ -435,7 +434,7 @@ const BookingPage = () => {
     // Date Requests için isim tıklanınca detayları çek
     const handleDateRequestNameClick = (item) => {
         // booking_id veya voucher_booking_id veya id'den birini kullan
-        const bookingId = item.voucher_booking_id || item.id || item.booking_id;
+        const bookingId = item.id;
         if (bookingId) {
             setSelectedBookingId(bookingId);
             setDetailDialogOpen(true);
@@ -974,14 +973,13 @@ const BookingPage = () => {
                                 <PaginatedTable
                                     data={dateRequested.map((item) => ({
                                         name: item.name || "",
-                                        number: item.number || item.phone || item.mobile || item.booking_phone || "",
-                                        email: item.email || item.booking_email || item.contact_email || "",
+                                        number: item.phone || "",
+                                        email: item.email || "",
                                         location: item.location || "",
-                                        date_requested: item.date_requested || item.requested_date || item.created_at || item.created || "",
-                                        voucher_booking_id: item.voucher_code || item.booking_id || item.id || "",
-                                        id: item.id || item.voucher_code || item.booking_id || item.voucher_booking_id || ""
+                                        date_requested: item.requested_date || item.created_at || "",
+                                        id: item.id || ""
                                     }))}
-                                    columns={["name", "number", "email", "location", "date_requested", "voucher_booking_id"]}
+                                    columns={["name", "number", "email", "location", "date_requested", "id"]}
                                     onNameClick={handleDateRequestNameClick}
                                 />
                             </>

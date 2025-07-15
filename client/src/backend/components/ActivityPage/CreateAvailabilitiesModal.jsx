@@ -6,7 +6,10 @@ import dayjs from 'dayjs';
 import axios from 'axios';
 
 const repeatOptions = [
-    { value: 'once', label: 'Just Once' }
+    { value: 'once', label: 'Just Once' },
+    { value: 'everyday', label: 'Repeat Daily' },
+    { value: 'weekdays', label: 'Repeat Weekdays' },
+    { value: 'weekends', label: 'Repeat Weekends' },
 ];
 
 const visibilityOptions = [
