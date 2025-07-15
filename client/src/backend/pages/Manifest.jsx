@@ -292,6 +292,7 @@ const Manifest = () => {
 
     const handleSaveGuests = async () => {
         if (!bookingDetail?.booking?.id) return;
+        // Add each guest
         for (const g of guestForms) {
             await axios.post('/api/addPassenger', {
                 booking_id: bookingDetail.booking.id,
@@ -303,8 +304,24 @@ const Manifest = () => {
                 weight: g.weight
             });
         }
+        // Fetch updated passengers
+        const res = await axios.get(`/api/getBookingDetail?booking_id=${bookingDetail.booking.id}`);
+        const updatedPassengers = res.data.passengers;
+        // Recalculate prices
+        const paid = parseFloat(res.data.booking.paid) || 0;
+        const n = updatedPassengers.length;
+        const perPassenger = n > 0 ? parseFloat((paid / n).toFixed(2)) : 0;
+        // Update all passenger prices in backend
+        await Promise.all(updatedPassengers.map((p) =>
+            axios.patch('/api/updatePassengerField', {
+                passenger_id: p.id,
+                field: 'price',
+                value: perPassenger
+            })
+        ));
+        // Refetch passengers to update UI
+        await fetchBookingDetail(bookingDetail.booking.id);
         setAddGuestDialogOpen(false);
-        fetchBookingDetail(bookingDetail.booking.id);
     };
 
     const fetchBookingDetail = async (bookingId) => {
@@ -534,6 +551,9 @@ const Manifest = () => {
     const [editPassengerPrice, setEditPassengerPrice] = useState("");
     const [savingPassengerEdit, setSavingPassengerEdit] = useState(false);
 
+    // Add state for tracking passenger prices in edit mode
+    const [editPassengerPrices, setEditPassengerPrices] = useState([]);
+
     const handleEditPassengerClick = (p) => {
         setEditPassengerFirstName(p.first_name || "");
         setEditPassengerLastName(p.last_name || "");
@@ -622,6 +642,116 @@ const Manifest = () => {
         }
     };
 
+    // Add state for status update loading
+    const [statusLoadingGroup, setStatusLoadingGroup] = useState(null);
+
+    // Add handler to toggle status for a group
+    const handleToggleGroupStatus = async (groupFlights) => {
+      if (!groupFlights || groupFlights.length === 0) return;
+      setStatusLoadingGroup(groupFlights[0].id);
+      const first = groupFlights[0];
+      const currentStatus = getFlightStatus(first);
+      const newStatus = currentStatus === 'Closed' ? 1 : 0; // 1=Open, 0=Closed
+      try {
+        await Promise.all(groupFlights.map(f =>
+          axios.post('/api/updateBookingStatus', {
+            booking_id: f.id,
+            manual_status_override: newStatus
+          })
+        ));
+        setFlights(prev => prev.map(f =>
+          groupFlights.some(gf => gf.id === f.id)
+            ? { ...f, manual_status_override: newStatus }
+            : f
+        ));
+      } catch (err) {
+        alert('Status update failed!');
+      }
+      setStatusLoadingGroup(null);
+    };
+
+    // When opening dialog, initialize editPassengerPrices
+    useEffect(() => {
+      if (detailDialogOpen && bookingDetail?.passengers) {
+        setEditPassengerPrices(bookingDetail.passengers.map(p => p.price ? parseFloat(p.price) : 0));
+      }
+    }, [detailDialogOpen, bookingDetail]);
+
+    // Add state for booking modal
+    const [bookingModalOpen, setBookingModalOpen] = useState(false);
+    const [bookingModalLoading, setBookingModalLoading] = useState(false);
+    const [bookingAvailabilities, setBookingAvailabilities] = useState([]);
+    const [bookingModalError, setBookingModalError] = useState("");
+    const [bookingModalDate, setBookingModalDate] = useState(null);
+    const [bookingModalTimes, setBookingModalTimes] = useState([]);
+    const [bookingModalGroup, setBookingModalGroup] = useState(null);
+    // Add state for passenger count in booking modal
+    const [bookingModalPax, setBookingModalPax] = useState(1);
+
+    // Add state for selected time slot and contact information fields in booking modal
+    const [bookingModalSelectedTime, setBookingModalSelectedTime] = useState(null);
+    const [bookingModalContactInfos, setBookingModalContactInfos] = useState([
+      { firstName: '', lastName: '', phone: '', email: '', weight: '' }
+    ]);
+
+    // Reset contact info and selected time when modal opens or date changes
+    useEffect(() => {
+      if (!bookingModalOpen) {
+        setBookingModalSelectedTime(null);
+        setBookingModalContactInfos([{ firstName: '', lastName: '', phone: '', email: '', weight: '' }]);
+      }
+    }, [bookingModalOpen]);
+    useEffect(() => {
+      setBookingModalSelectedTime(null);
+      setBookingModalContactInfos([{ firstName: '', lastName: '', phone: '', email: '', weight: '' }]);
+    }, [bookingModalDate]);
+
+    // Handler to update a field in a contact info object
+    const handleContactInfoChange = (idx, field, value) => {
+      setBookingModalContactInfos(prev => prev.map((info, i) => i === idx ? { ...info, [field]: value } : info));
+    };
+
+    // Handler for Book button
+    const handleOpenBookingModal = async (group) => {
+      setBookingModalGroup(group);
+      setBookingModalOpen(true);
+      setBookingModalLoading(true);
+      setBookingModalError("");
+      setBookingAvailabilities([]);
+      setBookingModalDate(null);
+      setBookingModalTimes([]);
+      setBookingModalPax(1); // Reset pax
+      try {
+        // Fetch activity id by location and flight_type
+        const res = await axios.post("/api/getActivityId", { location: group.location });
+        const activity = res.data.activity;
+        // Fetch availabilities for this activity
+        const availRes = await axios.get(`/api/activity/${activity.id}/availabilities`);
+        setBookingAvailabilities(availRes.data.data || []);
+      } catch (err) {
+        setBookingModalError("Failed to fetch availabilities");
+      } finally {
+        setBookingModalLoading(false);
+      }
+    };
+
+    // When pax count changes, update the contact info array length
+    useEffect(() => {
+      setBookingModalContactInfos(prev => {
+        if (bookingModalPax > prev.length) {
+          // Add new empty contact infos
+          return [
+            ...prev,
+            ...Array.from({ length: bookingModalPax - prev.length }, () => ({ firstName: '', lastName: '', phone: '', email: '', weight: '' }))
+          ];
+        } else if (bookingModalPax < prev.length) {
+          // Remove extra contact infos
+          return prev.slice(0, bookingModalPax);
+        }
+        return prev;
+      });
+    }, [bookingModalPax]);
+
     return (
         <div className="final-menifest-wrap">
             <Container maxWidth="xl">
@@ -692,13 +822,19 @@ const Manifest = () => {
                                                 <Box display="flex" alignItems="center" gap={3} mt={1}>
                                                     <Typography>Pax Booked: {paxBooked} / {paxTotal}</Typography>
                                                     <Typography>Balloon Resource: {balloonResource}</Typography>
-                                                    <Typography>Status: <span style={{ color: status === 'Closed' ? 'red' : 'green', fontWeight: 600 }}>{status}</span></Typography>
+                                                    <Typography>Status: <span
+  style={{ color: status === 'Closed' ? 'red' : 'green', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+  onClick={() => handleToggleGroupStatus(groupFlights)}
+>{status}{statusLoadingGroup === first.id ? '...' : ''}</span></Typography>
                                                     <Typography>Type: {first.flight_type}</Typography>
                                                 </Box>
                                             </Box>
-                                            <IconButton size="large" onClick={e => handleGlobalMenuOpen(e, first, groupFlights)}>
-                                                <MoreVertIcon />
-                                            </IconButton>
+                                            <Box display="flex" alignItems="center" gap={1}>
+                                                <Button variant="contained" color="primary" sx={{ minWidth: 90, fontWeight: 600, textTransform: 'none' }} onClick={() => handleOpenBookingModal(first)}>Book</Button>
+                                                <IconButton size="large" onClick={e => handleGlobalMenuOpen(e, first, groupFlights)}>
+                                                    <MoreVertIcon />
+                                                </IconButton>
+                                            </Box>
                                             <Menu
                                                 anchorEl={globalMenuAnchorEl}
                                                 open={Boolean(globalMenuAnchorEl)}
@@ -894,7 +1030,35 @@ const Manifest = () => {
                                         <Typography><b>Paid:</b> {editField === 'paid' ? (
   <>
     <input value={editValue} onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} style={{marginRight: 8}} />
-    <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+    <Button size="small" onClick={async () => {
+      // Split paid equally among passengers
+      const paid = parseFloat(editValue) || 0;
+      const n = bookingDetail.passengers.length;
+      const perPassenger = n > 0 ? parseFloat((paid / n).toFixed(2)) : 0;
+      // Update all passengers in backend
+      await Promise.all(bookingDetail.passengers.map((p, idx) =>
+        axios.patch('/api/updatePassengerField', {
+          passenger_id: p.id,
+          field: 'price',
+          value: perPassenger
+        })
+      ));
+      // Update paid in backend
+      await axios.patch('/api/updateBookingField', {
+        booking_id: bookingDetail.booking.id,
+        field: 'paid',
+        value: paid
+      });
+      // Update UI
+      setBookingDetail(prev => ({
+        ...prev,
+        booking: { ...prev.booking, paid },
+        passengers: prev.passengers.map(p => ({ ...p, price: perPassenger }))
+      }));
+      setEditPassengerPrices(bookingDetail.passengers.map(() => perPassenger));
+      setEditField(null);
+      setEditValue('');
+    }} disabled={savingEdit}>Save</Button>
     <Button size="small" onClick={handleEditCancel}>Cancel</Button>
   </>
 ) : (
@@ -1035,7 +1199,14 @@ const Manifest = () => {
                                                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Current Booking</Typography>
                                                 <Typography><b>Activity:</b> {bookingDetail.booking.flight_type} - {bookingDetail.booking.location}</Typography>
                                                 {bookingDetail.booking.status !== 'Cancelled' && (
-                                                    <Typography><b>Booked For:</b> {bookingDetail.booking.flight_date ? dayjs(bookingDetail.booking.flight_date).format('DD/MM/YYYY HH:mm') : '-'}</Typography>
+                                                    <Typography><b>Booked For:</b> {bookingDetail.booking.flight_date ? (
+                                                        <a
+                                                            href={`http://44.202.155.45:3002/manifest?date=${dayjs(bookingDetail.booking.flight_date).format('YYYY-MM-DD')}&time=${dayjs(bookingDetail.booking.flight_date).format('HH:mm')}`}
+                                                            style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
+                                                        >
+                                                            {dayjs(bookingDetail.booking.flight_date).format('DD/MM/YYYY HH:mm')}
+                                                        </a>
+                                                    ) : '-'}</Typography>
                                                 )}
                                                 <Typography>
                                                     <b>Redeemed Voucher:</b> {bookingDetail.booking.voucher_code ? <span style={{ color: 'green', fontWeight: 600 }}>Yes</span> : <span style={{ color: 'red', fontWeight: 600 }}>No</span>} <span style={{ fontWeight: 500 }}>{bookingDetail.booking.voucher_code || ''}</span>
@@ -1198,6 +1369,131 @@ const Manifest = () => {
                 location={bookingDetail?.booking?.location}
                 onSlotSelect={handleRebookSlotSelect}
             />
+            {/* Booking Modal */}
+            <Dialog open={bookingModalOpen} onClose={() => setBookingModalOpen(false)} maxWidth="md" fullWidth>
+              <DialogTitle style={{ fontWeight: 700, fontSize: 22 }}>
+                Create Booking<br/>{bookingModalGroup ? `${bookingModalGroup.location} - ${bookingModalGroup.flight_type}` : ''}
+              </DialogTitle>
+              <DialogContent>
+                {bookingModalLoading ? (
+                  <Typography>Loading availabilities...</Typography>
+                ) : bookingModalError ? (
+                  <Typography color="error">{bookingModalError}</Typography>
+                ) : (
+                  <Box>
+                    {/* Flight info and pax selector, calendar, and time slots */}
+                    {bookingAvailabilities.length > 0 && (
+                      <>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, p: 2, border: '1px solid #e0e0e0', borderRadius: 2 }}>
+                          <Box sx={{ flex: 1 }}>
+                            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                              {bookingModalGroup?.flight_type || ''} £{bookingAvailabilities[0].price || ''}
+                            </Typography>
+                            <Typography sx={{ color: '#888' }}>£{bookingAvailabilities[0].price || ''} Per Person</Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Button variant="contained" color="primary" onClick={() => setBookingModalPax(p => Math.max(1, p - 1))} sx={{ minWidth: 40, fontSize: 22, fontWeight: 700 }}>-</Button>
+                            <Typography sx={{ minWidth: 32, textAlign: 'center', fontSize: 22 }}>{bookingModalPax}</Typography>
+                            <Button variant="contained" color="primary" onClick={() => setBookingModalPax(p => p + 1)} sx={{ minWidth: 40, fontSize: 22, fontWeight: 700 }}>+</Button>
+                          </Box>
+                        </Box>
+                        {/* Calendar grid by date */}
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                          {[...new Set(bookingAvailabilities.map(a => a.date))].map(date => (
+                            <Button
+                              key={date}
+                              variant={bookingModalDate === date ? 'contained' : 'outlined'}
+                              onClick={() => {
+                                setBookingModalDate(date);
+                                setBookingModalTimes(bookingAvailabilities.filter(a => a.date === date));
+                                setBookingModalSelectedTime(null); // reset time selection on date change
+                                setBookingModalContactInfos([{ firstName: '', lastName: '', phone: '', email: '', weight: '' }]);
+                              }}
+                              sx={{ minWidth: 90, mb: 1 }}
+                            >
+                              {dayjs(date).isValid() ? dayjs(date).format('DD/MM/YYYY') : date}
+                            </Button>
+                          ))}
+                        </Box>
+                        {/* Time slots for selected date */}
+                        {bookingModalDate && (
+                          <Box>
+                            <Typography variant="h6">Times for {dayjs(bookingModalDate).isValid() ? dayjs(bookingModalDate).format('DD/MM/YYYY') : bookingModalDate}</Typography>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                              {bookingModalTimes.map(slot => (
+                                <Button
+                                  key={slot.id}
+                                  variant={bookingModalSelectedTime && bookingModalSelectedTime.id === slot.id ? 'contained' : 'outlined'}
+                                  sx={{ minWidth: 120, mb: 1 }}
+                                  onClick={() => setBookingModalSelectedTime(slot)}
+                                >
+                                  {slot.time} {slot.status === 'Open' ? '' : '(Full)'}
+                                </Button>
+                              ))}
+                            </Box>
+                            {/* Contact Information Form */}
+                            {bookingModalSelectedTime && (
+                              <Box sx={{ mt: 3, p: 2, border: '1px solid #e0e0e0', borderRadius: 2, background: '#fafbfc' }}>
+                                <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Contact Information</Typography>
+                                {bookingModalContactInfos.map((info, idx) => (
+                                  <Box key={idx} sx={{ mb: 3, p: 2, border: '1px solid #e0e0e0', borderRadius: 2, background: '#fff' }}>
+                                    <Typography sx={{ fontWeight: 600, mb: 2 }}>Passenger {idx + 1}</Typography>
+                                    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                                      <TextField
+                                        label="First Name"
+                                        value={info.firstName}
+                                        onChange={e => handleContactInfoChange(idx, 'firstName', e.target.value)}
+                                        fullWidth
+                                        placeholder="First"
+                                      />
+                                      <TextField
+                                        label="Last Name"
+                                        value={info.lastName}
+                                        onChange={e => handleContactInfoChange(idx, 'lastName', e.target.value)}
+                                        fullWidth
+                                        placeholder="Last"
+                                      />
+                                    </Box>
+                                    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                                      <TextField
+                                        label="Phone"
+                                        value={info.phone}
+                                        onChange={e => handleContactInfoChange(idx, 'phone', e.target.value)}
+                                        fullWidth
+                                        placeholder="Phone number"
+                                      />
+                                      <TextField
+                                        label="Email"
+                                        value={info.email}
+                                        onChange={e => handleContactInfoChange(idx, 'email', e.target.value)}
+                                        fullWidth
+                                        placeholder="john@gmail.com"
+                                      />
+                                    </Box>
+                                    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                                      <TextField
+                                        label="Weight (kg)"
+                                        value={info.weight}
+                                        onChange={e => handleContactInfoChange(idx, 'weight', e.target.value.replace(/[^0-9.]/g, ''))}
+                                        fullWidth
+                                        placeholder="Weight"
+                                      />
+                                    </Box>
+                                  </Box>
+                                ))}
+                              </Box>
+                            )}
+                          </Box>
+                        )}
+                      </>
+                    )}
+                  </Box>
+                )}
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={() => setBookingModalOpen(false)}>Close</Button>
+              </DialogActions>
+            </Dialog>
         </div>
     );
 };

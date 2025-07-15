@@ -151,7 +151,7 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
             {/* Display Filtered Data */}
             <div style={{ marginTop: "20px" }}>
                 <div className="home-filter-data-wrap">
-                    <div style={{ display: 'flex', flexDirection: 'row', width: '100%' }}>
+                    <div style={{ display: 'flex', flexDirection: 'row', width: '100%', alignItems: 'center' }}>
                         <div className="home-filter-data-table" style={{ flex: 1 }}>
                             <h3 style={{ fontFamily: "Gilroy Light" }}>Totals:</h3>
                             {Object.keys(summary).length > 0 ? (
@@ -181,7 +181,7 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                                 <p>No data found for the selected range.</p>
                             )}
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 180, marginLeft: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 180, marginLeft: 32, marginTop: 38 }}>
                             <a
                                 href="http://54.174.214.16/"
                                 target="_blank"
