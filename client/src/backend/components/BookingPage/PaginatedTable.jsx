@@ -72,7 +72,7 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick }) => {
                                             >
                                                 {item[col]}
                                             </span>
-                                        ) : ( col === 'flight_date' ? (
+                                        ) : (col === 'flight_date' ? (
                                             (() => {
                                                 if (!item[col]) return '';
                                                 let isoString = item[col].includes('T') ? item[col] : item[col].replace(' ', 'T');
@@ -83,7 +83,18 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick }) => {
                                                 const year = date.getFullYear();
                                                 let hours = date.getHours();
                                                 const ampm = hours < 12 ? 'AM' : 'PM';
-                                                return `${day}/${month}/${year} ${ampm}`;
+                                                // YYYY-MM-DD format for URL
+                                                const urlDate = `${year}-${month}-${day}`;
+                                                return (
+                                                    <a
+                                                        href={`http://44.202.155.45:3002/manifest?date=${urlDate}`}
+                                                        style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
+                                                        target="_self"
+                                                        rel="noopener noreferrer"
+                                                    >
+                                                        {`${day}/${month}/${year} ${ampm}`}
+                                                    </a>
+                                                );
                                             })()
                                         ) : ( (col === 'created_at' || col === 'created' || col === 'expires' || col === 'date_requested') ? formatDate(item[col]) :
                                             col === 'status' && item[col] === 'Confirmed' ? 'Scheduled' : item[col]))}

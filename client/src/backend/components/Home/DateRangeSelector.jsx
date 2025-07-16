@@ -92,9 +92,25 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
     const calculateSummary = (data) => {
         const safeValue = (value) => isNaN(value) ? 0 : value;
         if(data){
+            // Filter flown flights: only count flights that are not cancelled, have flight_date, and flight_date is in the past
+            const flownFlights = data?.filter(item => {
+                // Must not be cancelled
+                if (item.status === 'Cancelled') return false;
+                
+                // Must have flight_date
+                if (!item.flight_date) return false;
+                
+                // Flight date must be in the past (flown)
+                const flightDate = new Date(item.flight_date);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0); // Reset time to start of day
+                
+                return flightDate < today;
+            });
+            
             const summary = {
-                totalFlights: data?.length,
-                totalPax: data?.reduce((sum, item) => sum + safeValue(parseInt(item.pax, 10)), 0),
+                totalFlights: flownFlights?.length || 0,
+                totalPax: flownFlights?.reduce((sum, item) => sum + safeValue(parseInt(item.pax, 10)), 0) || 0,
                 completedFlights: data?.reduce((sum, item) => sum + safeValue(parseInt((item.paid || "0").replace("£", ""), 10)), 0),
                 totalSales: data?.reduce((sum, item) => sum + safeValue(parseFloat((item.paid || "0").replace("£", ""))), 0),
                 totalLiability: data?.reduce((sum, item) => sum + safeValue(parseFloat((item.due || "0").replace("£", ""))), 0),
