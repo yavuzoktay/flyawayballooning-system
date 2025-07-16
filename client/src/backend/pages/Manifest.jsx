@@ -204,27 +204,35 @@ const Manifest = () => {
     const toggleFlightStatus = async (flightId) => {
         const flight = flights.find(f => f.id === flightId);
         if (!flight) return;
-        let newStatus;
-        if (flight.manual_status_override === 1 || (flight.manual_status_override === null && getFlightStatus(flight) === "Open")) {
-            newStatus = 0; // Close slot
-        } else {
-            newStatus = 1; // Open slot
-        }
+        
+        const oldStatus = flight.manual_status_override === 1 || (flight.manual_status_override === null && getFlightStatus(flight) === "Open") ? "Open" : "Closed";
+        const newStatus = oldStatus === "Open" ? "Closed" : "Open";
+        
         try {
-            await axios.post("/api/updateBookingStatus", {
+            // Call new endpoint that updates both booking status and availability
+            await axios.patch("/api/updateManifestStatus", {
                 booking_id: flightId,
-                manual_status_override: newStatus
+                old_status: oldStatus,
+                new_status: newStatus,
+                flight_date: flight.flight_date,
+                location: flight.location
             });
+            
             // Update local state for instant UI feedback
             setFlights(prevFlights => prevFlights.map(f =>
-                f.id === flightId ? { ...f, manual_status_override: newStatus } : f
+                f.id === flightId ? { 
+                    ...f, 
+                    manual_status_override: newStatus === "Closed" ? 0 : 1 
+                } : f
             ));
+            
             // Optionally, also refetch from backend for consistency
             if (typeof bookingHook.refetch === 'function') {
                 await bookingHook.refetch();
             }
         } catch (err) {
-            alert("Status update failed");
+            console.error("Status update failed:", err);
+            alert("Status update failed: " + (err.response?.data?.message || err.message));
         }
         handleMenuClose();
     };
@@ -461,14 +469,33 @@ const Manifest = () => {
         setRebookModalOpen(true);
     };
 
-    const handleRebookSlotSelect = async (date, time, activityId) => {
+    const handleRebookSlotSelect = async (date, time, activityId, selectedActivity, selectedLocation) => {
         if (!bookingDetail || !bookingDetail.booking) return;
         setRebookLoading(true);
         try {
+            // Get activity details to determine flight type and pricing
+            const activityResponse = await axios.get(`/api/activity/${activityId}`);
+            const activity = activityResponse.data.data;
+            
+            // Determine flight type based on passenger count
+            const passengerCount = bookingDetail.booking.pax || 1;
+            const flightType = passengerCount === 1 ? 'Shared Flight' : 'Private Flight';
+            
+            // Calculate price based on flight type
+            let totalPrice = bookingDetail.booking.paid || 0;
+            if (activity) {
+                if (flightType === 'Shared Flight') {
+                    totalPrice = activity.shared_price * passengerCount;
+                } else {
+                    // For private flights, use the group price
+                    totalPrice = activity.private_price;
+                }
+            }
+            
             const payload = {
-                activitySelect: bookingDetail.booking.flight_type,
-                chooseLocation: bookingDetail.booking.location,
-                chooseFlightType: { type: bookingDetail.booking.flight_type, passengerCount: bookingDetail.booking.pax },
+                activitySelect: flightType,
+                chooseLocation: selectedLocation || bookingDetail.booking.location,
+                chooseFlightType: { type: flightType, passengerCount: passengerCount },
                 activity_id: activityId,
                 passengerData: [
                     {
@@ -477,12 +504,12 @@ const Manifest = () => {
                         weight: bookingDetail.passengers?.[0]?.weight || '',
                         email: bookingDetail.booking.email || '',
                         phone: bookingDetail.booking.phone || '',
-                        ticketType: bookingDetail.booking.flight_type || '',
+                        ticketType: flightType,
                         weatherRefund: bookingDetail.passengers?.[0]?.weather_refund || false
                     }
                 ],
                 selectedDate: dayjs(date).format('YYYY-MM-DD') + ' ' + time,
-                totalPrice: bookingDetail.booking.paid || 0,
+                totalPrice: totalPrice,
                 additionalInfo: { notes: bookingDetail.booking.additional_notes || '' },
                 voucher_code: bookingDetail.booking.voucher_code || null
             };
