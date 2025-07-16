@@ -18,21 +18,21 @@ const ActivityList = ({ activity }) => {
     const [open, setOpen] = useState(false);
     const [form, setForm] = useState({
         activity_name: '',
-        price: '',
+        shared_price: '',
+        private_price: '',
         capacity: '',
-        start_date: '',
-        end_date: '',
         event_time: '',
         location: '',
         flight_type: '',
         status: 'Live',
-        repeat_option: 'custom', // Add repeat_option to form state
     });
+    const [priceFieldLabel, setPriceFieldLabel] = useState('Price');
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [editForm, setEditForm] = useState({});
+    const [editPriceFieldLabel, setEditPriceFieldLabel] = useState('Price');
     const [editId, setEditId] = useState(null);
     const [editSaving, setEditSaving] = useState(false);
     const [editError, setEditError] = useState('');
@@ -48,28 +48,20 @@ const ActivityList = ({ activity }) => {
     const handleClose = () => {
         setOpen(false);
         setForm({
-            activity_name: '', price: '', capacity: '', start_date: '', end_date: '', event_time: '', location: '', flight_type: '', status: 'Live'
+            activity_name: '', shared_price: '', private_price: '', capacity: '', event_time: '', location: '', flight_type: '', status: 'Live'
         });
+        setPriceFieldLabel('Price');
         setError('');
         setSuccess(false);
     };
-    // Add logic for repeat_option changes (Create)
+    // Update price field label based on flight type
     const handleChange = (e) => {
         const { name, value } = e.target;
-        if (name === 'repeat_option') {
-            let newForm = { ...form, repeat_option: value };
-            const today = dayjs().format('YYYY-MM-DD');
-            const endOfYear = dayjs().endOf('year').format('YYYY-MM-DD');
-            if (value === 'once') {
-                newForm.start_date = today;
-                newForm.end_date = today;
-            } else if (value === 'everyday' || value === 'weekdays' || value === 'weekends') {
-                newForm.start_date = today;
-                newForm.end_date = endOfYear;
-            }
-            setForm(newForm);
-        } else {
-            setForm({ ...form, [name]: value });
+        setForm({ ...form, [name]: value });
+        
+        // Update price field label based on flight type
+        if (name === 'flight_type') {
+            setPriceFieldLabel(value === 'Private' ? 'Group Price' : 'Price');
         }
     };
     const handleImageChange = (e) => {
@@ -127,23 +119,14 @@ const ActivityList = ({ activity }) => {
             setEditError('Error fetching activity');
         }
     };
-    // Add logic for repeat_option changes (Edit)
+    // Update edit price field label based on flight type
     const handleEditChange = (e) => {
         const { name, value } = e.target;
-        if (name === 'repeat_option') {
-            let newEditForm = { ...editForm, repeat_option: value };
-            const today = dayjs().format('YYYY-MM-DD');
-            const endOfYear = dayjs().endOf('year').format('YYYY-MM-DD');
-            if (value === 'once') {
-                newEditForm.start_date = today;
-                newEditForm.end_date = today;
-            } else if (value === 'everyday' || value === 'weekdays' || value === 'weekends') {
-                newEditForm.start_date = today;
-                newEditForm.end_date = endOfYear;
-            }
-            setEditForm(newEditForm);
-        } else {
-            setEditForm({ ...editForm, [name]: value });
+        setEditForm({ ...editForm, [name]: value });
+        
+        // Update price field label based on flight type
+        if (name === 'flight_type') {
+            setEditPriceFieldLabel(value === 'Private' ? 'Group Price' : 'Price');
         }
     };
     const handleEditImageChange = (e) => {
@@ -211,37 +194,15 @@ const ActivityList = ({ activity }) => {
                 <DialogTitle>Create Activity</DialogTitle>
                 <DialogContent>
                     <TextField margin="dense" label="Activity Name" name="activity_name" value={form.activity_name} onChange={handleChange} fullWidth required />
-                    <TextField margin="dense" label="Price" name="price" value={form.price} onChange={handleChange} type="number" fullWidth required />
                     <TextField margin="dense" label="Capacity" name="capacity" value={form.capacity} onChange={handleChange} type="number" fullWidth required />
-                    <div style={{ display: 'flex', gap: 16 }}>
-                    <TextField margin="dense" label="Start Date" name="start_date" value={form.start_date} onChange={handleChange} type="date" fullWidth required InputLabelProps={{ shrink: true }} />
-                        <TextField
-                            margin="dense"
-                            label="How often to repeat"
-                            name="repeat_option"
-                            value={form.repeat_option}
-                            onChange={handleChange}
-                            select
-                            fullWidth
-                            required
-                        >
-                            <MenuItem value="custom">Custom Date Range</MenuItem>
-                            <MenuItem value="once">Just Once</MenuItem>
-                            <MenuItem value="everyday">Everyday</MenuItem>
-                            <MenuItem value="weekdays">Weekdays</MenuItem>
-                            <MenuItem value="weekends">Weekends</MenuItem>
-                        </TextField>
-                    </div>
-                    {/* Hide End Date if 'just once' is selected */}
-                    {form.repeat_option !== 'once' && (
-                    <TextField margin="dense" label="End Date" name="end_date" value={form.end_date} onChange={handleChange} type="date" fullWidth required InputLabelProps={{ shrink: true }} />
-                    )}
                     <TextField margin="dense" label="Event Time" name="event_time" value={form.event_time} onChange={handleChange} type="time" fullWidth required InputLabelProps={{ shrink: true }} />
                     <TextField margin="dense" label="Location" name="location" value={form.location} onChange={handleChange} fullWidth required />
                     <TextField margin="dense" label="Flight Type" name="flight_type" value={form.flight_type} onChange={handleChange} select fullWidth required>
                         <MenuItem value="Private">Private</MenuItem>
                         <MenuItem value="Shared">Shared</MenuItem>
                     </TextField>
+                    <TextField margin="dense" label="Shared Flight Price" name="shared_price" value={form.shared_price} onChange={handleChange} type="number" fullWidth required />
+                    <TextField margin="dense" label="Private Flight Group Price" name="private_price" value={form.private_price} onChange={handleChange} type="number" fullWidth required />
                     <TextField margin="dense" label="Status" name="status" value={form.status} onChange={handleChange} select fullWidth required>
                         <MenuItem value="Live">Live</MenuItem>
                         <MenuItem value="Inactive">Inactive</MenuItem>
@@ -293,37 +254,15 @@ const ActivityList = ({ activity }) => {
                 <DialogTitle>Edit Activity</DialogTitle>
                 <DialogContent>
                     <TextField margin="dense" label="Activity Name" name="activity_name" value={editForm.activity_name || ''} onChange={handleEditChange} fullWidth required />
-                    <TextField margin="dense" label="Price" name="price" value={editForm.price || ''} onChange={handleEditChange} type="number" fullWidth required />
                     <TextField margin="dense" label="Capacity" name="capacity" value={editForm.capacity || ''} onChange={handleEditChange} type="number" fullWidth required />
-                    <div style={{ display: 'flex', gap: 16 }}>
-                        <TextField
-                            margin="dense"
-                            label="How often to repeat"
-                            name="repeat_option"
-                            value={editForm.repeat_option || 'custom'}
-                            onChange={handleEditChange}
-                            select
-                            fullWidth
-                            required
-                        >
-                            <MenuItem value="custom">Custom Date Range</MenuItem>
-                            <MenuItem value="once">Just Once</MenuItem>
-                            <MenuItem value="everyday">Everyday</MenuItem>
-                            <MenuItem value="weekdays">Weekdays</MenuItem>
-                            <MenuItem value="weekends">Weekends</MenuItem>
-                        </TextField>
-                    <TextField margin="dense" label="Start Date" name="start_date" value={editForm.start_date || ''} onChange={handleEditChange} type="date" fullWidth required InputLabelProps={{ shrink: true }} />
-                    </div>
-                    {/* Hide End Date if 'just once' is selected */}
-                    {(editForm.repeat_option || 'custom') !== 'once' && (
-                    <TextField margin="dense" label="End Date" name="end_date" value={editForm.end_date || ''} onChange={handleEditChange} type="date" fullWidth required InputLabelProps={{ shrink: true }} />
-                    )}
                     <TextField margin="dense" label="Event Time" name="event_time" value={editForm.event_time || ''} onChange={handleEditChange} type="time" fullWidth required InputLabelProps={{ shrink: true }} />
                     <TextField margin="dense" label="Location" name="location" value={editForm.location || ''} onChange={handleEditChange} fullWidth required />
                     <TextField margin="dense" label="Flight Type" name="flight_type" value={editForm.flight_type || ''} onChange={handleEditChange} select fullWidth required>
                         <MenuItem value="Private">Private</MenuItem>
                         <MenuItem value="Shared">Shared</MenuItem>
                     </TextField>
+                    <TextField margin="dense" label="Shared Flight Price" name="shared_price" value={editForm.shared_price || ''} onChange={handleEditChange} type="number" fullWidth required />
+                    <TextField margin="dense" label="Private Flight Group Price" name="private_price" value={editForm.private_price || ''} onChange={handleEditChange} type="number" fullWidth required />
                     <TextField margin="dense" label="Status" name="status" value={editForm.status || ''} onChange={handleEditChange} select fullWidth required>
                         <MenuItem value="Live">Live</MenuItem>
                         <MenuItem value="Inactive">Inactive</MenuItem>

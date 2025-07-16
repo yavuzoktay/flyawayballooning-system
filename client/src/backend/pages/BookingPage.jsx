@@ -168,6 +168,7 @@ const BookingPage = () => {
                     const resp = await axios.get(`/api/getAllVoucherData`);
                     setVoucher(resp.data.data || []);
                     setFilteredData((resp.data.data || []).map(item => ({
+                        ...item,
                         created: item.created_at || '',
                         name: item.name || '',
                         flight_type: item.flight_type || '',
@@ -178,7 +179,8 @@ const BookingPage = () => {
                         redeemed: item.redeemed || '',
                         paid: item.paid || '',
                         offer_code: item.offer_code || '',
-                        voucher_ref: item.voucher_ref || ''
+                        voucher_ref: item.voucher_ref || '',
+                        _original: item // _original her zaman eklensin
                     })));
                 } catch (err) {
                     setVoucher([]);
@@ -196,7 +198,8 @@ const BookingPage = () => {
                         email: item.email || "",
                         location: item.location || "",
                         date_requested: item.requested_date || item.created_at || "",
-                        id: item.id || ""
+                        id: item.id || "",
+                        _original: item // _original burada da eklensin
                     })));
                 } catch (err) {
                     setDateRequested([]);
@@ -220,7 +223,8 @@ const BookingPage = () => {
                 redeemed: item.redeemed || '',
                 paid: item.paid || '',
                 offer_code: item.offer_code || '',
-                voucher_ref: item.voucher_ref || ''
+                voucher_ref: item.voucher_ref || '',
+                _original: item // _original her zaman eklensin
             })));
         }
     }, [voucher, activeTab]);
@@ -230,19 +234,61 @@ const BookingPage = () => {
     // Name tıklanınca detayları çek
     const handleNameClick = async (item) => {
         if (activeTab === 'vouchers') {
-            setBookingDetail({
-                success: true,
-                booking: item, // sadece booking olarak set edildi
-                passengers: [],
-                notes: []
-            });
-            setDetailDialogOpen(true);
-            setLoadingDetail(false);
+            const voucherItem = item._original || item;
+            setLoadingDetail(true);
             setDetailError(null);
-        } else {
+            let voucherDetail = null;
+            
+            try {
+                let res;
+                let apiUrl = '';
+                
+                // Always use single /api prefix, never double
+                if (voucherItem.voucher_ref) {
+                    apiUrl = `/api/getVoucherDetail?voucher_ref=${voucherItem.voucher_ref}`;
+                    res = await axios.get(apiUrl);
+                } else if (voucherItem.id) {
+                    apiUrl = `/api/getVoucherDetail?id=${voucherItem.id}`;
+                    res = await axios.get(apiUrl);
+                } else {
+                    throw new Error('No voucher_ref or id found');
+                }
+                
+                voucherDetail = res?.data || null;
+                
+                // Ensure voucher data is properly structured
+                const finalVoucherDetail = voucherDetail || { 
+                    success: true, 
+                    voucher: voucherItem, 
+                    passengers: [], 
+                    notes: [] 
+                };
+                
+                // If the API response doesn't have a voucher property, add it
+                if (finalVoucherDetail && !finalVoucherDetail.voucher && voucherItem) {
+                    finalVoucherDetail.voucher = voucherItem;
+                }
+                
+                setBookingDetail(finalVoucherDetail);
+                setDetailDialogOpen(true);
+            } catch (err) {
+                console.error('Error fetching voucher detail:', err);
+                
+                // Even on error, try to show basic voucher info
+                const errorVoucherDetail = {
+                    success: true,
+                    voucher: voucherItem,
+                    passengers: [],
+                    notes: []
+                };
+                setBookingDetail(errorVoucherDetail);
+                setDetailDialogOpen(true);
+            }
+            setLoadingDetail(false);
+            return;
+        }
         setSelectedBookingId(item.id);
         setDetailDialogOpen(true);
-        }
     };
 
     useEffect(() => {
@@ -262,11 +308,15 @@ const BookingPage = () => {
                     setDetailError('Detaylar alınamadı');
                 })
                 .finally(() => setLoadingDetail(false));
-        } else {
+        } else if (detailDialogOpen && !selectedBookingId && activeTab === 'vouchers') {
+            // Voucher'lar için bookingDetail zaten set edilmiş, sıfırlama
+            console.log('Voucher dialog open, not resetting bookingDetail');
+        } else if (!detailDialogOpen) {
+            // Dialog kapandığında sıfırla
             setBookingDetail(null);
             setBookingHistory([]);
         }
-    }, [detailDialogOpen, selectedBookingId]);
+    }, [detailDialogOpen, selectedBookingId, activeTab]);
 
     // 2. When opening the dialog, set notesValue to the current notes
     useEffect(() => {
@@ -275,6 +325,8 @@ const BookingPage = () => {
             setEditingNotes(false);
         }
     }, [detailDialogOpen, bookingDetail]);
+
+
 
     // Add Guest butonuna tıklanınca
     const handleAddGuestClick = () => {
@@ -351,57 +403,80 @@ const BookingPage = () => {
     };
 
     const handleEditSave = async () => {
-        if (!bookingDetail?.booking?.id || !editField) return;
+        if (!editField) return;
         setSavingEdit(true);
         try {
-            if (editField === 'paid') {
-                await axios.patch('/api/updateBookingField', {
-                    booking_id: bookingDetail.booking.id,
-                    field: 'paid',
+            if (activeTab === 'vouchers') {
+                // Voucher güncelleme
+                if (!bookingDetail?.voucher?.id) return;
+                await axios.patch('/api/updateVoucherField', {
+                    voucher_id: bookingDetail.voucher.id,
+                    field: editField,
                     value: editValue
                 });
+                // Local state güncelle
                 setBookingDetail(prev => ({
                     ...prev,
-                    booking: {
-                        ...prev.booking,
-                        paid: editValue
+                    voucher: {
+                        ...prev.voucher,
+                        [editField]: editValue
                     }
                 }));
-                setBooking(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, paid: editValue } : b));
-                setFilteredData(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, paid: editValue } : b));
-                setEditField(null);
-                setEditValue('');
-                setSavingEdit(false);
-                return;
-            }
-            await axios.patch('/api/updateBookingField', {
-                booking_id: bookingDetail.booking.id,
-                field: editField,
-                value: editValue
-            });
-            if (editField === 'weight' && bookingDetail.passengers && bookingDetail.passengers.length > 0) {
-                setBookingDetail(prev => ({
-                    ...prev,
-                    passengers: prev.passengers.map((p, i) => i === 0 ? { ...p, weight: editValue } : p)
-                }));
-                setFilteredData(prevData => prevData.map(f => {
-                    if (f.id === bookingDetail.booking.id && Array.isArray(f.passengers) && f.passengers.length > 0) {
-                        return {
-                            ...f,
-                            passengers: f.passengers.map((p, i) => i === 0 ? { ...p, weight: editValue } : p)
-                        };
-                    }
-                    return f;
-                }));
+                // Tabloyu güncelle
+                setVoucher(prev => prev.map(v => v.id === bookingDetail.voucher.id ? { ...v, [editField]: editValue } : v));
+                setFilteredData(prev => prev.map(v => v.id === bookingDetail.voucher.id ? { ...v, [editField]: editValue } : v));
             } else {
-            await fetchPassengers(bookingDetail.booking.id);
-            }
-            // Tabloyu anında güncelle
-            setBooking(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, [editField]: editValue } : b));
-            setFilteredData(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, [editField]: editValue } : b));
-            // Eğer aktif tab dateRequests ise, dateRequestedData ile tabloyu güncelle
-            if (activeTab === 'dateRequests') {
-                await dateRequestedData();
+                // Booking güncelleme
+                if (!bookingDetail?.booking?.id) return;
+                if (editField === 'paid') {
+                    await axios.patch('/api/updateBookingField', {
+                        booking_id: bookingDetail.booking.id,
+                        field: 'paid',
+                        value: editValue
+                    });
+                    setBookingDetail(prev => ({
+                        ...prev,
+                        booking: {
+                            ...prev.booking,
+                            paid: editValue
+                        }
+                    }));
+                    setBooking(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, paid: editValue } : b));
+                    setFilteredData(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, paid: editValue } : b));
+                    setEditField(null);
+                    setEditValue('');
+                    setSavingEdit(false);
+                    return;
+                }
+                await axios.patch('/api/updateBookingField', {
+                    booking_id: bookingDetail.booking.id,
+                    field: editField,
+                    value: editValue
+                });
+                if (editField === 'weight' && bookingDetail.passengers && bookingDetail.passengers.length > 0) {
+                    setBookingDetail(prev => ({
+                        ...prev,
+                        passengers: prev.passengers.map((p, i) => i === 0 ? { ...p, weight: editValue } : p)
+                    }));
+                    setFilteredData(prevData => prevData.map(f => {
+                        if (f.id === bookingDetail.booking.id && Array.isArray(f.passengers) && f.passengers.length > 0) {
+                            return {
+                                ...f,
+                                passengers: f.passengers.map((p, i) => i === 0 ? { ...p, weight: editValue } : p)
+                            };
+                        }
+                        return f;
+                    }));
+                } else {
+                    await fetchPassengers(bookingDetail.booking.id);
+                }
+                // Tabloyu anında güncelle
+                setBooking(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, [editField]: editValue } : b));
+                setFilteredData(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, [editField]: editValue } : b));
+                // Eğer aktif tab dateRequests ise, dateRequestedData ile tabloyu güncelle
+                if (activeTab === 'dateRequests') {
+                    await dateRequestedData();
+                }
             }
             setEditField(null);
             setEditValue('');
@@ -530,16 +605,35 @@ const BookingPage = () => {
         setRebookModalOpen(true);
     };
 
-    const handleRebookSlotSelect = async (date, time, activityId) => {
+    const handleRebookSlotSelect = async (date, time, activityId, selectedActivity, selectedLocation) => {
         if (!bookingDetail || !bookingDetail.booking) return;
         setRebookLoading(true);
         try {
+            // Get activity details to determine flight type and pricing
+            const activityResponse = await axios.get(`/api/activity/${activityId}`);
+            const activity = activityResponse.data.data;
+            
+            // Determine flight type based on passenger count
+            const passengerCount = bookingDetail.booking.pax || 1;
+            const flightType = passengerCount === 1 ? 'Shared Flight' : 'Private Flight';
+            
+            // Calculate price based on flight type
+            let totalPrice = bookingDetail.booking.paid || 0;
+            if (activity) {
+                if (flightType === 'Shared Flight') {
+                    totalPrice = activity.shared_price * passengerCount;
+                } else {
+                    // For private flights, use the group price
+                    totalPrice = activity.private_price;
+                }
+            }
+            
             // Yeni booking için gerekli verileri hazırla
             const payload = {
-                activitySelect: bookingDetail.booking.flight_type,
-                chooseLocation: bookingDetail.booking.location,
-                chooseFlightType: { type: bookingDetail.booking.flight_type, passengerCount: bookingDetail.booking.pax },
-                activity_id: activityId, // Modal'dan gelen activity_id kullan
+                activitySelect: flightType,
+                chooseLocation: selectedLocation || bookingDetail.booking.location,
+                chooseFlightType: { type: flightType, passengerCount: passengerCount },
+                activity_id: activityId,
                 passengerData: [
                     {
                         firstName: bookingDetail.booking.name?.split(' ')[0] || '',
@@ -547,12 +641,12 @@ const BookingPage = () => {
                         weight: bookingDetail.passengers?.[0]?.weight || '',
                         email: bookingDetail.booking.email || '',
                         phone: bookingDetail.booking.phone || '',
-                        ticketType: bookingDetail.booking.flight_type || '',
+                        ticketType: flightType,
                         weatherRefund: bookingDetail.passengers?.[0]?.weather_refund || false
                     }
                 ],
                 selectedDate: dayjs(date).format('YYYY-MM-DD') + ' ' + time,
-                totalPrice: bookingDetail.booking.paid || 0,
+                totalPrice: totalPrice,
                 additionalInfo: { notes: bookingDetail.booking.additional_notes || '' },
                 voucher_code: bookingDetail.booking.voucher_code || null
             };
@@ -987,71 +1081,177 @@ const BookingPage = () => {
                     </div>
                 </div>
                 <Dialog open={detailDialogOpen} onClose={() => { setDetailDialogOpen(false); setSelectedBookingId(null); }} maxWidth="md" fullWidth>
-                    <DialogTitle style={{ background: '#2d4263', color: '#fff', fontWeight: 700, fontSize: 22 }}>Booking Details</DialogTitle>
+                    <DialogTitle style={{ background: '#2d4263', color: '#fff', fontWeight: 700, fontSize: 22 }}>
+                        {activeTab === 'vouchers' ? 'Voucher Details' : 'Booking Details'}
+                    </DialogTitle>
                     <DialogContent style={{ background: '#f7f7f7', minHeight: 500 }}>
                         {loadingDetail ? (
                             <Typography>Loading...</Typography>
                         ) : detailError ? (
                             <Typography color="error">{detailError}</Typography>
-                        ) : bookingDetail && bookingDetail.success && (
-                            <Box>
+                        ) : bookingDetail ? (
+                            <>
+
+                                
+
+                                {console.log('Rendering dialog with bookingDetail:', bookingDetail)}
+                                
+                                {/* Simple voucher display */}
+                                {activeTab === 'vouchers' && bookingDetail?.voucher ? (
+                                    <Box sx={{ p: 3 }}>
+                                        <Typography variant="h5" sx={{ mb: 3, fontWeight: 700 }}>Voucher Details</Typography>
+                                        
+                                        <Grid container spacing={3}>
+                                            <Grid item xs={12} md={6}>
+                                                <Box sx={{ background: '#fff', borderRadius: 2, p: 3, boxShadow: 1 }}>
+                                                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>Personal Information</Typography>
+                                                    <Typography><b>Voucher ID:</b> {bookingDetail.voucher.id}</Typography>
+                                                    <Typography><b>Name:</b> {bookingDetail.voucher.name}</Typography>
+                                                    <Typography><b>Email:</b> {bookingDetail.voucher.email}</Typography>
+                                                    <Typography><b>Phone:</b> {bookingDetail.voucher.phone}</Typography>
+                                                    <Typography><b>Mobile:</b> {bookingDetail.voucher.mobile}</Typography>
+                                                    <Typography><b>Weight:</b> {bookingDetail.voucher.weight}kg</Typography>
+                                                </Box>
+                                            </Grid>
+                                            
+                                            <Grid item xs={12} md={6}>
+                                                <Box sx={{ background: '#fff', borderRadius: 2, p: 3, boxShadow: 1 }}>
+                                                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>Flight Information</Typography>
+                                                    <Typography><b>Flight Type:</b> {bookingDetail.voucher.flight_type}</Typography>
+                                                    <Typography><b>Voucher Type:</b> {bookingDetail.voucher.voucher_type}</Typography>
+                                                    <Typography><b>Status:</b> {bookingDetail.voucher.status}</Typography>
+                                                    <Typography><b>Redeemed:</b> {bookingDetail.voucher.redeemed}</Typography>
+                                                </Box>
+                                            </Grid>
+                                            
+                                            <Grid item xs={12} md={6}>
+                                                <Box sx={{ background: '#fff', borderRadius: 2, p: 3, boxShadow: 1 }}>
+                                                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>Payment Information</Typography>
+                                                    <Typography><b>Paid:</b> £{bookingDetail.voucher.paid}</Typography>
+                                                    <Typography><b>Offer Code:</b> {bookingDetail.voucher.offer_code || 'N/A'}</Typography>
+                                                    <Typography><b>Voucher Ref:</b> {bookingDetail.voucher.voucher_ref || 'N/A'}</Typography>
+                                                    <Typography><b>Voucher Code:</b> {bookingDetail.voucher.voucher_code || 'N/A'}</Typography>
+                                                </Box>
+                                            </Grid>
+                                            
+                                            <Grid item xs={12} md={6}>
+                                                <Box sx={{ background: '#fff', borderRadius: 2, p: 3, boxShadow: 1 }}>
+                                                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>Dates</Typography>
+                                                    <Typography><b>Created:</b> {dayjs(bookingDetail.voucher.created_at).format('DD/MM/YYYY HH:mm')}</Typography>
+                                                    <Typography><b>Expires:</b> {bookingDetail.voucher.expires ? dayjs(bookingDetail.voucher.expires).format('DD/MM/YYYY') : 'N/A'}</Typography>
+                                                </Box>
+                                            </Grid>
+                                        </Grid>
+                                    </Box>
+                                ) : null}
+                                <Box>
                                 <Grid container spacing={2}>
                                     {/* Personal Details */}
                                     <Grid item xs={12} md={4}>
                                         <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
                                             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Personal Details</Typography>
                                             {activeTab === 'vouchers' ? (
-                                                <>
-                                                    <Typography><b>Name:</b> {bookingDetail.booking.name || '-'}</Typography>
-                                                    <Typography><b>Email:</b> {bookingDetail.booking.email || '-'}</Typography>
-                                                    <Typography><b>Phone:</b> {bookingDetail.booking.phone || '-'}</Typography>
-                                                    <Typography><b>Voucher Type:</b> {bookingDetail.booking.voucher_type || '-'}</Typography>
-                                                    <Typography><b>Created:</b> {bookingDetail.booking.created_at || '-'}</Typography>
-                                                    <Typography><b>Expires:</b> {bookingDetail.booking.expires || '-'}</Typography>
-                                                    <Typography><b>Paid:</b> {editField === 'paid' ? (
-                                                        <>
-                                                            <input value={editValue} onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} style={{marginRight: 8}} />
-                                                            <Button size="small" onClick={async () => {
-                                                                // Split paid equally among passengers
-                                                                const paid = parseFloat(editValue) || 0;
-                                                                const n = bookingDetail.passengers.length;
-                                                                const perPassenger = n > 0 ? parseFloat((paid / n).toFixed(2)) : 0;
-                                                                // Update all passengers in backend
-                                                                await Promise.all(bookingDetail.passengers.map((p, idx) =>
-                                                                    axios.patch('/api/updatePassengerField', {
-                                                                        passenger_id: p.id,
-                                                                        field: 'price',
-                                                                        value: perPassenger
-                                                                    })
-                                                                ));
-                                                                // Update paid in backend
-                                                                await axios.patch('/api/updateBookingField', {
-                                                                    booking_id: bookingDetail.booking.id,
-                                                                    field: 'paid',
-                                                                    value: paid
-                                                                });
-                                                                // Update UI
-                                                                setBookingDetail(prev => ({
-                                                                    ...prev,
-                                                                    booking: { ...prev.booking, paid },
-                                                                    passengers: prev.passengers.map(p => ({ ...p, price: perPassenger }))
-                                                                }));
-                                                                setEditPassengerPrices(bookingDetail.passengers.map(() => perPassenger));
-                                                                setEditField(null);
-                                                                setEditValue('');
-                                                            }} disabled={savingEdit}>Save</Button>
-                                                            <Button size="small" onClick={handleEditCancel}>Cancel</Button>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            £{bookingDetail.booking.paid}
-                                                            <IconButton size="small" onClick={() => handleEditClick('paid', bookingDetail.booking.paid)}><EditIcon fontSize="small" /></IconButton>
-                                                        </>
-                                                    )}</Typography>
-                                                    <Typography><b>Redeemed:</b> {bookingDetail.booking.redeemed || '-'}</Typography>
-                                                    <Typography><b>Offer Code:</b> {bookingDetail.booking.offer_code || '-'}</Typography>
-                                                    <Typography><b>Voucher Ref:</b> {bookingDetail.booking.voucher_ref || '-'}</Typography>
-                                                </>
+                                                (() => {
+                                                    const v = bookingDetail.voucher || {};
+                                                    // Check if voucher data exists
+                                                    if (!v || Object.keys(v).length === 0) {
+                                                        return (
+                                                            <Box sx={{ p: 2, textAlign: 'center' }}>
+                                                                <Typography variant="h6" color="text.secondary">
+                                                                    Voucher details not available
+                                                                </Typography>
+                                                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                                                    The voucher data could not be loaded. Please try again.
+                                                                </Typography>
+                                                            </Box>
+                                                        );
+                                                    }
+                                                    return <>
+                                                        <Typography><b>Voucher Name:</b> {editField === 'name' ? (
+                                                            <>
+                                                                <input value={editValue} onChange={e => setEditValue(e.target.value)} style={{marginRight: 8}} />
+                                                                <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                                <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                {v.name || '-'}
+                                                                <IconButton size="small" onClick={() => handleEditClick('name', v.name)}><EditIcon fontSize="small" /></IconButton>
+                                                            </>
+                                                        )}</Typography>
+                                                        <Typography><b>Voucher Created:</b> {v.created_at ? dayjs(v.created_at).format('DD/MM/YYYY') : '-'}</Typography>
+                                                        <Typography><b>Phone:</b> {editField === 'phone' ? (
+                                                            <>
+                                                                <input value={editValue} onChange={e => setEditValue(e.target.value)} style={{marginRight: 8}} />
+                                                                <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                                <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                {v.phone || '-'}
+                                                                <IconButton size="small" onClick={() => handleEditClick('phone', v.phone)}><EditIcon fontSize="small" /></IconButton>
+                                                            </>
+                                                        )}</Typography>
+                                                        <Typography><b>Email:</b> {editField === 'email' ? (
+                                                            <>
+                                                                <input value={editValue} onChange={e => setEditValue(e.target.value)} style={{marginRight: 8}} />
+                                                                <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                                <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                {v.email || '-'}
+                                                                <IconButton size="small" onClick={() => handleEditClick('email', v.email)}><EditIcon fontSize="small" /></IconButton>
+                                                            </>
+                                                        )}</Typography>
+                                                        <Typography><b>Paid:</b> {editField === 'paid' ? (
+                                                            <>
+                                                                <input value={editValue} onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} style={{marginRight: 8}} />
+                                                                <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                                <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                £{v.paid || '0.00'}
+                                                                <IconButton size="small" onClick={() => handleEditClick('paid', v.paid)}><EditIcon fontSize="small" /></IconButton>
+                                                            </>
+                                                        )}</Typography>
+                                                        <Typography><b>Expires:</b> {editField === 'expires' ? (
+                                                            <>
+                                                                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                                                                    <DatePicker
+                                                                        value={editValue ? dayjs(editValue) : null}
+                                                                        onChange={date => setEditValue(date ? date.format('YYYY-MM-DD') : '')}
+                                                                        format="DD/MM/YYYY"
+                                                                        slotProps={{ textField: { size: 'small' } }}
+                                                                    />
+                                                                    <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                                    <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                                </LocalizationProvider>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                {v.expires ? dayjs(v.expires).format('DD/MM/YYYY') : '-'}
+                                                                <IconButton size="small" onClick={() => handleEditClick('expires', v.expires)}><EditIcon fontSize="small" /></IconButton>
+                                                            </>
+                                                        )}</Typography>
+                                                        <Typography><b>Weight:</b> {editField === 'weight' ? (
+                                                            <>
+                                                                <input value={editValue} onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} style={{marginRight: 8}} />
+                                                                <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                                <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                {v.weight || '-'}kg
+                                                                <IconButton size="small" onClick={() => handleEditClick('weight', v.weight)}><EditIcon fontSize="small" /></IconButton>
+                                                            </>
+                                                        )}</Typography>
+                                                        <Typography><b>Voucher ID:</b> {v.id || '-'}</Typography>
+                                                        <Typography><b>Voucher Code:</b> {v.voucher_code || '-'}</Typography>
+                                                        <Typography><b>Flight Attempts:</b> {v.flight_attempts || '-'}</Typography>
+                                                    </>;
+                                                })()
                                             ) : (
                                                 <>
                                             <Typography><b>Booking Name:</b> {editField === 'name' ? (
@@ -1126,126 +1326,151 @@ const BookingPage = () => {
                                             )}
                                         </Box>
                                         {/* Additional */}
-                                        <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
-                                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Additional</Typography>
-                                            {editingNotes ? (
-                                                <>
-                                                    <TextField
-                                                        multiline
-                                                        minRows={2}
-                                                        maxRows={6}
-                                                        fullWidth
-                                                        value={notesValue}
-                                                        onChange={e => setNotesValue(e.target.value)}
-                                                        disabled={savingNotes}
-                                                        sx={{ mb: 1 }}
-                                                    />
-                                                    <Button variant="contained" color="primary" onClick={handleSaveNotes} disabled={savingNotes || notesValue === (bookingDetail.booking.additional_notes || "")}>Save</Button>
-                                                    <Button variant="outlined" onClick={handleCancelNotes} sx={{ ml: 1 }} disabled={savingNotes}>Cancel</Button>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Typography><b>Booking Notes:</b> {bookingDetail.booking.additional_notes || '-'}</Typography>
-                                                    <Button variant="text" size="small" onClick={handleEditNotes} sx={{ mt: 1 }}>Edit</Button>
-                                                </>
-                                            )}
-                                        </Box>
-                                        {/* Add On */}
-                                        <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
-                                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Add On's</Typography>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                                <Typography><b>Fab Cap:</b> {bookingDetail.booking.choose_add_on && bookingDetail.booking.choose_add_on.includes('Fab Cap') ? 'Yes' : 'No'}</Typography>
-                                                <Button variant="outlined" size="small" onClick={async () => {
-                                                    // Fab Cap ekle
-                                                    let newAddOn = bookingDetail.booking.choose_add_on || [];
-                                                    if (typeof newAddOn === 'string') {
-                                                        try { newAddOn = JSON.parse(newAddOn); } catch { newAddOn = []; }
-                                                    }
-                                                    if (!Array.isArray(newAddOn)) newAddOn = [];
-                                                    if (!newAddOn.includes('Fab Cap')) newAddOn.push('Fab Cap');
-                                                    await axios.patch('/api/updateBookingField', {
-                                                        booking_id: bookingDetail.booking.id,
-                                                        field: 'choose_add_on',
-                                                        value: JSON.stringify(newAddOn)
-                                                    });
-                                                    setBookingDetail(prev => ({
-                                                        ...prev,
-                                                        booking: {
-                                                            ...prev.booking,
-                                                            choose_add_on: newAddOn
+                                        {activeTab === 'vouchers' ? (
+                                            <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
+                                                <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Additional</Typography>
+                                                {(() => {
+                                                    const v = bookingDetail.voucher || {};
+                                                    return <>
+                                                        <Typography><b>Voucher Type:</b> {v.voucher_type || '-'}</Typography>
+                                                        <Typography><b>Flight Type:</b> {v.flight_type || '-'}</Typography>
+                                                        <Typography><b>Redeemed:</b> {v.redeemed || 'No'}</Typography>
+                                                        <Typography><b>Offer Code:</b> {v.offer_code || '-'}</Typography>
+                                                        <Typography><b>Voucher Ref:</b> {v.voucher_ref || '-'}</Typography>
+                                                        <Typography><b>Status:</b> {v.status || '-'}</Typography>
+                                                        <Typography><b>Voucher Code:</b> {v.voucher_code || '-'}</Typography>
+                                                        <Typography><b>Flight Attempts:</b> {v.flight_attempts || '-'}</Typography>
+                                                        <Typography><b>Created At:</b> {v.created_at ? dayjs(v.created_at).format('DD/MM/YYYY HH:mm') : '-'}</Typography>
+                                                        <Typography><b>Updated At:</b> {v.updated_at ? dayjs(v.updated_at).format('DD/MM/YYYY HH:mm') : '-'}</Typography>
+                                                    </>;
+                                                })()}
+                                            </Box>
+                                        ) : (
+                                            <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
+                                                <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Additional</Typography>
+                                                {editingNotes ? (
+                                                    <>
+                                                        <TextField
+                                                            multiline
+                                                            minRows={2}
+                                                            maxRows={6}
+                                                            fullWidth
+                                                            value={notesValue}
+                                                            onChange={e => setNotesValue(e.target.value)}
+                                                            disabled={savingNotes}
+                                                            sx={{ mb: 1 }}
+                                                        />
+                                                        <Button variant="contained" color="primary" onClick={handleSaveNotes} disabled={savingNotes || notesValue === (bookingDetail.booking?.additional_notes || "")}>Save</Button>
+                                                        <Button variant="outlined" onClick={handleCancelNotes} sx={{ ml: 1 }} disabled={savingNotes}>Cancel</Button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Typography><b>Booking Notes:</b> {bookingDetail.booking?.additional_notes || '-'}</Typography>
+                                                        <Button variant="text" size="small" onClick={handleEditNotes} sx={{ mt: 1 }}>Edit</Button>
+                                                    </>
+                                                )}
+                                            </Box>
+                                        )}
+                                        {/* Add On - Only for bookings, not vouchers */}
+                                        {activeTab !== 'vouchers' && (
+                                            <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
+                                                <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Add On's</Typography>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                    <Typography><b>Fab Cap:</b> {bookingDetail.booking?.choose_add_on && bookingDetail.booking.choose_add_on.includes('Fab Cap') ? 'Yes' : 'No'}</Typography>
+                                                    <Button variant="outlined" size="small" onClick={async () => {
+                                                        // Fab Cap ekle
+                                                        let newAddOn = bookingDetail.booking?.choose_add_on || [];
+                                                        if (typeof newAddOn === 'string') {
+                                                            try { newAddOn = JSON.parse(newAddOn); } catch { newAddOn = []; }
                                                         }
-                                                    }));
-                                                }}>FAB Add On</Button>
+                                                        if (!Array.isArray(newAddOn)) newAddOn = [];
+                                                        if (!newAddOn.includes('Fab Cap')) newAddOn.push('Fab Cap');
+                                                        await axios.patch('/api/updateBookingField', {
+                                                            booking_id: bookingDetail.booking.id,
+                                                            field: 'choose_add_on',
+                                                            value: JSON.stringify(newAddOn)
+                                                        });
+                                                        setBookingDetail(prev => ({
+                                                            ...prev,
+                                                            booking: {
+                                                                ...prev.booking,
+                                                                choose_add_on: newAddOn
+                                                            }
+                                                        }));
+                                                    }}>FAB Add On</Button>
+                                                </Box>
+                                                <Typography><b>WX Refundable:</b> {bookingDetail.passengers && bookingDetail.passengers.some(p => p.weather_refund === 1) ? 'Yes' : 'No'}</Typography>
+                                                <Typography><b>Marketing:</b> {bookingDetail.booking?.hear_about_us || 'N/A'}</Typography>
+                                                <Typography><b>Reason for Ballooning:</b> {bookingDetail.booking?.ballooning_reason || 'N/A'}</Typography>
                                             </Box>
-                                            <Typography><b>WX Refundable:</b> {bookingDetail.passengers && bookingDetail.passengers.some(p => p.weather_refund === 1) ? 'Yes' : 'No'}</Typography>
-                                            <Typography><b>Marketing:</b> {bookingDetail.booking.hear_about_us || 'N/A'}</Typography>
-                                            <Typography><b>Reason for Ballooning:</b> {bookingDetail.booking.ballooning_reason || 'N/A'}</Typography>
-                                        </Box>
-                                        {/* Preferences Section - always visible */}
-                                        <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
-                                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Preferences</Typography>
-                                            {/* Preferred Day */}
-                                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                                <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Day:</b></Typography>
-                                                {editPrefField === 'preferred_day' ? (
-                                                    <>
-                                                        <select value={editPrefValue} onChange={e => setEditPrefValue(e.target.value)} style={{ marginRight: 8, width: 220 }} disabled={savingPref}>
-                                                            <option value="">Select...</option>
-                                                            <option value="Weekend Only">Weekend Only</option>
-                                                            <option value="Weekday & Weekend">Weekday & Weekend</option>
-                                                        </select>
-                                                        <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_day')} disabled={savingPref}>Save</Button>
-                                                        <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Typography sx={{ mr: 1 }}>{bookingDetail.booking.preferred_day || '-'}</Typography>
-                                                        <Button size="small" onClick={() => handleEditPref('preferred_day', bookingDetail.booking.preferred_day)}>Edit</Button>
-                                                    </>
-                                                )}
+                                        )}
+                                        {/* Preferences Section - Only for bookings, not vouchers */}
+                                        {activeTab !== 'vouchers' && (
+                                            <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
+                                                <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Preferences</Typography>
+                                                {/* Preferred Day */}
+                                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                                    <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Day:</b></Typography>
+                                                    {editPrefField === 'preferred_day' ? (
+                                                        <>
+                                                            <select value={editPrefValue} onChange={e => setEditPrefValue(e.target.value)} style={{ marginRight: 8, width: 220 }} disabled={savingPref}>
+                                                                <option value="">Select...</option>
+                                                                <option value="Weekend Only">Weekend Only</option>
+                                                                <option value="Weekday & Weekend">Weekday & Weekend</option>
+                                                            </select>
+                                                            <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_day')} disabled={savingPref}>Save</Button>
+                                                            <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Typography sx={{ mr: 1 }}>{bookingDetail.booking?.preferred_day || '-'}</Typography>
+                                                            <Button size="small" onClick={() => handleEditPref('preferred_day', bookingDetail.booking?.preferred_day)}>Edit</Button>
+                                                        </>
+                                                    )}
+                                                </Box>
+                                                {/* Preferred Location */}
+                                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                                    <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Location:</b></Typography>
+                                                    {editPrefField === 'preferred_location' ? (
+                                                        <>
+                                                            <select value={editPrefValue} onChange={e => setEditPrefValue(e.target.value)} style={{ marginRight: 8, width: 220 }} disabled={savingPref}>
+                                                                <option value="">Select...</option>
+                                                                <option value="Bath">Bath</option>
+                                                                <option value="Taunton & South Somerset">Taunton & South Somerset</option>
+                                                                <option value="Exeter & Tiverton">Exeter & Tiverton</option>
+                                                            </select>
+                                                            <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_location')} disabled={savingPref}>Save</Button>
+                                                            <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Typography sx={{ mr: 1 }}>{bookingDetail.booking?.preferred_location || '-'}</Typography>
+                                                            <Button size="small" onClick={() => handleEditPref('preferred_location', bookingDetail.booking?.preferred_location)}>Edit</Button>
+                                                        </>
+                                                    )}
+                                                </Box>
+                                                {/* Preferred Time */}
+                                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                    <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Time:</b></Typography>
+                                                    {editPrefField === 'preferred_time' ? (
+                                                        <>
+                                                            <select value={editPrefValue} onChange={e => setEditPrefValue(e.target.value)} style={{ marginRight: 8, width: 220 }} disabled={savingPref}>
+                                                                <option value="">Select...</option>
+                                                                <option value="Morning">Morning</option>
+                                                                <option value="Afternoon & Evening">Afternoon & Evening</option>
+                                                            </select>
+                                                            <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_time')} disabled={savingPref}>Save</Button>
+                                                            <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Typography sx={{ mr: 1 }}>{bookingDetail.booking?.preferred_time || '-'}</Typography>
+                                                            <Button size="small" onClick={() => handleEditPref('preferred_time', bookingDetail.booking?.preferred_time)}>Edit</Button>
+                                                        </>
+                                                    )}
+                                                </Box>
                                             </Box>
-                                            {/* Preferred Location */}
-                                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                                <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Location:</b></Typography>
-                                                {editPrefField === 'preferred_location' ? (
-                                                    <>
-                                                        <select value={editPrefValue} onChange={e => setEditPrefValue(e.target.value)} style={{ marginRight: 8, width: 220 }} disabled={savingPref}>
-                                                            <option value="">Select...</option>
-                                                            <option value="Bath">Bath</option>
-                                                            <option value="Taunton & South Somerset">Taunton & South Somerset</option>
-                                                            <option value="Exeter & Tiverton">Exeter & Tiverton</option>
-                                                        </select>
-                                                        <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_location')} disabled={savingPref}>Save</Button>
-                                                        <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Typography sx={{ mr: 1 }}>{bookingDetail.booking.preferred_location || '-'}</Typography>
-                                                        <Button size="small" onClick={() => handleEditPref('preferred_location', bookingDetail.booking.preferred_location)}>Edit</Button>
-                                                    </>
-                                                )}
-                                            </Box>
-                                            {/* Preferred Time */}
-                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Time:</b></Typography>
-                                                {editPrefField === 'preferred_time' ? (
-                                                    <>
-                                                        <select value={editPrefValue} onChange={e => setEditPrefValue(e.target.value)} style={{ marginRight: 8, width: 220 }} disabled={savingPref}>
-                                                            <option value="">Select...</option>
-                                                            <option value="Morning">Morning</option>
-                                                            <option value="Afternoon & Evening">Afternoon & Evening</option>
-                                                        </select>
-                                                        <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_time')} disabled={savingPref}>Save</Button>
-                                                        <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Typography sx={{ mr: 1 }}>{bookingDetail.booking.preferred_time || '-'}</Typography>
-                                                        <Button size="small" onClick={() => handleEditPref('preferred_time', bookingDetail.booking.preferred_time)}>Edit</Button>
-                                                    </>
-                                                )}
-                                            </Box>
-                                        </Box>
+                                        )}
                                     </Grid>
                                     {/* Main Details */}
                                     <Grid item xs={12} md={8}>
@@ -1255,20 +1480,23 @@ const BookingPage = () => {
                                                 <Box>
                                                     <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Current Booking</Typography>
                                                     {activeTab === 'vouchers' ? (
-                                                        <>
-                                                            <Typography><b>Flight Type:</b> {bookingDetail.booking.flight_type || '-'}</Typography>
-                                                            <Typography><b>Voucher Type:</b> {bookingDetail.booking.voucher_type || '-'}</Typography>
-                                                            <Typography><b>Paid:</b> £{bookingDetail.booking.paid || '0.00'}</Typography>
-                                                            <Typography><b>Redeemed:</b> {bookingDetail.booking.redeemed || '-'}</Typography>
-                                                            <Typography><b>Offer Code:</b> {bookingDetail.booking.offer_code || '-'}</Typography>
-                                                            <Typography><b>Voucher Ref:</b> {bookingDetail.booking.voucher_ref || '-'}</Typography>
-                                                            <Typography><b>Expires:</b> {bookingDetail.booking.expires || '-'}</Typography>
-                                                        </>
+                                                        (() => {
+                                                            const v = bookingDetail.voucher || {};
+                                                            return <>
+                                                                <Typography><b>Flight Type:</b> {v.flight_type || '-'}</Typography>
+                                                                <Typography><b>Voucher Type:</b> {v.voucher_type || '-'}</Typography>
+                                                                <Typography><b>Paid:</b> £{v.paid || '0.00'}</Typography>
+                                                                <Typography><b>Redeemed:</b> {v.redeemed || '-'}</Typography>
+                                                                <Typography><b>Offer Code:</b> {v.offer_code || '-'}</Typography>
+                                                                <Typography><b>Voucher Ref:</b> {v.voucher_ref || '-'}</Typography>
+                                                                <Typography><b>Expires:</b> {v.expires ? dayjs(v.expires).format('DD/MM/YYYY') : '-'}</Typography>
+                                                            </>;
+                                                        })()
                                                     ) : (
                                                         <>
-                                                    <Typography><b>Activity:</b> {bookingDetail.booking.flight_type} - {bookingDetail.booking.location}</Typography>
-                                                    {bookingDetail.booking.status !== 'Cancelled' && (
-  <Typography><b>Booked For:</b> {bookingDetail.booking.flight_date ? (
+                                                    <Typography><b>Activity:</b> {bookingDetail.booking?.flight_type || '-'} - {bookingDetail.booking?.location || '-'}</Typography>
+                                                    {bookingDetail.booking?.status !== 'Cancelled' && (
+  <Typography><b>Booked For:</b> {bookingDetail.booking?.flight_date ? (
     <a
       href={`http://44.202.155.45:3002/manifest?date=${dayjs(bookingDetail.booking.flight_date).format('YYYY-MM-DD')}&time=${dayjs(bookingDetail.booking.flight_date).format('HH:mm')}`}
       style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
@@ -1278,7 +1506,7 @@ const BookingPage = () => {
   ) : '-'}</Typography>
 )}
                                                     <Typography>
-                                                        <b>Redeemed Voucher:</b> {bookingDetail.booking.voucher_code ? <span style={{ color: 'green', fontWeight: 600 }}>Yes</span> : <span style={{ color: 'red', fontWeight: 600 }}>No</span>} <span style={{ fontWeight: 500 }}>{bookingDetail.booking.voucher_code || ''}</span>
+                                                        <b>Redeemed Voucher:</b> {bookingDetail.booking?.voucher_code ? <span style={{ color: 'green', fontWeight: 600 }}>Yes</span> : <span style={{ color: 'red', fontWeight: 600 }}>No</span>} <span style={{ fontWeight: 500 }}>{bookingDetail.booking?.voucher_code || ''}</span>
                                                     </Typography>
                                                         </>
                                                     )}
@@ -1293,11 +1521,36 @@ const BookingPage = () => {
                                                 </Box>
                                             </Box>
                                             <Divider sx={{ my: 2 }} />
+                                            {/* Related Booking (for vouchers) */}
+                                            {activeTab === 'vouchers' && bookingDetail.booking ? (
+                                                <Box sx={{ mb: 2 }}>
+                                                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Related Booking</Typography>
+                                                    <Typography><b>Booking ID:</b> {bookingDetail.booking.id || '-'}</Typography>
+                                                    <Typography><b>Booking Name:</b> {bookingDetail.booking.name || '-'}</Typography>
+                                                    <Typography><b>Booking Email:</b> {bookingDetail.booking.email || '-'}</Typography>
+                                                    <Typography><b>Booking Phone:</b> {bookingDetail.booking.phone || '-'}</Typography>
+                                                    <Typography><b>Flight Date:</b> {bookingDetail.booking.flight_date ? dayjs(bookingDetail.booking.flight_date).format('DD/MM/YYYY HH:mm') : '-'}</Typography>
+                                                    <Typography><b>Location:</b> {bookingDetail.booking.location || '-'}</Typography>
+                                                    <Typography><b>Status:</b> {bookingDetail.booking.status || '-'}</Typography>
+                                                    <Typography><b>Voucher Code Used:</b> {bookingDetail.booking.voucher_code || '-'}</Typography>
+                                                </Box>
+                                            ) : null}
+                                            
                                             {/* Passenger Details */}
                                             <Box sx={{ mb: 2 }}>
                                                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Passenger Details</Typography>
                                                 {activeTab === 'vouchers' ? (
-                                                    <Typography>-</Typography>
+                                                    bookingDetail.passengers && bookingDetail.passengers.length > 0 ? (
+                                                        <Box>
+                                                            {bookingDetail.passengers.map((p, i) => (
+                                                                <Typography key={p.id || i}>
+                                                                    Passenger {i + 1}: {p.first_name || '-'} {p.last_name || '-'}{p.weight ? ` (${p.weight}kg${p.price ? ' £' + p.price : ''})` : ''}
+                                                                </Typography>
+                                                            ))}
+                                                        </Box>
+                                                    ) : (
+                                                        <Typography>No passengers found</Typography>
+                                                    )
                                                 ) : (
                                                     bookingDetail.passengers && bookingDetail.passengers.length > 0 ? (
                                                         <Box>
@@ -1426,39 +1679,57 @@ const BookingPage = () => {
                                                 )) : <Typography>No notes</Typography>}
                                             </Box>
                                             <Divider sx={{ my: 2 }} />
-                                            {/* HISTORY SECTION - visually separated */}
-                                            <Box sx={{ background: '#e0e0e0', borderRadius: 2, p: 2, mt: 2, mb: 2 }}>
-                                                <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>History</Typography>
-                                                <Table>
-                                                    <TableHead>
-                                                        <TableRow>
-                                                            <TableCell>Booking Date</TableCell>
-                                                            <TableCell>Activity Type</TableCell>
-                                                            <TableCell>Location</TableCell>
-                                                            <TableCell>Status</TableCell>
-                                                        </TableRow>
-                                                    </TableHead>
-                                                    <TableBody>
-                                                        <TableRow>
-                                                            <TableCell>{bookingDetail.booking.created_at ? dayjs(bookingDetail.booking.created_at).format('DD/MM/YYYY HH:mm') : '-'}</TableCell>
-                                                            <TableCell>{bookingDetail.booking.flight_type || '-'}</TableCell>
-                                                            <TableCell>{bookingDetail.booking.location || '-'}</TableCell>
-                                                            <TableCell>Scheduled</TableCell>
-                                                        </TableRow>
-                                                        {bookingHistory.map((h, i) => (
-                                                            <TableRow key={i}>
-                                                                <TableCell>{h.changed_at ? dayjs(h.changed_at).format('DD/MM/YYYY HH:mm') : '-'}</TableCell>
-                                                                <TableCell>{bookingDetail.booking.flight_type || '-'}</TableCell>
-                                                                <TableCell>{bookingDetail.booking.location || '-'}</TableCell>
-                                                                <TableCell>{h.status}</TableCell>
+                                            {/* HISTORY SECTION - Only for bookings, not vouchers */}
+                                            {activeTab !== 'vouchers' && (
+                                                <Box sx={{ background: '#e0e0e0', borderRadius: 2, p: 2, mt: 2, mb: 2 }}>
+                                                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>History</Typography>
+                                                    <Table>
+                                                        <TableHead>
+                                                            <TableRow>
+                                                                <TableCell>Booking Date</TableCell>
+                                                                <TableCell>Activity Type</TableCell>
+                                                                <TableCell>Location</TableCell>
+                                                                <TableCell>Status</TableCell>
                                                             </TableRow>
-                                                        ))}
-                                                    </TableBody>
-                                                </Table>
-                                            </Box>
+                                                        </TableHead>
+                                                        <TableBody>
+                                                            <TableRow>
+                                                                <TableCell>{bookingDetail.booking?.created_at ? dayjs(bookingDetail.booking.created_at).format('DD/MM/YYYY HH:mm') : '-'}</TableCell>
+                                                                <TableCell>{bookingDetail.booking?.flight_type || '-'}</TableCell>
+                                                                <TableCell>{bookingDetail.booking?.location || '-'}</TableCell>
+                                                                <TableCell>Scheduled</TableCell>
+                                                            </TableRow>
+                                                            {bookingHistory.map((h, i) => (
+                                                                <TableRow key={i}>
+                                                                    <TableCell>{h.changed_at ? dayjs(h.changed_at).format('DD/MM/YYYY HH:mm') : '-'}</TableCell>
+                                                                    <TableCell>{bookingDetail.booking?.flight_type || '-'}</TableCell>
+                                                                    <TableCell>{bookingDetail.booking?.location || '-'}</TableCell>
+                                                                    <TableCell>{h.status}</TableCell>
+                                                                </TableRow>
+                                                            ))}
+                                                        </TableBody>
+                                                    </Table>
+                                                </Box>
+                                            )}
                                         </Box>
                                     </Grid>
                                 </Grid>
+                            </Box>
+                            </>
+                        ) : (
+                            <Box sx={{ p: 3, textAlign: 'center' }}>
+                                <Typography variant="h6" color="text.secondary">
+                                    {activeTab === 'vouchers' ? 'Voucher details not available' : 'No data available'}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                    Please try again or contact support if the problem persists.
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                    Debug: bookingDetail = {bookingDetail ? 'exists' : 'null'}, activeTab = {activeTab}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                    Loading: {loadingDetail ? 'true' : 'false'}, Error: {detailError || 'none'}
+                                </Typography>
                             </Box>
                         )}
                     </DialogContent>
