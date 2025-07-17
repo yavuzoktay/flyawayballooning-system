@@ -31,12 +31,16 @@ import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import RebookAvailabilityModal from '../components/BookingPage/RebookAvailabilityModal';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 const Manifest = () => {
     // Hook'lar her zaman bir dizi döndürsün, yoksa boş dizi olsun
@@ -241,7 +245,7 @@ const Manifest = () => {
         flight.flight_date && flight.flight_date.substring(0, 10) === selectedDate && flight.status !== 'Cancelled'
     );
 
-    // flights'i location ve flight_date bazında grupla
+    // flights'i location, flight_type ve flight time bazında grupla
     const groupBy = (arr, keyFn) => arr.reduce((acc, item) => {
         const key = keyFn(item);
         if (!acc[key]) acc[key] = [];
@@ -249,7 +253,7 @@ const Manifest = () => {
         return acc;
     }, {});
 
-    const groupedFlights = groupBy(filteredFlights, f => `${f.location}||${f.flight_date.substring(0,10)}`);
+    const groupedFlights = groupBy(filteredFlights, f => `${f.location}||${f.flight_type}||${f.time_slot || (f.flight_date && f.flight_date.length >= 16 ? f.flight_date.substring(11,16) : '')}`);
 
     const handleNameClick = (bookingId) => {
         setSelectedBookingId(bookingId);
@@ -679,18 +683,46 @@ const Manifest = () => {
       const first = groupFlights[0];
       const currentStatus = getFlightStatus(first);
       const newStatus = currentStatus === 'Closed' ? 1 : 0; // 1=Open, 0=Closed
+      const newStatusText = newStatus === 1 ? 'Open' : 'Closed';
+      const oldStatusText = currentStatus === 'Open' ? 'Open' : 'Closed';
       try {
+        // 1. Önce booking status'u güncelle
         await Promise.all(groupFlights.map(f =>
           axios.post('/api/updateBookingStatus', {
             booking_id: f.id,
             manual_status_override: newStatus
           })
         ));
+        // 2. Tüm groupFlights için toplam pax hesapla
+        const totalPax = groupFlights.reduce((sum, f) => sum + (f.passengers ? f.passengers.length : 0), 0);
+        // 3. Sadece bir kez availability güncelle (toplam pax ile)
+        await axios.patch('/api/updateManifestStatus', {
+          booking_id: first.id, // referans booking id
+          old_status: oldStatusText,
+          new_status: newStatusText,
+          flight_date: first.flight_date,
+          location: first.location,
+          total_pax: totalPax
+        });
+        // 4. UI state güncelle
         setFlights(prev => prev.map(f =>
           groupFlights.some(gf => gf.id === f.id)
             ? { ...f, manual_status_override: newStatus }
             : f
         ));
+        // 5. Availabilities tekrar fetch et
+        if (Array.isArray(activity)) {
+          let all = [];
+          for (const act of activity) {
+            try {
+              const res = await axios.get(`/api/activity/${act.id}/availabilities`);
+              if (res.data.success && Array.isArray(res.data.data)) {
+                all = all.concat(res.data.data.map(a => ({ ...a, activity_id: act.id, location: act.location, flight_type: act.flight_type })));
+              }
+            } catch {}
+          }
+          setAvailabilities(all);
+        }
       } catch (err) {
         alert('Status update failed!');
       }
@@ -822,30 +854,57 @@ const Manifest = () => {
                             // Ortak başlık bilgileri
                             const first = groupFlights[0];
                             const activityName = first.location + ' - ' + first.flight_type;
-                            const paxBooked = groupFlights.reduce((sum, f) => sum + (f.passengers?.length || 0), 0);
-                            // Find matching availability for this group (activity_id, date, time)
-                            let slotCapacity = null;
+                            const normalizeTime = t => t ? t.slice(0,5) : '';
+                            let found = null;
                             if (availabilities.length > 0) {
                                 const dateStr = first.flight_date ? first.flight_date.substring(0,10) : null;
-                                const timeStr = first.time_slot || (first.flight_date && first.flight_date.length >= 16 ? first.flight_date.substring(11,16) : null);
-                                const found = availabilities.find(a => {
-                                    // Compare by activity_id, date, and time
+                                // Try to match by time_slot, fallback to 09:00 if not set
+                                let timeStr = null;
+                                if (first.time_slot) {
+                                    timeStr = first.time_slot.slice(0,5);
+                                } else if (first.flight_date && first.flight_date.length >= 16) {
+                                    timeStr = first.flight_date.substring(11,16);
+                                } else {
+                                    timeStr = '09:00'; // fallback default
+                                }
+                                found = availabilities.find(a => {
                                     const aDate = a.date && a.date.length >= 10 ? a.date.substring(0,10) : null;
-                                    const aTime = a.time && a.time.length >= 5 ? a.time.substring(0,5) : null;
+                                    const aTime = a.time ? a.time.slice(0,5) : null;
                                     return a.activity_id == first.activity_id && aDate === dateStr && aTime === timeStr;
                                 });
-                                if (found) slotCapacity = found.capacity;
                             }
-                            const paxTotal = slotCapacity ? parseInt(slotCapacity) : groupFlights.reduce((sum, f) => sum + (parseInt(f.pax) || 0), 0);
-                            const status = getFlightStatus(first);
+                            // GÜNCELLEME: Pax Booked kesin olarak capacity - available / capacity olacak
+                            let paxBooked = 0;
+                            let paxTotal = 0;
+                            if (found) {
+                                paxBooked = found.capacity - found.available;
+                                paxTotal = found.capacity;
+                            } else {
+                                paxBooked = '-';
+                                paxTotal = '-';
+                            }
+                            const status = found ? (found.available > 0 ? "Open" : "Closed") : getFlightStatus(first);
                             const balloonResource = first.balloon_resources || 'N/A';
                             const timeSlot = first.time_slot || 'N/A';
+                            // Find the correct flight time from availability if found, always show as local time
+                            let displayFlightTime = '';
+                            if (found && found.time) {
+                                // Try to parse as local time
+                                displayFlightTime = dayjs(found.time, 'HH:mm:ss').format('HH:mm');
+                            } else if (first.time_slot) {
+                                displayFlightTime = dayjs(first.time_slot, 'HH:mm').format('HH:mm');
+                            } else if (first.flight_date && first.flight_date.length >= 16) {
+                                // Try to parse as local time
+                                const timePart = first.flight_date.substring(11, 16);
+                                displayFlightTime = dayjs(timePart, 'HH:mm').format('HH:mm');
+                            }
                             return (
                                 <Card key={groupKey} sx={{ marginBottom: 2 }}>
                                     <CardContent>
                                         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                                             <Box display="flex" flexDirection="column" alignItems="flex-start">
-                                                <Typography variant="h6">{activityName}</Typography>
+                                                {/* Section başlığında activityName ve flight time birlikte gösterilecek */}
+                                                <Typography variant="h6">{activityName} - Flight Time: {displayFlightTime}</Typography>
                                                 <Box display="flex" alignItems="center" gap={3} mt={1}>
                                                     <Typography>Pax Booked: {paxBooked} / {paxTotal}</Typography>
                                                     <Typography>Balloon Resource: {balloonResource}</Typography>
@@ -894,34 +953,30 @@ const Manifest = () => {
                                                     </TableRow>
                                                 </TableHead>
                                                 <TableBody>
-                                                    {groupFlights.map((flight, idx) => (
-                                                        <React.Fragment key={flight.id}>
-                                                    {flight.passengers.map((passenger, index) => (
-                                                        <TableRow key={index}>
-                                                                    <TableCell>
-                                                                        <span style={{ color: '#3274b4', cursor: 'pointer', textDecoration: 'underline' }}
-                                                                            onClick={() => handleNameClick(passenger.booking_id)}>
-                                                                            {passenger.booking_id || ''}
-                                                                        </span>
-                                                                    </TableCell>
-                                                            <TableCell>
-                                                                <span style={{ color: '#3274b4', cursor: 'pointer', textDecoration: 'underline' }}
-                                                                    onClick={() => handleNameClick(passenger.booking_id)}>
-                                                                    {flight.name || ''}
-                                                                </span>
-                                                            </TableCell>
-                                                            <TableCell>{passenger.weight || ''}</TableCell>
-                                                            <TableCell>{flight.phone || ''}</TableCell>
-                                                            <TableCell>{flight.email || ''}</TableCell>
-                                                                    <TableCell>{(() => {
-                                                                        if (flight.time_slot) return flight.time_slot;
-                                                                        if (flight.flight_date && flight.flight_date.length >= 16) {
-                                                                            return flight.flight_date.substring(11, 16);
-                                                                        }
-                                                                        return '';
-                                                                    })()}</TableCell>
-                                                            <TableCell>{passenger.weatherRefund || passenger.weather_refund ? 'Yes' : 'No'}</TableCell>
-                                                                    <TableCell>{(() => {
+                                                    {/* Her booking için sadece bir satır (ilk passenger) göster */}
+                                                    {groupFlights.map((flight, idx) => {
+                                                        // Sadece ilk passenger'ı al
+                                                        const firstPassenger = Array.isArray(flight.passengers) && flight.passengers.length > 0 ? flight.passengers[0] : null;
+                                                        return (
+                                                            <TableRow key={flight.id}>
+                                                                <TableCell>
+                                                                    <span style={{ color: '#3274b4', cursor: 'pointer', textDecoration: 'underline' }}
+                                                                        onClick={() => handleNameClick(flight.id)}>
+                                                                        {flight.id || ''}
+                                                                    </span>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <span style={{ color: '#3274b4', cursor: 'pointer', textDecoration: 'underline' }}
+                                                                        onClick={() => handleNameClick(flight.id)}>
+                                                                        {firstPassenger ? `${firstPassenger.first_name || ''} ${firstPassenger.last_name || ''}`.trim() : (flight.name || '')}
+                                                                    </span>
+                                                                </TableCell>
+                                                                <TableCell>{firstPassenger ? firstPassenger.weight : ''}</TableCell>
+                                                                <TableCell>{flight.phone || ''}</TableCell>
+                                                                <TableCell>{flight.email || ''}</TableCell>
+                                                                <TableCell>{displayFlightTime}</TableCell>
+                                                                <TableCell>{passenger.weatherRefund || passenger.weather_refund ? 'Yes' : 'No'}</TableCell>
+                                                                <TableCell>{(() => {
                                                                     if (Array.isArray(flight.choose_add_on)) {
                                                                         return flight.choose_add_on.join(', ');
                                                                     }
@@ -937,34 +992,33 @@ const Manifest = () => {
                                                                         }
                                                                     }
                                                                     return '';
-                                                                    })()}</TableCell>
-                                                                    <TableCell>{flight.additional_notes || ''}</TableCell>
-                                                                    <TableCell>
-                                                                        <Select
-                                                                            value={['Scheduled','Checked In','Flown','No Show'].includes(flight.status) ? flight.status : 'Scheduled'}
-                                                                            onChange={async (e) => {
-                                                                                const newStatus = e.target.value;
-                                                                                await axios.patch('/api/updateBookingField', {
-                                                                                    booking_id: flight.id,
-                                                                                    field: 'status',
-                                                                                    value: newStatus
-                                                                                });
-                                                                                setFlights(prev => prev.map(f => f.id === flight.id ? { ...f, status: newStatus } : f));
-                                                                            }}
-                                                                            size="small"
-                                                                            variant="standard"
-                                                                            sx={{ minWidth: 120 }}
-                                                                        >
-                                                                            <MenuItem value="Scheduled">Scheduled</MenuItem>
-                                                                            <MenuItem value="Checked In">Checked In</MenuItem>
-                                                                            <MenuItem value="Flown">Flown</MenuItem>
-                                                                            <MenuItem value="No Show">No Show</MenuItem>
-                                                                        </Select>
-                                                                    </TableCell>
-                                                                </TableRow>
-                                                            ))}
-                                                        </React.Fragment>
-                                                    ))}
+                                                                })()}</TableCell>
+                                                                <TableCell>{flight.additional_notes || ''}</TableCell>
+                                                                <TableCell>
+                                                                    <Select
+                                                                        value={['Scheduled','Checked In','Flown','No Show'].includes(flight.status) ? flight.status : 'Scheduled'}
+                                                                        onChange={async (e) => {
+                                                                            const newStatus = e.target.value;
+                                                                            await axios.patch('/api/updateBookingField', {
+                                                                                booking_id: flight.id,
+                                                                                field: 'status',
+                                                                                value: newStatus
+                                                                            });
+                                                                            setFlights(prev => prev.map(f => f.id === flight.id ? { ...f, status: newStatus } : f));
+                                                                        }}
+                                                                        size="small"
+                                                                        variant="standard"
+                                                                        sx={{ minWidth: 120 }}
+                                                                    >
+                                                                        <MenuItem value="Scheduled">Scheduled</MenuItem>
+                                                                        <MenuItem value="Checked In">Checked In</MenuItem>
+                                                                        <MenuItem value="Flown">Flown</MenuItem>
+                                                                        <MenuItem value="No Show">No Show</MenuItem>
+                                                                    </Select>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        );
+                                                    })}
                                                     {/* Move the summary row here, inside TableBody */}
                                                     <TableRow>
                                                         <TableCell colSpan={10} style={{ textAlign: 'right', fontWeight: 600, background: '#f5f5f5' }}>

@@ -431,6 +431,7 @@ app.post('/api/createBooking', (req, res) => {
         additionalInfo,
         recipientDetails,
         selectedDate,
+        selectedTime, // <-- yeni eklenen alan
         totalPrice,
         voucher_code,
         flight_attempts, // frontend'den geliyorsa, yoksa undefined
@@ -465,6 +466,19 @@ app.post('/api/createBooking', (req, res) => {
     function insertBookingAndPassengers(expiresDateFinal) {
         const nowDate = moment().format('YYYY-MM-DD HH:mm:ss');
         const mainPassenger = passengerData[0] || {};
+        // Eğer selectedTime varsa, selectedDate ile birleştir
+        let bookingDateTime = selectedDate;
+        if (selectedTime && selectedDate) {
+            // selectedDate string ise, sadece tarih kısmını al
+            let datePart = selectedDate;
+            if (typeof selectedDate === 'string' && selectedDate.includes(' ')) {
+                datePart = selectedDate.split(' ')[0];
+            } else if (typeof selectedDate === 'string' && selectedDate.length > 10) {
+                datePart = selectedDate.substring(0, 10);
+            }
+            bookingDateTime = `${datePart} ${selectedTime}`;
+        }
+        // bookingSql ve bookingValues'da selectedDate yerine bookingDateTime kullan
         const bookingSql = `
             INSERT INTO all_booking (
                 name,
@@ -502,7 +516,7 @@ app.post('/api/createBooking', (req, res) => {
         const bookingValues = [
             passengerName,
             chooseFlightType.type,
-            selectedDate,
+            bookingDateTime, // <-- burada güncelledik
             chooseFlightType.passengerCount,
             chooseLocation,
             'Confirmed', // Default status
@@ -545,23 +559,20 @@ app.post('/api/createBooking', (req, res) => {
                 console.log('chooseLocation:', chooseLocation);
                 console.log('req.body.activity_id:', req.body.activity_id);
                 
-                // selectedTime frontend'den gelmiyorsa, selectedDate'in saat kısmı kullanılabilir
                 let bookingDate = moment(selectedDate).format('YYYY-MM-DD');
                 let bookingTime = null;
-                
-                // selectedDate formatını kontrol et
-                if (typeof selectedDate === 'string' && selectedDate.includes(' ')) {
-                    // "YYYY-MM-DD HH:mm" formatı
+                // Eğer selectedTime varsa onu kullan
+                if (selectedTime) {
+                    bookingTime = selectedTime;
+                } else if (typeof selectedDate === 'string' && selectedDate.includes(' ')) {
                     const parts = selectedDate.split(' ');
                     bookingDate = parts[0];
                     bookingTime = parts[1];
                 } else if (typeof selectedDate === 'string' && selectedDate.includes('T')) {
-                    // ISO string ise saat kısmını al
                     bookingTime = moment(selectedDate).format('HH:mm');
                 } else if (selectedDate instanceof Date) {
                     bookingTime = moment(selectedDate).format('HH:mm');
                 } else if (typeof selectedDate === 'string' && selectedDate.length === 10) {
-                    // Sadece tarih geliyorsa, saat zorunlu değil
                     bookingTime = null;
                 }
                 
@@ -740,16 +751,22 @@ app.post('/api/createVoucher', (req, res) => {
         redeemed = 'No',
         paid = 0,
         offer_code = '',
-        voucher_ref = ''
+        voucher_ref = '',
+        recipient_name = '',
+        recipient_email = '',
+        recipient_phone = '',
+        recipient_gift_date = '',
+        preferred_location = '',
+        preferred_time = '',
+        preferred_day = ''
     } = req.body;
 
     const now = moment().format('YYYY-MM-DD HH:mm:ss');
     let expiresFinal = expires && expires !== '' ? expires : moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
 
-    // Remove first_name and last_name from insert
     const insertSql = `INSERT INTO all_vouchers 
-        (name, weight, flight_type, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        (name, weight, flight_type, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     const values = [
         emptyToNull(name),
         emptyToNull(weight),
@@ -763,7 +780,14 @@ app.post('/api/createVoucher', (req, res) => {
         paid,
         emptyToNull(offer_code),
         emptyToNull(voucher_ref),
-        now
+        now,
+        emptyToNull(recipient_name),
+        emptyToNull(recipient_email),
+        emptyToNull(recipient_phone),
+        emptyToNull(recipient_gift_date),
+        emptyToNull(preferred_location),
+        emptyToNull(preferred_time),
+        emptyToNull(preferred_day)
     ];
     con.query(insertSql, values, (err, result) => {
         if (err) {
@@ -858,7 +882,7 @@ app.post('/api/updateBookingStatus', (req, res) => {
 
 app.patch('/api/updateBookingField', (req, res) => {
     const { booking_id, field, value } = req.body;
-    const allowedFields = ['name', 'phone', 'email', 'expires', 'weight', 'status', 'flight_attempts', 'choose_add_on', 'additional_notes', 'preferred_day', 'preferred_location', 'preferred_time', 'paid']; // Add 'paid'
+    const allowedFields = ['name', 'phone', 'email', 'expires', 'weight', 'status', 'flight_attempts', 'choose_add_on', 'additional_notes', 'preferred_day', 'preferred_location', 'preferred_time', 'paid', 'activity_id', 'location', 'flight_type', 'flight_date']; // Add new fields
     if (!booking_id || !field || !allowedFields.includes(field)) {
         return res.status(400).json({ success: false, message: 'Invalid request' });
     }
@@ -1326,6 +1350,38 @@ app.delete('/api/availability/:id', (req, res) => {
     });
 });
 
+// Update availability status (Open/Close)
+app.patch('/api/availability/:id/status', (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    if (!id || !status) {
+        return res.status(400).json({ success: false, message: 'Missing availability id or status' });
+    }
+    
+    if (status !== 'Open' && status !== 'Closed') {
+        return res.status(400).json({ success: false, message: 'Status must be either "Open" or "Closed"' });
+    }
+    
+    const sql = 'UPDATE activity_availability SET status = ? WHERE id = ?';
+    con.query(sql, [status, id], (err, result) => {
+        if (err) {
+            console.error('Error updating availability status:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Availability not found' });
+        }
+        
+        res.json({ 
+            success: true, 
+            message: `Availability status updated to ${status}`,
+            data: { id, status }
+        });
+    });
+});
+
 // Get activity open availabilities
 app.get('/api/activity/:id/open-availabilities', (req, res) => {
     const { id } = req.params;
@@ -1455,7 +1511,7 @@ app.post("/api/getActivityId", (req, res) => {
             // date alanını DD/MM/YYYY formatına çevir
             const formattedAvail = availabilities.map(a => ({
                 ...a,
-                date: moment(a.date, "YYYY-MM-DD").format("DD/MM/YYYY")
+                date: moment(a.date, "YYYY-MM-DD").format("YYYY-MM-DD")
             }));
             res.json({ success: true, activity, availabilities: formattedAvail });
         });
@@ -1529,7 +1585,7 @@ app.delete("/api/deleteAdminNote", (req, res) => {
 
 // Update Manifest Status and Availability
 app.patch("/api/updateManifestStatus", async (req, res) => {
-    const { booking_id, new_status, old_status, flight_date, location } = req.body;
+    const { booking_id, new_status, old_status, flight_date, location, total_pax } = req.body;
     
     if (!booking_id || !new_status || !old_status || !flight_date || !location) {
         return res.status(400).json({ success: false, message: "Missing required fields" });
@@ -1560,13 +1616,50 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
 
         const activity_id = activityRows[0].id;
 
-        // 3. Format flight_date to match availability date format
-        const formattedDate = moment(flight_date).format('YYYY-MM-DD');
+        // 3. Format flight_date to match availability date and time
+        let formattedDate = moment(flight_date).format('YYYY-MM-DD');
+        let formattedTime = null;
+        // Saat bilgisini flight_date'ten çek
+        if (typeof flight_date === 'string' && flight_date.includes(' ')) {
+            formattedTime = flight_date.split(' ')[1];
+        } else if (typeof flight_date === 'string' && flight_date.length > 10) {
+            formattedTime = flight_date.substring(11, 16); // 'YYYY-MM-DD HH:mm:ss' veya 'YYYY-MM-DD HH:mm'
+        }
 
-        // 4. Get current availability
-        const getAvailabilitySql = "SELECT available, capacity FROM activity_availability WHERE activity_id = ? AND date = ?";
+        // 4. Get pax (passenger count) for this booking (default 1)
+        let pax = 1;
+        if (typeof total_pax === 'number' && total_pax > 0) {
+            pax = total_pax;
+        } else {
+            const [bookingRows] = await new Promise((resolve, reject) => {
+                con.query('SELECT pax, flight_date FROM all_booking WHERE id = ?', [booking_id], (err, rows) => {
+                    if (err) reject(err);
+                    else resolve([rows]);
+                });
+            });
+            if (bookingRows && bookingRows.length > 0) {
+                pax = Number(bookingRows[0].pax) || 1;
+                // Eğer booking'in flight_date'inde saat varsa onu kullan
+                if (!formattedTime && bookingRows[0].flight_date) {
+                    const fd = bookingRows[0].flight_date;
+                    if (typeof fd === 'string' && fd.includes(' ')) {
+                        formattedTime = fd.split(' ')[1];
+                    } else if (typeof fd === 'string' && fd.length > 10) {
+                        formattedTime = fd.substring(11, 16);
+                    }
+                }
+            }
+        }
+
+        // 5. Get current availability (hem date hem time ile)
+        let getAvailabilitySql = "SELECT available, capacity FROM activity_availability WHERE activity_id = ? AND date = ?";
+        let getAvailabilityParams = [activity_id, formattedDate];
+        if (formattedTime) {
+            getAvailabilitySql += " AND time = ?";
+            getAvailabilityParams.push(formattedTime);
+        }
         const [availabilityRows] = await new Promise((resolve, reject) => {
-            con.query(getAvailabilitySql, [activity_id, formattedDate], (err, rows) => {
+            con.query(getAvailabilitySql, getAvailabilityParams, (err, rows) => {
                 if (err) reject(err);
                 else resolve([rows]);
             });
@@ -1579,19 +1672,24 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
         const currentAvailability = availabilityRows[0];
         let newAvailable = currentAvailability.available;
 
-        // 5. Calculate new available count based on status change
+        // 6. Calculate new available count based on status change and pax
         if (old_status === 'Open' && new_status === 'Closed') {
-            // From Open to Closed: decrease available by 1
-            newAvailable = Math.max(0, currentAvailability.available - 1);
+            // From Open to Closed: decrease available by pax
+            newAvailable = Math.max(0, currentAvailability.available - pax);
         } else if (old_status === 'Closed' && new_status === 'Open') {
-            // From Closed to Open: increase available by 1
-            newAvailable = Math.min(currentAvailability.capacity, currentAvailability.available + 1);
+            // From Closed to Open: increase available by pax
+            newAvailable = Math.min(currentAvailability.capacity, currentAvailability.available + pax);
         }
 
-        // 6. Update availability
-        const updateAvailabilitySql = "UPDATE activity_availability SET available = ? WHERE activity_id = ? AND date = ?";
+        // 7. Update availability (hem date hem time ile)
+        let updateAvailabilitySql = "UPDATE activity_availability SET available = ? WHERE activity_id = ? AND date = ?";
+        let updateAvailabilityParams = [newAvailable, activity_id, formattedDate];
+        if (formattedTime) {
+            updateAvailabilitySql += " AND time = ?";
+            updateAvailabilityParams.push(formattedTime);
+        }
         await new Promise((resolve, reject) => {
-            con.query(updateAvailabilitySql, [newAvailable, activity_id, formattedDate], (err, result) => {
+            con.query(updateAvailabilitySql, updateAvailabilityParams, (err, result) => {
                 if (err) reject(err);
                 else resolve(result);
             });

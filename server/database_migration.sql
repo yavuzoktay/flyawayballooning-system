@@ -9,3 +9,16 @@ UPDATE activity SET private_price = 900 WHERE private_price IS NULL;
 -- Make the new columns required for future records
 ALTER TABLE activity MODIFY COLUMN shared_price DECIMAL(10,2) NOT NULL;
 ALTER TABLE activity MODIFY COLUMN private_price DECIMAL(10,2) NOT NULL; 
+
+-- Add recipient fields to all_vouchers
+ALTER TABLE all_vouchers
+ADD COLUMN recipient_name VARCHAR(255) DEFAULT NULL,
+ADD COLUMN recipient_email VARCHAR(255) DEFAULT NULL,
+ADD COLUMN recipient_phone VARCHAR(50) DEFAULT NULL,
+ADD COLUMN recipient_gift_date DATE DEFAULT NULL; 
+
+-- Add preferences fields to all_vouchers
+ALTER TABLE all_vouchers
+ADD COLUMN preferred_location VARCHAR(255) DEFAULT NULL,
+ADD COLUMN preferred_time VARCHAR(255) DEFAULT NULL,
+ADD COLUMN preferred_day VARCHAR(255) DEFAULT NULL; 

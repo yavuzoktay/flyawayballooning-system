@@ -13,6 +13,7 @@ import MenuItem from '@mui/material/MenuItem';
 import dayjs from 'dayjs';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import { Checkbox, FormControlLabel, FormGroup } from '@mui/material';
 
 const ActivityList = ({ activity }) => {
     const [open, setOpen] = useState(false);
@@ -23,7 +24,7 @@ const ActivityList = ({ activity }) => {
         capacity: '',
         event_time: '',
         location: '',
-        flight_type: '',
+        flight_type: [], // now array
         status: 'Live',
     });
     const [priceFieldLabel, setPriceFieldLabel] = useState('Price');
@@ -48,7 +49,7 @@ const ActivityList = ({ activity }) => {
     const handleClose = () => {
         setOpen(false);
         setForm({
-            activity_name: '', shared_price: '', private_price: '', capacity: '', event_time: '', location: '', flight_type: '', status: 'Live'
+            activity_name: '', shared_price: '', private_price: '', capacity: '', event_time: '', location: '', flight_type: [], status: 'Live'
         });
         setPriceFieldLabel('Price');
         setError('');
@@ -56,12 +57,20 @@ const ActivityList = ({ activity }) => {
     };
     // Update price field label based on flight type
     const handleChange = (e) => {
-        const { name, value } = e.target;
-        setForm({ ...form, [name]: value });
-        
-        // Update price field label based on flight type
+        const { name, value, type, checked } = e.target;
         if (name === 'flight_type') {
-            setPriceFieldLabel(value === 'Private' ? 'Group Price' : 'Price');
+            let newTypes = [...form.flight_type];
+            if (checked) {
+                newTypes.push(value);
+            } else {
+                newTypes = newTypes.filter(t => t !== value);
+            }
+            setForm({ ...form, flight_type: newTypes });
+        } else {
+            setForm({ ...form, [name]: value });
+            if (name === 'flight_type') {
+                setPriceFieldLabel(value === 'Private' ? 'Group Price' : 'Price');
+            }
         }
     };
     const handleImageChange = (e) => {
@@ -79,7 +88,13 @@ const ActivityList = ({ activity }) => {
         setSuccess(false);
         try {
             const formData = new FormData();
-            Object.entries(form).forEach(([key, value]) => formData.append(key, value));
+            Object.entries(form).forEach(([key, value]) => {
+                if (key === 'flight_type') {
+                    formData.append(key, value.join(','));
+                } else {
+                    formData.append(key, value);
+                }
+            });
             if (image) formData.append('image', image);
             const res = await fetch('/api/createActivity', {
                 method: 'POST',
@@ -121,12 +136,20 @@ const ActivityList = ({ activity }) => {
     };
     // Update edit price field label based on flight type
     const handleEditChange = (e) => {
-        const { name, value } = e.target;
-        setEditForm({ ...editForm, [name]: value });
-        
-        // Update price field label based on flight type
+        const { name, value, type, checked } = e.target;
         if (name === 'flight_type') {
-            setEditPriceFieldLabel(value === 'Private' ? 'Group Price' : 'Price');
+            let newTypes = Array.isArray(editForm.flight_type) ? [...editForm.flight_type] : (typeof editForm.flight_type === 'string' ? editForm.flight_type.split(',') : []);
+            if (checked) {
+                newTypes.push(value);
+            } else {
+                newTypes = newTypes.filter(t => t !== value);
+            }
+            setEditForm({ ...editForm, flight_type: newTypes });
+        } else {
+            setEditForm({ ...editForm, [name]: value });
+            if (name === 'flight_type') {
+                setEditPriceFieldLabel(value === 'Private' ? 'Group Price' : 'Price');
+            }
         }
     };
     const handleEditImageChange = (e) => {
@@ -143,7 +166,13 @@ const ActivityList = ({ activity }) => {
         setEditError('');
         try {
             const formData = new FormData();
-            Object.entries(editForm).forEach(([key, value]) => formData.append(key, value));
+            Object.entries(editForm).forEach(([key, value]) => {
+                if (key === 'flight_type') {
+                    formData.append(key, Array.isArray(value) ? value.join(',') : value);
+                } else {
+                    formData.append(key, value);
+                }
+            });
             if (editImage) formData.append('image', editImage);
             const res = await fetch(`/api/activity/${editId}`, {
                 method: 'PUT',
@@ -197,10 +226,17 @@ const ActivityList = ({ activity }) => {
                     <TextField margin="dense" label="Capacity" name="capacity" value={form.capacity} onChange={handleChange} type="number" fullWidth required />
                     <TextField margin="dense" label="Event Time" name="event_time" value={form.event_time} onChange={handleChange} type="time" fullWidth required InputLabelProps={{ shrink: true }} />
                     <TextField margin="dense" label="Location" name="location" value={form.location} onChange={handleChange} fullWidth required />
-                    <TextField margin="dense" label="Flight Type" name="flight_type" value={form.flight_type} onChange={handleChange} select fullWidth required>
-                        <MenuItem value="Private">Private</MenuItem>
-                        <MenuItem value="Shared">Shared</MenuItem>
-                    </TextField>
+                    <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Flight Type</div>
+                    <FormGroup row sx={{ mb: 2, mt: 1 }}>
+                        <FormControlLabel
+                            control={<Checkbox checked={form.flight_type.includes('Private')} onChange={handleChange} name="flight_type" value="Private" />}
+                            label="Private"
+                        />
+                        <FormControlLabel
+                            control={<Checkbox checked={form.flight_type.includes('Shared')} onChange={handleChange} name="flight_type" value="Shared" />}
+                            label="Shared"
+                        />
+                    </FormGroup>
                     <TextField margin="dense" label="Shared Flight Price" name="shared_price" value={form.shared_price} onChange={handleChange} type="number" fullWidth required />
                     <TextField margin="dense" label="Private Flight Group Price" name="private_price" value={form.private_price} onChange={handleChange} type="number" fullWidth required />
                     <TextField margin="dense" label="Status" name="status" value={form.status} onChange={handleChange} select fullWidth required>
@@ -257,10 +293,17 @@ const ActivityList = ({ activity }) => {
                     <TextField margin="dense" label="Capacity" name="capacity" value={editForm.capacity || ''} onChange={handleEditChange} type="number" fullWidth required />
                     <TextField margin="dense" label="Event Time" name="event_time" value={editForm.event_time || ''} onChange={handleEditChange} type="time" fullWidth required InputLabelProps={{ shrink: true }} />
                     <TextField margin="dense" label="Location" name="location" value={editForm.location || ''} onChange={handleEditChange} fullWidth required />
-                    <TextField margin="dense" label="Flight Type" name="flight_type" value={editForm.flight_type || ''} onChange={handleEditChange} select fullWidth required>
-                        <MenuItem value="Private">Private</MenuItem>
-                        <MenuItem value="Shared">Shared</MenuItem>
-                    </TextField>
+                    <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Flight Type</div>
+                    <FormGroup row sx={{ mb: 2, mt: 1 }}>
+                        <FormControlLabel
+                            control={<Checkbox checked={Array.isArray(editForm.flight_type) ? editForm.flight_type.includes('Private') : (typeof editForm.flight_type === 'string' ? editForm.flight_type.split(',').includes('Private') : false)} onChange={handleEditChange} name="flight_type" value="Private" />}
+                            label="Private"
+                        />
+                        <FormControlLabel
+                            control={<Checkbox checked={Array.isArray(editForm.flight_type) ? editForm.flight_type.includes('Shared') : (typeof editForm.flight_type === 'string' ? editForm.flight_type.split(',').includes('Shared') : false)} onChange={handleEditChange} name="flight_type" value="Shared" />}
+                            label="Shared"
+                        />
+                    </FormGroup>
                     <TextField margin="dense" label="Shared Flight Price" name="shared_price" value={editForm.shared_price || ''} onChange={handleEditChange} type="number" fullWidth required />
                     <TextField margin="dense" label="Private Flight Group Price" name="private_price" value={editForm.private_price || ''} onChange={handleEditChange} type="number" fullWidth required />
                     <TextField margin="dense" label="Status" name="status" value={editForm.status || ''} onChange={handleEditChange} select fullWidth required>

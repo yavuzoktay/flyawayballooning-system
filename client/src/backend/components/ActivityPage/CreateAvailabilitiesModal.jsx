@@ -78,22 +78,6 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
                         margin="dense"
                     />
                     <FormControl fullWidth margin="dense">
-                        <InputLabel>Choose one or more Activities</InputLabel>
-                        <Select
-                            value={selectedActivity}
-                            onChange={e => setSelectedActivity(e.target.value)}
-                            label="Choose one or more Activities"
-                            renderValue={selected => {
-                                const found = activities.find(a => a.id === selected);
-                                return found ? found.activity_name : '';
-                            }}
-                        >
-                            {activities.map(a => (
-                                <MenuItem key={a.id} value={a.id}>{a.activity_name}</MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-                    <FormControl fullWidth margin="dense">
                         <InputLabel>Choose how often to repeat</InputLabel>
                         <Select
                             value={repeat}
