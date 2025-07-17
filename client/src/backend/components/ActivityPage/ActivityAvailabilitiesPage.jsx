@@ -11,6 +11,7 @@ import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
 import DeleteIcon from '@mui/icons-material/Delete';
 import dayjs from 'dayjs';
+import Checkbox from '@mui/material/Checkbox';
 
 const columns = [
     { key: 'schedule', label: 'Schedule' },
@@ -32,6 +33,7 @@ const ActivityAvailabilitiesPage = () => {
     const [selectedRow, setSelectedRow] = useState(null);
     const [editDate, setEditDate] = useState('');
     const [editOpen, setEditOpen] = useState(false);
+    const [selectedRows, setSelectedRows] = useState([]);
 
     useEffect(() => {
         axios.get(`/api/activity/${id}/availabilities`).then(res => {
@@ -63,6 +65,41 @@ const ActivityAvailabilitiesPage = () => {
         });
     };
 
+    const handleStatusToggle = async (availabilityId, currentStatus, event) => {
+        event.stopPropagation(); // Prevent row click
+        const newStatus = currentStatus === 'Open' ? 'Closed' : 'Open';
+        
+        try {
+            await axios.patch(`/api/availability/${availabilityId}/status`, { status: newStatus });
+            // Update local state immediately for better UX
+            setAvailabilities(prev => prev.map(avail => 
+                avail.id === availabilityId ? { ...avail, status: newStatus } : avail
+            ));
+        } catch (error) {
+            console.error('Error updating status:', error);
+            alert('Failed to update status. Please try again.');
+        }
+    };
+
+    const handleCheckboxChange = (id) => {
+        setSelectedRows(prev => prev.includes(id) ? prev.filter(rowId => rowId !== id) : [...prev, id]);
+    };
+    const handleSelectAll = (event) => {
+        if (event.target.checked) {
+            setSelectedRows(availabilities.map(row => row.id));
+        } else {
+            setSelectedRows([]);
+        }
+    };
+    const handleBulkDelete = async () => {
+        await Promise.all(selectedRows.map(id => axios.delete(`/api/availability/${id}`)));
+        setSelectedRows([]);
+        // Refresh table
+        axios.get(`/api/activity/${id}/availabilities`).then(res => {
+            if (res.data.success) setAvailabilities(res.data.data);
+        });
+    };
+
     return (
         <Container maxWidth="lg" style={{ marginTop: 40 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
@@ -70,17 +107,40 @@ const ActivityAvailabilitiesPage = () => {
                     <Button variant="outlined" onClick={() => navigate(-1)}>&larr; Back</Button>
                     <h2 style={{ margin: 0 }}>Availabilities</h2>
                 </div>
-                <Button variant="contained" color="primary" onClick={() => setModalOpen(true)}>Create</Button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        disabled={selectedRows.length === 0}
+                        onClick={handleBulkDelete}
+                    >
+                        Delete
+                    </Button>
+                    <Button variant="contained" color="primary" onClick={() => setModalOpen(true)}>Create</Button>
+                </div>
             </div>
             <Table>
                 <TableHead>
                     <TableRow>
+                        <TableCell padding="checkbox">
+                            <Checkbox
+                                indeterminate={selectedRows.length > 0 && selectedRows.length < availabilities.length}
+                                checked={availabilities.length > 0 && selectedRows.length === availabilities.length}
+                                onChange={handleSelectAll}
+                            />
+                        </TableCell>
                         {columns.map(col => <TableCell key={col.key}>{col.label}</TableCell>)}
                     </TableRow>
                 </TableHead>
                 <TableBody>
                     {availabilities.map(row => (
                         <TableRow key={row.id} hover style={{ cursor: 'pointer' }} onClick={() => handleRowClick(row)}>
+                            <TableCell padding="checkbox" onClick={e => e.stopPropagation()}>
+                                <Checkbox
+                                    checked={selectedRows.includes(row.id)}
+                                    onChange={() => handleCheckboxChange(row.id)}
+                                />
+                            </TableCell>
                             <TableCell>{row.schedule || ''}</TableCell>
                             <TableCell>
                                 {row.date ? (
@@ -98,7 +158,13 @@ const ActivityAvailabilitiesPage = () => {
                             <TableCell>{row.capacity}</TableCell>
                             <TableCell>{row.available}</TableCell>
                             <TableCell>
-                                <Chip label={row.status} color={row.status === 'Open' ? 'success' : 'default'} size="small" />
+                                <Chip 
+                                    label={row.status} 
+                                    color={row.status === 'Open' ? 'success' : 'default'} 
+                                    size="small"
+                                    onClick={(e) => handleStatusToggle(row.id, row.status, e)}
+                                    style={{ cursor: 'pointer' }}
+                                />
                             </TableCell>
                             <TableCell>
                                 <Chip label={row.channels} color="success" size="small" />

@@ -428,54 +428,54 @@ const BookingPage = () => {
             } else {
                 // Booking güncelleme
                 if (!bookingDetail?.booking?.id) return;
-                if (editField === 'paid') {
-                    await axios.patch('/api/updateBookingField', {
-                        booking_id: bookingDetail.booking.id,
-                        field: 'paid',
-                        value: editValue
-                    });
-                    setBookingDetail(prev => ({
-                        ...prev,
-                        booking: {
-                            ...prev.booking,
-                            paid: editValue
-                        }
-                    }));
-                    setBooking(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, paid: editValue } : b));
-                    setFilteredData(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, paid: editValue } : b));
-                    setEditField(null);
-                    setEditValue('');
-                    setSavingEdit(false);
-                    return;
-                }
+            if (editField === 'paid') {
                 await axios.patch('/api/updateBookingField', {
                     booking_id: bookingDetail.booking.id,
-                    field: editField,
+                    field: 'paid',
                     value: editValue
                 });
-                if (editField === 'weight' && bookingDetail.passengers && bookingDetail.passengers.length > 0) {
-                    setBookingDetail(prev => ({
-                        ...prev,
-                        passengers: prev.passengers.map((p, i) => i === 0 ? { ...p, weight: editValue } : p)
-                    }));
-                    setFilteredData(prevData => prevData.map(f => {
-                        if (f.id === bookingDetail.booking.id && Array.isArray(f.passengers) && f.passengers.length > 0) {
-                            return {
-                                ...f,
-                                passengers: f.passengers.map((p, i) => i === 0 ? { ...p, weight: editValue } : p)
-                            };
-                        }
-                        return f;
-                    }));
-                } else {
-                    await fetchPassengers(bookingDetail.booking.id);
-                }
-                // Tabloyu anında güncelle
-                setBooking(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, [editField]: editValue } : b));
-                setFilteredData(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, [editField]: editValue } : b));
-                // Eğer aktif tab dateRequests ise, dateRequestedData ile tabloyu güncelle
-                if (activeTab === 'dateRequests') {
-                    await dateRequestedData();
+                setBookingDetail(prev => ({
+                    ...prev,
+                    booking: {
+                        ...prev.booking,
+                        paid: editValue
+                    }
+                }));
+                setBooking(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, paid: editValue } : b));
+                setFilteredData(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, paid: editValue } : b));
+                setEditField(null);
+                setEditValue('');
+                setSavingEdit(false);
+                return;
+            }
+            await axios.patch('/api/updateBookingField', {
+                booking_id: bookingDetail.booking.id,
+                field: editField,
+                value: editValue
+            });
+            if (editField === 'weight' && bookingDetail.passengers && bookingDetail.passengers.length > 0) {
+                setBookingDetail(prev => ({
+                    ...prev,
+                    passengers: prev.passengers.map((p, i) => i === 0 ? { ...p, weight: editValue } : p)
+                }));
+                setFilteredData(prevData => prevData.map(f => {
+                    if (f.id === bookingDetail.booking.id && Array.isArray(f.passengers) && f.passengers.length > 0) {
+                        return {
+                            ...f,
+                            passengers: f.passengers.map((p, i) => i === 0 ? { ...p, weight: editValue } : p)
+                        };
+                    }
+                    return f;
+                }));
+            } else {
+            await fetchPassengers(bookingDetail.booking.id);
+            }
+            // Tabloyu anında güncelle
+            setBooking(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, [editField]: editValue } : b));
+            setFilteredData(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, [editField]: editValue } : b));
+            // Eğer aktif tab dateRequests ise, dateRequestedData ile tabloyu güncelle
+            if (activeTab === 'dateRequests') {
+                await dateRequestedData();
                 }
             }
             setEditField(null);
@@ -627,31 +627,48 @@ const BookingPage = () => {
                     totalPrice = activity.private_price;
                 }
             }
-            
-            // Yeni booking için gerekli verileri hazırla
-            const payload = {
-                activitySelect: flightType,
-                chooseLocation: selectedLocation || bookingDetail.booking.location,
-                chooseFlightType: { type: flightType, passengerCount: passengerCount },
-                activity_id: activityId,
-                passengerData: [
-                    {
-                        firstName: bookingDetail.booking.name?.split(' ')[0] || '',
-                        lastName: bookingDetail.booking.name?.split(' ').slice(1).join(' ') || '',
-                        weight: bookingDetail.passengers?.[0]?.weight || '',
-                        email: bookingDetail.booking.email || '',
-                        phone: bookingDetail.booking.phone || '',
-                        ticketType: flightType,
-                        weatherRefund: bookingDetail.passengers?.[0]?.weather_refund || false
-                    }
-                ],
-                selectedDate: dayjs(date).format('YYYY-MM-DD') + ' ' + time,
-                totalPrice: totalPrice,
-                additionalInfo: { notes: bookingDetail.booking.additional_notes || '' },
-                voucher_code: bookingDetail.booking.voucher_code || null
-            };
-            console.log('Rebook payload:', payload); // Debug için
-            await axios.post('/api/createBooking', payload);
+
+            // Yeni tarih ve saat
+            const newFlightDate = dayjs(date).format('YYYY-MM-DD') + ' ' + time;
+
+            // 1. activity_id güncelle
+            await axios.patch('/api/updateBookingField', {
+                booking_id: bookingDetail.booking.id,
+                field: 'activity_id',
+                value: activityId
+            });
+            // 2. location güncelle
+            await axios.patch('/api/updateBookingField', {
+                booking_id: bookingDetail.booking.id,
+                field: 'location',
+                value: selectedLocation || bookingDetail.booking.location
+            });
+            // 3. flight_type güncelle
+            await axios.patch('/api/updateBookingField', {
+                booking_id: bookingDetail.booking.id,
+                field: 'flight_type',
+                value: flightType
+            });
+            // 4. flight_date güncelle
+            await axios.patch('/api/updateBookingField', {
+                booking_id: bookingDetail.booking.id,
+                field: 'flight_date',
+                value: newFlightDate
+            });
+            // 5. paid güncelle
+            await axios.patch('/api/updateBookingField', {
+                booking_id: bookingDetail.booking.id,
+                field: 'paid',
+                value: totalPrice
+            });
+            // 6. Eğer status Cancelled ise, Scheduled yap
+            if (bookingDetail.booking.status === 'Cancelled') {
+                await axios.patch('/api/updateBookingField', {
+                    booking_id: bookingDetail.booking.id,
+                    field: 'status',
+                    value: 'Scheduled'
+                });
+            }
             setRebookModalOpen(false);
             setDetailDialogOpen(false);
             // Tabloyu güncelle
@@ -818,6 +835,20 @@ const BookingPage = () => {
             setEditPassengerPrices(bookingDetail.passengers.map(p => p.price ? parseFloat(p.price) : 0));
         }
     }, [detailDialogOpen, bookingDetail]);
+
+    // Add this useEffect to auto-split paid among passengers for display
+    useEffect(() => {
+        if (detailDialogOpen && bookingDetail?.booking && Array.isArray(bookingDetail.passengers) && bookingDetail.passengers.length > 0) {
+            const paid = parseFloat(bookingDetail.booking.paid) || 0;
+            const n = bookingDetail.passengers.length;
+            const perPassenger = n > 0 ? parseFloat((paid / n).toFixed(2)) : 0;
+            // Sadece UI için, DB'ye yazma
+            setBookingDetail(prev => ({
+                ...prev,
+                passengers: prev.passengers.map((p) => ({ ...p, price: perPassenger }))
+            }));
+        }
+    }, [detailDialogOpen, bookingDetail?.booking?.paid, bookingDetail?.passengers?.length]);
 
     return (
         <div className="booking-page-wrap">
@@ -1144,7 +1175,7 @@ const BookingPage = () => {
                                         </Grid>
                                     </Box>
                                 ) : null}
-                                <Box>
+                            <Box>
                                 <Grid container spacing={2}>
                                     {/* Personal Details */}
                                     <Grid item xs={12} md={4}>
@@ -1346,130 +1377,130 @@ const BookingPage = () => {
                                                 })()}
                                             </Box>
                                         ) : (
-                                            <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
-                                                <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Additional</Typography>
-                                                {editingNotes ? (
-                                                    <>
-                                                        <TextField
-                                                            multiline
-                                                            minRows={2}
-                                                            maxRows={6}
-                                                            fullWidth
-                                                            value={notesValue}
-                                                            onChange={e => setNotesValue(e.target.value)}
-                                                            disabled={savingNotes}
-                                                            sx={{ mb: 1 }}
-                                                        />
+                                        <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
+                                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Additional</Typography>
+                                            {editingNotes ? (
+                                                <>
+                                                    <TextField
+                                                        multiline
+                                                        minRows={2}
+                                                        maxRows={6}
+                                                        fullWidth
+                                                        value={notesValue}
+                                                        onChange={e => setNotesValue(e.target.value)}
+                                                        disabled={savingNotes}
+                                                        sx={{ mb: 1 }}
+                                                    />
                                                         <Button variant="contained" color="primary" onClick={handleSaveNotes} disabled={savingNotes || notesValue === (bookingDetail.booking?.additional_notes || "")}>Save</Button>
-                                                        <Button variant="outlined" onClick={handleCancelNotes} sx={{ ml: 1 }} disabled={savingNotes}>Cancel</Button>
-                                                    </>
-                                                ) : (
-                                                    <>
+                                                    <Button variant="outlined" onClick={handleCancelNotes} sx={{ ml: 1 }} disabled={savingNotes}>Cancel</Button>
+                                                </>
+                                            ) : (
+                                                <>
                                                         <Typography><b>Booking Notes:</b> {bookingDetail.booking?.additional_notes || '-'}</Typography>
-                                                        <Button variant="text" size="small" onClick={handleEditNotes} sx={{ mt: 1 }}>Edit</Button>
-                                                    </>
-                                                )}
-                                            </Box>
+                                                    <Button variant="text" size="small" onClick={handleEditNotes} sx={{ mt: 1 }}>Edit</Button>
+                                                </>
+                                            )}
+                                        </Box>
                                         )}
                                         {/* Add On - Only for bookings, not vouchers */}
                                         {activeTab !== 'vouchers' && (
-                                            <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
-                                                <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Add On's</Typography>
-                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                        <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
+                                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Add On's</Typography>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                                     <Typography><b>Fab Cap:</b> {bookingDetail.booking?.choose_add_on && bookingDetail.booking.choose_add_on.includes('Fab Cap') ? 'Yes' : 'No'}</Typography>
-                                                    <Button variant="outlined" size="small" onClick={async () => {
-                                                        // Fab Cap ekle
+                                                <Button variant="outlined" size="small" onClick={async () => {
+                                                    // Fab Cap ekle
                                                         let newAddOn = bookingDetail.booking?.choose_add_on || [];
-                                                        if (typeof newAddOn === 'string') {
-                                                            try { newAddOn = JSON.parse(newAddOn); } catch { newAddOn = []; }
+                                                    if (typeof newAddOn === 'string') {
+                                                        try { newAddOn = JSON.parse(newAddOn); } catch { newAddOn = []; }
+                                                    }
+                                                    if (!Array.isArray(newAddOn)) newAddOn = [];
+                                                    if (!newAddOn.includes('Fab Cap')) newAddOn.push('Fab Cap');
+                                                    await axios.patch('/api/updateBookingField', {
+                                                        booking_id: bookingDetail.booking.id,
+                                                        field: 'choose_add_on',
+                                                        value: JSON.stringify(newAddOn)
+                                                    });
+                                                    setBookingDetail(prev => ({
+                                                        ...prev,
+                                                        booking: {
+                                                            ...prev.booking,
+                                                            choose_add_on: newAddOn
                                                         }
-                                                        if (!Array.isArray(newAddOn)) newAddOn = [];
-                                                        if (!newAddOn.includes('Fab Cap')) newAddOn.push('Fab Cap');
-                                                        await axios.patch('/api/updateBookingField', {
-                                                            booking_id: bookingDetail.booking.id,
-                                                            field: 'choose_add_on',
-                                                            value: JSON.stringify(newAddOn)
-                                                        });
-                                                        setBookingDetail(prev => ({
-                                                            ...prev,
-                                                            booking: {
-                                                                ...prev.booking,
-                                                                choose_add_on: newAddOn
-                                                            }
-                                                        }));
-                                                    }}>FAB Add On</Button>
-                                                </Box>
-                                                <Typography><b>WX Refundable:</b> {bookingDetail.passengers && bookingDetail.passengers.some(p => p.weather_refund === 1) ? 'Yes' : 'No'}</Typography>
+                                                    }));
+                                                }}>FAB Add On</Button>
+                                            </Box>
+                                            <Typography><b>WX Refundable:</b> {bookingDetail.passengers && bookingDetail.passengers.some(p => p.weather_refund === 1) ? 'Yes' : 'No'}</Typography>
                                                 <Typography><b>Marketing:</b> {bookingDetail.booking?.hear_about_us || 'N/A'}</Typography>
                                                 <Typography><b>Reason for Ballooning:</b> {bookingDetail.booking?.ballooning_reason || 'N/A'}</Typography>
-                                            </Box>
+                                        </Box>
                                         )}
                                         {/* Preferences Section - Only for bookings, not vouchers */}
                                         {activeTab !== 'vouchers' && (
-                                            <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
-                                                <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Preferences</Typography>
-                                                {/* Preferred Day */}
-                                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                                    <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Day:</b></Typography>
-                                                    {editPrefField === 'preferred_day' ? (
-                                                        <>
-                                                            <select value={editPrefValue} onChange={e => setEditPrefValue(e.target.value)} style={{ marginRight: 8, width: 220 }} disabled={savingPref}>
-                                                                <option value="">Select...</option>
-                                                                <option value="Weekend Only">Weekend Only</option>
-                                                                <option value="Weekday & Weekend">Weekday & Weekend</option>
-                                                            </select>
-                                                            <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_day')} disabled={savingPref}>Save</Button>
-                                                            <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
-                                                        </>
-                                                    ) : (
-                                                        <>
+                                        <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
+                                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Preferences</Typography>
+                                            {/* Preferred Day */}
+                                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                                <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Day:</b></Typography>
+                                                {editPrefField === 'preferred_day' ? (
+                                                    <>
+                                                        <select value={editPrefValue} onChange={e => setEditPrefValue(e.target.value)} style={{ marginRight: 8, width: 220 }} disabled={savingPref}>
+                                                            <option value="">Select...</option>
+                                                            <option value="Weekend Only">Weekend Only</option>
+                                                            <option value="Weekday & Weekend">Weekday & Weekend</option>
+                                                        </select>
+                                                        <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_day')} disabled={savingPref}>Save</Button>
+                                                        <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
+                                                    </>
+                                                ) : (
+                                                    <>
                                                             <Typography sx={{ mr: 1 }}>{bookingDetail.booking?.preferred_day || '-'}</Typography>
                                                             <Button size="small" onClick={() => handleEditPref('preferred_day', bookingDetail.booking?.preferred_day)}>Edit</Button>
-                                                        </>
-                                                    )}
-                                                </Box>
-                                                {/* Preferred Location */}
-                                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                                    <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Location:</b></Typography>
-                                                    {editPrefField === 'preferred_location' ? (
-                                                        <>
-                                                            <select value={editPrefValue} onChange={e => setEditPrefValue(e.target.value)} style={{ marginRight: 8, width: 220 }} disabled={savingPref}>
-                                                                <option value="">Select...</option>
-                                                                <option value="Bath">Bath</option>
-                                                                <option value="Taunton & South Somerset">Taunton & South Somerset</option>
-                                                                <option value="Exeter & Tiverton">Exeter & Tiverton</option>
-                                                            </select>
-                                                            <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_location')} disabled={savingPref}>Save</Button>
-                                                            <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
-                                                        </>
-                                                    ) : (
-                                                        <>
+                                                    </>
+                                                )}
+                                            </Box>
+                                            {/* Preferred Location */}
+                                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                                <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Location:</b></Typography>
+                                                {editPrefField === 'preferred_location' ? (
+                                                    <>
+                                                        <select value={editPrefValue} onChange={e => setEditPrefValue(e.target.value)} style={{ marginRight: 8, width: 220 }} disabled={savingPref}>
+                                                            <option value="">Select...</option>
+                                                            <option value="Bath">Bath</option>
+                                                            <option value="Taunton & South Somerset">Taunton & South Somerset</option>
+                                                            <option value="Exeter & Tiverton">Exeter & Tiverton</option>
+                                                        </select>
+                                                        <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_location')} disabled={savingPref}>Save</Button>
+                                                        <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
+                                                    </>
+                                                ) : (
+                                                    <>
                                                             <Typography sx={{ mr: 1 }}>{bookingDetail.booking?.preferred_location || '-'}</Typography>
                                                             <Button size="small" onClick={() => handleEditPref('preferred_location', bookingDetail.booking?.preferred_location)}>Edit</Button>
-                                                        </>
-                                                    )}
-                                                </Box>
-                                                {/* Preferred Time */}
-                                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                    <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Time:</b></Typography>
-                                                    {editPrefField === 'preferred_time' ? (
-                                                        <>
-                                                            <select value={editPrefValue} onChange={e => setEditPrefValue(e.target.value)} style={{ marginRight: 8, width: 220 }} disabled={savingPref}>
-                                                                <option value="">Select...</option>
-                                                                <option value="Morning">Morning</option>
-                                                                <option value="Afternoon & Evening">Afternoon & Evening</option>
-                                                            </select>
-                                                            <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_time')} disabled={savingPref}>Save</Button>
-                                                            <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
-                                                        </>
-                                                    ) : (
-                                                        <>
+                                                    </>
+                                                )}
+                                            </Box>
+                                            {/* Preferred Time */}
+                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Time:</b></Typography>
+                                                {editPrefField === 'preferred_time' ? (
+                                                    <>
+                                                        <select value={editPrefValue} onChange={e => setEditPrefValue(e.target.value)} style={{ marginRight: 8, width: 220 }} disabled={savingPref}>
+                                                            <option value="">Select...</option>
+                                                            <option value="Morning">Morning</option>
+                                                            <option value="Afternoon & Evening">Afternoon & Evening</option>
+                                                        </select>
+                                                        <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_time')} disabled={savingPref}>Save</Button>
+                                                        <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
+                                                    </>
+                                                ) : (
+                                                    <>
                                                             <Typography sx={{ mr: 1 }}>{bookingDetail.booking?.preferred_time || '-'}</Typography>
                                                             <Button size="small" onClick={() => handleEditPref('preferred_time', bookingDetail.booking?.preferred_time)}>Edit</Button>
-                                                        </>
-                                                    )}
-                                                </Box>
+                                                    </>
+                                                )}
                                             </Box>
+                                        </Box>
                                         )}
                                     </Grid>
                                     {/* Main Details */}
@@ -1681,36 +1712,63 @@ const BookingPage = () => {
                                             <Divider sx={{ my: 2 }} />
                                             {/* HISTORY SECTION - Only for bookings, not vouchers */}
                                             {activeTab !== 'vouchers' && (
-                                                <Box sx={{ background: '#e0e0e0', borderRadius: 2, p: 2, mt: 2, mb: 2 }}>
-                                                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>History</Typography>
-                                                    <Table>
-                                                        <TableHead>
-                                                            <TableRow>
-                                                                <TableCell>Booking Date</TableCell>
-                                                                <TableCell>Activity Type</TableCell>
-                                                                <TableCell>Location</TableCell>
-                                                                <TableCell>Status</TableCell>
-                                                            </TableRow>
-                                                        </TableHead>
-                                                        <TableBody>
-                                                            <TableRow>
+                                            <Box sx={{ background: '#e0e0e0', borderRadius: 2, p: 2, mt: 2, mb: 2 }}>
+                                                <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>History</Typography>
+                                                <Table>
+                                                    <TableHead>
+                                                        <TableRow>
+                                                            <TableCell>Booking Date</TableCell>
+                                                            <TableCell>Activity Type</TableCell>
+                                                            <TableCell>Location</TableCell>
+                                                            <TableCell>Status</TableCell>
+                                                        </TableRow>
+                                                    </TableHead>
+                                                    <TableBody>
+                                                        <TableRow>
                                                                 <TableCell>{bookingDetail.booking?.created_at ? dayjs(bookingDetail.booking.created_at).format('DD/MM/YYYY HH:mm') : '-'}</TableCell>
                                                                 <TableCell>{bookingDetail.booking?.flight_type || '-'}</TableCell>
                                                                 <TableCell>{bookingDetail.booking?.location || '-'}</TableCell>
-                                                                <TableCell>Scheduled</TableCell>
-                                                            </TableRow>
-                                                            {bookingHistory.map((h, i) => (
-                                                                <TableRow key={i}>
-                                                                    <TableCell>{h.changed_at ? dayjs(h.changed_at).format('DD/MM/YYYY HH:mm') : '-'}</TableCell>
+                                                            <TableCell>Scheduled</TableCell>
+                                                        </TableRow>
+                                                        {bookingHistory.map((h, i) => (
+                                                            <TableRow key={i}>
+                                                                <TableCell>{h.changed_at ? dayjs(h.changed_at).format('DD/MM/YYYY HH:mm') : '-'}</TableCell>
                                                                     <TableCell>{bookingDetail.booking?.flight_type || '-'}</TableCell>
                                                                     <TableCell>{bookingDetail.booking?.location || '-'}</TableCell>
-                                                                    <TableCell>{h.status}</TableCell>
-                                                                </TableRow>
-                                                            ))}
-                                                        </TableBody>
-                                                    </Table>
-                                                </Box>
+                                                                <TableCell>{h.status}</TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </Box>
                                             )}
+                                        </Box>
+                                    </Grid>
+                                    <Grid item xs={12} md={4}>
+                                        <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
+                                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Recipient Details</Typography>
+                                            {(() => {
+                                                const v = bookingDetail.voucher || {};
+                                                return <>
+                                                    <Typography><b>Name:</b> {v.recipient_name || '-'}</Typography>
+                                                    <Typography><b>Email:</b> {v.recipient_email || '-'}</Typography>
+                                                    <Typography><b>Phone:</b> {v.recipient_phone || '-'}</Typography>
+                                                    <Typography><b>Gift Date:</b> {v.recipient_gift_date ? dayjs(v.recipient_gift_date).format('DD/MM/YYYY') : '-'}</Typography>
+                                                </>;
+                                            })()}
+                                        </Box>
+                                </Grid>
+                                    <Grid item xs={12} md={4}>
+                                        <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
+                                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Preferences</Typography>
+                                            {(() => {
+                                                const v = bookingDetail.voucher || {};
+                                                return <>
+                                                    <Typography><b>Preferred Location:</b> {v.preferred_location || '-'}</Typography>
+                                                    <Typography><b>Preferred Time:</b> {v.preferred_time || '-'}</Typography>
+                                                    <Typography><b>Preferred Day:</b> {v.preferred_day || '-'}</Typography>
+                                                </>;
+                                            })()}
                                         </Box>
                                     </Grid>
                                 </Grid>

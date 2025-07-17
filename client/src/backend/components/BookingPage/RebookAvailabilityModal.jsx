@@ -61,12 +61,20 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect }) => {
                     .then(res => {
                         if (res.data.success) {
                             console.log('Raw availabilities:', res.data.data);
-                            // Filter availabilities by location and status
+                            // Filtreyi normalize et: location, status, available
                             const filteredAvailabilities = res.data.data.filter(a => 
-                                a.location === selectedLocation && a.status === 'Open' && a.available > 0
+                                a.status === 'Open' && a.available > 0 &&
+                                a.location && selectedLocation &&
+                                a.location.trim().toLowerCase() === selectedLocation.trim().toLowerCase()
                             );
                             console.log('Filtered availabilities:', filteredAvailabilities);
+                            if (filteredAvailabilities.length === 0) {
+                                console.warn('No availabilities found after filtering. Locations in data:', res.data.data.map(a => a.location));
+                            }
                             setAvailabilities(filteredAvailabilities);
+                        } else {
+                            console.error('API did not return success:', res.data);
+                            setError('API did not return success.');
                         }
                     })
                     .catch((err) => {
@@ -171,7 +179,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect }) => {
                                         <Typography variant="subtitle1" sx={{ mb: 2 }}>Select a date:</Typography>
                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
                                             {availableDates.length === 0 ? (
-                                                <Typography color="text.secondary">No available dates</Typography>
+                                                <Typography color="text.secondary">No available dates. Lütfen seçtiğiniz aktivite ve lokasyon için uygun uçuş ekleyin veya filtreleri kontrol edin.</Typography>
                                             ) : (
                                                 availableDates.map(dateStr => {
                                                     const d = dayjs(dateStr, 'YYYY-MM-DD');
