@@ -44,7 +44,6 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // Ensure uploads directories exist
-const fs = require('fs');
 const uploadsPath = path.join(__dirname, 'uploads');
 const activitiesPath = path.join(uploadsPath, 'activities');
 
