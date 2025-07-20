@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, MenuItem, Select, InputLabel, FormControl, OutlinedInput, Chip, Box, Typography } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, MenuItem, Select, InputLabel, FormControl, OutlinedInput, Chip, Box, Typography, Checkbox, FormControlLabel, FormGroup } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import IconButton from '@mui/material/IconButton';
 import dayjs from 'dayjs';
@@ -23,11 +23,20 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
     const [repeat, setRepeat] = useState('once');
     const [startDate, setStartDate] = useState(dayjs().format('YYYY-MM-DD'));
     const [endDate, setEndDate] = useState(dayjs().add(6, 'month').format('YYYY-MM-DD'));
+
+    // When repeat is 'once', set endDate to startDate
+    useEffect(() => {
+        if (repeat === 'once') {
+            setEndDate(startDate);
+        }
+    }, [repeat, startDate]);
     const [startTime, setStartTime] = useState('09:00');
     const [visibility, setVisibility] = useState('open');
     const [name, setName] = useState('');
     const [capacity, setCapacity] = useState(8);
     const [available, setAvailable] = useState(8);
+    const [flightTypes, setFlightTypes] = useState(['Shared']); // Default to Shared
+    const [availabilityCount, setAvailabilityCount] = useState(0);
 
     useEffect(() => {
         if (open) {
@@ -37,27 +46,99 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
         }
     }, [open]);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        // Örnek: Tek bir availability kaydı oluşturuluyor
-        const dayOfWeek = startDate ? new Date(startDate).toLocaleDateString('en-US', { weekday: 'long' }) : '';
-        const payload = {
-            name,
-            schedule: name,
-            date: startDate,
-            day_of_week: dayOfWeek,
-            time: startTime,
-            capacity: Number(capacity),
-            available: Number(available),
-            status: visibility === 'open' ? 'Open' : 'Closed',
-            channels: 'All',
-        };
+    // Calculate how many availabilities will be created
+    useEffect(() => {
+        if (!startDate || !endDate) {
+            setAvailabilityCount(0);
+            return;
+        }
+
+        const availabilities = [];
+        let currentDate = new Date(startDate);
+        const endDateObj = new Date(endDate);
+
+        while (currentDate <= endDateObj) {
+            const dayOfWeek = currentDate.getDay();
+            let shouldCreate = false;
+
+            switch (repeat) {
+                case 'once':
+                    shouldCreate = currentDate.getTime() === new Date(startDate).getTime();
+                    break;
+                case 'everyday':
+                    shouldCreate = true;
+                    break;
+                case 'weekdays':
+                    shouldCreate = dayOfWeek >= 1 && dayOfWeek <= 5;
+                    break;
+                case 'weekends':
+                    shouldCreate = dayOfWeek === 0 || dayOfWeek === 6;
+                    break;
+            }
+
+            if (shouldCreate) {
+                availabilities.push({
+                    date: currentDate.toISOString().split('T')[0],
+                    day_of_week: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayOfWeek]
+                });
+            }
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        setAvailabilityCount(availabilities.length);
+    }, [startDate, endDate, repeat]);
+
+    const handleSubmit = async () => {
+        if (!name || !selectedActivity || !startDate || !endDate || !startTime || !capacity || !available) {
+            alert('Please fill in all required fields');
+            return;
+        }
+
+        const availabilities = [];
+        let currentDate = new Date(startDate);
+        const endDateObj = new Date(endDate);
+
+        while (currentDate <= endDateObj) {
+            const dayOfWeek = currentDate.getDay();
+            let shouldCreate = false;
+
+            switch (repeat) {
+                case 'once':
+                    shouldCreate = currentDate.getTime() === new Date(startDate).getTime();
+                    break;
+                case 'everyday':
+                    shouldCreate = true;
+                    break;
+                case 'weekdays':
+                    shouldCreate = dayOfWeek >= 1 && dayOfWeek <= 5;
+                    break;
+                case 'weekends':
+                    shouldCreate = dayOfWeek === 0 || dayOfWeek === 6;
+                    break;
+            }
+
+            if (shouldCreate) {
+                availabilities.push({
+                    schedule: name,
+                    date: currentDate.toISOString().split('T')[0],
+                    day_of_week: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayOfWeek],
+                    time: startTime,
+                    capacity: parseInt(capacity),
+                    available: parseInt(available),
+                    status: visibility,
+                    channels: 'All',
+                    flight_types: flightTypes.length > 0 ? flightTypes.join(',') : 'All'
+                });
+            }
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+
         try {
-            await axios.post(`/api/activity/${selectedActivity}/availabilities`, payload);
-            if (onCreated) onCreated();
+            await axios.post(`/api/activity/${selectedActivity}/availabilities`, { availabilities });
+            onCreated();
             onClose();
-        } catch (err) {
-            alert('Error creating availability');
+        } catch (error) {
+            alert('Failed to create availabilities');
         }
     };
 
@@ -89,25 +170,27 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
                     </FormControl>
                     <Box sx={{ display: 'flex', gap: 2 }}>
                         <TextField
-                            label="Starting On"
+                            label={repeat === 'once' ? 'Date' : 'Starting On'}
                             type="date"
                             value={startDate}
                             onChange={e => setStartDate(e.target.value)}
                             InputLabelProps={{ shrink: true }}
                             fullWidth
                         />
-                        <TextField
-                            label="Ending On"
-                            type="date"
-                            value={endDate}
-                            onChange={e => setEndDate(e.target.value)}
-                            InputLabelProps={{ shrink: true }}
-                            fullWidth
-                        />
+                        {repeat !== 'once' && (
+                            <TextField
+                                label="Ending On"
+                                type="date"
+                                value={endDate}
+                                onChange={e => setEndDate(e.target.value)}
+                                InputLabelProps={{ shrink: true }}
+                                fullWidth
+                            />
+                        )}
                     </Box>
                     <Box sx={{ display: 'flex', gap: 2 }}>
                         <TextField
-                            label="Starting At"
+                            label="Time"
                             type="time"
                             value={startTime}
                             onChange={e => setStartTime(e.target.value)}
@@ -133,6 +216,39 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
                             margin="dense"
                         />
                     </Box>
+                    <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Flight Types</div>
+                    <FormGroup row sx={{ mb: 2, mt: 1 }}>
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={flightTypes.includes('Shared')}
+                                    onChange={(e) => {
+                                        if (e.target.checked) {
+                                            setFlightTypes(prev => [...prev, 'Shared']);
+                                        } else {
+                                            setFlightTypes(prev => prev.filter(type => type !== 'Shared'));
+                                        }
+                                    }}
+                                />
+                            }
+                            label="Shared Flight"
+                        />
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={flightTypes.includes('Private')}
+                                    onChange={(e) => {
+                                        if (e.target.checked) {
+                                            setFlightTypes(prev => [...prev, 'Private']);
+                                        } else {
+                                            setFlightTypes(prev => prev.filter(type => type !== 'Private'));
+                                        }
+                                    }}
+                                />
+                            }
+                            label="Private Flight"
+                        />
+                    </FormGroup>
                     <FormControl fullWidth margin="dense">
                         <InputLabel>Visibility</InputLabel>
                         <Select
@@ -143,6 +259,20 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
                             {visibilityOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
                         </Select>
                     </FormControl>
+                    
+                    {availabilityCount > 0 && (
+                        <Box sx={{ 
+                            mt: 2, 
+                            p: 2, 
+                            bgcolor: 'info.light', 
+                            borderRadius: 1,
+                            textAlign: 'center'
+                        }}>
+                            <Typography variant="body2" color="info.contrastText">
+                                {availabilityCount} availability slot{availabilityCount !== 1 ? 's' : ''} will be created
+                            </Typography>
+                        </Box>
+                    )}
                 </Box>
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 2 }}>

@@ -22,3 +22,6 @@ ALTER TABLE all_vouchers
 ADD COLUMN preferred_location VARCHAR(255) DEFAULT NULL,
 ADD COLUMN preferred_time VARCHAR(255) DEFAULT NULL,
 ADD COLUMN preferred_day VARCHAR(255) DEFAULT NULL; 
+
+-- Add flight_types column to activity_availability table
+ALTER TABLE activity_availability ADD COLUMN flight_types VARCHAR(255) DEFAULT 'All'; 
