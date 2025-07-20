@@ -46,6 +46,37 @@ const upload = multer({ storage });
 // Statik olarak uploads klasörünü sun
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Test endpoint for checking uploads directory
+app.get('/api/test-uploads', (req, res) => {
+    const fs = require('fs');
+    const uploadsPath = path.join(__dirname, 'uploads');
+    const activitiesPath = path.join(uploadsPath, 'activities');
+    
+    try {
+        const uploadsExists = fs.existsSync(uploadsPath);
+        const activitiesExists = fs.existsSync(activitiesPath);
+        
+        let files = [];
+        if (activitiesExists) {
+            files = fs.readdirSync(activitiesPath);
+        }
+        
+        res.json({
+            success: true,
+            uploadsExists,
+            activitiesExists,
+            files,
+            uploadsPath,
+            activitiesPath
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 // API routes
 app.get('/api/example', (req, res) => {
     res.json({ message: 'Hello from the backend!' });
@@ -1225,6 +1256,10 @@ app.get('/api/activeLocations', (req, res) => {
     `;
     con.query(sql, (err, result) => {
         if (err) return res.status(500).json({ success: false, message: "Database error" });
+        
+        // Log the results for debugging
+        console.log('Active locations with images:', result);
+        
         res.json({ success: true, data: result });
     });
 });
@@ -1268,12 +1303,13 @@ app.post('/api/activity/:id/availabilities', (req, res) => {
         a.time,
         a.capacity,
         a.available,
+        a.flight_types || 'All',
         a.status,
         a.channels || 'All'
     ]);
     const sql = `
         INSERT INTO activity_availability
-        (activity_id, schedule, date, day_of_week, time, capacity, available, status, channels)
+        (activity_id, schedule, date, day_of_week, time, capacity, available, flight_types, status, channels)
         VALUES ?
     `;
     con.query(sql, [values], (err, result) => {

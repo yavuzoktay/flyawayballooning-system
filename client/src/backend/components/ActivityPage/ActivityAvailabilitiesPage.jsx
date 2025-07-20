@@ -20,6 +20,7 @@ const columns = [
     { key: 'time', label: 'Time' },
     { key: 'capacity', label: 'Capacity' },
     { key: 'available', label: 'Available' },
+    { key: 'flight_types', label: 'Flight Type' },
     { key: 'status', label: 'Status' },
     { key: 'channels', label: 'Channels' },
 ];
@@ -157,6 +158,27 @@ const ActivityAvailabilitiesPage = () => {
                             <TableCell>{row.time ? row.time.slice(0,5) : ''}</TableCell>
                             <TableCell>{row.capacity}</TableCell>
                             <TableCell>{row.available}</TableCell>
+                            <TableCell>
+                                {row.flight_types && row.flight_types !== 'All' ? 
+                                    row.flight_types.split(',').map((type, index) => (
+                                        <Chip 
+                                            key={index} 
+                                            label={type.trim()} 
+                                            size="small" 
+                                            color="primary" 
+                                            variant="outlined"
+                                            sx={{ mr: 0.5, mb: 0.5 }}
+                                        />
+                                    ))
+                                    : 
+                                    <Chip 
+                                        label="All" 
+                                        size="small" 
+                                        color="default" 
+                                        variant="outlined"
+                                    />
+                                }
+                            </TableCell>
                             <TableCell>
                                 <Chip 
                                     label={row.status} 
