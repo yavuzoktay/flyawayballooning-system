@@ -43,12 +43,32 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+// Ensure uploads directories exist
+const fs = require('fs');
+const uploadsPath = path.join(__dirname, 'uploads');
+const activitiesPath = path.join(uploadsPath, 'activities');
+
+if (!fs.existsSync(uploadsPath)) {
+    fs.mkdirSync(uploadsPath, { recursive: true });
+    console.log('Created uploads directory:', uploadsPath);
+}
+
+if (!fs.existsSync(activitiesPath)) {
+    fs.mkdirSync(activitiesPath, { recursive: true });
+    console.log('Created activities directory:', activitiesPath);
+}
+
 // Statik olarak uploads klasörünü sun
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Test endpoint for checking uploads directory
 app.get('/api/test-uploads', (req, res) => {
-    const fs = require('fs');
+    // Set proper headers
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    
     const uploadsPath = path.join(__dirname, 'uploads');
     const activitiesPath = path.join(uploadsPath, 'activities');
     
@@ -61,18 +81,28 @@ app.get('/api/test-uploads', (req, res) => {
             files = fs.readdirSync(activitiesPath);
         }
         
+        console.log('Test uploads endpoint called');
+        console.log('Uploads path:', uploadsPath);
+        console.log('Activities path:', activitiesPath);
+        console.log('Uploads exists:', uploadsExists);
+        console.log('Activities exists:', activitiesExists);
+        console.log('Files:', files);
+        
         res.json({
             success: true,
             uploadsExists,
             activitiesExists,
             files,
             uploadsPath,
-            activitiesPath
+            activitiesPath,
+            timestamp: new Date().toISOString()
         });
     } catch (error) {
+        console.error('Error in test-uploads endpoint:', error);
         res.status(500).json({
             success: false,
-            error: error.message
+            error: error.message,
+            timestamp: new Date().toISOString()
         });
     }
 });
@@ -80,6 +110,16 @@ app.get('/api/test-uploads', (req, res) => {
 // API routes
 app.get('/api/example', (req, res) => {
     res.json({ message: 'Hello from the backend!' });
+});
+
+// Simple test endpoint
+app.get('/api/test', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.json({ 
+        message: 'API is working!',
+        timestamp: new Date().toISOString(),
+        server: 'flyawayballooning-system'
+    });
 });
 
 // API endpoint to delete Manifest.jsx
