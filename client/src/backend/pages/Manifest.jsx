@@ -1449,6 +1449,7 @@ const Manifest = () => {
                 onClose={() => setRebookModalOpen(false)}
                 location={bookingDetail?.booking?.location}
                 onSlotSelect={handleRebookSlotSelect}
+                flightType={bookingDetail?.booking?.flight_type || ''}
             />
             {/* Booking Modal */}
             <Dialog open={bookingModalOpen} onClose={() => setBookingModalOpen(false)} maxWidth="md" fullWidth>

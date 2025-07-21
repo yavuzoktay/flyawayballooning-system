@@ -605,7 +605,7 @@ const BookingPage = () => {
         setRebookModalOpen(true);
     };
 
-    const handleRebookSlotSelect = async (date, time, activityId, selectedActivity, selectedLocation) => {
+    const handleRebookSlotSelect = async (date, time, activityId, selectedActivity, selectedLocation, selectedFlightTypeFromModal) => {
         if (!bookingDetail || !bookingDetail.booking) return;
         setRebookLoading(true);
         try {
@@ -613,10 +613,19 @@ const BookingPage = () => {
             const activityResponse = await axios.get(`/api/activity/${activityId}`);
             const activity = activityResponse.data.data;
             
-            // Determine flight type based on passenger count
+            // Kullanıcının seçtiği flight type'ı doğru formatla gönder
+            let selectedFlightType = selectedFlightTypeFromModal || bookingDetail.booking.flight_type || '';
+            let flightType;
+            if (selectedFlightType.toLowerCase().includes('shared')) {
+                flightType = 'Shared Flight';
+            } else if (selectedFlightType.toLowerCase().includes('private')) {
+                flightType = 'Private Flight';
+            } else {
+                flightType = selectedFlightType; // fallback
+            }
+
+            // Determine passenger count
             const passengerCount = bookingDetail.booking.pax || 1;
-            const flightType = passengerCount === 1 ? 'Shared Flight' : 'Private Flight';
-            
             // Calculate price based on flight type
             let totalPrice = bookingDetail.booking.paid || 0;
             if (activity) {
@@ -631,43 +640,33 @@ const BookingPage = () => {
             // Yeni tarih ve saat
             const newFlightDate = dayjs(date).format('YYYY-MM-DD') + ' ' + time;
 
+            // PATCH isteklerinden önce payload'u konsola yazdır
+            const patchPayloads = [
+                { booking_id: bookingDetail.booking.id, field: 'activity_id', value: activityId }, // GERİ ALINDI: activity -> activity_id
+                { booking_id: bookingDetail.booking.id, field: 'location', value: selectedLocation || bookingDetail.booking.location },
+                { booking_id: bookingDetail.booking.id, field: 'flight_type', value: flightType },
+                { booking_id: bookingDetail.booking.id, field: 'flight_date', value: newFlightDate },
+                { booking_id: bookingDetail.booking.id, field: 'paid', value: totalPrice }
+            ];
+            patchPayloads.forEach(payload => {
+                console.log('PATCH /api/updateBookingField payload:', payload);
+            });
+
             // 1. activity_id güncelle
-            await axios.patch('/api/updateBookingField', {
-                booking_id: bookingDetail.booking.id,
-                field: 'activity_id',
-                value: activityId
-            });
+            await axios.patch('/api/updateBookingField', patchPayloads[0]);
             // 2. location güncelle
-            await axios.patch('/api/updateBookingField', {
-                booking_id: bookingDetail.booking.id,
-                field: 'location',
-                value: selectedLocation || bookingDetail.booking.location
-            });
+            await axios.patch('/api/updateBookingField', patchPayloads[1]);
             // 3. flight_type güncelle
-            await axios.patch('/api/updateBookingField', {
-                booking_id: bookingDetail.booking.id,
-                field: 'flight_type',
-                value: flightType
-            });
+            await axios.patch('/api/updateBookingField', patchPayloads[2]);
             // 4. flight_date güncelle
-            await axios.patch('/api/updateBookingField', {
-                booking_id: bookingDetail.booking.id,
-                field: 'flight_date',
-                value: newFlightDate
-            });
+            await axios.patch('/api/updateBookingField', patchPayloads[3]);
             // 5. paid güncelle
-            await axios.patch('/api/updateBookingField', {
-                booking_id: bookingDetail.booking.id,
-                field: 'paid',
-                value: totalPrice
-            });
+            await axios.patch('/api/updateBookingField', patchPayloads[4]);
             // 6. Eğer status Cancelled ise, Scheduled yap
             if (bookingDetail.booking.status === 'Cancelled') {
-                await axios.patch('/api/updateBookingField', {
-                    booking_id: bookingDetail.booking.id,
-                    field: 'status',
-                    value: 'Scheduled'
-                });
+                const statusPayload = { booking_id: bookingDetail.booking.id, field: 'status', value: 'Scheduled' };
+                console.log('PATCH /api/updateBookingField payload:', statusPayload);
+                await axios.patch('/api/updateBookingField', statusPayload);
             }
             setRebookModalOpen(false);
             setDetailDialogOpen(false);

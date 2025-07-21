@@ -3,7 +3,7 @@ import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, 
 import dayjs from 'dayjs';
 import axios from 'axios';
 
-const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect }) => {
+const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flightType }) => {
     const [availabilities, setAvailabilities] = useState([]);
     const [loading, setLoading] = useState(false);
     const [selectedDate, setSelectedDate] = useState(null);
@@ -18,24 +18,40 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect }) => {
     const [selectedLocation, setSelectedLocation] = useState('');
     const [loadingActivities, setLoadingActivities] = useState(false);
 
+    // Yeni: Modalda flight type seçici için state
+    const [availableFlightTypes, setAvailableFlightTypes] = useState([]);
+    const [selectedFlightType, setSelectedFlightType] = useState('');
+
+    // availableDates state'i
+    const [availableDates, setAvailableDates] = useState([]);
+    const [filteredAvailabilities, setFilteredAvailabilities] = useState([]);
+
     // Load activities and locations on modal open
     useEffect(() => {
         if (open) {
             setLoadingActivities(true);
-            // Load activities with location and pricing info
             axios.get('/api/activitiesForRebook')
                 .then(res => {
                     if (res.data.success) {
                         setActivities(res.data.data);
-                        // Extract unique locations from activities
                         const uniqueLocations = [...new Set(res.data.data.map(a => a.location))];
                         setLocations(uniqueLocations.map(loc => ({ location: loc })));
+                        // Varsayılan olarak prop ile gelen activity/location seçili olsun
+                        if (location) {
+                            setSelectedLocation(location);
+                        }
+                        // Eğer activityId prop ile gelirse, activity_name'i bulup seç
+                        if (location && res.data.data.length > 0) {
+                            const found = res.data.data.find(a => a.location === location);
+                            if (found) {
+                                setSelectedActivity(found.activity_name);
+                            }
+                        }
                     }
                 })
                 .catch(err => console.error('Error loading activities:', err))
                 .finally(() => setLoadingActivities(false));
         } else {
-            // Reset state when modal closes
             setAvailabilities([]);
             setSelectedDate(null);
             setSelectedTime(null);
@@ -43,58 +59,77 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect }) => {
             setSelectedActivity('');
             setSelectedLocation('');
         }
-    }, [open]);
+    }, [open, location]);
 
-    // Load availabilities when activity and location are selected
+    // Fetch availabilities (sadece activity/location değişince)
     useEffect(() => {
         if (selectedActivity && selectedLocation) {
             setLoading(true);
             setError(null);
-            
-            // Find the activity ID for the selected activity and location
             const activity = activities.find(a => a.activity_name === selectedActivity && a.location === selectedLocation);
             if (activity) {
                 setActivityId(activity.id);
-                
-                // Get availabilities for this activity
                 axios.get(`/api/activity/${activity.id}/availabilities`)
                     .then(res => {
                         if (res.data.success) {
-                            console.log('Raw availabilities:', res.data.data);
-                            // Filtreyi normalize et: location, status, available
-                            const filteredAvailabilities = res.data.data.filter(a => 
-                                a.status === 'Open' && a.available > 0 &&
-                                a.location && selectedLocation &&
-                                a.location.trim().toLowerCase() === selectedLocation.trim().toLowerCase()
-                            );
-                            console.log('Filtered availabilities:', filteredAvailabilities);
-                            if (filteredAvailabilities.length === 0) {
-                                console.warn('No availabilities found after filtering. Locations in data:', res.data.data.map(a => a.location));
-                            }
-                            setAvailabilities(filteredAvailabilities);
-                        } else {
-                            console.error('API did not return success:', res.data);
-                            setError('API did not return success.');
+                            setAvailabilities(res.data.data);
+                            // Flight types dropdown için sadece flight_types alanı kullanılacak
+                            const normalizeType = t => t.replace(' Flight', '').trim().toLowerCase();
+                            const allTypes = Array.from(new Set(
+                                res.data.data
+                                    .map(a => a.flight_types || 'All')
+                                    .flatMap(types => types.split(',').map(t => normalizeType(t)))
+                                    .filter(t => t && t !== 'all')
+                            ));
+                            setAvailableFlightTypes(allTypes);
+                            if (allTypes.length > 0) setSelectedFlightType(allTypes[0]);
                         }
                     })
-                    .catch((err) => {
-                        console.error('Error fetching availabilities:', err);
-                        setError('Could not fetch availabilities');
-                    })
+                    .catch(() => setError('Could not fetch availabilities'))
                     .finally(() => setLoading(false));
             }
         }
     }, [selectedActivity, selectedLocation, activities]);
 
-    // Get unique dates from availabilities
-    const availableDates = Array.from(new Set(availabilities.map(a => a.date))).filter(date => date);
-    console.log('Available dates:', availableDates);
+    // Flight type değişince sadece filtrele
+    useEffect(() => {
+        // Flight type seçili değilse, ilk uygun flight type otomatik seç
+        if (!selectedFlightType && availableFlightTypes.length > 0) {
+            setSelectedFlightType(availableFlightTypes[0]);
+            return;
+        }
+
+        const normalizeType = t => t.replace(' Flight', '').trim().toLowerCase();
+        const bookingType = normalizeType(selectedFlightType || '');
+
+        const filtered = availabilities.filter(a => {
+            if (a.status && a.status.toLowerCase() !== 'open') return false;
+            if (a.available !== undefined && a.available <= 0) return false;
+            if (!a.flight_types || a.flight_types.toLowerCase() === 'all') return true;
+            // Her bir flight_types'ı normalize et ve includes ile kontrol et
+            const typesArr = a.flight_types.split(',').map(t => normalizeType(t));
+            return typesArr.includes(bookingType);
+        });
+
+        console.log('DEBUG: selectedFlightType:', selectedFlightType, 'bookingType:', bookingType, 'availabilities:', availabilities, 'filtered:', filtered);
+
+        setFilteredAvailabilities(filtered);
+        setSelectedDate(null);
+        setSelectedTime(null);
+        setAvailableDates(Array.from(new Set(filtered.map(a => a.date))).filter(date => date));
+    }, [selectedFlightType, availabilities, availableFlightTypes]);
+
+    // Flight type değişince selectedDate ve selectedTime sıfırlansın
+    useEffect(() => {
+        setSelectedDate(null);
+        setSelectedTime(null);
+    }, [selectedFlightType]);
 
     const getTimesForDate = (date) => {
         const dateStr = dayjs(date).format('YYYY-MM-DD');
         console.log('Looking for times for date:', dateStr);
         
-        const times = availabilities.filter(a => a.date === dateStr);
+        const times = filteredAvailabilities.filter(a => a.date === dateStr);
         console.log('Found times for date', dateStr, ':', times);
         return times;
     };
@@ -168,6 +203,28 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect }) => {
                         {/* Date and Time Selection */}
                         {selectedActivity && selectedLocation && (
                             <>
+                                {/* Flight Type Selector */}
+                                {availableFlightTypes.length > 0 && (
+                                    <Box sx={{ mb: 2 }}>
+                                        {selectedFlightType && (
+                                            <Typography variant="subtitle2" sx={{ mb: 1, color: 'primary.main' }}>
+                                                Selected Flight Type: <b>{selectedFlightType.charAt(0).toUpperCase() + selectedFlightType.slice(1)}</b>
+                                            </Typography>
+                                        )}
+                                        <FormControl fullWidth>
+                                            <InputLabel>Flight Type</InputLabel>
+                                            <Select
+                                                value={selectedFlightType}
+                                                onChange={e => setSelectedFlightType(e.target.value)}
+                                                label="Flight Type"
+                                            >
+                                                {availableFlightTypes.map(type => (
+                                                    <MenuItem key={type} value={type}>{type.charAt(0).toUpperCase() + type.slice(1)}</MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+                                    </Box>
+                                )}
                                 {loading ? (
                                     <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
                                         <CircularProgress />
@@ -179,7 +236,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect }) => {
                                         <Typography variant="subtitle1" sx={{ mb: 2 }}>Select a date:</Typography>
                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
                                             {availableDates.length === 0 ? (
-                                                <Typography color="text.secondary">No available dates. Lütfen seçtiğiniz aktivite ve lokasyon için uygun uçuş ekleyin veya filtreleri kontrol edin.</Typography>
+                                                <Typography color="text.secondary">No available dates. Lütfen seçtiğiniz aktivite, lokasyon ve uçuş tipi için uygun uçuş ekleyin veya filtreleri kontrol edin.</Typography>
                                             ) : (
                                                 availableDates.map(dateStr => {
                                                     const d = dayjs(dateStr, 'YYYY-MM-DD');
@@ -196,39 +253,39 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect }) => {
                                                 })
                                             )}
                                         </div>
-                                                                {selectedDate && (
-                            <>
-                                <Typography variant="subtitle1" sx={{ mb: 1 }}>Available Times for {dayjs(selectedDate).format('DD/MM/YYYY')}:</Typography>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-                                    {getTimesForDate(selectedDate).length === 0 && (
-                                        <Box>
-                                            <Typography color="text.secondary">No available times</Typography>
-                                            <Typography variant="caption" color="text.secondary">
-                                                Debug: Selected date: {dayjs(selectedDate).format('YYYY-MM-DD')}
-                                            </Typography>
-                                            <Typography variant="caption" color="text.secondary">
-                                                Total availabilities: {availabilities.length}
-                                            </Typography>
-                                        </Box>
-                                    )}
-                                    {getTimesForDate(selectedDate).map(slot => {
-                                        const isAvailable = slot.available > 0;
-                                        const isSelected = selectedTime === slot.time;
-                                        return (
-                                            <Button
-                                                key={slot.id}
-                                                variant={isSelected ? 'contained' : 'outlined'}
-                                                color={isAvailable ? 'primary' : 'inherit'}
-                                                disabled={!isAvailable}
-                                                onClick={() => isAvailable && setSelectedTime(slot.time)}
-                                            >
-                                                {slot.time} ({slot.available}/{slot.capacity})
-                                            </Button>
-                                        );
-                                    })}
-                                </div>
-                            </>
-                        )}
+                                        {selectedDate && (
+                                            <>
+                                                <Typography variant="subtitle1" sx={{ mb: 1 }}>Available Times for {dayjs(selectedDate).format('DD/MM/YYYY')}:</Typography>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+                                                    {getTimesForDate(selectedDate).length === 0 && (
+                                                        <Box>
+                                                            <Typography color="text.secondary">No available times</Typography>
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                Debug: Selected date: {dayjs(selectedDate).format('YYYY-MM-DD')}
+                                                            </Typography>
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                Total availabilities: {availabilities.length}
+                                                            </Typography>
+                                                        </Box>
+                                                    )}
+                                                    {getTimesForDate(selectedDate).map(slot => {
+                                                        const isAvailable = slot.available > 0;
+                                                        const isSelected = selectedTime === slot.time;
+                                                        return (
+                                                            <Button
+                                                                key={slot.id}
+                                                                variant={isSelected ? 'contained' : 'outlined'}
+                                                                color={isAvailable ? 'primary' : 'inherit'}
+                                                                disabled={!isAvailable}
+                                                                onClick={() => isAvailable && setSelectedTime(slot.time)}
+                                                            >
+                                                                {slot.time} ({slot.available}/{slot.capacity})
+                                                            </Button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </>
+                                        )}
                                     </>
                                 )}
                             </>
