@@ -22,7 +22,6 @@ const ActivityList = ({ activity }) => {
         shared_price: '',
         private_price: '',
         capacity: '',
-        event_time: '',
         location: '',
         flight_type: [], // now array
         status: 'Live',
@@ -49,7 +48,7 @@ const ActivityList = ({ activity }) => {
     const handleClose = () => {
         setOpen(false);
         setForm({
-            activity_name: '', shared_price: '', private_price: '', capacity: '', event_time: '', location: '', flight_type: [], status: 'Live'
+            activity_name: '', shared_price: '', private_price: '', capacity: '', location: '', flight_type: [], status: 'Live'
         });
         setPriceFieldLabel('Price');
         setError('');
@@ -224,7 +223,6 @@ const ActivityList = ({ activity }) => {
                 <DialogContent>
                     <TextField margin="dense" label="Activity Name" name="activity_name" value={form.activity_name} onChange={handleChange} fullWidth required />
                     <TextField margin="dense" label="Capacity" name="capacity" value={form.capacity} onChange={handleChange} type="number" fullWidth required />
-                    <TextField margin="dense" label="Event Time" name="event_time" value={form.event_time} onChange={handleChange} type="time" fullWidth required InputLabelProps={{ shrink: true }} />
                     <TextField margin="dense" label="Location" name="location" value={form.location} onChange={handleChange} fullWidth required />
                     <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Flight Type</div>
                     <FormGroup row sx={{ mb: 2, mt: 1 }}>
@@ -291,7 +289,6 @@ const ActivityList = ({ activity }) => {
                 <DialogContent>
                     <TextField margin="dense" label="Activity Name" name="activity_name" value={editForm.activity_name || ''} onChange={handleEditChange} fullWidth required />
                     <TextField margin="dense" label="Capacity" name="capacity" value={editForm.capacity || ''} onChange={handleEditChange} type="number" fullWidth required />
-                    <TextField margin="dense" label="Event Time" name="event_time" value={editForm.event_time || ''} onChange={handleEditChange} type="time" fullWidth required InputLabelProps={{ shrink: true }} />
                     <TextField margin="dense" label="Location" name="location" value={editForm.location || ''} onChange={handleEditChange} fullWidth required />
                     <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Flight Type</div>
                     <FormGroup row sx={{ mb: 2, mt: 1 }}>
