@@ -98,6 +98,9 @@ const BookingPage = () => {
     // Add state for tracking passenger prices in edit mode
     const [editPassengerPrices, setEditPassengerPrices] = useState([]);
 
+    // Add to component state:
+    const [selectedDateRequestIds, setSelectedDateRequestIds] = useState([]);
+
     // Fetch data
     const voucherData = async () => {
         try {
@@ -849,6 +852,20 @@ const BookingPage = () => {
         }
     }, [detailDialogOpen, bookingDetail?.booking?.paid, bookingDetail?.passengers?.length]);
 
+    // Add handler:
+    const handleDeleteDateRequests = async () => {
+        if (!selectedDateRequestIds || selectedDateRequestIds.length === 0) return;
+        if (!window.confirm('Are you sure you want to delete the selected date requests?')) return;
+        try {
+            await Promise.all(selectedDateRequestIds.map(id => axios.delete(`/api/date-requests/${id}`)));
+            // Update local state immediately for instant UI feedback
+            setDateRequested(prev => prev.filter(item => !selectedDateRequestIds.includes(item.id)));
+            setSelectedDateRequestIds([]);
+        } catch (err) {
+            alert('Failed to delete date requests.');
+        }
+    };
+
     return (
         <div className="booking-page-wrap">
             <Container maxWidth="xl">
@@ -1094,17 +1111,23 @@ const BookingPage = () => {
                         {activeTab === "dateRequests" && (
                             <>
                                 <h3 style={{ fontFamily: "Gilroy Light" }}>Date Requests</h3>
+                                <Button variant="contained" color="error" style={{marginBottom: 16}} onClick={handleDeleteDateRequests} disabled={!selectedDateRequestIds || selectedDateRequestIds.length === 0}>
+                                    Delete
+                                </Button>
                                 <PaginatedTable
                                     data={dateRequested.map((item) => ({
+                                        id: item.id,
                                         name: item.name || "",
                                         number: item.phone || "",
+                                        flight_type: item.flight_type || "",
                                         email: item.email || "",
                                         location: item.location || "",
-                                        date_requested: item.requested_date || item.created_at || "",
-                                        id: item.id || ""
+                                        date_requested: item.requested_date || item.created_at || ""
                                     }))}
-                                    columns={["name", "number", "email", "location", "date_requested", "id"]}
+                                    columns={["name", "number", "flight_type", "email", "location", "date_requested"]}
                                     onNameClick={handleDateRequestNameClick}
+                                    selectable={true}
+                                    onSelectionChange={setSelectedDateRequestIds}
                                 />
                             </>
                         )}

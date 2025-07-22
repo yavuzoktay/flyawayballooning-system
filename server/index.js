@@ -1796,3 +1796,17 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
 });
+
+// Delete a date request by ID
+app.delete('/api/date-requests/:id', (req, res) => {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ success: false, message: 'Missing id' });
+    const sql = 'DELETE FROM date_requests WHERE id = ?';
+    con.query(sql, [id], (err, result) => {
+        if (err) {
+            console.error('Error deleting date request:', err);
+            return res.status(500).json({ success: false, message: 'Database error' });
+        }
+        res.json({ success: true });
+    });
+});
