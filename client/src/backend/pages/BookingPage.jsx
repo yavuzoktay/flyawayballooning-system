@@ -995,6 +995,7 @@ const BookingPage = () => {
                                 </div>
                                 <PaginatedTable
                                     data={filteredData.map(item => ({
+                                        id: item.id || '', // Ensure id is always present
                                         created_at: item.created_at || '',
                                         name: item.name || '',
                                         flight_type: item.flight_type || '',
