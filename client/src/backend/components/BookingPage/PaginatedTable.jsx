@@ -128,6 +128,11 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                                                 </span>
                                             ) : col === 'flight_date' ? (
                                                 (() => {
+                                                    if (item.flight_date_display !== undefined) {
+                                                        if (item.flight_date_display === '-') return '-';
+                                                        return item.flight_date_display;
+                                                    }
+                                                    if (item[col] === '-') return '-';
                                                     if (!item[col]) return '';
                                                     let isoString = item[col].includes('T') ? item[col] : item[col].replace(' ', 'T');
                                                     const date = new Date(isoString);
@@ -149,6 +154,28 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                                                             {`${day}/${month}/${year} ${ampm}`}
                                                         </a>
                                                     );
+                                                })()
+                                            ) : col === 'date_requested' ? (
+                                                (() => {
+                                                    if (!item[col]) return '';
+                                                    let isoString = item[col].includes('T') ? item[col] : item[col].replace(' ', 'T');
+                                                    const date = new Date(isoString);
+                                                    if (isNaN(date.getTime())) return String(item[col]);
+                                                    const day = String(date.getDate()).padStart(2, '0');
+                                                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                                                    const year = date.getFullYear();
+                                                    return `${day}/${month}/${year}`;
+                                                })()
+                                            ) : col === 'expires' ? (
+                                                (() => {
+                                                    if (!item[col]) return '';
+                                                    let isoString = item[col].includes('T') ? item[col] : item[col].replace(' ', 'T');
+                                                    const date = new Date(isoString);
+                                                    if (isNaN(date.getTime())) return String(item[col]);
+                                                    const day = String(date.getDate()).padStart(2, '0');
+                                                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                                                    const year = date.getFullYear();
+                                                    return `${day}/${month}/${year}`;
                                                 })()
                                             ) : col === 'status' && item[col] === 'Confirmed' ? 'Scheduled' : item[col]}
                                         </td>

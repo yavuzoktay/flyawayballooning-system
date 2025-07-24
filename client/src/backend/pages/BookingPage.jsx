@@ -994,15 +994,27 @@ const BookingPage = () => {
                                     </div>
                                 </div>
                                 <PaginatedTable
-                                    data={filteredData}
+                                    data={filteredData.map(item => ({
+                                        created_at: item.created_at || '',
+                                        name: item.name || '',
+                                        flight_type: item.flight_type || '',
+                                        location: item.location || '',
+                                        flight_date: item.flight_date_display || item.flight_date || '',
+                                        pax: item.pax || '',
+                                        status: item.status || '',
+                                        paid: item.paid || '',
+                                        due: item.due || '',
+                                        voucher_code: item.voucher_code || '',
+                                        flight_attempts: item.flight_attempts || '',
+                                        expires: item.expires || ''
+                                    }))}
                                     columns={[
                                         "created_at",
                                         "name",
                                         "flight_type",
+                                        "location",
                                         "flight_date",
-                                        "location", // moved here
                                         "pax",
-                                        "email",
                                         "status",
                                         "paid",
                                         "due",

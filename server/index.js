@@ -150,12 +150,40 @@ app.get("/api/getfilteredBookings", (req, res) => {
             return;
         }
         if (result.length > 0) {
-            const formatted = result.map(row => ({
-                ...row,
-                created_at: row.created_at ? moment(row.created_at).format('YYYY-MM-DD') : '',
-                created_at_display: row.created_at ? moment(row.created_at).format('DD/MM/YYYY') : '',
-                choose_add_on: row.choose_add_on || ''
-            }));
+            const formatted = result.map(row => {
+                // If status is Cancelled, show '-' for flight_date
+                if (row.status === 'Cancelled') {
+                    return {
+                        ...row,
+                        flight_date: '-',
+                        flight_date_display: '-',
+                        created_at: row.created_at ? moment(row.created_at).format('YYYY-MM-DD') : '',
+                        created_at_display: row.created_at ? moment(row.created_at).format('DD/MM/YYYY') : '',
+                        choose_add_on: row.choose_add_on || ''
+                    };
+                }
+                // Format flight_date as DD/MM/YYYY AM/PM if time exists
+                let flightDateFormatted = '';
+                if (row.flight_date) {
+                    // Try to parse as date+time
+                    const dateTime = moment(row.flight_date, ["YYYY-MM-DD HH:mm", "YYYY-MM-DDTHH:mm", "YYYY-MM-DD", "DD/MM/YYYY HH:mm", "DD/MM/YYYY"]);
+                    if (dateTime.isValid()) {
+                        const hour = dateTime.hour();
+                        const ampm = hour < 12 ? 'AM' : 'PM';
+                        flightDateFormatted = dateTime.format('DD/MM/YYYY') + (row.flight_date.length > 10 ? ' ' + ampm : '');
+                    } else {
+                        // Fallback: just show as is
+                        flightDateFormatted = row.flight_date;
+                    }
+                }
+                return {
+                    ...row,
+                    created_at: row.created_at ? moment(row.created_at).format('YYYY-MM-DD') : '',
+                    created_at_display: row.created_at ? moment(row.created_at).format('DD/MM/YYYY') : '',
+                    choose_add_on: row.choose_add_on || '',
+                    flight_date_display: flightDateFormatted
+                };
+            });
             res.send({ success: true, data: formatted });
         } else {
             res.send({ success: false, message: "No bookings found" });
@@ -248,7 +276,9 @@ app.get("/api/getAllBookingData", (req, res) => {
             const formatted = result.map(row => {
                 // Format flight_date as DD/MM/YYYY AM/PM if time exists
                 let flightDateFormatted = '';
-                if (row.flight_date) {
+                if (row.status === 'Cancelled') {
+                    flightDateFormatted = '-';
+                } else if (row.flight_date) {
                     // Try to parse as date+time
                     const dateTime = moment(row.flight_date, ["YYYY-MM-DD HH:mm", "YYYY-MM-DDTHH:mm", "YYYY-MM-DD", "DD/MM/YYYY HH:mm", "DD/MM/YYYY"]);
                     if (dateTime.isValid()) {
