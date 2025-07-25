@@ -120,12 +120,16 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                                     selectable && colIdx === 0 && col === 'checkbox' ? null : (
                                         <td key={col} style={{ textAlign: "center", padding: "8px", wordBreak: "break-all", overflowWrap: "break-word" }}>
                                             {col === 'name' ? (
-                                                <span
-                                                    style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer' }}
-                                                    onClick={() => onNameClick && onNameClick(item)}
-                                                >
-                                                    {item[col]}
-                                                </span>
+                                                selectable ? (
+                                                    <span>{item[col]}</span>
+                                                ) : (
+                                                    <span
+                                                        style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer' }}
+                                                        onClick={() => onNameClick && onNameClick(item)}
+                                                    >
+                                                        {item[col]}
+                                                    </span>
+                                                )
                                             ) : col === 'flight_date' ? (
                                                 (() => {
                                                     if (item.flight_date_display !== undefined) {

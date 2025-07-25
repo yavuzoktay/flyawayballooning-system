@@ -1,3 +1,5 @@
+require('dotenv').config();
+console.log('Stripe Key:', process.env.STRIPE_SECRET_KEY);
 const express = require("express");
 const mysql = require("mysql2");
 const cors = require("cors");
@@ -8,6 +10,7 @@ const dayjs = require("dayjs");
 const moment = require('moment');
 const multer = require('multer');
 const dotenv = require('dotenv');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 dotenv.config();
 
 // Enable CORS
@@ -1839,4 +1842,87 @@ app.delete('/api/date-requests/:id', (req, res) => {
         }
         res.json({ success: true });
     });
+});
+
+// Geçici Stripe session verisi için bellek içi bir store
+const stripeSessionStore = {};
+
+// Stripe Checkout Session oluşturma endpointini güncelle
+app.post('/api/create-checkout-session', async (req, res) => {
+    try {
+        const { totalPrice, currency = 'GBP', bookingData, voucherData, type } = req.body;
+        if (!totalPrice || (!bookingData && !voucherData)) {
+            return res.status(400).json({ success: false, message: 'Eksik veri: totalPrice veya bookingData/voucherData yok.' });
+        }
+        // Stripe fiyatı kuruş cinsinden ister
+        const amount = Math.round(Number(totalPrice) * 100);
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [
+                {
+                    price_data: {
+                        currency,
+                        product_data: {
+                            name: type === 'voucher' ? 'Balloon Flight Voucher' : 'Balloon Flight Booking',
+                            description: type === 'voucher' ? 'Hot Air Balloon Flight Voucher' : 'Hot Air Balloon Flight Reservation',
+                        },
+                        unit_amount: amount,
+                    },
+                    quantity: 1,
+                },
+            ],
+            mode: 'payment',
+            success_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/?payment=success`,
+            cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/?payment=cancel`,
+            metadata: {
+                session_id: '' // Sonradan doldurulacak
+            }
+        });
+        // bookingData veya voucherData'yı session_id ile store'da sakla
+        const session_id = session.id;
+        stripeSessionStore[session_id] = {
+            type: type || (voucherData ? 'voucher' : 'booking'),
+            bookingData,
+            voucherData
+        };
+        // Stripe metadata'ya session_id ekle
+        await stripe.checkout.sessions.update(session_id, {
+            metadata: { session_id }
+        });
+        res.json({ success: true, sessionId: session_id });
+    } catch (error) {
+        console.error('Stripe Checkout Session error:', error);
+        res.status(500).json({ success: false, message: 'Stripe Checkout Session oluşturulamadı', error: error.message });
+    }
+});
+
+// Stripe Webhook endpoint EN ÜSTE ALINDI
+app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (req, res) => {
+    console.log('Stripe webhook endpoint hit!');
+    try {
+        const event = JSON.parse(req.body);
+        if (event.type === 'checkout.session.completed') {
+            const session = event.data.object;
+            const session_id = session.metadata.session_id;
+            const storeData = stripeSessionStore[session_id];
+            if (!storeData) {
+                console.error('Stripe session store data not found for session_id:', session_id);
+                return res.status(400).send('Session data not found');
+            }
+            if (storeData.type === 'booking') {
+                const axios = require('axios');
+                await axios.post(`http://localhost:${PORT}/api/createBooking`, storeData.bookingData);
+                console.log('Booking created via webhook:', storeData.bookingData);
+            } else if (storeData.type === 'voucher') {
+                const axios = require('axios');
+                await axios.post(`http://localhost:${PORT}/api/createVoucher`, storeData.voucherData);
+                console.log('Voucher created via webhook:', storeData.voucherData);
+            }
+            delete stripeSessionStore[session_id];
+        }
+        res.json({received: true});
+    } catch (err) {
+        console.error('Stripe webhook error:', err);
+        res.status(400).send(`Webhook Error: ${err.message}`);
+    }
 });
