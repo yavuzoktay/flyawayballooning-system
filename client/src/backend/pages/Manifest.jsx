@@ -1282,7 +1282,7 @@ const Manifest = () => {
                                                 {bookingDetail.booking.status !== 'Cancelled' && (
                                                     <Typography><b>Booked For:</b> {bookingDetail.booking.flight_date ? (
                                                         <a
-                                                            href={`http://44.202.155.45:3002/manifest?date=${dayjs(bookingDetail.booking.flight_date).format('YYYY-MM-DD')}&time=${dayjs(bookingDetail.booking.flight_date).format('HH:mm')}`}
+                                                            href={`http://3.95.28.43:3002/manifest?date=${dayjs(bookingDetail.booking.flight_date).format('YYYY-MM-DD')}&time=${dayjs(bookingDetail.booking.flight_date).format('HH:mm')}`}
                                                             style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
                                                         >
                                                             {dayjs(bookingDetail.booking.flight_date).format('DD/MM/YYYY HH:mm')}

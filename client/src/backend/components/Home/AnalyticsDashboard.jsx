@@ -11,7 +11,7 @@ const AnalyticsDashboard = ({ dateRange }) => {
 
     useEffect(() => {
         setLoading(true);
-        axios.get(`http://44.202.155.45:3002/api/analytics`, {
+        axios.get(`http://3.95.28.43:3002/api/analytics`, {
             params: {
                 start_date: dateRange.start,
                 end_date: dateRange.end
