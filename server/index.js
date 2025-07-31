@@ -728,6 +728,9 @@ app.post('/api/createBooking', (req, res) => {
                         console.error('Error creating passengers:', err);
                         return res.status(500).json({ success: false, error: 'Database query failed to create passengers' });
                     }
+                    // Update availability status after booking creation
+                    updateAvailabilityStatus();
+                    
                     res.status(201).json({ success: true, message: 'Booking created successfully!', bookingId: bookingId, created_at: createdAt });
                 });
             }
@@ -1258,20 +1261,20 @@ app.get('/api/analytics', async (req, res) => {
 
 // Create Activity endpoint (with image upload)
 app.post("/api/createActivity", upload.single('image'), (req, res) => {
-    const { activity_name, shared_price, private_price, capacity, event_time, location, flight_type, status } = req.body;
+    const { activity_name, shared_price, private_price, capacity, event_time, location, flight_type, voucher_type, status } = req.body;
     let image = null;
     if (req.file) {
         // Sunucuya göre path'i düzelt
         image = `/uploads/activities/${req.file.filename}`;
     }
-    if (!activity_name || !shared_price || !private_price || !capacity || !event_time || !location || !flight_type || !status) {
+    if (!activity_name || !shared_price || !private_price || !capacity || !location || !flight_type || !status) {
         return res.status(400).json({ success: false, message: "Eksik bilgi!" });
     }
     const sql = `
-        INSERT INTO activity (activity_name, shared_price, private_price, capacity, start_date, end_date, event_time, location, flight_type, status, image)
-        VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?)
+        INSERT INTO activity (activity_name, shared_price, private_price, capacity, start_date, end_date, event_time, location, flight_type, voucher_type, status, image)
+        VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?)
     `;
-    con.query(sql, [activity_name, shared_price, private_price, capacity, event_time, location, flight_type, status, image], (err, result) => {
+    con.query(sql, [activity_name, shared_price, private_price, capacity, location, flight_type, voucher_type || 'All', status, image], (err, result) => {
         if (err) {
             return res.status(500).json({ success: false, message: "Database error" });
         }
@@ -1289,10 +1292,39 @@ app.get("/api/activity/:id", (req, res) => {
     });
 });
 
+// Get voucher types for a specific location
+app.get('/api/locationVoucherTypes/:location', (req, res) => {
+    const { location } = req.params;
+    if (!location) return res.status(400).json({ success: false, message: 'Location is required' });
+    
+    const sql = `
+        SELECT voucher_type
+        FROM activity 
+        WHERE location = ? AND status = 'Live'
+        ORDER BY id ASC
+        LIMIT 1
+    `;
+    con.query(sql, [location], (err, result) => {
+        if (err) return res.status(500).json({ success: false, message: "Database error" });
+        if (!result || result.length === 0) {
+            return res.status(404).json({ success: false, message: "No voucher types found for this location" });
+        }
+        
+        const voucherTypes = result[0].voucher_type;
+        let voucherTypesArray = [];
+        
+        if (voucherTypes && voucherTypes !== 'All') {
+            voucherTypesArray = voucherTypes.split(',').map(type => type.trim());
+        }
+        
+        res.json({ success: true, data: voucherTypesArray });
+    });
+});
+
 // Update activity by id (with image upload)
 app.put("/api/activity/:id", upload.single('image'), (req, res) => {
     const { id } = req.params;
-    const { activity_name, shared_price, private_price, capacity, event_time, location, flight_type, status } = req.body;
+    const { activity_name, shared_price, private_price, capacity, event_time, location, flight_type, voucher_type, status } = req.body;
     let image = null;
     if (req.file) {
         image = `/uploads/activities/${req.file.filename}`;
@@ -1304,10 +1336,10 @@ app.put("/api/activity/:id", upload.single('image'), (req, res) => {
         const currentImage = result && result[0] ? result[0].image : null;
         const finalImage = image || currentImage;
         const sql = `
-            UPDATE activity SET activity_name=?, shared_price=?, private_price=?, capacity=?, start_date=NULL, end_date=NULL, event_time=?, location=?, flight_type=?, status=?, image=?
+            UPDATE activity SET activity_name=?, shared_price=?, private_price=?, capacity=?, start_date=NULL, end_date=NULL, event_time=NULL, location=?, flight_type=?, voucher_type=?, status=?, image=?
             WHERE id=?
         `;
-        con.query(sql, [activity_name, shared_price, private_price, capacity, event_time, location, flight_type, status, finalImage, id], (err, result) => {
+        con.query(sql, [activity_name, shared_price, private_price, capacity, location, flight_type, voucher_type || 'All', status, finalImage, id], (err, result) => {
             if (err) return res.status(500).json({ success: false, message: "Database error" });
             res.json({ success: true, data: result });
         });
@@ -1342,7 +1374,7 @@ app.get('/api/locationPricing/:location', (req, res) => {
     if (!location) return res.status(400).json({ success: false, message: 'Location is required' });
     
     const sql = `
-        SELECT id, activity_name, shared_price, private_price, location, flight_type, status
+        SELECT id, activity_name, shared_price, private_price, location, flight_type, voucher_type, status
         FROM activity 
         WHERE location = ? AND status = 'Live'
         ORDER BY id ASC
@@ -1377,11 +1409,12 @@ app.post('/api/activity/:id/availabilities', (req, res) => {
         a.available,
         a.flight_types || 'All',
         a.status,
-        a.channels || 'All'
+        a.channels || 'All',
+        a.voucher_types || 'All'
     ]);
     const sql = `
         INSERT INTO activity_availability
-        (activity_id, schedule, date, day_of_week, time, capacity, available, flight_types, status, channels)
+        (activity_id, schedule, date, day_of_week, time, capacity, available, flight_types, status, channels, voucher_types)
         VALUES ?
     `;
     con.query(sql, [values], (err, result) => {
@@ -1408,6 +1441,97 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
         }));
         
         console.log('Availabilities for activity', id, ':', normalizedResult);
+        res.json({ success: true, data: normalizedResult });
+    });
+});
+
+// Get availabilities filtered by location, flight type, and voucher types
+app.get('/api/availabilities/filter', (req, res) => {
+    const { location, flightType, voucherTypes, date, time } = req.query;
+    
+    if (!location) {
+        return res.status(400).json({ success: false, message: 'Location is required' });
+    }
+    
+    // Debug: Log what flight types exist in the database for this location
+    const debugSql = `
+        SELECT DISTINCT aa.flight_types, aa.voucher_types, COUNT(*) as count
+        FROM activity_availability aa 
+        JOIN activity a ON aa.activity_id = a.id 
+        WHERE a.location = ? AND a.status = 'Live' AND aa.status = 'open'
+        GROUP BY aa.flight_types, aa.voucher_types
+    `;
+    
+    con.query(debugSql, [location], (debugErr, debugResult) => {
+        if (!debugErr) {
+            console.log('Available flight_types and voucher_types in database for', location, ':', debugResult);
+        }
+    });
+    
+    let sql = `
+        SELECT aa.*, a.location, a.flight_type, a.voucher_type as activity_voucher_types
+        FROM activity_availability aa 
+        JOIN activity a ON aa.activity_id = a.id 
+        WHERE a.location = ? AND a.status = 'Live' AND aa.status = 'open'
+    `;
+    
+    const params = [location];
+    
+    if (flightType && flightType !== 'All') {
+        sql += ` AND (aa.flight_types = 'All' OR aa.flight_types = ?)`;
+        params.push(flightType);
+    } else {
+        // If no flight type specified, show all flight types
+        sql += ` AND (aa.flight_types = 'All' OR aa.flight_types IS NOT NULL)`;
+    }
+    
+    if (voucherTypes && voucherTypes !== 'All') {
+        sql += ` AND (aa.voucher_types = 'All' OR aa.voucher_types = ?)`;
+        params.push(voucherTypes);
+    } else {
+        // If no voucher type specified, show all voucher types
+        sql += ` AND (aa.voucher_types = 'All' OR aa.voucher_types IS NOT NULL)`;
+    }
+    
+    if (date) {
+        sql += ` AND aa.date = ?`;
+        params.push(date);
+    }
+    
+    if (time) {
+        sql += ` AND aa.time = ?`;
+        params.push(time);
+    }
+    
+    sql += ` ORDER BY aa.date, aa.time`;
+    
+    con.query(sql, params, (err, result) => {
+        if (err) {
+            console.error('Error fetching filtered availabilities:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err });
+        }
+        
+        // Normalize date format to YYYY-MM-DD
+        const normalizedResult = result.map(row => ({
+            ...row,
+            date: row.date ? dayjs(row.date).format('YYYY-MM-DD') : row.date
+        }));
+        
+        console.log('Filtered availabilities:', { 
+            location, 
+            flightType, 
+            voucherTypes, 
+            count: normalizedResult.length,
+            sql: sql,
+            params: params,
+            sampleData: normalizedResult.slice(0, 3).map(r => ({ 
+                id: r.id, 
+                date: r.date, 
+                flight_types: r.flight_types, 
+                voucher_types: r.voucher_types,
+                status: r.status 
+            }))
+        });
         res.json({ success: true, data: normalizedResult });
     });
 });
@@ -1490,6 +1614,32 @@ app.patch('/api/availability/:id/status', (req, res) => {
     });
 });
 
+// Auto-update availability status based on available count
+app.post('/api/updateAvailabilityStatus', (req, res) => {
+    const sql = `
+        UPDATE activity_availability 
+        SET status = CASE 
+            WHEN available = 0 THEN 'Closed'
+            WHEN available > 0 THEN 'Open'
+            ELSE status
+        END
+        WHERE available = 0 OR available > 0
+    `;
+    
+    con.query(sql, (err, result) => {
+        if (err) {
+            console.error('Error auto-updating availability status:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err });
+        }
+        
+        res.json({ 
+            success: true, 
+            message: 'Availability statuses updated automatically',
+            affectedRows: result.affectedRows
+        });
+    });
+});
+
 // Get activity open availabilities
 app.get('/api/activity/:id/open-availabilities', (req, res) => {
     const { id } = req.params;
@@ -1507,6 +1657,18 @@ app.get('/api/activity/:id/open-availabilities', (req, res) => {
         // { date: '2025-07-03', times: ['09:00', '18:00'] } formatına çevir
         const data = Object.entries(grouped).map(([date, times]) => ({ date, times }));
         res.json({ success: true, data });
+    });
+});
+
+// Get activity availabilities for rebooking (only open ones)
+app.get('/api/activity/:id/rebook-availabilities', (req, res) => {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ success: false, message: 'Eksik bilgi!' });
+    // Sadece status = 'Open' olanları al
+    const sql = 'SELECT id, date, time, available, capacity FROM activity_availability WHERE activity_id = ? AND status = "Open" ORDER BY date, time';
+    con.query(sql, [id], (err, result) => {
+        if (err) return res.status(500).json({ success: false, message: 'Database error', error: err });
+        res.json({ success: true, data: result });
     });
 });
 
@@ -1824,10 +1986,65 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
 });
 
+// Function to auto-update availability status
+const updateAvailabilityStatus = async () => {
+    try {
+        const sql = `
+            UPDATE activity_availability 
+            SET status = CASE 
+                WHEN available = 0 THEN 'Closed'
+                WHEN available > 0 THEN 'Open'
+                ELSE status
+            END
+            WHERE available = 0 OR available > 0
+        `;
+        
+        con.query(sql, (err, result) => {
+            if (err) {
+                console.error('Error auto-updating availability status:', err);
+            } else {
+                console.log(`Auto-updated ${result.affectedRows} availability statuses`);
+            }
+        });
+    } catch (error) {
+        console.error('Error in updateAvailabilityStatus:', error);
+    }
+};
+
 // Start the server
 const PORT = process.env.PORT || 3002;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
+    
+    // Run initial availability status update
+    updateAvailabilityStatus();
+    
+    // Set up periodic updates every 5 minutes
+    setInterval(updateAvailabilityStatus, 5 * 60 * 1000);
+});
+
+// Delete a booking by ID (with cascade delete for passengers)
+app.delete('/api/deleteBooking/:id', (req, res) => {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ success: false, message: 'Missing booking id' });
+    
+    // Delete the booking (passengers will be deleted automatically due to ON DELETE CASCADE)
+    const sql = 'DELETE FROM all_booking WHERE id = ?';
+    con.query(sql, [id], (err, result) => {
+        if (err) {
+            console.error('Error deleting booking:', err);
+            return res.status(500).json({ success: false, message: 'Database error' });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Booking not found' });
+        }
+        
+        // Update availability status after booking deletion
+        updateAvailabilityStatus();
+        
+        res.json({ success: true, message: 'Booking deleted successfully' });
+    });
 });
 
 // Delete a date request by ID
