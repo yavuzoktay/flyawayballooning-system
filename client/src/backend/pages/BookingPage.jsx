@@ -4,6 +4,7 @@ import PaginatedTable from "../components/BookingPage/PaginatedTable";
 import { Container, FormControl, InputLabel, MenuItem, OutlinedInput, Select, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Grid, Typography, Box, Divider, IconButton, Table, TableHead, TableRow, TableCell, TableBody } from "@mui/material";
 import dayjs from 'dayjs';
 import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import RebookAvailabilityModal from '../components/BookingPage/RebookAvailabilityModal';
@@ -356,42 +357,101 @@ const BookingPage = () => {
     // Add Guest kaydetme fonksiyonunu güncelle
     const handleSaveGuests = async () => {
         if (!selectedBookingId) return;
-        // Add each guest
-        for (const g of guestForms) {
-            await axios.post('/api/addPassenger', {
-                booking_id: selectedBookingId,
-                first_name: g.firstName,
-                last_name: g.lastName,
-                email: g.email,
-                phone: g.phone,
-                ticket_type: g.ticketType,
-                weight: g.weight
-            });
+        
+        try {
+            // Add each guest and collect updated pax counts
+            let lastUpdatedPax = null;
+            for (const g of guestForms) {
+                const response = await axios.post('/api/addPassenger', {
+                    booking_id: selectedBookingId,
+                    first_name: g.firstName,
+                    last_name: g.lastName,
+                    email: g.email,
+                    phone: g.phone,
+                    ticket_type: g.ticketType,
+                    weight: g.weight
+                });
+                lastUpdatedPax = response.data.updatedPax;
+            }
+            
+            // Fetch updated passengers
+            const res = await axios.get(`/api/getBookingDetail?booking_id=${selectedBookingId}`);
+            const updatedPassengers = res.data.passengers;
+            
+            // Recalculate prices
+            const paid = parseFloat(res.data.booking.paid) || 0;
+            const n = updatedPassengers.length;
+            const perPassenger = n > 0 ? parseFloat((paid / n).toFixed(2)) : 0;
+            
+            // Update all passenger prices in backend
+            await Promise.all(updatedPassengers.map((p) =>
+                axios.patch('/api/updatePassengerField', {
+                    passenger_id: p.id,
+                    field: 'price',
+                    value: perPassenger
+                })
+            ));
+            
+            // Update the booking table with new pax count
+            if (lastUpdatedPax !== null) {
+                setBooking(prev => prev.map(b => 
+                    b.id === selectedBookingId ? { ...b, pax: lastUpdatedPax } : b
+                ));
+                setFilteredData(prev => prev.map(b => 
+                    b.id === selectedBookingId ? { ...b, pax: lastUpdatedPax } : b
+                ));
+            }
+            
+            // Refetch passengers to update UI
+            await fetchPassengers(selectedBookingId);
+            setAddGuestDialogOpen(false);
+        } catch (error) {
+            console.error('Error adding guests:', error);
+            alert('Failed to add guests. Please try again.');
         }
-        // Fetch updated passengers
-        const res = await axios.get(`/api/getBookingDetail?booking_id=${selectedBookingId}`);
-        const updatedPassengers = res.data.passengers;
-        // Recalculate prices
-        const paid = parseFloat(res.data.booking.paid) || 0;
-        const n = updatedPassengers.length;
-        const perPassenger = n > 0 ? parseFloat((paid / n).toFixed(2)) : 0;
-        // Update all passenger prices in backend
-        await Promise.all(updatedPassengers.map((p) =>
-            axios.patch('/api/updatePassengerField', {
-                passenger_id: p.id,
-                field: 'price',
-                value: perPassenger
-            })
-        ));
-        // Refetch passengers to update UI
-        await fetchPassengers(selectedBookingId);
-        setAddGuestDialogOpen(false);
     };
 
     // Passenger listesini güncelleyen fonksiyon
     const fetchPassengers = async (bookingId) => {
         const res = await axios.get(`/api/getBookingDetail?booking_id=${bookingId}`);
         setBookingDetail(res.data);
+    };
+
+    // Delete passenger function
+    const handleDeletePassenger = async (passengerId) => {
+        if (!selectedBookingId || !passengerId) return;
+        
+        if (!window.confirm('Are you sure you want to delete this passenger?')) {
+            return;
+        }
+        
+        try {
+            const response = await axios.delete('/api/deletePassenger', {
+                data: {
+                    passenger_id: passengerId,
+                    booking_id: selectedBookingId
+                }
+            });
+            
+            if (response.data.success) {
+                // Update the booking table with new pax count
+                const updatedPax = response.data.updatedPax;
+                if (updatedPax !== null) {
+                    setBooking(prev => prev.map(b => 
+                        b.id === selectedBookingId ? { ...b, pax: updatedPax } : b
+                    ));
+                    setFilteredData(prev => prev.map(b => 
+                        b.id === selectedBookingId ? { ...b, pax: updatedPax } : b
+                    ));
+                }
+                
+                // Refetch passengers to update UI
+                await fetchPassengers(selectedBookingId);
+            }
+        } catch (error) {
+            console.error('Error deleting passenger:', error);
+            alert('Failed to delete passenger. Please try again.');
+        }
     };
 
     // Edit functions
@@ -1684,6 +1744,15 @@ const BookingPage = () => {
                                                                         <>
                                                                             {p.first_name || '-'} {p.last_name || '-'}{p.weight ? ` (${p.weight}kg${p.price ? ' £' + p.price : ''})` : ''}
                                                                             <IconButton size="small" onClick={() => handleEditPassengerClick(p)}><EditIcon fontSize="small" /></IconButton>
+                                                                            {i > 0 && ( // Only show delete button for additional passengers (not the first one)
+                                                                                <IconButton 
+                                                                                    size="small" 
+                                                                                    onClick={() => handleDeletePassenger(p.id)}
+                                                                                    sx={{ color: 'red' }}
+                                                                                >
+                                                                                    <DeleteIcon fontSize="small" />
+                                                                                </IconButton>
+                                                                            )}
                                                                         </>
                                                                     )}
                                                                 </Typography>

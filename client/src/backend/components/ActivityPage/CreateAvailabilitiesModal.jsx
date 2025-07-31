@@ -36,6 +36,7 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
     const [capacity, setCapacity] = useState(8);
     const [available, setAvailable] = useState(8);
     const [flightTypes, setFlightTypes] = useState(['Shared']); // Default to Shared
+    const [voucherTypes, setVoucherTypes] = useState([]); // Default to empty array
     const [availabilityCount, setAvailabilityCount] = useState(0);
 
     useEffect(() => {
@@ -127,7 +128,8 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
                     available: parseInt(available),
                     status: visibility,
                     channels: 'All',
-                    flight_types: flightTypes.length > 0 ? flightTypes.join(',') : 'All'
+                    flight_types: flightTypes.length > 0 ? flightTypes.join(',') : 'All',
+                    voucher_types: voucherTypes.length > 0 ? voucherTypes.join(',') : 'All'
                 });
             }
             currentDate.setDate(currentDate.getDate() + 1);
@@ -247,6 +249,54 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
                                 />
                             }
                             label="Private Flight"
+                        />
+                    </FormGroup>
+                    <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Voucher Type</div>
+                    <FormGroup row sx={{ mb: 2, mt: 1 }}>
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={voucherTypes.includes('Weekday Morning')}
+                                    onChange={(e) => {
+                                        if (e.target.checked) {
+                                            setVoucherTypes(prev => [...prev, 'Weekday Morning']);
+                                        } else {
+                                            setVoucherTypes(prev => prev.filter(type => type !== 'Weekday Morning'));
+                                        }
+                                    }}
+                                />
+                            }
+                            label="Weekday Morning"
+                        />
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={voucherTypes.includes('Flexible Weekday')}
+                                    onChange={(e) => {
+                                        if (e.target.checked) {
+                                            setVoucherTypes(prev => [...prev, 'Flexible Weekday']);
+                                        } else {
+                                            setVoucherTypes(prev => prev.filter(type => type !== 'Flexible Weekday'));
+                                        }
+                                    }}
+                                />
+                            }
+                            label="Flexible Weekday"
+                        />
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={voucherTypes.includes('Any Day Flight')}
+                                    onChange={(e) => {
+                                        if (e.target.checked) {
+                                            setVoucherTypes(prev => [...prev, 'Any Day Flight']);
+                                        } else {
+                                            setVoucherTypes(prev => prev.filter(type => type !== 'Any Day Flight'));
+                                        }
+                                    }}
+                                />
+                            }
+                            label="Any Day Flight"
                         />
                     </FormGroup>
                     <FormControl fullWidth margin="dense">

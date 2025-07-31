@@ -22,6 +22,7 @@ import {
     Button,
 } from "@mui/material";
 import { MoreVert as MoreVertIcon, Edit as EditIcon } from "@mui/icons-material";
+import DeleteIcon from '@mui/icons-material/Delete';
 import useBooking from "../api/useBooking";
 import usePessanger from "../api/usePessanger";
 import useActivity from "../api/useActivity";
@@ -130,21 +131,23 @@ const Manifest = () => {
 
     // Helper: fetch capacity for a slot
     const [availabilities, setAvailabilities] = useState([]);
-    useEffect(() => {
-        // Fetch all availabilities for all activities on mount
-        async function fetchAllAvailabilities() {
-            if (!Array.isArray(activity)) return;
-            let all = [];
-            for (const act of activity) {
-                try {
-                    const res = await axios.get(`/api/activity/${act.id}/availabilities`);
-                    if (res.data.success && Array.isArray(res.data.data)) {
-                        all = all.concat(res.data.data.map(a => ({ ...a, activity_id: act.id, location: act.location, flight_type: act.flight_type })));
-                    }
-                } catch {}
-            }
-            setAvailabilities(all);
+    
+    // Fetch all availabilities for all activities
+    const fetchAllAvailabilities = async () => {
+        if (!Array.isArray(activity)) return;
+        let all = [];
+        for (const act of activity) {
+            try {
+                const res = await axios.get(`/api/activity/${act.id}/availabilities`);
+                if (res.data.success && Array.isArray(res.data.data)) {
+                    all = all.concat(res.data.data.map(a => ({ ...a, activity_id: act.id, location: act.location, flight_type: act.flight_type })));
+                }
+            } catch {}
         }
+        setAvailabilities(all);
+    };
+    
+    useEffect(() => {
         fetchAllAvailabilities();
     }, [activity]);
 
@@ -349,6 +352,32 @@ const Manifest = () => {
         }
     };
 
+    // Delete passenger function
+    const handleDeletePassenger = async (passengerId) => {
+        if (!bookingDetail?.booking?.id || !passengerId) return;
+        
+        if (!window.confirm('Are you sure you want to delete this passenger?')) {
+            return;
+        }
+        
+        try {
+            const response = await axios.delete('/api/deletePassenger', {
+                data: {
+                    passenger_id: passengerId,
+                    booking_id: bookingDetail.booking.id
+                }
+            });
+            
+            if (response.data.success) {
+                // Refetch passengers to update UI
+                await fetchBookingDetail(bookingDetail.booking.id);
+            }
+        } catch (error) {
+            console.error('Error deleting passenger:', error);
+            alert('Failed to delete passenger. Please try again.');
+        }
+    };
+
     const handleEditClick = (field, currentValue) => {
         setEditField(field);
         setEditValue(currentValue || '');
@@ -517,13 +546,40 @@ const Manifest = () => {
                 additionalInfo: { notes: bookingDetail.booking.additional_notes || '' },
                 voucher_code: bookingDetail.booking.voucher_code || null
             };
-            await axios.post('/api/createBooking', payload);
+            // First delete the old booking
+            await axios.delete(`/api/deleteBooking/${bookingDetail.booking.id}`);
+            // Then create the new booking
+            const createResponse = await axios.post('/api/createBooking', payload);
+            
+            // Clear all states
             setRebookModalOpen(false);
             setDetailDialogOpen(false);
-            // Tabloyu güncelle
+            setSelectedBookingId(null);
+            setBookingDetail(null);
+            setBookingHistory([]);
+            
+            // Force refresh all data
             if (typeof bookingHook.refetch === 'function') {
                 await bookingHook.refetch();
             }
+            
+            // Also refresh passenger data
+            if (typeof pessangerHook.refetch === 'function') {
+                await pessangerHook.refetch();
+            }
+            
+            // Refresh availabilities
+            await fetchAllAvailabilities();
+            
+            // Force re-render by updating flights state
+            setTimeout(() => {
+                if (typeof bookingHook.refetch === 'function') {
+                    bookingHook.refetch();
+                }
+            }, 500);
+            
+            // Show success message
+            alert('Booking successfully rebooked!');
         } catch (err) {
             alert('Rebooking failed!');
         } finally {
@@ -784,8 +840,8 @@ const Manifest = () => {
         // Fetch activity id by location and flight_type
         const res = await axios.post("/api/getActivityId", { location: group.location });
         const activity = res.data.activity;
-        // Fetch availabilities for this activity
-        const availRes = await axios.get(`/api/activity/${activity.id}/availabilities`);
+        // Fetch only open availabilities for this activity
+        const availRes = await axios.get(`/api/activity/${activity.id}/rebook-availabilities`);
         setBookingAvailabilities(availRes.data.data || []);
       } catch (err) {
         setBookingModalError("Failed to fetch availabilities");
@@ -1338,8 +1394,17 @@ const Manifest = () => {
                                                                 </>
                                                             ) : (
                                                                 <>
-                                                                    {p.first_name || '-'} {p.last_name || '-'}{p.weight ? ` (${p.weight}kg${p.price ? ' £' + p.price : ''})` : ''}
-                                                                    <IconButton size="small" onClick={() => handleEditPassengerClick(p)}><EditIcon fontSize="small" /></IconButton>
+                                                                                                                                          {p.first_name || '-'} {p.last_name || '-'}{p.weight ? ` (${p.weight}kg${p.price ? ' £' + p.price : ''})` : ''}
+                                                                      <IconButton size="small" onClick={() => handleEditPassengerClick(p)}><EditIcon fontSize="small" /></IconButton>
+                                                                      {i > 0 && ( // Only show delete button for additional passengers (not the first one)
+                                                                          <IconButton 
+                                                                              size="small" 
+                                                                              onClick={() => handleDeletePassenger(p.id)}
+                                                                              sx={{ color: 'red' }}
+                                                                          >
+                                                                              <DeleteIcon fontSize="small" />
+                                                                          </IconButton>
+                                                                      )}
                                                                 </>
                                                             )}
                                                         </Typography>
