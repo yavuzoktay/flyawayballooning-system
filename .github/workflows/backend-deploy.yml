@@ -67,5 +67,5 @@ jobs:
             pm2 delete flyawayballooning-server 2>/dev/null || true &&
             PORT=3002 pm2 start index.js --name flyawayballooning-server &&
             pm2 save &&
-            pm2 startup systemd -u ec2-user --hp /home/ec2-user
+            sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u ec2-user --hp /home/ec2-user || true
           ' 
