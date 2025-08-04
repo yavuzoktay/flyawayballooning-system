@@ -146,7 +146,7 @@ const ActivityAvailabilitiesPage = () => {
                             <TableCell>
                                 {row.date ? (
                                     <a
-                                        href={`http://http://34.205.25.8:3000/manifest?date=${dayjs(row.date).format('YYYY-MM-DD')}`}
+                                        href={`http://http://34.205.25.8:3002/manifest?date=${dayjs(row.date).format('YYYY-MM-DD')}`}
                                         style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
                                         onClick={e => e.stopPropagation()}
                                     >
