@@ -15,7 +15,7 @@ dotenv.config();
 
 // Enable CORS
 app.use(cors({
-    origin: ['https://flyawayballooning-book.com', 'http://localhost:3000'], // Production ve development
+    origin: ['https://flyawayballooning-book.com', 'http://localhost:3000', 'http://34.205.25.8:3002'], // Production ve development
     methods: "GET,POST,PUT,DELETE",
     credentials: true
 }));
@@ -274,6 +274,10 @@ app.get("/api/getfilteredBookings", (req, res) => {
 
 // Get All Booking Data
 app.get("/api/getAllBookingData", (req, res) => {
+    console.log('getAllBookingData endpoint hit!');
+    console.log('Request headers:', req.headers);
+    console.log('Request query:', req.query);
+    
     const { flightType, location, search, status } = req.query;
 
     let sql = "SELECT * FROM all_booking";
@@ -345,6 +349,8 @@ app.get("/api/getAllBookingData", (req, res) => {
             return res.status(500).send({ success: false, message: "Database query failed" });
         }
         
+        console.log('Query result count:', result ? result.length : 0);
+        
         // Debug: İlk birkaç kaydın created_at değerlerini göster
         if (result && result.length > 0) {
             console.log('Sample created_at values:');
@@ -382,8 +388,10 @@ app.get("/api/getAllBookingData", (req, res) => {
                     preferred_day: row.preferred_day || null
                 };
             });
+            console.log('Sending response with', formatted.length, 'records');
             res.send({ success: true, data: formatted });
         } else {
+            console.log('No bookings found, sending empty response');
             res.send({ success: false, message: "No bookings found" });
         }
     });
