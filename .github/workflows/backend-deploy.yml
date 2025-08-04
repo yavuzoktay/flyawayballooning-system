@@ -52,7 +52,7 @@ jobs:
         run: |
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > deploy_key
           chmod 600 deploy_key
-          ssh -i deploy_key -o StrictHostKeyChecking=no ec2-user@http://3.86.214.48 '
+          ssh -i deploy_key -o StrictHostKeyChecking=no ec2-user@http://34.205.25.8 '
             mkdir -p ~/flyawayballooning-system-backend &&
             cd ~/flyawayballooning-system-backend &&
             aws s3 cp s3://flyawayballooning-backend/backend-deploy.zip . &&
