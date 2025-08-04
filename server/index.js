@@ -15,10 +15,88 @@ dotenv.config();
 
 // Enable CORS
 app.use(cors({
-    origin: process.env.FRONTEND_URL || '*', // Environment'a göre frontend domaini
+    origin: ['https://flyawayballooning-book.com', 'http://localhost:3000'], // Production ve development
     methods: "GET,POST,PUT,DELETE",
     credentials: true
 }));
+
+// Stripe Webhook endpoint - EN ÜSTTE OLMALI (body parsing'den önce)
+app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (req, res) => {
+    console.log('Stripe webhook endpoint hit!');
+    
+    const sig = req.headers['stripe-signature'];
+    let event;
+    
+    try {
+        // Webhook signature verification
+        event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+        console.log('Webhook signature verified successfully');
+    } catch (err) {
+        console.error('Webhook signature verification failed:', err.message);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+    
+    try {
+        if (event.type === 'checkout.session.completed') {
+            const session = event.data.object;
+            console.log('Checkout session completed:', session.id);
+            
+            const session_id = session.id;
+            console.log('Using session ID:', session_id);
+            
+            const storeData = stripeSessionStore[session_id];
+            if (!storeData) {
+                console.error('Stripe session store data not found for session_id:', session_id);
+                return res.status(400).send('Session data not found');
+            }
+            
+            // Duplicate kontrolü - aynı session için birden fazla işlem yapılmasını engelle
+            if (storeData.processed) {
+                console.log('Session already processed, skipping:', session_id);
+                return res.json({received: true, message: 'Session already processed'});
+            }
+            
+            // Session ID kontrolü - session data var mı kontrol et
+            if (!storeData.bookingData && !storeData.voucherData) {
+                console.log('No booking/voucher data found for session:', session_id);
+                return res.status(400).send('No booking/voucher data found');
+            }
+            
+            // İşlem başlamadan önce processed flag'ini set et
+            storeData.processed = true;
+            
+            console.log('Processing webhook for session:', session_id, 'Type:', storeData.type);
+            
+            try {
+                if (storeData.type === 'booking') {
+                    console.log('Creating booking via webhook:', storeData.bookingData);
+                    // Direct database insertion instead of HTTP call
+                    await createBookingFromWebhook(storeData.bookingData);
+                } else if (storeData.type === 'voucher') {
+                    console.log('Creating voucher via webhook:', storeData.voucherData);
+                    // Direct database insertion instead of HTTP call
+                    await createVoucherFromWebhook(storeData.voucherData);
+                }
+                
+                // Session data temizle
+                delete stripeSessionStore[session_id];
+                console.log('Session data cleaned up for:', session_id);
+            } catch (error) {
+                console.error('Error processing webhook:', error);
+                // Hata durumunda processed flag'ini geri al
+                storeData.processed = false;
+                throw error;
+            }
+        }
+        
+        res.json({received: true});
+    } catch (err) {
+        console.error('Stripe webhook processing error:', err);
+        res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+});
+
+// Body parsing middleware - webhook'tan SONRA
 app.use(express.json()); // To parse JSON-encoded request bodies
 app.use(express.urlencoded({ extended: true })); // To parse URL-encoded request bodies
 
@@ -2064,6 +2142,207 @@ app.delete('/api/date-requests/:id', (req, res) => {
 // Geçici Stripe session verisi için bellek içi bir store
 const stripeSessionStore = {};
 
+// Webhook için booking oluşturma fonksiyonu
+async function createBookingFromWebhook(bookingData) {
+    return new Promise((resolve, reject) => {
+        function emptyToNull(val) {
+            if (val === '' || val === undefined || val === null) {
+                return null;
+            }
+            if (typeof val === 'object' && Object.keys(val).length === 0) {
+                return null;
+            }
+            return val;
+        }
+        
+        let {
+            activitySelect,
+            chooseLocation,
+            chooseFlightType,
+            chooseAddOn,
+            choose_add_on,
+            passengerData,
+            additionalInfo,
+            recipientDetails,
+            selectedDate,
+            selectedTime,
+            totalPrice,
+            voucher_code,
+            flight_attempts,
+            preferred_location,
+            preferred_time,
+            preferred_day
+        } = bookingData;
+
+        // Unify add-on field
+        if (!choose_add_on && chooseAddOn) {
+            choose_add_on = chooseAddOn;
+        }
+        if (!Array.isArray(choose_add_on)) {
+            choose_add_on = [];
+        } else {
+            choose_add_on = choose_add_on.filter(a => a && a.name);
+        }
+
+        // Basic validation
+        if (!chooseLocation || !chooseFlightType || !passengerData) {
+            return reject(new Error('Missing required booking information.'));
+        }
+
+        const passengerName = `${passengerData[0].firstName} ${passengerData[0].lastName}`;
+        const now = moment();
+        let expiresDate = null;
+
+        function insertBookingAndPassengers(expiresDateFinal) {
+            const nowDate = moment().format('YYYY-MM-DD HH:mm:ss');
+            const mainPassenger = passengerData[0] || {};
+            
+            let bookingDateTime = selectedDate;
+            if (selectedTime && selectedDate) {
+                let datePart = selectedDate;
+                if (typeof selectedDate === 'string' && selectedDate.includes(' ')) {
+                    datePart = selectedDate.split(' ')[0];
+                } else if (typeof selectedDate === 'string' && selectedDate.length > 10) {
+                    datePart = selectedDate.substring(0, 10);
+                }
+                bookingDateTime = `${datePart} ${selectedTime}`;
+            }
+
+            let choose_add_on_str = '';
+            if (Array.isArray(choose_add_on) && choose_add_on.length > 0) {
+                choose_add_on_str = choose_add_on.map(a => a && a.name ? a.name : '').filter(Boolean).join(', ');
+            }
+
+            const bookingSql = `
+                INSERT INTO all_booking (
+                    name, flight_type, flight_date, pax, location, status, paid, due,
+                    voucher_code, created_at, expires, additional_notes, hear_about_us,
+                    ballooning_reason, prefer, weight, email, phone, choose_add_on,
+                    preferred_location, preferred_time, preferred_day
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+
+            const bookingValues = [
+                passengerName,
+                chooseFlightType.type,
+                bookingDateTime,
+                passengerData.length,
+                chooseLocation,
+                'Confirmed',
+                totalPrice,
+                0,
+                voucher_code || null,
+                nowDate,
+                expiresDateFinal,
+                emptyToNull(additionalInfo?.notes),
+                emptyToNull(additionalInfo?.hearAboutUs),
+                emptyToNull(additionalInfo?.reason),
+                emptyToNull(additionalInfo?.prefer),
+                emptyToNull(mainPassenger.weight),
+                emptyToNull(mainPassenger.email),
+                emptyToNull(mainPassenger.phone),
+                emptyToNull(choose_add_on_str),
+                emptyToNull(preferred_location),
+                emptyToNull(preferred_time),
+                emptyToNull(preferred_day)
+            ];
+
+            con.query(bookingSql, bookingValues, (err, result) => {
+                if (err) {
+                    console.error('Webhook booking insertion error:', err);
+                    return reject(err);
+                }
+                console.log('Webhook booking created successfully, ID:', result.insertId);
+                resolve(result.insertId);
+            });
+        }
+
+        // Calculate expires date
+        if (chooseFlightType.type === 'Private Charter') {
+            expiresDate = now.add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+        } else {
+            expiresDate = now.add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
+        }
+
+        insertBookingAndPassengers(expiresDate);
+    });
+}
+
+// Webhook için voucher oluşturma fonksiyonu
+async function createVoucherFromWebhook(voucherData) {
+    return new Promise((resolve, reject) => {
+        function emptyToNull(val) {
+            if (val === '' || val === undefined || val === null) {
+                return null;
+            }
+            if (typeof val === 'object' && Object.keys(val).length === 0) {
+                return null;
+            }
+            return val;
+        }
+        
+        const {
+            name = '',
+            weight = '',
+            flight_type = '',
+            voucher_type = '',
+            email = '',
+            phone = '',
+            mobile = '',
+            expires = '',
+            redeemed = 'No',
+            paid = 0,
+            offer_code = '',
+            voucher_ref = '',
+            recipient_name = '',
+            recipient_email = '',
+            recipient_phone = '',
+            recipient_gift_date = '',
+            preferred_location = '',
+            preferred_time = '',
+            preferred_day = ''
+        } = voucherData;
+
+        const now = moment().format('YYYY-MM-DD HH:mm:ss');
+        let expiresFinal = expires && expires !== '' ? expires : moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+
+        const insertSql = `INSERT INTO all_vouchers 
+            (name, weight, flight_type, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const values = [
+            emptyToNull(name),
+            emptyToNull(weight),
+            emptyToNull(flight_type),
+            emptyToNull(voucher_type),
+            emptyToNull(email),
+            emptyToNull(phone),
+            emptyToNull(mobile),
+            emptyToNull(expiresFinal),
+            emptyToNull(redeemed),
+            paid,
+            emptyToNull(offer_code),
+            emptyToNull(voucher_ref),
+            now,
+            emptyToNull(recipient_name),
+            emptyToNull(recipient_email),
+            emptyToNull(recipient_phone),
+            emptyToNull(recipient_gift_date),
+            emptyToNull(preferred_location),
+            emptyToNull(preferred_time),
+            emptyToNull(preferred_day)
+        ];
+        
+        con.query(insertSql, values, (err, result) => {
+            if (err) {
+                console.error('Webhook voucher insertion error:', err);
+                return reject(err);
+            }
+            console.log('Webhook voucher created successfully, ID:', result.insertId);
+            resolve(result.insertId);
+        });
+    });
+}
+
 // Stripe Checkout Session oluşturma endpointini güncelle
 app.post('/api/create-checkout-session', async (req, res) => {
     try {
@@ -2089,11 +2368,9 @@ app.post('/api/create-checkout-session', async (req, res) => {
                 },
             ],
             mode: 'payment',
-            success_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/?payment=success`,
-            cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/?payment=cancel`,
-            metadata: {
-                session_id: '' // Sonradan doldurulacak
-            }
+            success_url: `https://flyawayballooning-book.com/?payment=success`,
+            cancel_url: `https://flyawayballooning-book.com/?payment=cancel`,
+            metadata: {}
         });
         // bookingData veya voucherData'yı session_id ile store'da sakla
         const session_id = session.id;
@@ -2113,33 +2390,4 @@ app.post('/api/create-checkout-session', async (req, res) => {
     }
 });
 
-// Stripe Webhook endpoint EN ÜSTE ALINDI
-app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (req, res) => {
-    console.log('Stripe webhook endpoint hit!');
-    try {
-        const event = JSON.parse(req.body);
-        if (event.type === 'checkout.session.completed') {
-            const session = event.data.object;
-            const session_id = session.metadata.session_id;
-            const storeData = stripeSessionStore[session_id];
-            if (!storeData) {
-                console.error('Stripe session store data not found for session_id:', session_id);
-                return res.status(400).send('Session data not found');
-            }
-            if (storeData.type === 'booking') {
-                const axios = require('axios');
-                await axios.post(`http://localhost:${PORT}/api/createBooking`, storeData.bookingData);
-                console.log('Booking created via webhook:', storeData.bookingData);
-            } else if (storeData.type === 'voucher') {
-                const axios = require('axios');
-                await axios.post(`http://localhost:${PORT}/api/createVoucher`, storeData.voucherData);
-                console.log('Voucher created via webhook:', storeData.voucherData);
-            }
-            delete stripeSessionStore[session_id];
-        }
-        res.json({received: true});
-    } catch (err) {
-        console.error('Stripe webhook error:', err);
-        res.status(400).send(`Webhook Error: ${err.message}`);
-    }
-});
+
