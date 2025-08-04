@@ -150,7 +150,7 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                                                     const urlDate = `${year}-${month}-${day}`;
                                                     return (
                                                         <a
-                                                            href={`http://34.205.25.8:3000/manifest?date=${urlDate}`}
+                                                            href={`http://34.205.25.8:3002/manifest?date=${urlDate}`}
                                                             style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
                                                             target="_self"
                                                             rel="noopener noreferrer"
