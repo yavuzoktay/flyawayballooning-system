@@ -63,16 +63,22 @@ jobs:
             aws s3 cp s3://flyawayballooning-backend/backend-deploy.zip . &&
             echo "Extracting deployment package..." &&
             unzip -o backend-deploy.zip -d . &&
+            echo "Fixing file permissions..." &&
+            sudo chown -R ec2-user:ec2-user . &&
+            sudo chmod -R 755 . &&
             echo "Checking extracted files..." &&
             ls -la &&
             if [ -d "client/build" ]; then
               echo "=== Deploying client build files ===" &&
               echo "Removing old public directory..." &&
-              rm -rf server/public &&
+              sudo rm -rf server/public &&
               echo "Creating new public directory..." &&
               mkdir -p server/public &&
               echo "Copying client build files..." &&
               cp -r client/build/* server/public/ &&
+              echo "Fixing public directory permissions..." &&
+              sudo chown -R ec2-user:ec2-user server/public &&
+              sudo chmod -R 755 server/public &&
               echo "Client build files deployed successfully" &&
               echo "Contents of server/public:" &&
               ls -la server/public/ &&
@@ -87,6 +93,7 @@ jobs:
             echo "=== Restarting PM2 server ===" &&
             if ! command -v pm2 > /dev/null; then sudo npm install -g pm2; fi &&
             pm2 delete flyawayballooning-server 2>/dev/null || true &&
+            pm2 kill || true &&
             PORT=3002 pm2 start index.js --name flyawayballooning-server &&
             pm2 save &&
             sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u ec2-user --hp /home/ec2-user || true &&
