@@ -105,6 +105,18 @@ jobs:
             sudo systemctl restart nginx &&
             echo "=== Checking Nginx status ===" &&
             sudo systemctl status nginx --no-pager &&
+            echo "Fixing Nginx configuration..." &&
+            sudo chown -R nginx:nginx /home/ec2-user/flyawayballooning-system-backend/server/public &&
+            sudo chmod -R 755 /home/ec2-user/flyawayballooning-system-backend/server/public &&
+            echo "Checking Nginx configuration..." &&
+            sudo nginx -t &&
+            echo "Nginx configuration is valid" &&
+            echo "Checking PM2 processes..." &&
+            pm2 list &&
+            echo "Checking if backend is responding..." &&
+            curl -s http://localhost:3002/api/health || echo "Backend not responding on port 3002" &&
+            echo "Checking Nginx error logs..." &&
+            sudo tail -10 /var/log/nginx/error.log &&
             echo "Re-enabling SELinux..." &&
             sudo setenforce 1 2>/dev/null || true &&
             echo "=== Deployment completed successfully! ==="
