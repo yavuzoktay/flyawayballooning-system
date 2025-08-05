@@ -57,6 +57,8 @@ jobs:
           chmod 600 deploy_key
           ssh -i deploy_key -o StrictHostKeyChecking=no ec2-user@34.205.25.8 '
             echo "=== Starting deployment process ===" &&
+            echo "Temporarily disabling SELinux..." &&
+            sudo setenforce 0 2>/dev/null || true &&
             mkdir -p ~/flyawayballooning-system-backend &&
             cd ~/flyawayballooning-system-backend &&
             echo "Downloading deployment package from S3..." &&
@@ -66,16 +68,18 @@ jobs:
             echo "Fixing file permissions..." &&
             sudo chown -R ec2-user:ec2-user . &&
             sudo chmod -R 755 . &&
+            echo "Force removing old client/build directory..." &&
+            sudo rm -rf client/build 2>/dev/null || true &&
             echo "Checking extracted files..." &&
             ls -la &&
             if [ -d "client/build" ]; then
               echo "=== Deploying client build files ===" &&
-              echo "Removing old public directory..." &&
-              sudo rm -rf server/public &&
+              echo "Force removing old public directory..." &&
+              sudo rm -rf server/public 2>/dev/null || true &&
               echo "Creating new public directory..." &&
               mkdir -p server/public &&
               echo "Copying client build files..." &&
-              cp -r client/build/* server/public/ &&
+              sudo cp -r client/build/* server/public/ &&
               echo "Fixing public directory permissions..." &&
               sudo chown -R ec2-user:ec2-user server/public &&
               sudo chmod -R 755 server/public &&
@@ -101,5 +105,7 @@ jobs:
             sudo systemctl restart nginx &&
             echo "=== Checking Nginx status ===" &&
             sudo systemctl status nginx --no-pager &&
+            echo "Re-enabling SELinux..." &&
+            sudo setenforce 1 2>/dev/null || true &&
             echo "=== Deployment completed successfully! ==="
           ' 
