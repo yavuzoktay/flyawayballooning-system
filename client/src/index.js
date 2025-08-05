@@ -6,7 +6,7 @@ import reportWebVitals from './reportWebVitals';
 import axios from 'axios';
 
 // Configure axios defaults to prevent 431 errors
-axios.defaults.baseURL = 'http://34.205.25.8:3002';
+axios.defaults.baseURL = 'https://flyawayballooning-system.com';
 axios.defaults.timeout = 30000;
 axios.defaults.maxContentLength = 50 * 1024 * 1024; // 50MB
 axios.defaults.maxBodyLength = 50 * 1024 * 1024; // 50MB
