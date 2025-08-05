@@ -124,7 +124,7 @@ jobs:
             echo "Fixing Nginx configuration..." &&
             sudo cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.backup &&
             echo "Creating correct Nginx configuration..." &&
-            echo "events { worker_connections 1024; } http { include /etc/nginx/mime.types; default_type application/octet-stream; sendfile on; keepalive_timeout 65; server { listen 80; server_name flyawayballooning-system.com www.flyawayballooning-system.com; location / { root /home/ec2-user/flyawayballooning-system-backend/server/public; try_files \$uri \$uri/ /index.html; index index.html; } location /api/ { proxy_pass http://127.0.0.1:3002; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection 'upgrade'; proxy_set_header Host \$host; proxy_set_header X-Real-IP \$remote_addr; proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for; proxy_set_header X-Forwarded-Proto \$scheme; proxy_cache_bypass \$http_upgrade; proxy_connect_timeout 60s; proxy_send_timeout 60s; proxy_read_timeout 60s; } location /uploads/ { alias /home/ec2-user/flyawayballooning-system-backend/server/uploads/; } } }" | sudo tee /etc/nginx/nginx.conf > /dev/null &&
+            sudo cp nginx.conf /etc/nginx/nginx.conf
             echo "Testing Nginx configuration..." &&
             sudo nginx -t &&
             echo "Restarting Nginx with new configuration..." &&
