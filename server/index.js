@@ -15,8 +15,17 @@ dotenv.config();
 
 // Enable CORS
 app.use(cors({
-    origin: ['https://flyawayballooning-book.com', 'http://localhost:3000', 'https://flyawayballooning-system.com'], // Production ve development
-    methods: "GET,POST,PUT,DELETE",
+    origin: [
+        'https://flyawayballooning-book.com', 
+        'http://flyawayballooning-book.com',
+        'https://flyawayballooning-system.com', 
+        'http://flyawayballooning-system.com',
+        'http://localhost:3000', 
+        'http://localhost:3001',
+        'http://34.205.25.8:3002'
+    ],
+    methods: "GET,POST,PUT,DELETE,OPTIONS",
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     credentials: true
 }));
 
