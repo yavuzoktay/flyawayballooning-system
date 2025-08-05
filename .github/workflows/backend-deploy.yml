@@ -15,7 +15,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v2
       with:
-        node-version: '18'
+        node-version: '20'
         
     - name: Install Dependencies (Backend)
       run: |
@@ -32,9 +32,9 @@ jobs:
         echo "Build completed. Checking build output..."
         ls -la build/
         
-          - name: Create deployment package (server + client/build + nginx.conf)
-        run: |
-          zip -r backend-deploy.zip server client/build nginx.conf
+    - name: Create deployment package (server + client/build + nginx.conf)
+      run: |
+        zip -r backend-deploy.zip server client/build nginx.conf
         
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
