@@ -29,6 +29,11 @@ app.use(cors({
     credentials: true
 }));
 
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
 // Stripe Webhook endpoint - EN ÜSTTE OLMALI (body parsing'den önce)
 app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (req, res) => {
     console.log('Stripe webhook endpoint hit!');
