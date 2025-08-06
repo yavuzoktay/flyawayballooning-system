@@ -1,108 +1,156 @@
-import React, { useEffect, useState } from 'react';
-import { Box, Grid, Card, CardContent, Typography } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Grid,
+  CircularProgress,
+  Alert
+} from '@mui/material';
+import {
+  TrendingUp as TrendingUpIcon,
+  People as PeopleIcon,
+  Flight as FlightIcon,
+  AttachMoney as MoneyIcon
+} from '@mui/icons-material';
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL;
+const AnalyticsDashboard = () => {
+  const [analytics, setAnalytics] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
+  useEffect(() => {
+    fetchAnalytics();
+  }, []);
 
-const AnalyticsDashboard = ({ dateRange }) => {
-    const [analytics, setAnalytics] = useState(null);
-    const [loading, setLoading] = useState(false);
+  const fetchAnalytics = async () => {
+    try {
+      const response = await axios.get('/api/analytics');
+      setAnalytics(response.data);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+      setError('Failed to load analytics data');
+      setLoading(false);
+    }
+  };
 
-    useEffect(() => {
-        setLoading(true);
-        axios.get(`http://34.205.25.8:3002/api/analytics`, {
-            params: {
-                start_date: dateRange.start,
-                end_date: dateRange.end
-            }
-        }).then(res => {
-            setAnalytics(res.data);
-        }).finally(() => setLoading(false));
-    }, [dateRange]);
-
-    if (loading || !analytics) return <Typography>Loading analytics...</Typography>;
-
+  if (loading) {
     return (
-        <Box sx={{ mt: 4 }}>
-            <Grid container spacing={2}>
-                {/* Booking Attempts */}
-                <Grid item xs={12} md={2.4}>
-                    <Card>
-                        <CardContent>
-                            <Typography variant="h6">Booking Attempts</Typography>
-                            <Typography>1st attempt: <span style={{color:'#2ecc71'}}>{analytics?.bookingAttempts?.first || 0}%</span></Typography>
-                            <Typography>2nd attempt: <span style={{color:'#27ae60'}}>{analytics?.bookingAttempts?.second || 0}%</span></Typography>
-                            <Typography>3rd attempt: <span style={{color:'#f1c40f'}}>{analytics?.bookingAttempts?.third || 0}%</span></Typography>
-                            <Typography>4th attempt: <span style={{color:'#e67e22'}}>{analytics?.bookingAttempts?.fourth || 0}%</span></Typography>
-                            <Typography>5th attempt: <span style={{color:'#e74c3c'}}>{analytics?.bookingAttempts?.fifth || 0}%</span></Typography>
-                            <Typography>6+ attempts: <span style={{color:'#c0392b'}}>{analytics?.bookingAttempts?.sixthPlus || 0}%</span></Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-                {/* Sales by Source */}
-                <Grid item xs={12} md={2.4}>
-                    <Card>
-                        <CardContent>
-                            <Typography variant="h6">Sales by Source</Typography>
-                            {analytics?.salesBySource?.map((s, i) => (
-                                <Typography key={i}>{s.source}: <span style={{color:'#2980b9'}}>{s.percent}%</span></Typography>
-                            )) || <Typography>No data available</Typography>}
-                        </CardContent>
-                    </Card>
-                </Grid>
-                {/* Non Redemption & Add Ons */}
-                <Grid item xs={12} md={2.4}>
-                    <Card>
-                        <CardContent>
-                            <Typography variant="h6">Non Redemption</Typography>
-                            <Typography>{analytics?.nonRedemption?.value || 0} ({analytics?.nonRedemption?.percent || 0}%)</Typography>
-                            <Typography variant="h6" sx={{ mt: 2 }}>Add On's</Typography>
-                            {analytics?.addOns?.map((a, i) => (
-                                <Typography key={i}>{a.name}: <span style={{color:'#16a085'}}>£{a.value}</span></Typography>
-                            )) || <Typography>No data available</Typography>}
-                        </CardContent>
-                    </Card>
-                </Grid>
-                {/* Sales by Location & Booking Type */}
-                <Grid item xs={12} md={2.4}>
-                    <Card>
-                        <CardContent>
-                            <Typography variant="h6">Sales by Location</Typography>
-                            {analytics?.salesByLocation?.map((l, i) => (
-                                <Typography key={i}>{l.location}: <span style={{color:'#8e44ad'}}>{l.percent}%</span></Typography>
-                            )) || <Typography>No data available</Typography>}
-                            <Typography variant="h6" sx={{ mt: 2 }}>Sales by Booking Type</Typography>
-                            {analytics?.salesByBookingType?.map((b, i) => (
-                                <Typography key={i}>{b.type}: <span style={{color:'#27ae60'}}>{b.percent}%</span></Typography>
-                            )) || <Typography>No data available</Typography>}
-                        </CardContent>
-                    </Card>
-                </Grid>
-                {/* Liability & Flown Flights */}
-                <Grid item xs={12} md={2.4}>
-                    <Card>
-                        <CardContent>
-                            <Typography variant="h6">Liability by Location</Typography>
-                            {analytics?.liabilityByLocation?.map((l, i) => (
-                                <Typography key={i}>{l.location}: <span style={{color:'#e67e22'}}>£{l.value}</span></Typography>
-                            )) || <Typography>No data available</Typography>}
-                            <Typography variant="h6" sx={{ mt: 2 }}>Liability by Flight Type</Typography>
-                            {analytics?.liabilityByFlightType?.map((l, i) => (
-                                <Typography key={i}>{l.type}: <span style={{color:'#e67e22'}}>£{l.value}</span></Typography>
-                            )) || <Typography>No data available</Typography>}
-                            <Typography variant="h6" sx={{ mt: 2 }}>Refundable Liability</Typography>
-                            <Typography><span style={{color:'#16a085'}}>£{analytics?.refundableLiability || 0}</span></Typography>
-                            <Typography variant="h6" sx={{ mt: 2 }}>Flown Flights by Location</Typography>
-                            {analytics?.flownFlightsByLocation?.map((f, i) => (
-                                <Typography key={i}>{f.location}: <span style={{color:'#2980b9'}}>{f.count}</span></Typography>
-                            )) || <Typography>No data available</Typography>}
-                        </CardContent>
-                    </Card>
-                </Grid>
-            </Grid>
-        </Box>
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
     );
+  }
+
+  if (error) {
+    return (
+      <Alert severity="error" sx={{ mb: 2 }}>
+        {error}
+      </Alert>
+    );
+  }
+
+  if (!analytics) {
+    return (
+      <Alert severity="info">
+        No analytics data available
+      </Alert>
+    );
+  }
+
+  const metrics = [
+    {
+      title: 'Total Bookings',
+      value: analytics.totalBookings || 0,
+      icon: <PeopleIcon />,
+      color: '#1976d2'
+    },
+    {
+      title: 'Active Flights',
+      value: analytics.activeFlights || 0,
+      icon: <FlightIcon />,
+      color: '#2e7d32'
+    },
+    {
+      title: 'Revenue',
+      value: `$${(analytics.totalRevenue || 0).toLocaleString()}`,
+      icon: <MoneyIcon />,
+      color: '#ed6c02'
+    },
+    {
+      title: 'Growth Rate',
+      value: `${(analytics.growthRate || 0).toFixed(1)}%`,
+      icon: <TrendingUpIcon />,
+      color: '#9c27b0'
+    }
+  ];
+
+  return (
+    <Box>
+      <Typography variant="h4" gutterBottom>
+        Analytics Dashboard
+      </Typography>
+      
+      <Grid container spacing={3}>
+        {metrics.map((metric, index) => (
+          <Grid item xs={12} sm={6} md={3} key={index}>
+            <Card>
+              <CardContent>
+                <Box display="flex" alignItems="center" justifyContent="space-between">
+                  <Box>
+                    <Typography color="textSecondary" gutterBottom>
+                      {metric.title}
+                    </Typography>
+                    <Typography variant="h4" component="div">
+                      {metric.value}
+                    </Typography>
+                  </Box>
+                  <Box
+                    sx={{
+                      color: metric.color,
+                      fontSize: '2rem'
+                    }}
+                  >
+                    {metric.icon}
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+
+      {analytics.recentBookings && analytics.recentBookings.length > 0 && (
+        <Box mt={4}>
+          <Typography variant="h5" gutterBottom>
+            Recent Bookings
+          </Typography>
+          <Grid container spacing={2}>
+            {analytics.recentBookings.slice(0, 6).map((booking, index) => (
+              <Grid item xs={12} sm={6} md={4} key={index}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom>
+                      {booking.customerName}
+                    </Typography>
+                    <Typography color="textSecondary">
+                      {booking.activityName}
+                    </Typography>
+                    <Typography variant="body2">
+                      {new Date(booking.bookingDate).toLocaleDateString()}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+      )}
+    </Box>
+  );
 };
 
 export default AnalyticsDashboard; 
