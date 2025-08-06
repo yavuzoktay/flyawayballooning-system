@@ -171,7 +171,8 @@ const BookingPage = () => {
                 try {
                     const resp = await axios.get(`/api/getAllVoucherData`);
                     setVoucher(resp.data.data || []);
-                    setFilteredData((resp.data.data || []).map(item => ({
+                    const voucherData = Array.isArray(resp.data.data) ? resp.data.data : [];
+                    setFilteredData(voucherData.map(item => ({
                         ...item,
                         created: item.created_at || '',
                         name: item.name || '',
@@ -196,7 +197,8 @@ const BookingPage = () => {
                 try {
                     const response = await axios.get(`/api/date-requests`);
                     setDateRequested(response.data.data || []);
-                    setFilteredData((response.data.data || []).map((item) => ({
+                    const dateRequestData = Array.isArray(response.data.data) ? response.data.data : [];
+                    setFilteredData(dateRequestData.map((item) => ({
                         name: item.name || "",
                         number: item.phone || "",
                         email: item.email || "",
@@ -216,7 +218,8 @@ const BookingPage = () => {
     // filteredData'yı voucher tablosu için backend key'lerine göre map'le
     useEffect(() => {
         if (activeTab === "vouchers") {
-            setFilteredData(voucher.map(item => ({
+            const voucherArray = Array.isArray(voucher) ? voucher : [];
+            setFilteredData(voucherArray.map(item => ({
                 created: item.created_at || '',
                 name: item.name || '',
                 flight_type: item.flight_type || '',
