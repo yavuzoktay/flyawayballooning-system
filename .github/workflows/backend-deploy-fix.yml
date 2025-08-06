@@ -30,6 +30,41 @@ jobs:
           # Pull latest changes
           git pull origin main
           
+          # Create necessary directories
+          echo "Creating necessary directories..."
+          mkdir -p client/build
+          mkdir -p server/uploads/activities
+          
+          # Create basic index.html if it doesn't exist
+          if [ ! -f "client/build/index.html" ]; then
+            echo "Creating basic index.html..."
+            cat > client/build/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="utf-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1" />
+              <title>FlyAway Ballooning System</title>
+          </head>
+          <body>
+              <div id="root">
+                  <h1>FlyAway Ballooning System</h1>
+                  <p>System is being deployed. Please wait...</p>
+              </div>
+          </body>
+          </html>
+          EOF
+          fi
+          
+          # Set proper permissions
+          echo "Setting proper permissions..."
+          sudo chown -R nginx:nginx client/build
+          sudo chmod -R 755 client/build
+          sudo chown -R ec2-user:ec2-user server
+          sudo chmod -R 755 server
+          sudo chown -R ec2-user:ec2-user server/uploads
+          sudo chmod -R 755 server/uploads
+          
           # Stop all PM2 processes
           echo "Stopping all PM2 processes..."
           pm2 stop all
@@ -46,17 +81,6 @@ jobs:
           # Install dependencies
           echo "Installing server dependencies..."
           npm install
-          
-          # Create uploads directory if it doesn't exist
-          echo "Creating uploads directory..."
-          mkdir -p uploads
-          chmod 755 uploads
-          
-          # Fix file permissions
-          echo "Fixing file permissions..."
-          chmod 755 /home/ec2-user/flyawayballooning-system-backend/server
-          chmod 644 /home/ec2-user/flyawayballooning-system-backend/server/*.js
-          chmod 644 /home/ec2-user/flyawayballooning-system-backend/server/package.json
           
           # Start the server with PM2
           echo "Starting server with PM2..."
@@ -80,85 +104,10 @@ jobs:
             pm2 logs flyawayballooning-server --lines 10
           fi
           
-          # Fix Nginx configuration
-          echo "Fixing Nginx configuration..."
-          
-          # Create a proper nginx.conf
-          cat > /tmp/nginx.conf << 'EOF'
-          events {
-              worker_connections 1024;
-          }
-          
-          http {
-              include       /etc/nginx/mime.types;
-              default_type  application/octet-stream;
-              
-              # Increase hash sizes to avoid warnings
-              types_hash_max_size 2048;
-              types_hash_bucket_size 128;
-              
-              sendfile        on;
-              keepalive_timeout  65;
-              
-              # Increase client header buffer size
-              client_header_buffer_size 4k;
-              large_client_header_buffers 4 16k;
-              
-              server {
-                  listen 80;
-                  server_name flyawayballooning-system.com www.flyawayballooning-system.com;
-                  
-                  # Root directory for static files
-                  root /home/ec2-user/flyawayballooning-system-backend/server/public;
-                  index index.html;
-                  
-                  # Handle static files properly
-                  location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-                      expires 1y;
-                      add_header Cache-Control "public, immutable";
-                      try_files $uri =404;
-                  }
-                  
-                  # Handle React Router - serve index.html for all routes
-                  location / {
-                      try_files $uri $uri/ /index.html;
-                  }
-                  
-                  # API proxy with proper error handling
-                  location /api/ {
-                      proxy_pass http://127.0.0.1:3002;
-                      proxy_http_version 1.1;
-                      proxy_set_header Upgrade $http_upgrade;
-                      proxy_set_header Connection "upgrade";
-                      proxy_set_header Host $host;
-                      proxy_set_header X-Real-IP $remote_addr;
-                      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                      proxy_set_header X-Forwarded-Proto $scheme;
-                      proxy_cache_bypass $http_upgrade;
-                      proxy_connect_timeout 60s;
-                      proxy_send_timeout 60s;
-                      proxy_read_timeout 60s;
-                      
-                      # Error handling
-                      proxy_intercept_errors on;
-                      error_page 502 503 504 = @fallback;
-                  }
-                  
-                  # Fallback location for API errors
-                  location @fallback {
-                      return 502 "Backend service temporarily unavailable";
-                  }
-                  
-                  # Uploads directory
-                  location /uploads/ {
-                      alias /home/ec2-user/flyawayballooning-system-backend/server/uploads/;
-                  }
-              }
-          }
-          EOF
-          
-          # Copy nginx configuration
-          sudo cp /tmp/nginx.conf /etc/nginx/nginx.conf
+          # Update Nginx configuration
+          echo "Updating Nginx configuration..."
+          cd ..
+          sudo cp nginx.conf /etc/nginx/nginx.conf
           
           # Test nginx configuration
           echo "Testing Nginx configuration..."
@@ -204,6 +153,10 @@ jobs:
           # Check nginx status
           echo "Nginx status:"
           sudo systemctl status nginx --no-pager
+          
+          # Check if index.html exists and is accessible
+          echo "Checking if index.html exists:"
+          ls -la /home/ec2-user/flyawayballooning-system-backend/client/build/index.html
           
           echo "=== Deployment completed ==="
           echo "Please check the website at http://flyawayballooning-system.com" 
