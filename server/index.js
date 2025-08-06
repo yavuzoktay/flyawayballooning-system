@@ -517,20 +517,27 @@ app.get('/api/getAllPassengers', (req, res) => {
 });
 
 
-// Get All Activity Data
+// Get All Activity Data (Legacy endpoint - redirects to /api/activities)
 app.get('/api/getAllActivity', (req, res) => {
-    var date_request = 'SELECT * FROM activity';
-    con.query(date_request, (err, result) => {
+    const sql = 'SELECT * FROM activity ORDER BY activity_name';
+    con.query(sql, (err, result) => {
         if (err) {
             console.error("Error occurred:", err);
             res.status(500).send({ success: false, error: "Database query failed" });
             return;
         }
-        if (result && result.length > 0) {
-            res.send({ success: true, data: result });
-        } else {
-            res.send({ success: false, message: "No activities found" });
-        }
+        
+        // Ensure result is always an array
+        const activities = Array.isArray(result) ? result : [];
+        
+        console.log('getAllActivity endpoint called, returning:', activities.length, 'activities');
+        
+        res.send({ 
+            success: true, 
+            data: activities,
+            count: activities.length,
+            timestamp: new Date().toISOString()
+        });
     });
 });
 
