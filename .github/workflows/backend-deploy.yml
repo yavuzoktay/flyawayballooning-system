@@ -63,6 +63,8 @@ jobs:
             echo "=== Starting deployment process ===" &&
             echo "Temporarily disabling SELinux..." &&
             sudo setenforce 0 2>/dev/null || true &&
+            echo "=== Cleaning up old deployment ===" &&
+            sudo rm -rf ~/flyawayballooning-system-backend 2>/dev/null || true &&
             mkdir -p ~/flyawayballooning-system-backend &&
             cd ~/flyawayballooning-system-backend &&
             echo "Downloading deployment package from S3..." &&
@@ -76,15 +78,18 @@ jobs:
             ls -la &&
             if [ -d "client/build" ]; then
               echo "=== Deploying client build files ===" &&
-              echo "Force removing old public directory..." &&
+              echo "Creating fresh public directory..." &&
               sudo rm -rf server/public 2>/dev/null || true &&
-              echo "Creating new public directory..." &&
               mkdir -p server/public &&
-              echo "Copying client build files..." &&
+              echo "Copying client build files with sudo..." &&
               sudo cp -r client/build/* server/public/ &&
               echo "Fixing public directory permissions..." &&
               sudo chown -R ec2-user:ec2-user server/public &&
               sudo chmod -R 755 server/public &&
+              echo "Setting specific permissions for JavaScript files..." &&
+              sudo find server/public -name "*.js" -type f -exec chmod 644 {} \; &&
+              sudo find server/public -name "*.css" -type f -exec chmod 644 {} \; &&
+              sudo find server/public -name "*.html" -type f -exec chmod 644 {} \; &&
               echo "Client build files deployed successfully" &&
               echo "Contents of server/public:" &&
               ls -la server/public/ &&
@@ -118,7 +123,7 @@ jobs:
             else
               echo "ERROR: nginx.conf not found! Creating manually..." &&
               sudo rm -f /etc/nginx/nginx.conf &&
-              echo "events { worker_connections 1024; } http { include /etc/nginx/mime.types; default_type application/octet-stream; sendfile on; keepalive_timeout 65; types { application/javascript js; text/javascript js; application/json json; text/css css; image/svg+xml svg; } server { listen 80; server_name flyawayballooning-system.com www.flyawayballooning-system.com; root /home/ec2-user/flyawayballooning-system-backend/server/public; index index.html; location ~* \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ { expires 1y; add_header Cache-Control \"public, immutable\"; try_files \$uri =404; } location / { try_files \$uri \$uri/ /index.html; } location /api/ { proxy_pass http://127.0.0.1:3002; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection \"upgrade\"; proxy_set_header Host \$host; proxy_set_header X-Real-IP \$remote_addr; proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for; proxy_set_header X-Forwarded-Proto \$scheme; proxy_cache_bypass \$http_upgrade; proxy_connect_timeout 60s; proxy_send_timeout 60s; proxy_read_timeout 60s; } location /uploads/ { alias /home/ec2-user/flyawayballooning-system-backend/server/uploads/; } } }" | sudo tee /etc/nginx/nginx.conf > /dev/null
+              echo "events { worker_connections 1024; } http { include /etc/nginx/mime.types; default_type application/octet-stream; sendfile on; keepalive_timeout 65; server { listen 80; server_name flyawayballooning-system.com www.flyawayballooning-system.com; root /home/ec2-user/flyawayballooning-system-backend/server/public; index index.html; location ~* \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ { expires 1y; add_header Cache-Control \"public, immutable\"; try_files \$uri =404; } location / { try_files \$uri \$uri/ /index.html; } location /api/ { proxy_pass http://127.0.0.1:3002; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection \"upgrade\"; proxy_set_header Host \$host; proxy_set_header X-Real-IP \$remote_addr; proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for; proxy_set_header X-Forwarded-Proto \$scheme; proxy_cache_bypass \$http_upgrade; proxy_connect_timeout 60s; proxy_send_timeout 60s; proxy_read_timeout 60s; } location /uploads/ { alias /home/ec2-user/flyawayballooning-system-backend/server/uploads/; } } }" | sudo tee /etc/nginx/nginx.conf > /dev/null
             fi &&
             echo "Testing Nginx configuration..." &&
             sudo nginx -t &&
