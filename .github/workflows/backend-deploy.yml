@@ -1,163 +1,71 @@
-name: Deploy Backend
+name: Deploy Backend and Client to S3 and EC2
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
     paths:
-      - 'server/**'
-      - 'client/**'
+      - '**'
       - '.github/workflows/backend-deploy.yml'
-  workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - uses: actions/checkout@v2
       
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: 'client/package-lock.json'
-        
-    - name: Install client dependencies
-      run: |
-        cd client
-        npm ci
-        
-    - name: Build frontend
-      run: |
-        cd client
-        CI=false npm run build
-        echo "Frontend build completed"
-        ls -la build/
-        
-    - name: Create deployment package
-      run: |
-        echo "Creating deployment package with frontend build..."
-        zip -r backend-deploy.zip . -x "node_modules/*" "client/node_modules/*" "client/build.tar.gz"
-        ls -la backend-deploy.zip
-        
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-1
-        
-    - name: Upload to S3
-      run: |
-        aws s3 cp backend-deploy.zip s3://flyawayballooning-backend/backend-deploy.zip
-        
-    - name: Deploy to EC2
-      run: |
-        echo "${{ secrets.SSH_PRIVATE_KEY }}" > deploy_key
-        chmod 600 deploy_key
-        ssh -i deploy_key -o StrictHostKeyChecking=no ec2-user@34.205.25.8 '
-          echo "=== Starting deployment process ===" &&
-          echo "Temporarily disabling SELinux..." &&
-          sudo setenforce 0 2>/dev/null || true &&
-          echo "=== Cleaning up old deployment ===" &&
-          sudo rm -rf ~/flyawayballooning-system-backend 2>/dev/null || true &&
-          mkdir -p ~/flyawayballooning-system-backend &&
-          cd ~/flyawayballooning-system-backend &&
-          echo "Downloading deployment package from S3..." &&
-          aws s3 cp s3://flyawayballooning-backend/backend-deploy.zip . &&
-          echo "Extracting deployment package..." &&
-          unzip -o backend-deploy.zip -d . &&
-          echo "Fixing file permissions..." &&
-          sudo chown -R ec2-user:ec2-user . &&
-          sudo chmod -R 755 . &&
-          echo "Checking extracted files..." &&
-          ls -la &&
-          if [ -d "client/build" ]; then
-            echo "=== Deploying client build files ===" &&
-            echo "Creating fresh public directory..." &&
-            sudo rm -rf server/public 2>/dev/null || true &&
-            mkdir -p server/public &&
-            echo "Copying client build files..." &&
-            cp -r client/build/* server/public/ &&
-            echo "Fixing public directory permissions..." &&
-            sudo chown -R ec2-user:ec2-user server/public &&
-            sudo chmod -R 755 server/public &&
-            sudo chown -R nginx:nginx server/public &&
-            echo "Setting specific permissions for files..." &&
-            sudo find server/public -name "*.js" -type f -exec chmod 644 {} \; &&
-            sudo find server/public -name "*.css" -type f -exec chmod 644 {} \; &&
-            sudo find server/public -name "*.html" -type f -exec chmod 644 {} \; &&
-            echo "Client build files deployed successfully" &&
-            echo "Contents of server/public:" &&
-            ls -la server/public/ &&
-            echo "Checking for JavaScript files:" &&
-            find server/public/ -name "*.js" -type f | head -5 &&
-            echo "Checking index.html content:" &&
-            head -10 server/public/index.html
-          else
-            echo "ERROR: client/build directory not found!"
-            ls -la
-          fi &&
-          echo "=== Installing server dependencies ===" &&
-          cd server && npm install &&
-          echo "=== Creating .env file for backend ===" &&
-          echo "STRIPE_SECRET_KEY=sk_test_dummy" > .env &&
-          echo "PORT=3002" >> .env &&
-          echo "NODE_ENV=production" >> .env &&
-          echo "=== Restarting PM2 server ===" &&
-          if ! command -v pm2 > /dev/null; then sudo npm install -g pm2; fi &&
-          pm2 delete flyawayballooning-server 2>/dev/null || true &&
-          pm2 kill || true &&
-          cd /home/ec2-user/flyawayballooning-system-backend/server &&
-          PORT=3002 pm2 start index.js --name flyawayballooning-server &&
-          pm2 save &&
-          sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u ec2-user --hp /home/ec2-user || true &&
-          echo "=== Waiting for backend to start ===" &&
-          sleep 5 &&
-          echo "=== Checking backend status ===" &&
-          pm2 list &&
-          echo "=== Testing backend API ===" &&
-          curl -s http://localhost:3002/api/health || echo "Backend health check failed" &&
-          echo "=== Fixing Nginx configuration ===" &&
-          echo "Backing up current nginx.conf..." &&
-          sudo cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.backup.$(date +%Y%m%d_%H%M%S) &&
-          echo "Creating correct Nginx configuration..." &&
-          if [ -f "/home/ec2-user/flyawayballooning-system-backend/nginx.conf" ]; then
-            echo "nginx.conf found, copying to /etc/nginx/nginx.conf" &&
-            sudo cp /home/ec2-user/flyawayballooning-system-backend/nginx.conf /etc/nginx/nginx.conf
-          else
-            echo "ERROR: nginx.conf not found! Creating manually..." &&
-            sudo rm -f /etc/nginx/nginx.conf &&
-            echo "events { worker_connections 1024; } http { include /etc/nginx/mime.types; default_type application/octet-stream; sendfile on; keepalive_timeout 65; server { listen 80; server_name flyawayballooning-system.com www.flyawayballooning-system.com; root /home/ec2-user/flyawayballooning-system-backend/server/public; index index.html; location ~* \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ { expires 1y; add_header Cache-Control \"public, immutable\"; try_files \$uri =404; } location / { try_files \$uri \$uri/ /index.html; } location /api/ { proxy_pass http://127.0.0.1:3002; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection \"upgrade\"; proxy_set_header Host \$host; proxy_set_header X-Real-IP \$remote_addr; proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for; proxy_set_header X-Forwarded-Proto \$scheme; proxy_cache_bypass \$http_upgrade; proxy_connect_timeout 60s; proxy_send_timeout 60s; proxy_read_timeout 60s; } location /uploads/ { alias /home/ec2-user/flyawayballooning-system-backend/server/uploads/; } } }" | sudo tee /etc/nginx/nginx.conf > /dev/null
-          fi &&
-          echo "Testing Nginx configuration..." &&
-          sudo nginx -t &&
-          echo "Restarting Nginx with new configuration..." &&
-          sudo systemctl restart nginx &&
-          echo "=== Checking services ===" &&
-          echo "Checking Nginx status..." &&
-          sudo systemctl status nginx --no-pager &&
-          echo "Checking PM2 processes..." &&
-          pm2 list &&
-          echo "Checking if backend is responding..." &&
-          curl -s http://localhost:3002/api/health || echo "Backend not responding on port 3002" &&
-          echo "Checking what is listening on port 3002..." &&
-          sudo netstat -tlnp | grep :3002 || echo "Nothing listening on port 3002" &&
-          echo "Checking Nginx error logs..." &&
-          sudo tail -10 /var/log/nginx/error.log &&
-          echo "Fixing Nginx permissions..." &&
-          sudo chown -R nginx:nginx /home/ec2-user/flyawayballooning-system-backend/server/public &&
-          sudo chmod -R 755 /home/ec2-user/flyawayballooning-system-backend/server/public &&
-          echo "Setting proper MIME types for JavaScript files..." &&
-          sudo find /home/ec2-user/flyawayballooning-system-backend/server/public -name "*.js" -type f -exec chmod 644 {} \; &&
-          echo "Re-enabling SELinux..." &&
-          sudo setenforce 1 2>/dev/null || true &&
-          echo "=== Final verification ===" &&
-          echo "Checking if index.html exists:" &&
-          ls -la /home/ec2-user/flyawayballooning-system-backend/server/public/index.html &&
-          echo "Checking backend logs:" &&
-          pm2 logs flyawayballooning-server --lines 10 &&
-          echo "=== Deployment completed successfully! ==="
-        ' 
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '18'
+          
+      - name: Install Dependencies (Backend)
+        run: |
+          cd server
+          npm install
+      
+      - name: Install Dependencies and Build (Client)
+        run: |
+          if [ -d "client" ]; then
+            cd client
+            npm install
+            CI=false npm run build
+          fi
+      
+      - name: Create deployment package (server + client/build)
+        run: |
+          zip -r backend-deploy.zip server client/build
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      
+      - name: Upload to S3
+        run: |
+          aws s3 cp backend-deploy.zip s3://flyawayballooning-backend/backend-deploy.zip
+      
+      - name: Deploy to EC2
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > deploy_key
+          chmod 600 deploy_key
+          ssh -i deploy_key -o StrictHostKeyChecking=no ec2-user@34.205.25.8 '
+            mkdir -p ~/flyawayballooning-system-backend &&
+            cd ~/flyawayballooning-system-backend &&
+            aws s3 cp s3://flyawayballooning-backend/backend-deploy.zip . &&
+            unzip -o backend-deploy.zip -d . &&
+            if [ -d "client/build" ]; then
+              rm -rf server/public
+              mkdir -p server/public
+              cp -r client/build/* server/public/
+            fi
+            cd server && npm install &&
+            if ! command -v pm2 > /dev/null; then sudo npm install -g pm2; fi &&
+            pm2 delete flyawayballooning-server 2>/dev/null || true &&
+            PORT=3002 pm2 start index.js --name flyawayballooning-server &&
+            pm2 save &&
+            sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u ec2-user --hp /home/ec2-user || true
+          ' 

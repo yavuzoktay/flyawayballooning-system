@@ -1645,8 +1645,22 @@ app.get('/api/availabilities/filter', (req, res) => {
 app.get('/api/activities', (req, res) => {
     const sql = 'SELECT id, activity_name FROM activity ORDER BY activity_name';
     con.query(sql, (err, result) => {
-        if (err) return res.status(500).json({ success: false, message: 'Database error', error: err });
-        res.json({ success: true, data: result });
+        if (err) {
+            console.error('Database error in /api/activities:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err });
+        }
+        
+        // Ensure result is always an array
+        const activities = Array.isArray(result) ? result : [];
+        
+        console.log('Activities endpoint called, returning:', activities.length, 'activities');
+        
+        res.json({ 
+            success: true, 
+            data: activities,
+            count: activities.length,
+            timestamp: new Date().toISOString()
+        });
     });
 });
 
