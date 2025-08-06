@@ -3,6 +3,7 @@ console.log('Stripe Key:', process.env.STRIPE_SECRET_KEY);
 console.log('Server starting with Stripe disabled - deployment test');
 console.log('Deployment timestamp:', new Date().toISOString());
 console.log('Deployment ID: STRIPE_FIXED_' + Date.now());
+console.log('FINAL_DEPLOYMENT_TEST_' + Math.random());
 const express = require("express");
 const mysql = require("mysql2");
 const cors = require("cors");
