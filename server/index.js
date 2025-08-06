@@ -2163,8 +2163,8 @@ app.delete('/api/date-requests/:id', (req, res) => {
     });
 });
 
-// Geçici Stripe session verisi için bellek içi bir store
-const stripeSessionStore = {};
+// Geçici Stripe session verisi için bellek içi bir store - TEMPORARILY DISABLED
+// const stripeSessionStore = {};
 
 // Webhook için booking oluşturma fonksiyonu
 async function createBookingFromWebhook(bookingData) {
@@ -2367,7 +2367,8 @@ async function createVoucherFromWebhook(voucherData) {
     });
 }
 
-// Stripe Checkout Session oluşturma endpointini güncelle
+// Stripe Checkout Session oluşturma endpointini güncelle - TEMPORARILY DISABLED
+/*
 app.post('/api/create-checkout-session', async (req, res) => {
     try {
         const { totalPrice, currency = 'GBP', bookingData, voucherData, type } = req.body;
@@ -2413,5 +2414,6 @@ app.post('/api/create-checkout-session', async (req, res) => {
         res.status(500).json({ success: false, message: 'Stripe Checkout Session oluşturulamadı', error: error.message });
     }
 });
+*/
 
 
