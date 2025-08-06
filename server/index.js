@@ -1,6 +1,5 @@
 require('dotenv').config();
-console.log('Stripe Key:', process.env.STRIPE_SECRET_KEY);
-console.log('Server starting with Stripe disabled - deployment test');
+console.log('Server starting - deployment test');
 console.log('Deployment timestamp:', new Date().toISOString());
 console.log('Deployment ID: STRIPE_FIXED_' + Date.now());
 console.log('FINAL_DEPLOYMENT_TEST_' + Math.random());
@@ -14,7 +13,6 @@ const dayjs = require("dayjs");
 const moment = require('moment');
 const multer = require('multer');
 const dotenv = require('dotenv');
-// const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 dotenv.config();
 
 // Enable CORS
