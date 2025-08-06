@@ -101,6 +101,10 @@ jobs:
           fi &&
           echo "=== Installing server dependencies ===" &&
           cd server && npm install &&
+          echo "=== Creating .env file for backend ===" &&
+          echo "STRIPE_SECRET_KEY=sk_test_dummy" > .env &&
+          echo "PORT=3002" >> .env &&
+          echo "NODE_ENV=production" >> .env &&
           echo "=== Restarting PM2 server ===" &&
           if ! command -v pm2 > /dev/null; then sudo npm install -g pm2; fi &&
           pm2 delete flyawayballooning-server 2>/dev/null || true &&
@@ -109,6 +113,12 @@ jobs:
           PORT=3002 pm2 start index.js --name flyawayballooning-server &&
           pm2 save &&
           sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u ec2-user --hp /home/ec2-user || true &&
+          echo "=== Waiting for backend to start ===" &&
+          sleep 5 &&
+          echo "=== Checking backend status ===" &&
+          pm2 list &&
+          echo "=== Testing backend API ===" &&
+          curl -s http://localhost:3002/api/health || echo "Backend health check failed" &&
           echo "=== Fixing Nginx configuration ===" &&
           echo "Backing up current nginx.conf..." &&
           sudo cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.backup.$(date +%Y%m%d_%H%M%S) &&
@@ -143,5 +153,10 @@ jobs:
           sudo find /home/ec2-user/flyawayballooning-system-backend/server/public -name "*.js" -type f -exec chmod 644 {} \; &&
           echo "Re-enabling SELinux..." &&
           sudo setenforce 1 2>/dev/null || true &&
+          echo "=== Final verification ===" &&
+          echo "Checking if index.html exists:" &&
+          ls -la /home/ec2-user/flyawayballooning-system-backend/server/public/index.html &&
+          echo "Checking backend logs:" &&
+          pm2 logs flyawayballooning-server --lines 10 &&
           echo "=== Deployment completed successfully! ==="
         ' 
