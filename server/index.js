@@ -1,6 +1,7 @@
 require('dotenv').config();
 console.log('Stripe Key:', process.env.STRIPE_SECRET_KEY);
 console.log('Server starting with Stripe disabled - deployment test');
+console.log('Deployment timestamp:', new Date().toISOString());
 const express = require("express");
 const mysql = require("mysql2");
 const cors = require("cors");
