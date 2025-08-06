@@ -49,11 +49,17 @@ const ActivityList = () => {
   const fetchActivities = async () => {
     try {
       const response = await axios.get('/api/activities');
-      setActivities(response.data);
+      if (response.data.success && Array.isArray(response.data.data)) {
+        setActivities(response.data.data);
+      } else {
+        console.error('Invalid response format:', response.data);
+        setActivities([]);
+      }
       setLoading(false);
     } catch (error) {
       console.error('Error fetching activities:', error);
       setError('Failed to fetch activities');
+      setActivities([]);
       setLoading(false);
     }
   };
@@ -61,13 +67,13 @@ const ActivityList = () => {
   const handleEditClick = (activity) => {
     setSelectedActivity(activity);
     setEditFormData({
-      name: activity.name,
+      name: activity.activity_name || activity.name,
       description: activity.description,
       duration: activity.duration,
       price: activity.price,
-      maxCapacity: activity.maxCapacity,
+      maxCapacity: activity.capacity || activity.maxCapacity,
       location: activity.location,
-      type: activity.type
+      type: activity.flight_type || activity.type
     });
     setEditDialogOpen(true);
   };
@@ -133,18 +139,18 @@ const ActivityList = () => {
                 <Box display="flex" justifyContent="space-between" alignItems="flex-start">
                   <Box flex={1}>
                     <Typography variant="h6" gutterBottom>
-                      {activity.name}
+                      {activity.activity_name || activity.name}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" paragraph>
-                      {activity.description}
+                      {activity.description || 'No description available'}
                     </Typography>
                     <Box display="flex" gap={1} flexWrap="wrap">
-                      <Chip label={`${activity.duration} hours`} size="small" />
-                      <Chip label={`$${activity.price}`} size="small" color="primary" />
-                      <Chip label={`Max: ${activity.maxCapacity}`} size="small" />
+                      <Chip label={`${activity.duration || 'N/A'} hours`} size="small" />
+                      <Chip label={`$${activity.price || 'N/A'}`} size="small" color="primary" />
+                      <Chip label={`Max: ${activity.capacity || activity.maxCapacity || 'N/A'}`} size="small" />
                     </Box>
                     <Typography variant="body2" color="text.secondary" mt={1}>
-                      Location: {activity.location}
+                      Location: {activity.location || 'N/A'}
                     </Typography>
                   </Box>
                   <Box>
