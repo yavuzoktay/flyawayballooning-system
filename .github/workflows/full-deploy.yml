@@ -1,0 +1,201 @@
+name: Full Deployment (Frontend + Backend)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'client/**'
+      - 'server/**'
+      - '.github/workflows/full-deploy.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Deploy to EC2
+      uses: appleboy/ssh-action@v0.1.5
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          echo "=== Starting Full Deployment ==="
+          
+          # Navigate to the project directory
+          cd /home/ec2-user/flyawayballooning-system-backend
+          
+          # Pull latest changes
+          git pull origin main
+          
+          # Stop all PM2 processes
+          echo "Stopping all PM2 processes..."
+          pm2 stop all
+          pm2 delete all
+          
+          # Kill any existing Node.js processes
+          echo "Killing any existing Node.js processes..."
+          pkill -f "node.*index.js" || true
+          pkill -f "node.*server" || true
+          
+          # === FRONTEND DEPLOYMENT ===
+          echo "=== Starting Frontend Deployment ==="
+          
+          # Navigate to client directory
+          cd client
+          
+          # Clean previous build
+          echo "Cleaning previous build..."
+          rm -rf build
+          rm -rf node_modules
+          
+          # Install dependencies
+          echo "Installing client dependencies..."
+          npm install
+          
+          # Build the client
+          echo "Building client application..."
+          npm run build
+          
+          # Check if build was successful
+          if [ ! -d "build" ]; then
+            echo "ERROR: Build directory not found!"
+            exit 1
+          fi
+          
+          # Check build contents
+          echo "Build contents:"
+          ls -la build/
+          
+          # Navigate back to project root
+          cd ..
+          
+          # Deploy client build to server/public
+          echo "Deploying client build to server/public..."
+          sudo rm -rf server/public
+          mkdir -p server/public
+          sudo cp -r client/build/* server/public/
+          
+          # Fix permissions
+          echo "Fixing file permissions..."
+          sudo chown -R ec2-user:ec2-user server/public
+          sudo chmod -R 755 server/public
+          sudo find server/public -name "*.js" -type f -exec chmod 644 {} \;
+          sudo find server/public -name "*.css" -type f -exec chmod 644 {} \;
+          sudo find server/public -name "*.html" -type f -exec chmod 644 {} \;
+          
+          # Verify deployment
+          echo "Verifying deployment..."
+          echo "Contents of server/public:"
+          ls -la server/public/
+          
+          echo "Checking for main JavaScript files:"
+          find server/public/ -name "*.js" -type f | head -5
+          
+          echo "Checking index.html:"
+          head -10 server/public/index.html
+          
+          # === BACKEND DEPLOYMENT ===
+          echo "=== Starting Backend Deployment ==="
+          
+          # Navigate to server directory
+          cd server
+          
+          # Install dependencies
+          echo "Installing server dependencies..."
+          npm install
+          
+          # Create uploads directory if it doesn't exist
+          echo "Creating uploads directory..."
+          mkdir -p uploads
+          chmod 755 uploads
+          
+          # Fix file permissions
+          echo "Fixing file permissions..."
+          chmod 755 /home/ec2-user/flyawayballooning-system-backend/server
+          chmod 644 /home/ec2-user/flyawayballooning-system-backend/server/*.js
+          chmod 644 /home/ec2-user/flyawayballooning-system-backend/server/package.json
+          
+          # Start the server with PM2
+          echo "Starting server with PM2..."
+          PORT=3002 pm2 start index.js --name flyawayballooning-server
+          
+          # Save PM2 configuration
+          echo "Saving PM2 configuration..."
+          pm2 save
+          
+          # Wait for server to start
+          echo "Waiting for server to start..."
+          sleep 10
+          
+          # Check if server is running
+          echo "Checking server status..."
+          if curl -s http://localhost:3002/api/health > /dev/null; then
+            echo "✓ Backend server is responding"
+          else
+            echo "✗ Backend server is not responding"
+            echo "Checking PM2 logs..."
+            pm2 logs flyawayballooning-server --lines 10
+          fi
+          
+          # === NGINX CONFIGURATION ===
+          echo "=== Updating Nginx Configuration ==="
+          
+          # Update Nginx configuration
+          echo "Updating Nginx configuration..."
+          sudo cp /home/ec2-user/flyawayballooning-system-backend/nginx.conf /etc/nginx/nginx.conf
+          
+          # Test nginx configuration
+          echo "Testing Nginx configuration..."
+          sudo nginx -t
+          
+          # Clear Nginx cache
+          echo "Clearing Nginx cache..."
+          sudo rm -rf /var/cache/nginx/*
+          
+          # Restart nginx
+          echo "Restarting Nginx..."
+          sudo systemctl restart nginx
+          
+          # Fix SELinux if needed
+          echo "Checking SELinux..."
+          if command -v sestatus > /dev/null 2>&1; then
+            if sestatus | grep -q "enabled"; then
+              echo "SELinux is enabled, setting proper context..."
+              sudo setsebool -P httpd_can_network_connect 1
+              sudo setsebool -P httpd_can_network_relay 1
+            fi
+          fi
+          
+          # === FINAL STATUS CHECK ===
+          echo "=== Final Status Check ==="
+          
+          # Check PM2 processes
+          echo "PM2 processes:"
+          pm2 list
+          
+          # Check if backend is responding
+          echo "Backend health check:"
+          curl -s http://localhost:3002/api/health || echo "Backend not responding"
+          
+          # Check what's listening on port 3002
+          echo "Port 3002 status:"
+          sudo netstat -tlnp | grep :3002 || echo "Nothing listening on port 3002"
+          
+          # Check nginx status
+          echo "Nginx status:"
+          sudo systemctl status nginx --no-pager
+          
+          # Check nginx error logs
+          echo "Recent Nginx error logs:"
+          sudo tail -5 /var/log/nginx/error.log
+          
+          # Test the website
+          echo "Testing website..."
+          curl -s http://localhost/ | head -10
+          
+          echo "=== Full deployment completed ==="
+          echo "Please check the website at http://flyawayballooning-system.com" 

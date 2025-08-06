@@ -11,8 +11,8 @@ const getApiBaseUrl = () => {
   if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
     return 'http://localhost:3002';
   }
-  // Production environment
-  return 'https://flyawayballooning-system.com';
+  // Production environment - no port needed, use relative URLs
+  return '';
 };
 
 // Configure axios defaults to prevent 431 errors
@@ -26,7 +26,8 @@ axios.interceptors.request.use(function (config) {
   if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
     config.baseURL = 'http://localhost:3002';
   } else {
-    config.baseURL = 'https://flyawayballooning-system.com';
+    // In production, use relative URLs (no baseURL needed)
+    config.baseURL = '';
   }
   console.log('Request URL:', config.baseURL + config.url);
   return config;
