@@ -23,7 +23,7 @@ import {
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
 import axios from 'axios';
 
-const ActivityList = () => {
+const ActivityList = ({ activity }) => {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -43,8 +43,15 @@ const ActivityList = () => {
   const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
-    fetchActivities();
-  }, []);
+    // Prop olarak gelen activity verisini kullan
+    if (activity && Array.isArray(activity)) {
+      setActivities(activity);
+      setLoading(false);
+    } else {
+      // Eğer prop yoksa veya array değilse, API'den çek
+      fetchActivities();
+    }
+  }, [activity]);
 
   const fetchActivities = async () => {
     try {
@@ -132,7 +139,7 @@ const ActivityList = () => {
       </Box>
 
       <Grid container spacing={3}>
-        {activities.map((activity) => (
+        {Array.isArray(activities) && activities.map((activity) => (
           <Grid item xs={12} sm={6} md={4} key={activity.id}>
             <Card>
               <CardContent>

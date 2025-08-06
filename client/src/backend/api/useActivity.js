@@ -26,7 +26,10 @@ const useActivity = () => {
     fetchActivity();
   }, []);
 
-  return { activity, loading };
+  // Ensure activity is always an array
+  const safeActivity = Array.isArray(activity) ? activity : [];
+  
+  return { activity: safeActivity, loading };
 };
 
 export default useActivity;
