@@ -8,10 +8,16 @@ const useActivity = () => {
   useEffect(() => {
     const fetchActivity = async () => {
       try {
-        const response = await axios.get("/api/getAllActivity");
-        setActivity(Array.isArray(response.data.data) ? response.data.data : []);
+        const response = await axios.get("/api/activities");
+        if (response.data.success && Array.isArray(response.data.data)) {
+          setActivity(response.data.data);
+        } else {
+          console.error("Invalid response format:", response.data);
+          setActivity([]);
+        }
       } catch (error) {
-        console.error("Error fetching flights:", error);
+        console.error("Error fetching activities:", error);
+        setActivity([]);
       } finally {
         setLoading(false);
       }
