@@ -34,6 +34,8 @@ jobs:
             CI=false GENERATE_SOURCEMAP=false npm run build
             echo "Client build completed successfully"
             ls -la build/
+            echo "Checking for JavaScript files in build:"
+            find build/ -name "*.js" -type f | head -5
           fi
         
       - name: Create deployment package (server + client/build + nginx.conf)
@@ -86,8 +88,12 @@ jobs:
               echo "Client build files deployed successfully" &&
               echo "Contents of server/public:" &&
               ls -la server/public/ &&
+              echo "Checking for JavaScript files:" &&
+              find server/public/ -name "*.js" -type f | head -5 &&
               echo "Checking index.html content:" &&
-              head -10 server/public/index.html
+              head -10 server/public/index.html &&
+              echo "Checking first few lines of main.js:" &&
+              find server/public/ -name "main.*.js" -type f | head -1 | xargs head -3 2>/dev/null || echo "No main.js found"
             else
               echo "ERROR: client/build directory not found!"
               ls -la
@@ -112,7 +118,7 @@ jobs:
             else
               echo "ERROR: nginx.conf not found! Creating manually..." &&
               sudo rm -f /etc/nginx/nginx.conf &&
-              echo "events { worker_connections 1024; } http { include /etc/nginx/mime.types; default_type application/octet-stream; sendfile on; keepalive_timeout 65; server { listen 80; server_name flyawayballooning-system.com www.flyawayballooning-system.com; location / { root /home/ec2-user/flyawayballooning-system-backend/server/public; try_files \$uri \$uri/ /index.html; index index.html; } location /api/ { proxy_pass http://127.0.0.1:3002; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection \"upgrade\"; proxy_set_header Host \$host; proxy_set_header X-Real-IP \$remote_addr; proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for; proxy_set_header X-Forwarded-Proto \$scheme; proxy_cache_bypass \$http_upgrade; proxy_connect_timeout 60s; proxy_send_timeout 60s; proxy_read_timeout 60s; } location /uploads/ { alias /home/ec2-user/flyawayballooning-system-backend/server/uploads/; } } }" | sudo tee /etc/nginx/nginx.conf > /dev/null
+              echo "events { worker_connections 1024; } http { include /etc/nginx/mime.types; default_type application/octet-stream; sendfile on; keepalive_timeout 65; types { application/javascript js; text/javascript js; application/json json; text/css css; image/svg+xml svg; } server { listen 80; server_name flyawayballooning-system.com www.flyawayballooning-system.com; root /home/ec2-user/flyawayballooning-system-backend/server/public; index index.html; location ~* \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ { expires 1y; add_header Cache-Control \"public, immutable\"; try_files \$uri =404; } location / { try_files \$uri \$uri/ /index.html; } location /api/ { proxy_pass http://127.0.0.1:3002; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection \"upgrade\"; proxy_set_header Host \$host; proxy_set_header X-Real-IP \$remote_addr; proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for; proxy_set_header X-Forwarded-Proto \$scheme; proxy_cache_bypass \$http_upgrade; proxy_connect_timeout 60s; proxy_send_timeout 60s; proxy_read_timeout 60s; } location /uploads/ { alias /home/ec2-user/flyawayballooning-system-backend/server/uploads/; } } }" | sudo tee /etc/nginx/nginx.conf > /dev/null
             fi &&
             echo "Testing Nginx configuration..." &&
             sudo nginx -t &&
@@ -132,6 +138,8 @@ jobs:
             echo "Fixing Nginx permissions..." &&
             sudo chown -R nginx:nginx /home/ec2-user/flyawayballooning-system-backend/server/public &&
             sudo chmod -R 755 /home/ec2-user/flyawayballooning-system-backend/server/public &&
+            echo "Setting proper MIME types for JavaScript files..." &&
+            sudo find /home/ec2-user/flyawayballooning-system-backend/server/public -name "*.js" -type f -exec chmod 644 {} \; &&
             echo "Re-enabling SELinux..." &&
             sudo setenforce 1 2>/dev/null || true &&
             echo "=== Deployment completed successfully! ==="
