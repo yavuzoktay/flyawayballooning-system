@@ -1,0 +1,209 @@
+name: Deploy Backend with Fixes
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'server/**'
+      - '.github/workflows/backend-deploy-fix.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Deploy to EC2
+      uses: appleboy/ssh-action@v0.1.5
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          echo "=== Starting Backend Deployment Fix ==="
+          
+          # Navigate to the project directory
+          cd /home/ec2-user/flyawayballooning-system-backend
+          
+          # Pull latest changes
+          git pull origin main
+          
+          # Stop all PM2 processes
+          echo "Stopping all PM2 processes..."
+          pm2 stop all
+          pm2 delete all
+          
+          # Kill any existing Node.js processes
+          echo "Killing any existing Node.js processes..."
+          pkill -f "node.*index.js" || true
+          pkill -f "node.*server" || true
+          
+          # Navigate to server directory
+          cd server
+          
+          # Install dependencies
+          echo "Installing server dependencies..."
+          npm install
+          
+          # Create uploads directory if it doesn't exist
+          echo "Creating uploads directory..."
+          mkdir -p uploads
+          chmod 755 uploads
+          
+          # Fix file permissions
+          echo "Fixing file permissions..."
+          chmod 755 /home/ec2-user/flyawayballooning-system-backend/server
+          chmod 644 /home/ec2-user/flyawayballooning-system-backend/server/*.js
+          chmod 644 /home/ec2-user/flyawayballooning-system-backend/server/package.json
+          
+          # Start the server with PM2
+          echo "Starting server with PM2..."
+          PORT=3002 pm2 start index.js --name flyawayballooning-server
+          
+          # Save PM2 configuration
+          echo "Saving PM2 configuration..."
+          pm2 save
+          
+          # Wait for server to start
+          echo "Waiting for server to start..."
+          sleep 10
+          
+          # Check if server is running
+          echo "Checking server status..."
+          if curl -s http://localhost:3002/api/health > /dev/null; then
+            echo "✓ Backend server is responding"
+          else
+            echo "✗ Backend server is not responding"
+            echo "Checking PM2 logs..."
+            pm2 logs flyawayballooning-server --lines 10
+          fi
+          
+          # Fix Nginx configuration
+          echo "Fixing Nginx configuration..."
+          
+          # Create a proper nginx.conf
+          cat > /tmp/nginx.conf << 'EOF'
+          events {
+              worker_connections 1024;
+          }
+          
+          http {
+              include       /etc/nginx/mime.types;
+              default_type  application/octet-stream;
+              
+              # Increase hash sizes to avoid warnings
+              types_hash_max_size 2048;
+              types_hash_bucket_size 128;
+              
+              sendfile        on;
+              keepalive_timeout  65;
+              
+              # Increase client header buffer size
+              client_header_buffer_size 4k;
+              large_client_header_buffers 4 16k;
+              
+              server {
+                  listen 80;
+                  server_name flyawayballooning-system.com www.flyawayballooning-system.com;
+                  
+                  # Root directory for static files
+                  root /home/ec2-user/flyawayballooning-system-backend/server/public;
+                  index index.html;
+                  
+                  # Handle static files properly
+                  location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+                      expires 1y;
+                      add_header Cache-Control "public, immutable";
+                      try_files $uri =404;
+                  }
+                  
+                  # Handle React Router - serve index.html for all routes
+                  location / {
+                      try_files $uri $uri/ /index.html;
+                  }
+                  
+                  # API proxy with proper error handling
+                  location /api/ {
+                      proxy_pass http://127.0.0.1:3002;
+                      proxy_http_version 1.1;
+                      proxy_set_header Upgrade $http_upgrade;
+                      proxy_set_header Connection "upgrade";
+                      proxy_set_header Host $host;
+                      proxy_set_header X-Real-IP $remote_addr;
+                      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                      proxy_set_header X-Forwarded-Proto $scheme;
+                      proxy_cache_bypass $http_upgrade;
+                      proxy_connect_timeout 60s;
+                      proxy_send_timeout 60s;
+                      proxy_read_timeout 60s;
+                      
+                      # Error handling
+                      proxy_intercept_errors on;
+                      error_page 502 503 504 = @fallback;
+                  }
+                  
+                  # Fallback location for API errors
+                  location @fallback {
+                      return 502 "Backend service temporarily unavailable";
+                  }
+                  
+                  # Uploads directory
+                  location /uploads/ {
+                      alias /home/ec2-user/flyawayballooning-system-backend/server/uploads/;
+                  }
+              }
+          }
+          EOF
+          
+          # Copy nginx configuration
+          sudo cp /tmp/nginx.conf /etc/nginx/nginx.conf
+          
+          # Test nginx configuration
+          echo "Testing Nginx configuration..."
+          sudo nginx -t
+          
+          # Restart nginx
+          echo "Restarting Nginx..."
+          sudo systemctl restart nginx
+          
+          # Fix SELinux if needed
+          echo "Checking SELinux..."
+          if command -v sestatus > /dev/null 2>&1; then
+            if sestatus | grep -q "enabled"; then
+              echo "SELinux is enabled, setting proper context..."
+              sudo setsebool -P httpd_can_network_connect 1
+              sudo setsebool -P httpd_can_network_relay 1
+            fi
+          fi
+          
+          # Check firewall
+          echo "Checking firewall..."
+          if command -v firewall-cmd > /dev/null 2>&1; then
+            sudo firewall-cmd --permanent --add-port=80/tcp
+            sudo firewall-cmd --permanent --add-port=3002/tcp
+            sudo firewall-cmd --reload
+          fi
+          
+          # Final status check
+          echo "=== Final Status Check ==="
+          
+          # Check PM2 processes
+          echo "PM2 processes:"
+          pm2 list
+          
+          # Check if backend is responding
+          echo "Backend health check:"
+          curl -s http://localhost:3002/api/health || echo "Backend not responding"
+          
+          # Check what's listening on port 3002
+          echo "Port 3002 status:"
+          sudo netstat -tlnp | grep :3002 || echo "Nothing listening on port 3002"
+          
+          # Check nginx status
+          echo "Nginx status:"
+          sudo systemctl status nginx --no-pager
+          
+          echo "=== Deployment completed ==="
+          echo "Please check the website at http://flyawayballooning-system.com" 
