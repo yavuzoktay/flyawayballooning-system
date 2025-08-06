@@ -34,7 +34,8 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Stripe Webhook endpoint - EN ÜSTTE OLMALI (body parsing'den önce)
+// Stripe Webhook endpoint - TEMPORARILY DISABLED
+/*
 app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (req, res) => {
     console.log('Stripe webhook endpoint hit!');
     
@@ -99,16 +100,17 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
                 console.error('Error processing webhook:', error);
                 // Hata durumunda processed flag'ini geri al
                 storeData.processed = false;
-                throw error;
+                return res.status(500).send('Internal server error');
             }
         }
         
         res.json({received: true});
-    } catch (err) {
-        console.error('Stripe webhook processing error:', err);
-        res.status(400).send(`Webhook Error: ${err.message}`);
+    } catch (error) {
+        console.error('Webhook processing error:', error);
+        res.status(500).send('Webhook processing failed');
     }
 });
+*/
 
 // Body parsing middleware - webhook'tan SONRA
 app.use(express.json()); // To parse JSON-encoded request bodies
