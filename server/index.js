@@ -1648,9 +1648,9 @@ app.get('/api/availabilities/filter', (req, res) => {
     });
 });
 
-// Get all activities (id, activity_name)
+// Get all activities (id, activity_name, status)
 app.get('/api/activities', (req, res) => {
-    const sql = 'SELECT id, activity_name FROM activity ORDER BY activity_name';
+    const sql = 'SELECT id, activity_name, status FROM activity ORDER BY activity_name';
     con.query(sql, (err, result) => {
         if (err) {
             console.error('Database error in /api/activities:', err);

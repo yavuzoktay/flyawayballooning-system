@@ -228,13 +228,18 @@ const ActivityList = ({ activity }) => {
         navigate(`/activity/${activity.id}/availabilities`);
     };
 
+    // Ensure activity is always an array
+    const safeActivity = Array.isArray(activity) ? activity : [];
+
     return (
         <div className="activity-list-wrap">
             <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 16 }}>
-                <Button variant="outlined" startIcon={<AddIcon />} onClick={handleOpen}>
-                    Create
+                <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpen} sx={{ backgroundColor: '#1976d2', color: 'white' }}>
+                    CREATE
                 </Button>
             </div>
+            
+            {/* Create Activity Dialog */}
             <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
                 <DialogTitle>Create Activity</DialogTitle>
                 <DialogContent>
@@ -282,6 +287,8 @@ const ActivityList = ({ activity }) => {
                     <Button onClick={handleSave} variant="contained" color="primary" disabled={saving}>Save</Button>
                 </DialogActions>
             </Dialog>
+
+            {/* Activity Table */}
             <TableContainer component={Paper} style={{ marginTop: "0px" }}>
                 <Table>
                     <TableHead>
@@ -295,27 +302,29 @@ const ActivityList = ({ activity }) => {
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {
-                            activity.map((item, index) => {
-                                return(
-                                    <TableRow key={index}>
-                                        <TableCell>{index+1}</TableCell>
-                                        <TableCell>{item?.activity_name}</TableCell>
-                                        <TableCell>{item?.status}</TableCell>
-                                        <TableCell><Link to="#" className="edit-activity" onClick={() => openEditModal(item.id)}><EditNoteIcon /></Link></TableCell>
-                                        <TableCell>
-                                            <EditIcon style={{ cursor: 'pointer' }} onClick={() => handleOpenAvailModal(item)} />
-                                        </TableCell>
-                                        <TableCell>
-                                            <EditIcon style={{ cursor: 'pointer' }} onClick={() => alert(`Resources for activity: ${item.activity_name}`)} />
-                                        </TableCell>
-                                    </TableRow>
-                                )
-                            })
-                        }
+                        {safeActivity.map((item, index) => (
+                            <TableRow key={index}>
+                                <TableCell>{index + 1}</TableCell>
+                                <TableCell>{item?.activity_name}</TableCell>
+                                <TableCell>{item?.status || 'Live'}</TableCell>
+                                <TableCell>
+                                    <Link to="#" className="edit-activity" onClick={() => openEditModal(item.id)}>
+                                        <EditNoteIcon />
+                                    </Link>
+                                </TableCell>
+                                <TableCell>
+                                    <EditIcon style={{ cursor: 'pointer' }} onClick={() => handleOpenAvailModal(item)} />
+                                </TableCell>
+                                <TableCell>
+                                    <EditIcon style={{ cursor: 'pointer' }} onClick={() => alert(`Resources for activity: ${item.activity_name}`)} />
+                                </TableCell>
+                            </TableRow>
+                        ))}
                     </TableBody>
                 </Table>
             </TableContainer>
+
+            {/* Edit Activity Dialog */}
             <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="sm" fullWidth>
                 <DialogTitle>Edit Activity</DialogTitle>
                 <DialogContent>
