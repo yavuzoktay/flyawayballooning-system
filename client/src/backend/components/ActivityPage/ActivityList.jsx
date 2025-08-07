@@ -271,7 +271,7 @@ const ActivityList = ({ activity }) => {
                             control={<Checkbox checked={form.voucher_type.includes('Any Day Flight')} onChange={handleChange} name="voucher_type" value="Any Day Flight" />}
                             label="Any Day Flight"
                         />
-                    </FormGroup>
+                    </FormGroup> 
                     <TextField margin="dense" label="Shared Flight Price" name="shared_price" value={form.shared_price} onChange={handleChange} type="number" fullWidth required />
                     <TextField margin="dense" label="Private Flight Group Price" name="private_price" value={form.private_price} onChange={handleChange} type="number" fullWidth required />
                     <TextField margin="dense" label="Status" name="status" value={form.status} onChange={handleChange} select fullWidth required>
