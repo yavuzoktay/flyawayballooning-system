@@ -91,7 +91,9 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
     }, [startDate, endDate, repeat]);
 
     const handleSubmit = async () => {
-        if (!name || !selectedActivity || !startDate || !endDate || !startTime || !capacity || !available) {
+        // For 'once' repeat, endDate is not required as it's set to startDate
+        const isEndDateRequired = repeat !== 'once';
+        if (!name || !selectedActivity || !startDate || (isEndDateRequired && !endDate) || !startTime || !capacity || !available) {
             alert('Please fill in all required fields');
             return;
         }
