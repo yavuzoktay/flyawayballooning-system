@@ -28,11 +28,22 @@ jobs:
       - name: Install Dependencies and Build (Client)
         run: |
           if [ -d "client" ]; then
+            echo "Building client application..."
             cd client
             npm install
+            echo "Dependencies installed, starting build..."
             CI=false npm run build
             echo "Client build completed successfully"
+            echo "Build directory contents:"
             ls -la build/
+            echo "Static JS files:"
+            ls -la build/static/js/
+            echo "Checking for CreateAvailabilitiesModal in build:"
+            grep -r "CreateAvailabilitiesModal" build/ || echo "CreateAvailabilitiesModal not found in build"
+          else
+            echo "ERROR: client directory not found!"
+            ls -la
+            exit 1
           fi
       
       - name: Create deployment package (server + client/build)
@@ -79,6 +90,14 @@ jobs:
             
             echo "Copying client build files to server/public..."
             cp -r client/build/* server/public/
+            
+            echo "Verifying copied files..."
+            echo "server/public contents:"
+            ls -la server/public/
+            echo "server/public/static/js contents:"
+            ls -la server/public/static/js/
+            echo "Checking for CreateAvailabilitiesModal in server/public:"
+            grep -r "CreateAvailabilitiesModal" server/public/ || echo "CreateAvailabilitiesModal not found in server/public"
             
             echo "Setting proper ownership and permissions for server/public..."
             sudo chown -R nginx:nginx server/public
