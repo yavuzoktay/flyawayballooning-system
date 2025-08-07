@@ -5,6 +5,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import IconButton from '@mui/material/IconButton';
 import dayjs from 'dayjs';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 const repeatOptions = [
     { value: 'once', label: 'Just Once' },
@@ -19,6 +20,7 @@ const visibilityOptions = [
 ];
 
 const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, onCreated }) => {
+    const navigate = useNavigate();
     const [activities, setActivities] = useState([]);
     const [selectedActivity, setSelectedActivity] = useState(activityId || '');
     const [repeat, setRepeat] = useState('once');
@@ -150,7 +152,7 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
             onCreated();
             onClose();
             // Redirect to availabilities page after successful creation
-            window.location.href = `/activity/${selectedActivity}/availabilities`;
+            navigate(`/activity/${selectedActivity}/availabilities`);
         } catch (error) {
             alert('Failed to create availabilities');
         }
