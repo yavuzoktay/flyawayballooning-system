@@ -1,3 +1,4 @@
+/* webpackChunkName: "CreateAvailabilitiesModal" */
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, MenuItem, Select, InputLabel, FormControl, OutlinedInput, Chip, Box, Typography, Checkbox, FormControlLabel, FormGroup } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
