@@ -4,7 +4,7 @@ import ActivityList from "../components/ActivityPage/ActivityList";
 import useActivity from "../api/useActivity";
 
 const Activity = () => {
-    const {activity} = useActivity();
+    const {activity, loading, error} = useActivity();
 
     return (
         <div className="activity-page-wrap">
@@ -16,7 +16,13 @@ const Activity = () => {
                     <hr />
                 </div>
                 <div className="activity-body-wrap">
-                    <ActivityList activity={activity} />
+                    {error ? (
+                        <div style={{ color: 'red', padding: '20px' }}>
+                            Error: {error}
+                        </div>
+                    ) : (
+                        <ActivityList activity={activity} />
+                    )}
                 </div>
             </Container>
         </div>
