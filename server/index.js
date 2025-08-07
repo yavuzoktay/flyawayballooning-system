@@ -13,7 +13,7 @@ const dayjs = require("dayjs");
 const moment = require('moment');
 const multer = require('multer');
 const dotenv = require('dotenv');
-// const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY); // Temporarily disabled
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 dotenv.config();
 
 // Enable CORS
@@ -37,8 +37,7 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Stripe Webhook endpoint - TEMPORARILY DISABLED
-/*
+// Stripe Webhook endpoint
 app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (req, res) => {
     console.log('Stripe webhook endpoint hit!');
     
@@ -47,7 +46,7 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
     
     try {
         // Webhook signature verification
-        // event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+        event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
         console.log('Webhook signature verified successfully');
     } catch (err) {
         console.error('Webhook signature verification failed:', err.message);
@@ -62,58 +61,57 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
             const session_id = session.id;
             console.log('Using session ID:', session_id);
             
-            // const storeData = stripeSessionStore[session_id];
-            // if (!storeData) {
-            //     console.error('Stripe session store data not found for session_id:', session_id);
-            //     return res.status(400).send('Session data not found');
-            // }
+            const storeData = stripeSessionStore[session_id];
+            if (!storeData) {
+                console.error('Stripe session store data not found for session_id:', session_id);
+                return res.status(400).send('Session data not found');
+            }
             
             // Duplicate kontrolü - aynı session için birden fazla işlem yapılmasını engelle
-            // if (storeData.processed) {
-            //     console.log('Session already processed, skipping:', session_id);
-            //     return res.json({received: true, message: 'Session already processed'});
-            // }
+            if (storeData.processed) {
+                console.log('Session already processed, skipping:', session_id);
+                return res.json({received: true, message: 'Session already processed'});
+            }
             
             // Session ID kontrolü - session data var mı kontrol et
-            // if (!storeData.bookingData && !storeData.voucherData) {
-            //     console.log('No booking/voucher data found for session:', session_id);
-            //     return res.status(400).send('No booking/voucher data found');
-            // }
+            if (!storeData.bookingData && !storeData.voucherData) {
+                console.log('No booking/voucher data found for session:', session_id);
+                return res.status(400).send('No booking/voucher data found');
+            }
             
             // İşlem başlamadan önce processed flag'ini set et
-            // storeData.processed = true;
+            storeData.processed = true;
             
-            // console.log('Processing webhook for session:', session_id, 'Type:', storeData.type);
+            console.log('Processing webhook for session:', session_id, 'Type:', storeData.type);
             
-            // try {
-            //     if (storeData.type === 'booking') {
-            //         console.log('Creating booking via webhook:', storeData.bookingData);
-            //         // Direct database insertion instead of HTTP call
-            //         await createBookingFromWebhook(storeData.bookingData);
-            //     } else if (storeData.type === 'voucher') {
-            //         console.log('Creating voucher via webhook:', storeData.voucherData);
-            //         // Direct database insertion instead of HTTP call
-            //         await createVoucherFromWebhook(storeData.voucherData);
-            //     }
+            try {
+                if (storeData.type === 'booking') {
+                    console.log('Creating booking via webhook:', storeData.bookingData);
+                    // Direct database insertion instead of HTTP call
+                    await createBookingFromWebhook(storeData.bookingData);
+                } else if (storeData.type === 'voucher') {
+                    console.log('Creating voucher via webhook:', storeData.voucherData);
+                    // Direct database insertion instead of HTTP call
+                    await createVoucherFromWebhook(storeData.voucherData);
+                }
                 
-            //     // Session data temizle
-            //     delete stripeSessionStore[session_id];
-            //     console.log('Session data cleaned up for:', session_id);
-            // } catch (error) {
-            //     console.error('Error processing webhook:', error);
-            //     // Hata durumunda processed flag'ini geri al
-            //     storeData.processed = false;
-            //     return res.status(500).send('Internal server error');
-            // }
+                // Session data temizle
+                delete stripeSessionStore[session_id];
+                console.log('Session data cleaned up for:', session_id);
+            } catch (error) {
+                console.error('Error processing webhook:', error);
+                // Hata durumunda processed flag'ini geri al
+                storeData.processed = false;
+                return res.status(500).send('Internal server error');
+            }
         }
         
         res.json({received: true});
-    // } catch (error) {
-    //     console.error('Webhook processing error:', error);
-    //     res.status(500).send('Webhook processing failed');
-    // }
+    } catch (error) {
+        console.error('Webhook processing error:', error);
+        res.status(500).send('Webhook processing failed');
+    }
 });
-*/
 
 // Body parsing middleware - webhook'tan SONRA
 app.use(express.json()); // To parse JSON-encoded request bodies
@@ -2187,8 +2185,8 @@ app.delete('/api/date-requests/:id', (req, res) => {
     });
 });
 
-// Geçici Stripe session verisi için bellek içi bir store - TEMPORARILY DISABLED
-// const stripeSessionStore = {};
+// Geçici Stripe session verisi için bellek içi bir store
+const stripeSessionStore = {};
 
 // Webhook için booking oluşturma fonksiyonu
 async function createBookingFromWebhook(bookingData) {
@@ -2391,8 +2389,7 @@ async function createVoucherFromWebhook(voucherData) {
     });
 }
 
-// Stripe Checkout Session oluşturma endpointini güncelle - TEMPORARILY DISABLED
-/*
+// Stripe Checkout Session oluşturma endpointini güncelle
 app.post('/api/create-checkout-session', async (req, res) => {
     try {
         const { totalPrice, currency = 'GBP', bookingData, voucherData, type } = req.body;
@@ -2401,6 +2398,11 @@ app.post('/api/create-checkout-session', async (req, res) => {
         }
         // Stripe fiyatı kuruş cinsinden ister
         const amount = Math.round(Number(totalPrice) * 100);
+        
+        // Environment'a göre URL'leri ayarla
+        const isProduction = process.env.NODE_ENV === 'production';
+        const baseUrl = isProduction ? 'https://flyawayballooning-book.com' : 'http://localhost:3000';
+        
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             line_items: [
@@ -2417,8 +2419,8 @@ app.post('/api/create-checkout-session', async (req, res) => {
                 },
             ],
             mode: 'payment',
-            success_url: `https://flyawayballooning-book.com/?payment=success`,
-            cancel_url: `https://flyawayballooning-book.com/?payment=cancel`,
+            success_url: `${baseUrl}/?payment=success`,
+            cancel_url: `${baseUrl}/?payment=cancel`,
             metadata: {}
         });
         // bookingData veya voucherData'yı session_id ile store'da sakla
@@ -2438,6 +2440,5 @@ app.post('/api/create-checkout-session', async (req, res) => {
         res.status(500).json({ success: false, message: 'Stripe Checkout Session oluşturulamadı', error: error.message });
     }
 });
-*/
 
 
