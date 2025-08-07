@@ -53,44 +53,17 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > deploy_key
           chmod 600 deploy_key
           ssh -i deploy_key -o StrictHostKeyChecking=no ec2-user@34.205.25.8 '
-            mkdir -p ~/flyawayballooning-system-backend &&
             cd ~/flyawayballooning-system-backend &&
             aws s3 cp s3://flyawayballooning-backend/backend-deploy.zip . &&
+            sudo rm -rf client/build &&
             unzip -o backend-deploy.zip -d . &&
-            
-            # Fix permissions before copying files
-            echo "Fixing permissions..."
-            sudo chown -R ec2-user:ec2-user .
-            sudo chmod -R 755 .
-            
-            # Remove old build files with proper permissions
-            if [ -d "client/build" ]; then
-              echo "Removing old build files..."
-              sudo rm -rf client/build
-              mkdir -p client/build
-            fi
-            
-            # Copy new build files
-            if [ -d "client/build" ]; then
-              echo "Copying new build files..."
-              cp -r client/build/* client/build/ 2>/dev/null || true
-            fi
-            
-            # Set proper permissions for build files
-            echo "Setting build file permissions..."
-            sudo chown -R nginx:nginx client/build
-            sudo chmod -R 755 client/build
-            
-            # Copy to server public directory
-            if [ -d "client/build" ]; then
-              echo "Copying to server public directory..."
-              rm -rf server/public
-              mkdir -p server/public
-              cp -r client/build/* server/public/
-              sudo chown -R nginx:nginx server/public
-              sudo chmod -R 755 server/public
-            fi
-            
+            sudo chown -R ec2-user:ec2-user client/build &&
+            sudo chmod -R 755 client/build &&
+            rm -rf server/public &&
+            mkdir -p server/public &&
+            cp -r client/build/* server/public/ &&
+            sudo chown -R nginx:nginx server/public &&
+            sudo chmod -R 755 server/public &&
             cd server && npm install &&
             if ! command -v pm2 > /dev/null; then sudo npm install -g pm2; fi &&
             pm2 delete flyawayballooning-server 2>/dev/null || true &&
