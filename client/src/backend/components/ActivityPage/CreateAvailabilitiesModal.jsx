@@ -48,6 +48,13 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
         }
     }, [open]);
 
+    // Set selectedActivity when modal opens with activityId
+    useEffect(() => {
+        if (open && activityId) {
+            setSelectedActivity(activityId);
+        }
+    }, [open, activityId]);
+
     // Calculate how many availabilities will be created
     useEffect(() => {
         if (!startDate || !endDate) {
@@ -142,6 +149,8 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
             await axios.post(`/api/activity/${selectedActivity}/availabilities`, { availabilities });
             onCreated();
             onClose();
+            // Redirect to availabilities page after successful creation
+            window.location.href = `/activity/${selectedActivity}/availabilities`;
         } catch (error) {
             alert('Failed to create availabilities');
         }
