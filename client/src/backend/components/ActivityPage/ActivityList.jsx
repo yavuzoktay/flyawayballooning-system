@@ -14,6 +14,7 @@ import dayjs from 'dayjs';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { Checkbox, FormControlLabel, FormGroup } from '@mui/material';
+import CreateAvailabilitiesModal from './CreateAvailabilitiesModal';
 
 const ActivityList = ({ activity }) => {
     const [open, setOpen] = useState(false);
@@ -225,7 +226,8 @@ const ActivityList = ({ activity }) => {
         setEditSaving(false);
     };
     const handleOpenAvailModal = (activity) => {
-        navigate(`/activity/${activity.id}/availabilities`);
+        setAvailActivity(activity);
+        setAvailModalOpen(true);
     };
 
     // Ensure activity is always an array
@@ -375,6 +377,18 @@ const ActivityList = ({ activity }) => {
                     <Button onClick={handleEditSave} variant="contained" color="primary" disabled={editSaving}>Save</Button>
                 </DialogActions>
             </Dialog>
+
+            {/* Create Availabilities Modal */}
+            <CreateAvailabilitiesModal 
+                open={availModalOpen} 
+                onClose={() => setAvailModalOpen(false)} 
+                activityName={availActivity?.activity_name} 
+                activityId={availActivity?.id} 
+                onCreated={() => {
+                    setAvailModalOpen(false);
+                    setAvailActivity(null);
+                }} 
+            />
         </div>
     )
 }
