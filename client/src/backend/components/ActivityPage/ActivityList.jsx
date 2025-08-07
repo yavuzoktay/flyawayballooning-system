@@ -55,18 +55,21 @@ const ActivityList = ({ activity }) => {
 
   const fetchActivities = async () => {
     try {
+      setLoading(true);
       const response = await axios.get('/api/activities');
-      if (response.data.success && Array.isArray(response.data.data)) {
+      console.log('API Response:', response.data); // Debug için
+      
+      if (response.data && response.data.success && Array.isArray(response.data.data)) {
         setActivities(response.data.data);
       } else {
         console.error('Invalid response format:', response.data);
         setActivities([]);
       }
-      setLoading(false);
     } catch (error) {
       console.error('Error fetching activities:', error);
       setError('Failed to fetch activities');
       setActivities([]);
+    } finally {
       setLoading(false);
     }
   };
@@ -121,8 +124,15 @@ const ActivityList = ({ activity }) => {
     }));
   };
 
+  // Güvenli array kontrolü
+  const safeActivities = Array.isArray(activities) ? activities : [];
+
   if (loading) {
     return <Typography>Loading activities...</Typography>;
+  }
+
+  if (error) {
+    return <Typography color="error">{error}</Typography>;
   }
 
   return (
@@ -138,49 +148,53 @@ const ActivityList = ({ activity }) => {
         </Button>
       </Box>
 
-      <Grid container spacing={3}>
-        {Array.isArray(activities) && activities.map((activity) => (
-          <Grid item xs={12} sm={6} md={4} key={activity.id}>
-            <Card>
-              <CardContent>
-                <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-                  <Box flex={1}>
-                    <Typography variant="h6" gutterBottom>
-                      {activity.activity_name || activity.name}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" paragraph>
-                      {activity.description || 'No description available'}
-                    </Typography>
-                    <Box display="flex" gap={1} flexWrap="wrap">
-                      <Chip label={`${activity.duration || 'N/A'} hours`} size="small" />
-                      <Chip label={`$${activity.price || 'N/A'}`} size="small" color="primary" />
-                      <Chip label={`Max: ${activity.capacity || activity.maxCapacity || 'N/A'}`} size="small" />
+      {safeActivities.length === 0 ? (
+        <Typography>No activities found.</Typography>
+      ) : (
+        <Grid container spacing={3}>
+          {safeActivities.map((activity) => (
+            <Grid item xs={12} sm={6} md={4} key={activity.id}>
+              <Card>
+                <CardContent>
+                  <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+                    <Box flex={1}>
+                      <Typography variant="h6" gutterBottom>
+                        {activity.activity_name || activity.name}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" paragraph>
+                        {activity.description || 'No description available'}
+                      </Typography>
+                      <Box display="flex" gap={1} flexWrap="wrap">
+                        <Chip label={`${activity.duration || 'N/A'} hours`} size="small" />
+                        <Chip label={`$${activity.price || 'N/A'}`} size="small" color="primary" />
+                        <Chip label={`Max: ${activity.capacity || activity.maxCapacity || 'N/A'}`} size="small" />
+                      </Box>
+                      <Typography variant="body2" color="text.secondary" mt={1}>
+                        Location: {activity.location || 'N/A'}
+                      </Typography>
                     </Box>
-                    <Typography variant="body2" color="text.secondary" mt={1}>
-                      Location: {activity.location || 'N/A'}
-                    </Typography>
+                    <Box>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleEditClick(activity)}
+                      >
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => handleDeleteClick(activity)}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Box>
                   </Box>
-                  <Box>
-                    <IconButton
-                      size="small"
-                      onClick={() => handleEditClick(activity)}
-                    >
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => handleDeleteClick(activity)}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      )}
 
       {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
