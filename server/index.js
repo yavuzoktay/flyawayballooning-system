@@ -46,6 +46,11 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
     
     try {
         // Webhook signature verification
+        if (!process.env.STRIPE_WEBHOOK_SECRET) {
+            console.error('STRIPE_WEBHOOK_SECRET environment variable is not set');
+            return res.status(500).send('Webhook configuration error');
+        }
+        
         event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
         console.log('Webhook signature verified successfully');
     } catch (err) {
@@ -2392,16 +2397,32 @@ async function createVoucherFromWebhook(voucherData) {
 // Stripe Checkout Session oluşturma endpointini güncelle
 app.post('/api/create-checkout-session', async (req, res) => {
     try {
+        console.log('Create checkout session request received:', req.body);
+        
+        // Stripe secret key kontrolü
+        if (!process.env.STRIPE_SECRET_KEY) {
+            console.error('STRIPE_SECRET_KEY environment variable is not set');
+            return res.status(500).json({ 
+                success: false, 
+                message: 'Stripe configuration error: Secret key not found' 
+            });
+        }
+        
         const { totalPrice, currency = 'GBP', bookingData, voucherData, type } = req.body;
         if (!totalPrice || (!bookingData && !voucherData)) {
             return res.status(400).json({ success: false, message: 'Eksik veri: totalPrice veya bookingData/voucherData yok.' });
         }
+        
+        console.log('Processing payment:', { totalPrice, type, hasBookingData: !!bookingData, hasVoucherData: !!voucherData });
+        
         // Stripe fiyatı kuruş cinsinden ister
         const amount = Math.round(Number(totalPrice) * 100);
         
         // Environment'a göre URL'leri ayarla
         const isProduction = process.env.NODE_ENV === 'production';
         const baseUrl = isProduction ? 'https://flyawayballooning-book.com' : 'http://localhost:3000';
+        
+        console.log('Creating Stripe session with:', { amount, baseUrl, isProduction });
         
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
@@ -2423,6 +2444,9 @@ app.post('/api/create-checkout-session', async (req, res) => {
             cancel_url: `${baseUrl}/?payment=cancel`,
             metadata: {}
         });
+        
+        console.log('Stripe session created:', session.id);
+        
         // bookingData veya voucherData'yı session_id ile store'da sakla
         const session_id = session.id;
         stripeSessionStore[session_id] = {
@@ -2430,14 +2454,22 @@ app.post('/api/create-checkout-session', async (req, res) => {
             bookingData,
             voucherData
         };
+        
         // Stripe metadata'ya session_id ekle
         await stripe.checkout.sessions.update(session_id, {
             metadata: { session_id }
         });
+        
+        console.log('Session stored and metadata updated');
         res.json({ success: true, sessionId: session_id });
     } catch (error) {
         console.error('Stripe Checkout Session error:', error);
-        res.status(500).json({ success: false, message: 'Stripe Checkout Session oluşturulamadı', error: error.message });
+        res.status(500).json({ 
+            success: false, 
+            message: 'Stripe Checkout Session oluşturulamadı', 
+            error: error.message,
+            details: error.stack
+        });
     }
 });
 
