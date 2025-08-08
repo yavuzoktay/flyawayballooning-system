@@ -13,13 +13,14 @@ const dayjs = require("dayjs");
 const moment = require('moment');
 const multer = require('multer');
 const dotenv = require('dotenv');
+dotenv.config();
+
 // Stripe configuration - ensure we're using live mode keys
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 if (!stripeSecretKey) {
     console.error('STRIPE_SECRET_KEY environment variable is not set');
 }
 const stripe = require('stripe')(stripeSecretKey);
-dotenv.config();
 
 // Enable CORS
 app.use(cors({
