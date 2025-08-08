@@ -15,12 +15,21 @@ const multer = require('multer');
 const dotenv = require('dotenv');
 dotenv.config();
 
-// Stripe configuration - ensure we're using live mode keys
+// Stripe configuration - environment-based keys
+const isProduction = process.env.NODE_ENV === 'production';
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+
+console.log('Environment:', isProduction ? 'PRODUCTION' : 'DEVELOPMENT');
+console.log('Stripe secret key loaded:', stripeSecretKey ? 'YES' : 'NO');
+console.log('Stripe key type:', stripeSecretKey?.startsWith('sk_live_') ? 'LIVE' : 'TEST');
+console.log('Stripe secret key (first 10 chars):', stripeSecretKey ? stripeSecretKey.substring(0, 10) + '...' : 'NOT SET');
+
 if (!stripeSecretKey) {
     console.error('STRIPE_SECRET_KEY environment variable is not set');
 }
-const stripe = require('stripe')(stripeSecretKey);
+const stripe = require('stripe')(stripeSecretKey, {
+    apiVersion: '2020-08-27'
+});
 
 // Enable CORS
 app.use(cors({
@@ -32,6 +41,8 @@ app.use(cors({
         'http://localhost:3000', 
         'http://localhost:3001',
         'http://localhost:3003',
+        'http://localhost:3004',
+        'http://localhost:3006',
         'http://34.205.25.8:3002'
     ],
     methods: "GET,POST,PUT,DELETE,OPTIONS",
@@ -58,6 +69,7 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
             return res.status(500).send('Webhook configuration error');
         }
         
+        console.log('Webhook secret:', process.env.STRIPE_WEBHOOK_SECRET);
         event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
         console.log('Webhook signature verified successfully');
     } catch (err) {
@@ -2407,7 +2419,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
         console.log('Create checkout session request received:', req.body);
         
         // Stripe secret key kontrolü
-        if (!process.env.STRIPE_SECRET_KEY) {
+        if (!stripeSecretKey) {
             console.error('STRIPE_SECRET_KEY environment variable is not set');
             return res.status(500).json({ 
                 success: false, 
@@ -2447,9 +2459,11 @@ app.post('/api/create-checkout-session', async (req, res) => {
                 },
             ],
             mode: 'payment',
-            success_url: `${baseUrl}/?payment=success`,
+            success_url: `${baseUrl}/?payment=success&session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${baseUrl}/?payment=cancel`,
-            metadata: {}
+            metadata: {
+                type: type || (voucherData ? 'voucher' : 'booking')
+            }
         });
         
         console.log('Stripe session created:', session.id);
@@ -2468,9 +2482,16 @@ app.post('/api/create-checkout-session', async (req, res) => {
         });
         
         console.log('Session stored and metadata updated');
+        console.log('Sending response:', { success: true, sessionId: session_id });
         res.json({ success: true, sessionId: session_id });
     } catch (error) {
         console.error('Stripe Checkout Session error:', error);
+        console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            stripeKey: stripeSecretKey ? 'SET' : 'NOT SET',
+            environment: isProduction ? 'PRODUCTION' : 'DEVELOPMENT'
+        });
         res.status(500).json({ 
             success: false, 
             message: 'Stripe Checkout Session oluşturulamadı', 
