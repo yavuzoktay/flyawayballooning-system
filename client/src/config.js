@@ -8,9 +8,14 @@ const getApiBaseUrl = () => {
   return process.env.REACT_APP_API_URL || 'https://flyawayballooning-system.com';
 };
 
+// Prefer env var if provided; otherwise hardcode TEST key
+const TEST_PK = 'pk_test_51HjVLCHwUKMuFjtp0QPX0KVZF1afEBmWUAcppWC6zTPum93jvgSUzd8X5dMQrLh3vaEUPruz5sgDY1jAbcf9pcuS00tmeruGek';
+const envPk = typeof process !== 'undefined' ? process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY : undefined;
+const resolvedPk = envPk && envPk.startsWith('pk_') ? envPk : TEST_PK;
+
 const config = {
   API_BASE_URL: getApiBaseUrl(),
-  STRIPE_PUBLIC_KEY: process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY || 'pk_live_51HjVLCHwUKMuFjtpYqU29dM4gqkLTiwG2zsgCtSfRe2Ehj44Ewpd3UpRAb3lc8PiOsKwGsIcOSD7XR6FmaVaoHHK00AcQ8TPsF'
+  STRIPE_PUBLIC_KEY: resolvedPk
 };
 
 export default config; 
