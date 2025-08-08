@@ -116,6 +116,23 @@ jobs:
               sudo npm install -g pm2
             fi
             
+            echo "Creating environment file for production..."
+            cat > .env << 'EOF'
+            # Database Configuration
+            DB_HOST=localhost
+            DB_USER=root
+            DB_PASSWORD=your_password_here
+            DB_NAME=flyawayballooning
+            
+            # Stripe Configuration
+            STRIPE_SECRET_KEY=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
+            STRIPE_WEBHOOK_SECRET=whsec_yr1mQ3yHWP3NILJucM0PuvmCkQnsgn3w
+            
+            # Server Configuration
+            PORT=3002
+            NODE_ENV=production
+            EOF
+            
             echo "Restarting application with PM2..."
             pm2 delete flyawayballooning-server 2>/dev/null || true
             PORT=3002 pm2 start index.js --name flyawayballooning-server
