@@ -25,6 +25,7 @@ app.use(cors({
         'http://flyawayballooning-system.com',
         'http://localhost:3000', 
         'http://localhost:3001',
+        'http://localhost:3003',
         'http://34.205.25.8:3002'
     ],
     methods: "GET,POST,PUT,DELETE,OPTIONS",
