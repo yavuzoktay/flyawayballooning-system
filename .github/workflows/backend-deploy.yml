@@ -124,14 +124,18 @@ jobs:
             DB_PASSWORD=qumton-jeghuz-doKxy3
             DB_NAME=trip_booking
             
-            # Stripe Configuration (Production - Live Mode)
-            STRIPE_SECRET_KEY=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
-            STRIPE_WEBHOOK_SECRET=whsec_yr1mQ3yHWP3NILJucM0PuvmCkQnsgn3w
+            # Stripe Configuration (Test Mode for Production)
+            STRIPE_SECRET_KEY=your_stripe_secret_key_here
+            STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret_here
             
             # Server Configuration
             PORT=3002
             NODE_ENV=production
             EOF
+            
+            echo "Running EC2 environment setup script..."
+            chmod +x setup-ec2-env.sh
+            ./setup-ec2-env.sh
             
             echo "Restarting application with PM2..."
             pm2 delete flyawayballooning-server 2>/dev/null || true
