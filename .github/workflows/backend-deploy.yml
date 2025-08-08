@@ -117,7 +117,7 @@ jobs:
             fi
             
             echo "Creating environment file for production..."
-            cat > .env << 'EOF'
+            cat > .env << EOF
             # Database Configuration
             DB_HOST=trip-booking-database.c9mqyasow9hg.us-east-1.rds.amazonaws.com
             DB_USER=admin
@@ -125,17 +125,13 @@ jobs:
             DB_NAME=trip_booking
             
             # Stripe Configuration (Test Mode)
-            STRIPE_SECRET_KEY=your_stripe_secret_key_here
-            STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret_here
+            STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
+            STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
             
             # Server Configuration
             PORT=3002
             NODE_ENV=production
             EOF
-            
-            echo "Running EC2 environment setup script..."
-            chmod +x setup-ec2-env.sh
-            ./setup-ec2-env.sh
             
             echo "Restarting application with PM2..."
             pm2 delete flyawayballooning-server 2>/dev/null || true
