@@ -17,8 +17,8 @@ DB_PASSWORD=qumton-jeghuz-doKxy3
 DB_NAME=trip_booking
 
 # Stripe Configuration (Test Mode)
-STRIPE_SECRET_KEY=your_stripe_secret_key_here
-STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret_here
+STRIPE_SECRET_KEY=sk_test_51HjVLCHwUKMuFjtpIAaHKDiWRCf3y6xXl4ZeVqRUefWCiNUsJdr93BPnvRvx69NZZV4HkgglpuOVUjI1X77lYNtk00vYeIs8qV
+STRIPE_WEBHOOK_SECRET=whsec_d9486cdc4554cef4e53d8f65b95297cde986e5e64d99bda605521788d2d82595
 
 # Server Configuration
 PORT=3002
