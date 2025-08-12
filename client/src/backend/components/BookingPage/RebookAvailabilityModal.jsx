@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, CircularProgress, FormControl, InputLabel, Select, MenuItem, Box } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, CircularProgress, FormControl, InputLabel, Select, MenuItem, Box, Checkbox, FormControlLabel, FormGroup } from '@mui/material';
 import dayjs from 'dayjs';
 import axios from 'axios';
 
-const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flightType }) => {
+const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flightType, onFlightTypesChange, onVoucherTypesChange }) => {
     const [availabilities, setAvailabilities] = useState([]);
     const [loading, setLoading] = useState(false);
     const [selectedDate, setSelectedDate] = useState(null);
@@ -19,8 +19,8 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
     const [loadingActivities, setLoadingActivities] = useState(false);
 
     // Yeni: Modalda flight type seçici için state
-    const [availableFlightTypes, setAvailableFlightTypes] = useState([]);
-    const [selectedFlightType, setSelectedFlightType] = useState('');
+    const [selectedFlightTypes, setSelectedFlightTypes] = useState([]);
+    const [selectedVoucherTypes, setSelectedVoucherTypes] = useState([]);
 
     // availableDates state'i
     const [availableDates, setAvailableDates] = useState([]);
@@ -73,16 +73,12 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                     .then(res => {
                         if (res.data.success) {
                             setAvailabilities(res.data.data);
-                            // Flight types dropdown için sadece flight_types alanı kullanılacak
-                            const normalizeType = t => t.replace(' Flight', '').trim().toLowerCase();
-                            const allTypes = Array.from(new Set(
-                                res.data.data
-                                    .map(a => a.flight_types || 'All')
-                                    .flatMap(types => types.split(',').map(t => normalizeType(t)))
-                                    .filter(t => t && t !== 'all')
-                            ));
-                            setAvailableFlightTypes(allTypes);
-                            if (allTypes.length > 0) setSelectedFlightType(allTypes[0]);
+                            // Initialize flight types based on activity data
+                            const flightTypes = ['private', 'shared'];
+                            setSelectedFlightTypes(flightTypes);
+                            // Initialize voucher types
+                            const voucherTypes = ['weekday morning', 'flexible weekday', 'any day flight'];
+                            setSelectedVoucherTypes(voucherTypes);
                         }
                     })
                     .catch(() => setError('Could not fetch availabilities'))
@@ -93,37 +89,47 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
 
     // Flight type değişince sadece filtrele
     useEffect(() => {
-        // Flight type seçili değilse, ilk uygun flight type otomatik seç
-        if (!selectedFlightType && availableFlightTypes.length > 0) {
-            setSelectedFlightType(availableFlightTypes[0]);
-            return;
-        }
+        if (selectedFlightTypes.length === 0 || availabilities.length === 0) return;
 
         const normalizeType = t => t.replace(' Flight', '').trim().toLowerCase();
-        const bookingType = normalizeType(selectedFlightType || '');
-
+        const selectedTypes = selectedFlightTypes.map(t => normalizeType(t));
+ 
         const filtered = availabilities.filter(a => {
             if (a.status && a.status.toLowerCase() !== 'open') return false;
             if (a.available !== undefined && a.available <= 0) return false;
             if (!a.flight_types || a.flight_types.toLowerCase() === 'all') return true;
             // Her bir flight_types'ı normalize et ve includes ile kontrol et
             const typesArr = a.flight_types.split(',').map(t => normalizeType(t));
-            return typesArr.includes(bookingType);
+            return selectedTypes.some(selectedType => typesArr.includes(selectedType));
         });
-
-        console.log('DEBUG: selectedFlightType:', selectedFlightType, 'bookingType:', bookingType, 'availabilities:', availabilities, 'filtered:', filtered);
-
+ 
+        console.log('DEBUG: selectedFlightTypes:', selectedFlightTypes, 'availabilities:', availabilities, 'filtered:', filtered);
+ 
         setFilteredAvailabilities(filtered);
         setSelectedDate(null);
         setSelectedTime(null);
         setAvailableDates(Array.from(new Set(filtered.map(a => a.date))).filter(date => date));
-    }, [selectedFlightType, availabilities, availableFlightTypes]);
+    }, [selectedFlightTypes, availabilities]);
 
     // Flight type değişince selectedDate ve selectedTime sıfırlansın
     useEffect(() => {
         setSelectedDate(null);
         setSelectedTime(null);
-    }, [selectedFlightType]);
+    }, [selectedFlightTypes]);
+
+    // Notify parent component when flight types change
+    useEffect(() => {
+        if (onFlightTypesChange) {
+            onFlightTypesChange(selectedFlightTypes);
+        }
+    }, [selectedFlightTypes, onFlightTypesChange]);
+
+    // Notify parent component when voucher types change
+    useEffect(() => {
+        if (onVoucherTypesChange) {
+            onVoucherTypesChange(selectedVoucherTypes);
+        }
+    }, [selectedVoucherTypes, onVoucherTypesChange]);
 
     const getTimesForDate = (date) => {
         const dateStr = dayjs(date).format('YYYY-MM-DD');
@@ -204,27 +210,93 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                         {selectedActivity && selectedLocation && (
                             <>
                                 {/* Flight Type Selector */}
-                                {availableFlightTypes.length > 0 && (
-                                    <Box sx={{ mb: 2 }}>
-                                        {selectedFlightType && (
-                                            <Typography variant="subtitle2" sx={{ mb: 1, color: 'primary.main' }}>
-                                                Selected Flight Type: <b>{selectedFlightType.charAt(0).toUpperCase() + selectedFlightType.slice(1)}</b>
-                                            </Typography>
-                                        )}
-                                        <FormControl fullWidth>
-                                            <InputLabel>Flight Type</InputLabel>
-                                            <Select
-                                                value={selectedFlightType}
-                                                onChange={e => setSelectedFlightType(e.target.value)}
-                                                label="Flight Type"
-                                            >
-                                                {availableFlightTypes.map(type => (
-                                                    <MenuItem key={type} value={type}>{type.charAt(0).toUpperCase() + type.slice(1)}</MenuItem>
-                                                ))}
-                                            </Select>
-                                        </FormControl>
-                                    </Box>
-                                )}
+                                <Box sx={{ mb: 3 }}>
+                                    <Typography variant="h6" sx={{ mb: 2 }}>Flight Type:</Typography>
+                                    <FormGroup row>
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    checked={selectedFlightTypes.includes('private')}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) {
+                                                            setSelectedFlightTypes(prev => [...prev, 'private']);
+                                                        } else {
+                                                            setSelectedFlightTypes(prev => prev.filter(t => t !== 'private'));
+                                                        }
+                                                    }}
+                                                />
+                                            }
+                                            label="Private"
+                                        />
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    checked={selectedFlightTypes.includes('shared')}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) {
+                                                            setSelectedFlightTypes(prev => [...prev, 'shared']);
+                                                        } else {
+                                                            setSelectedFlightTypes(prev => prev.filter(t => t !== 'shared'));
+                                                        }
+                                                    }}
+                                                />
+                                            }
+                                            label="Shared"
+                                        />
+                                    </FormGroup>
+                                </Box>
+
+                                {/* Voucher Type Selector */}
+                                <Box sx={{ mb: 3 }}>
+                                    <Typography variant="h6" sx={{ mb: 2 }}>Voucher Type:</Typography>
+                                    <FormGroup row>
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    checked={selectedVoucherTypes.includes('weekday morning')}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) {
+                                                            setSelectedVoucherTypes(prev => [...prev, 'weekday morning']);
+                                                        } else {
+                                                            setSelectedVoucherTypes(prev => prev.filter(t => t !== 'weekday morning'));
+                                                        }
+                                                    }}
+                                                />
+                                            }
+                                            label="Weekday Morning"
+                                        />
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    checked={selectedVoucherTypes.includes('flexible weekday')}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) {
+                                                            setSelectedVoucherTypes(prev => [...prev, 'flexible weekday']);
+                                                        } else {
+                                                            setSelectedVoucherTypes(prev => prev.filter(t => t !== 'flexible weekday'));
+                                                        }
+                                                    }}
+                                                />
+                                            }
+                                            label="Flexible Weekday"
+                                        />
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    checked={selectedVoucherTypes.includes('any day flight')}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) {
+                                                            setSelectedVoucherTypes(prev => [...prev, 'any day flight']);
+                                                        } else {
+                                                            setSelectedVoucherTypes(prev => prev.filter(t => t !== 'any day flight'));
+                                                        }
+                                                    }}
+                                                />
+                                            }
+                                            label="Any Day Flight"
+                                        />
+                                    </FormGroup>
+                                </Box>
                                 {loading ? (
                                     <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
                                         <CircularProgress />
@@ -298,7 +370,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                 <Button
                     onClick={() => {
                         console.log('Confirming slot with activityId:', activityId);
-                        onSlotSelect(selectedDate, selectedTime, activityId, selectedActivity, selectedLocation);
+                        onSlotSelect(selectedDate, selectedTime, activityId, selectedActivity, selectedLocation, selectedFlightTypes, selectedVoucherTypes);
                     }}
                     disabled={!selectedDate || !selectedTime || !selectedActivity || !selectedLocation}
                     variant="contained"
