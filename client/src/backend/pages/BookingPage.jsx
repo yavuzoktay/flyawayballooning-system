@@ -668,7 +668,7 @@ const BookingPage = () => {
         setRebookModalOpen(true);
     };
 
-    const handleRebookSlotSelect = async (date, time, activityId, selectedActivity, selectedLocation, selectedFlightTypeFromModal) => {
+    const handleRebookSlotSelect = async (date, time, activityId, selectedActivity, selectedLocation, selectedFlightTypes, selectedVoucherTypes) => {
         if (!bookingDetail || !bookingDetail.booking) return;
         setRebookLoading(true);
         try {
@@ -677,14 +677,24 @@ const BookingPage = () => {
             const activity = activityResponse.data.data;
             
             // Kullanıcının seçtiği flight type'ı doğru formatla gönder
-            let selectedFlightType = selectedFlightTypeFromModal || bookingDetail.booking.flight_type || '';
-            let flightType;
-            if (selectedFlightType.toLowerCase().includes('shared')) {
-                flightType = 'Shared Flight';
-            } else if (selectedFlightType.toLowerCase().includes('private')) {
-                flightType = 'Private Flight';
-            } else {
-                flightType = selectedFlightType; // fallback
+            let flightType = '';
+            if (selectedFlightTypes && selectedFlightTypes.length > 0) {
+                // Check if Shared is selected
+                if (selectedFlightTypes.includes('shared')) {
+                    flightType = 'Shared Flight';
+                } else if (selectedFlightTypes.includes('private')) {
+                    flightType = 'Private Flight';
+                }
+            }
+            
+            // Fallback to existing booking flight type if no selection
+            if (!flightType) {
+                const existingFlightType = bookingDetail.booking.flight_type || '';
+                if (existingFlightType.toLowerCase().includes('shared')) {
+                    flightType = 'Shared Flight';
+                } else if (existingFlightType.toLowerCase().includes('private')) {
+                    flightType = 'Private Flight';
+                }
             }
 
             // Determine passenger count

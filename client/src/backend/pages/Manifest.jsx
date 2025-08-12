@@ -502,7 +502,7 @@ const Manifest = () => {
         setRebookModalOpen(true);
     };
 
-    const handleRebookSlotSelect = async (date, time, activityId, selectedActivity, selectedLocation) => {
+    const handleRebookSlotSelect = async (date, time, activityId, selectedActivity, selectedLocation, selectedFlightTypes, selectedVoucherTypes) => {
         if (!bookingDetail || !bookingDetail.booking) return;
         setRebookLoading(true);
         try {

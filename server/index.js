@@ -45,7 +45,7 @@ app.use(cors({
         'http://localhost:3006',
         'http://34.205.25.8:3002'
     ],
-    methods: "GET,POST,PUT,DELETE,OPTIONS",
+    methods: "GET,POST,PUT,DELETE,PATCH,OPTIONS",
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     credentials: true
 }));
