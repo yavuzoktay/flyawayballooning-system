@@ -161,7 +161,7 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
     return (
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
             <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                Create Availabilities
+                Create Availabilities{activityName ? ` - ${activityName}` : ''}
                 <IconButton onClick={onClose}><CloseIcon /></IconButton>
             </DialogTitle>
             <DialogContent>

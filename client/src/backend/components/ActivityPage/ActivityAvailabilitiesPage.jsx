@@ -28,7 +28,7 @@ const columns = [
 const ActivityAvailabilitiesPage = () => {
     const navigate = useNavigate();
     const { id } = useParams();
-    const activityName = 'Somerset Private'; // İleride API'den çekilebilir
+    const [activityName, setActivityName] = useState('');
     const [modalOpen, setModalOpen] = useState(false);
     const [availabilities, setAvailabilities] = useState([]);
     const [selectedRow, setSelectedRow] = useState(null);
@@ -37,6 +37,13 @@ const ActivityAvailabilitiesPage = () => {
     const [selectedRows, setSelectedRows] = useState([]);
 
     useEffect(() => {
+        // Fetch activity details to get the activity name
+        axios.get(`/api/activity/${id}`).then(res => {
+            if (res.data.success) {
+                setActivityName(res.data.data.activity_name || '');
+            }
+        });
+
         axios.get(`/api/activity/${id}/availabilities`).then(res => {
             if (res.data.success) setAvailabilities(res.data.data);
         });
@@ -106,7 +113,7 @@ const ActivityAvailabilitiesPage = () => {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                     <Button variant="outlined" onClick={() => navigate(-1)}>&larr; Back</Button>
-                    <h2 style={{ margin: 0 }}>Availabilities</h2>
+                    <h2 style={{ margin: 0 }}>Availabilities{activityName ? ` - ${activityName}` : ''}</h2>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <Button
@@ -117,7 +124,9 @@ const ActivityAvailabilitiesPage = () => {
                     >
                         Delete
                     </Button>
-                    <Button variant="contained" color="primary" onClick={() => setModalOpen(true)}>Create</Button>
+                    <Button variant="contained" color="primary" onClick={() => setModalOpen(true)}>
+                        Create Availabilities
+                    </Button>
                 </div>
             </div>
             <Table>
