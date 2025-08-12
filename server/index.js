@@ -1395,20 +1395,20 @@ app.get('/api/analytics', async (req, res) => {
 
 // Create Activity endpoint (with image upload)
 app.post("/api/createActivity", upload.single('image'), (req, res) => {
-    const { activity_name, shared_price, private_price, capacity, event_time, location, flight_type, voucher_type, status } = req.body;
+    const { activity_name, capacity, event_time, location, flight_type, voucher_type, status, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price } = req.body;
     let image = null;
     if (req.file) {
         // Sunucuya göre path'i düzelt
         image = `/uploads/activities/${req.file.filename}`;
     }
-    if (!activity_name || !shared_price || !private_price || !capacity || !location || !flight_type || !status) {
+    if (!activity_name || !capacity || !location || !flight_type || !status || !weekday_morning_price || !flexible_weekday_price || !any_day_flight_price || !shared_flight_from_price || !private_charter_from_price) {
         return res.status(400).json({ success: false, message: "Eksik bilgi!" });
     }
     const sql = `
-        INSERT INTO activity (activity_name, shared_price, private_price, capacity, start_date, end_date, event_time, location, flight_type, voucher_type, status, image)
-        VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?)
+        INSERT INTO activity (activity_name, capacity, start_date, end_date, event_time, location, flight_type, voucher_type, status, image, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price)
+        VALUES (?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    con.query(sql, [activity_name, shared_price, private_price, capacity, location, flight_type, voucher_type || 'All', status, image], (err, result) => {
+    con.query(sql, [activity_name, capacity, location, flight_type, voucher_type || 'All', status, image, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price], (err, result) => {
         if (err) {
             return res.status(500).json({ success: false, message: "Database error" });
         }
@@ -1458,7 +1458,7 @@ app.get('/api/locationVoucherTypes/:location', (req, res) => {
 // Update activity by id (with image upload)
 app.put("/api/activity/:id", upload.single('image'), (req, res) => {
     const { id } = req.params;
-    const { activity_name, shared_price, private_price, capacity, event_time, location, flight_type, voucher_type, status } = req.body;
+    const { activity_name, capacity, event_time, location, flight_type, voucher_type, status, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price } = req.body;
     let image = null;
     if (req.file) {
         image = `/uploads/activities/${req.file.filename}`;
@@ -1470,10 +1470,10 @@ app.put("/api/activity/:id", upload.single('image'), (req, res) => {
         const currentImage = result && result[0] ? result[0].image : null;
         const finalImage = image || currentImage;
         const sql = `
-            UPDATE activity SET activity_name=?, shared_price=?, private_price=?, capacity=?, start_date=NULL, end_date=NULL, event_time=NULL, location=?, flight_type=?, voucher_type=?, status=?, image=?
+            UPDATE activity SET activity_name=?, capacity=?, start_date=NULL, end_date=NULL, event_time=NULL, location=?, flight_type=?, voucher_type=?, status=?, image=?, weekday_morning_price=?, flexible_weekday_price=?, any_day_flight_price=?, shared_flight_from_price=?, private_charter_from_price=?
             WHERE id=?
         `;
-        con.query(sql, [activity_name, shared_price, private_price, capacity, location, flight_type, voucher_type || 'All', status, finalImage, id], (err, result) => {
+        con.query(sql, [activity_name, capacity, location, flight_type, voucher_type || 'All', status, finalImage, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price, id], (err, result) => {
             if (err) return res.status(500).json({ success: false, message: "Database error" });
             res.json({ success: true, data: result });
         });
@@ -1508,7 +1508,7 @@ app.get('/api/locationPricing/:location', (req, res) => {
     if (!location) return res.status(400).json({ success: false, message: 'Location is required' });
     
     const sql = `
-        SELECT id, activity_name, shared_price, private_price, location, flight_type, voucher_type, status
+        SELECT weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price
         FROM activity 
         WHERE location = ? AND status = 'Live'
         ORDER BY id ASC
@@ -1519,7 +1519,18 @@ app.get('/api/locationPricing/:location', (req, res) => {
         if (!result || result.length === 0) {
             return res.status(404).json({ success: false, message: "No pricing found for this location" });
         }
-        res.json({ success: true, data: result[0] });
+        
+        const pricing = result[0];
+        res.json({ 
+            success: true, 
+            data: {
+                weekday_morning_price: pricing.weekday_morning_price,
+                flexible_weekday_price: pricing.flexible_weekday_price,
+                any_day_flight_price: pricing.any_day_flight_price,
+                shared_flight_from_price: pricing.shared_flight_from_price,
+                private_charter_from_price: pricing.private_charter_from_price
+            }
+        });
     });
 });
 
@@ -2499,6 +2510,38 @@ app.post('/api/create-checkout-session', async (req, res) => {
             details: error.stack
         });
     }
+});
+
+// Get activity pricing for a specific location
+app.get('/api/locationPricing/:location', (req, res) => {
+    const { location } = req.params;
+    if (!location) return res.status(400).json({ success: false, message: 'Location is required' });
+    
+    const sql = `
+        SELECT weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price
+        FROM activity 
+        WHERE location = ? AND status = 'Live'
+        ORDER BY id ASC
+        LIMIT 1
+    `;
+    con.query(sql, [location], (err, result) => {
+        if (err) return res.status(500).json({ success: false, message: "Database error" });
+        if (!result || result.length === 0) {
+            return res.status(404).json({ success: false, message: "No pricing found for this location" });
+        }
+        
+        const pricing = result[0];
+        res.json({ 
+            success: true, 
+            data: {
+                weekday_morning_price: pricing.weekday_morning_price,
+                flexible_weekday_price: pricing.flexible_weekday_price,
+                any_day_flight_price: pricing.any_day_flight_price,
+                shared_flight_from_price: pricing.shared_flight_from_price,
+                private_charter_from_price: pricing.private_charter_from_price
+            }
+        });
+    });
 });
 
 

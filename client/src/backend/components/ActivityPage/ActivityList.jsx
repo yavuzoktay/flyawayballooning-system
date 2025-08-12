@@ -20,21 +20,22 @@ const ActivityList = ({ activity }) => {
     const [open, setOpen] = useState(false);
     const [form, setForm] = useState({
         activity_name: '',
-        shared_price: '',
-        private_price: '',
         capacity: '',
         location: '',
         flight_type: [], // now array
         voucher_type: [], // voucher types array
+        weekday_morning_price: '',
+        flexible_weekday_price: '',
+        any_day_flight_price: '',
+        shared_flight_from_price: '',
+        private_charter_from_price: '',
         status: 'Live',
     });
-    const [priceFieldLabel, setPriceFieldLabel] = useState('Price');
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [editForm, setEditForm] = useState({});
-    const [editPriceFieldLabel, setEditPriceFieldLabel] = useState('Price');
     const [editId, setEditId] = useState(null);
     const [editSaving, setEditSaving] = useState(false);
     const [editError, setEditError] = useState('');
@@ -50,9 +51,8 @@ const ActivityList = ({ activity }) => {
     const handleClose = () => {
         setOpen(false);
         setForm({
-            activity_name: '', shared_price: '', private_price: '', capacity: '', location: '', flight_type: [], voucher_type: [], status: 'Live'
+            activity_name: '', capacity: '', location: '', flight_type: [], voucher_type: [], weekday_morning_price: '', flexible_weekday_price: '', any_day_flight_price: '', shared_flight_from_price: '', private_charter_from_price: '', status: 'Live'
         });
-        setPriceFieldLabel('Price');
         setError('');
         setSuccess(false);
     };
@@ -77,9 +77,6 @@ const ActivityList = ({ activity }) => {
             setForm({ ...form, voucher_type: newTypes });
         } else {
             setForm({ ...form, [name]: value });
-            if (name === 'flight_type') {
-                setPriceFieldLabel(value === 'Private' ? 'Group Price' : 'Price');
-            }
         }
     };
     const handleImageChange = (e) => {
@@ -164,9 +161,6 @@ const ActivityList = ({ activity }) => {
             setEditForm({ ...editForm, voucher_type: newTypes });
         } else {
             setEditForm({ ...editForm, [name]: value });
-            if (name === 'flight_type') {
-                setEditPriceFieldLabel(value === 'Private' ? 'Group Price' : 'Price');
-            }
         }
     };
     const handleEditImageChange = (e) => {
@@ -259,6 +253,9 @@ const ActivityList = ({ activity }) => {
                             label="Shared"
                         />
                     </FormGroup>
+                    <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>From Price</div>
+                    <TextField margin="dense" label="Shared Flight From Price" name="shared_flight_from_price" value={form.shared_flight_from_price} onChange={handleChange} type="number" fullWidth required />
+                    <TextField margin="dense" label="Private Charter From Price" name="private_charter_from_price" value={form.private_charter_from_price} onChange={handleChange} type="number" fullWidth required />
                     <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Voucher Type</div>
                     <FormGroup row sx={{ mb: 2, mt: 1 }}>
                         <FormControlLabel
@@ -274,8 +271,10 @@ const ActivityList = ({ activity }) => {
                             label="Any Day Flight"
                         />
                     </FormGroup> 
-                    <TextField margin="dense" label="Shared Flight Price" name="shared_price" value={form.shared_price} onChange={handleChange} type="number" fullWidth required />
-                    <TextField margin="dense" label="Private Flight Group Price" name="private_price" value={form.private_price} onChange={handleChange} type="number" fullWidth required />
+                    <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Per Person Pricing</div>
+                    <TextField margin="dense" label="Weekday Morning Price" name="weekday_morning_price" value={form.weekday_morning_price} onChange={handleChange} type="number" fullWidth required />
+                    <TextField margin="dense" label="Flexible Weekday Price" name="flexible_weekday_price" value={form.flexible_weekday_price} onChange={handleChange} type="number" fullWidth required />
+                    <TextField margin="dense" label="Any Day Flight Price" name="any_day_flight_price" value={form.any_day_flight_price} onChange={handleChange} type="number" fullWidth required />
                     <TextField margin="dense" label="Status" name="status" value={form.status} onChange={handleChange} select fullWidth required>
                         <MenuItem value="Live">Live</MenuItem>
                         <MenuItem value="Inactive">Inactive</MenuItem>
@@ -348,6 +347,9 @@ const ActivityList = ({ activity }) => {
                             label="Shared"
                         />
                     </FormGroup>
+                    <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>From Price</div>
+                    <TextField margin="dense" label="Shared Flight From Price" name="shared_flight_from_price" value={editForm.shared_flight_from_price || ''} onChange={handleEditChange} type="number" fullWidth required />
+                    <TextField margin="dense" label="Private Charter From Price" name="private_charter_from_price" value={editForm.private_charter_from_price || ''} onChange={handleEditChange} type="number" fullWidth required />
                     <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Voucher Type</div>
                     <FormGroup row sx={{ mb: 2, mt: 1 }}>
                         <FormControlLabel
@@ -363,8 +365,10 @@ const ActivityList = ({ activity }) => {
                             label="Any Day Flight"
                         />
                     </FormGroup>
-                    <TextField margin="dense" label="Shared Flight Price" name="shared_price" value={editForm.shared_price || ''} onChange={handleEditChange} type="number" fullWidth required />
-                    <TextField margin="dense" label="Private Flight Group Price" name="private_price" value={editForm.private_price || ''} onChange={handleEditChange} type="number" fullWidth required />
+                    <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Per Person Pricing</div>
+                    <TextField margin="dense" label="Weekday Morning Price" name="weekday_morning_price" value={editForm.weekday_morning_price || ''} onChange={handleEditChange} type="number" fullWidth required />
+                    <TextField margin="dense" label="Flexible Weekday Price" name="flexible_weekday_price" value={editForm.flexible_weekday_price || ''} onChange={handleEditChange} type="number" fullWidth required />
+                    <TextField margin="dense" label="Any Day Flight Price" name="any_day_flight_price" value={editForm.any_day_flight_price || ''} onChange={handleEditChange} type="number" fullWidth required />
                     <TextField margin="dense" label="Status" name="status" value={editForm.status || ''} onChange={handleEditChange} select fullWidth required>
                         <MenuItem value="Live">Live</MenuItem>
                         <MenuItem value="Inactive">Inactive</MenuItem>
