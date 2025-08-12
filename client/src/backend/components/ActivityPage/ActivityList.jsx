@@ -315,7 +315,11 @@ const ActivityList = ({ activity }) => {
                                     </Link>
                                 </TableCell>
                                 <TableCell>
-                                    <EditIcon style={{ cursor: 'pointer' }} onClick={() => handleOpenAvailModal(item)} />
+                                    <EditIcon
+                                        titleAccess="Edit Availabilities"
+                                        style={{ cursor: 'pointer' }}
+                                        onClick={() => navigate(`/activity/${item.id}/availabilities`)}
+                                    />
                                 </TableCell>
                                 <TableCell>
                                     <EditIcon style={{ cursor: 'pointer' }} onClick={() => alert(`Resources for activity: ${item.activity_name}`)} />

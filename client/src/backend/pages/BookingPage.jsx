@@ -171,8 +171,7 @@ const BookingPage = () => {
                 try {
                     const resp = await axios.get(`/api/getAllVoucherData`);
                     setVoucher(resp.data.data || []);
-                    const voucherData = Array.isArray(resp.data.data) ? resp.data.data : [];
-                    setFilteredData(voucherData.map(item => ({
+                    setFilteredData((resp.data.data || []).map(item => ({
                         ...item,
                         created: item.created_at || '',
                         name: item.name || '',
@@ -197,8 +196,7 @@ const BookingPage = () => {
                 try {
                     const response = await axios.get(`/api/date-requests`);
                     setDateRequested(response.data.data || []);
-                    const dateRequestData = Array.isArray(response.data.data) ? response.data.data : [];
-                    setFilteredData(dateRequestData.map((item) => ({
+                    setFilteredData((response.data.data || []).map((item) => ({
                         name: item.name || "",
                         number: item.phone || "",
                         email: item.email || "",
@@ -218,8 +216,7 @@ const BookingPage = () => {
     // filteredData'yı voucher tablosu için backend key'lerine göre map'le
     useEffect(() => {
         if (activeTab === "vouchers") {
-            const voucherArray = Array.isArray(voucher) ? voucher : [];
-            setFilteredData(voucherArray.map(item => ({
+            setFilteredData(voucher.map(item => ({
                 created: item.created_at || '',
                 name: item.name || '',
                 flight_type: item.flight_type || '',
@@ -1627,7 +1624,7 @@ const BookingPage = () => {
                                                     {bookingDetail.booking?.status !== 'Cancelled' && (
   <Typography><b>Booked For:</b> {bookingDetail.booking?.flight_date ? (
     <a
-      href={`http://34.205.25.8:3002/manifest?date=${dayjs(bookingDetail.booking.flight_date).format('YYYY-MM-DD')}&time=${dayjs(bookingDetail.booking.flight_date).format('HH:mm')}`}
+      href={`http://3.95.28.43:3000/manifest?date=${dayjs(bookingDetail.booking.flight_date).format('YYYY-MM-DD')}&time=${dayjs(bookingDetail.booking.flight_date).format('HH:mm')}`}
       style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
     >
       {dayjs(bookingDetail.booking.flight_date).format('DD/MM/YYYY HH:mm')}

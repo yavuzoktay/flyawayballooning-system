@@ -160,14 +160,10 @@ const Manifest = () => {
 
     useEffect(() => {
         if (!bookingLoading && !passengerLoading) {
-            // Ensure booking and passenger are arrays
-            const bookingArray = Array.isArray(booking) ? booking : [];
-            const passengerArray = Array.isArray(passenger) ? passenger : [];
-            
-            const combinedFlights = bookingArray.map((b) => ({
+            const combinedFlights = booking.map((b) => ({
                 ...b,
-                passengers: passengerArray.filter((p) => p.booking_id === b.id),
-                totalWeight: passengerArray
+                passengers: passenger.filter((p) => p.booking_id === b.id),
+                totalWeight: passenger
                     .filter((p) => p.booking_id === b.id)
                     .reduce((sum, p) => sum + parseFloat(p.weight || 0), 0),
             }));
