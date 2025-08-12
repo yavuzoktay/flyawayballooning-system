@@ -97,6 +97,9 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         const filtered = availabilities.filter(a => {
             if (a.status && a.status.toLowerCase() !== 'open') return false;
             if (a.available !== undefined && a.available <= 0) return false;
+            // Filter out past dates and times
+            const slotDateTime = dayjs(`${a.date} ${a.time}`);
+            if (slotDateTime.isBefore(dayjs())) return false;
             if (!a.flight_types || a.flight_types.toLowerCase() === 'all') return true;
             // Her bir flight_types'ı normalize et ve includes ile kontrol et
             const typesArr = a.flight_types.split(',').map(t => normalizeType(t));
@@ -313,11 +316,24 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                 availableDates.map(dateStr => {
                                                     const d = dayjs(dateStr, 'YYYY-MM-DD');
                                                     const isSelected = selectedDate && dayjs(selectedDate).isSame(d, 'day');
+                                                    const isPastDate = d.isBefore(dayjs(), 'day');
+                                                    const hasAvailableTimes = getTimesForDate(d.toDate()).some(slot => {
+                                                        const slotDateTime = dayjs(`${dateStr} ${slot.time}`);
+                                                        return slotDateTime.isAfter(dayjs()) && slot.available > 0;
+                                                    });
+                                                    const isDisabled = isPastDate || !hasAvailableTimes;
                                                     return (
                                                         <Button
                                                             key={dateStr}
                                                             variant={isSelected ? 'contained' : 'outlined'}
-                                                            onClick={() => { setSelectedDate(d.toDate()); setSelectedTime(null); }}
+                                                            onClick={() => !isDisabled && setSelectedDate(d.toDate())}
+                                                            disabled={isDisabled}
+                                                            sx={{
+                                                                opacity: isDisabled ? 0.5 : 1,
+                                                                backgroundColor: isDisabled ? '#f5f5f5' : 'inherit',
+                                                                color: isDisabled ? '#999' : 'inherit',
+                                                                cursor: isDisabled ? 'not-allowed' : 'pointer'
+                                                            }}
                                                         >
                                                             {d.format('DD/MM/YYYY')}
                                                         </Button>
@@ -343,13 +359,22 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                     {getTimesForDate(selectedDate).map(slot => {
                                                         const isAvailable = slot.available > 0;
                                                         const isSelected = selectedTime === slot.time;
+                                                        const slotDateTime = dayjs(`${dayjs(selectedDate).format('YYYY-MM-DD')} ${slot.time}`);
+                                                        const isPastTime = slotDateTime.isBefore(dayjs());
+                                                        const isDisabled = !isAvailable || isPastTime;
                                                         return (
                                                             <Button
                                                                 key={slot.id}
                                                                 variant={isSelected ? 'contained' : 'outlined'}
                                                                 color={isAvailable ? 'primary' : 'inherit'}
-                                                                disabled={!isAvailable}
-                                                                onClick={() => isAvailable && setSelectedTime(slot.time)}
+                                                                disabled={isDisabled}
+                                                                onClick={() => !isDisabled && setSelectedTime(slot.time)}
+                                                                sx={{
+                                                                    opacity: isDisabled ? 0.5 : 1,
+                                                                    backgroundColor: isDisabled ? '#f5f5f5' : 'inherit',
+                                                                    color: isDisabled ? '#999' : 'inherit',
+                                                                    cursor: isDisabled ? 'not-allowed' : 'pointer'
+                                                                }}
                                                             >
                                                                 {slot.time} ({slot.available}/{slot.capacity})
                                                             </Button>
