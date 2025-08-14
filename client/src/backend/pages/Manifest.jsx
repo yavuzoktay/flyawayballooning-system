@@ -131,25 +131,51 @@ const Manifest = () => {
 
     // Helper: fetch capacity for a slot
     const [availabilities, setAvailabilities] = useState([]);
+    const [locationToActivityId, setLocationToActivityId] = useState({});
+    const [nameToActivityId, setNameToActivityId] = useState({});
     
-    // Fetch all availabilities for all activities
+    // Fetch availabilities for the selected date and location
     const fetchAllAvailabilities = async () => {
-        if (!Array.isArray(activity)) return;
-        let all = [];
-        for (const act of activity) {
-            try {
-                const res = await axios.get(`/api/activity/${act.id}/availabilities`);
-                if (res.data.success && Array.isArray(res.data.data)) {
-                    all = all.concat(res.data.data.map(a => ({ ...a, activity_id: act.id, location: act.location, flight_type: act.flight_type })));
+        try {
+            // Use activitiesForRebook to ensure location is provided
+            const activitiesRes = await axios.get('/api/activitiesForRebook');
+            if (activitiesRes.data.success && Array.isArray(activitiesRes.data.data)) {
+                const activities = activitiesRes.data.data;
+                const map = activities.reduce((acc, a) => { if (a.location) acc[a.location] = a.id; return acc; }, {});
+                setLocationToActivityId(map);
+                const nameMap = activities.reduce((acc, a) => { if (a.activity_name) acc[a.activity_name] = a.id; return acc; }, {});
+                setNameToActivityId(nameMap);
+
+                let allAvailabilities = [];
+                for (const act of activities) {
+                    try {
+                        const availRes = await axios.get(`/api/activity/${act.id}/availabilities`);
+                        if (availRes.data.success && Array.isArray(availRes.data.data)) {
+                            const withMeta = availRes.data.data.map(avail => ({
+                                ...avail,
+                                activity_id: act.id,
+                                location: act.location,
+                                activity_name: act.activity_name,
+                                flight_type: act.flight_type,
+                                capacity: avail.capacity
+                            }));
+                            allAvailabilities = allAvailabilities.concat(withMeta);
+                        }
+                    } catch (error) {
+                        console.error(`Error fetching availabilities for activity ${act.id}:`, error);
+                    }
                 }
-            } catch {}
+                console.log('All availabilities loaded:', allAvailabilities);
+                setAvailabilities(allAvailabilities);
+            }
+        } catch (error) {
+            console.error('Error fetching activities:', error);
         }
-        setAvailabilities(all);
     };
     
     useEffect(() => {
         fetchAllAvailabilities();
-    }, [activity]);
+    }, [flights, selectedDate, activity]);
 
     // Hatalı veri durumunu kontrol et
     useEffect(() => {
@@ -201,7 +227,7 @@ const Manifest = () => {
         }
         const currentDate = new Date(selectedDate);
         const flightDate = new Date(flight.flight_date);
-        const maxCapacity = activity.find((a) => a.activity_sku === flight.activity_id)?.seats || 0;
+        const maxCapacity = activity.find((a) => a.id == flight.activity_id)?.capacity || 0;
         if (flightDate < currentDate) {
             return "Closed";
         }
@@ -923,11 +949,55 @@ const Manifest = () => {
                                 } else {
                                     timeStr = '09:00'; // fallback default
                                 }
+                                
+                                // Determine target activity id from location using prebuilt map
+                                const targetActivityId = (nameToActivityId && first.location) ? (nameToActivityId[first.location] ?? first.activity_id) : first.activity_id;
+                                
+                                // Debug logging to understand the matching issue
+                                console.log('Trying to match availability:', {
+                                    flightDate: dateStr,
+                                    flightTime: timeStr,
+                                    flightActivityId: first.activity_id,
+                                    targetActivityId,
+                                    flightLocation: first.location,
+                                    availabilitiesCount: availabilities.length,
+                                    availabilities: availabilities.filter(a => (a.location === first.location) || (targetActivityId && a.activity_id == targetActivityId)),
+                                    allAvailabilities: availabilities
+                                });
+                                
                                 found = availabilities.find(a => {
                                     const aDate = a.date && a.date.length >= 10 ? a.date.substring(0,10) : null;
                                     const aTime = a.time ? a.time.slice(0,5) : null;
-                                    return a.activity_id == first.activity_id && aDate === dateStr && aTime === timeStr;
+                                    const dateMatch = aDate === dateStr;
+                                    const timeMatch = aTime === timeStr;
+                                    
+                                    // Match by (activity_id OR location), date, and time
+                                    const locationMatch = a.location === first.location;
+                                    const activityIdMatch = targetActivityId ? (a.activity_id == targetActivityId) : false;
+                                    
+                                    if ((locationMatch || activityIdMatch) && dateMatch && timeMatch) {
+                                        console.log('Found exact availability match:', a);
+                                        return true;
+                                    }
+                                    
+                                    // Debug: log what we're comparing
+                                    console.log('Comparing:', {
+                                        availability: { activity_id: a.activity_id, location: a.location, date: aDate, time: aTime },
+                                        flight: { activity_id: first.activity_id, targetActivityId, location: first.location, date: dateStr, time: timeStr },
+                                        matches: { location: locationMatch, activityId: activityIdMatch, date: dateMatch, time: timeMatch }
+                                    });
+                                    
+                                    return false;
                                 });
+                                
+                                if (!found) {
+                                    console.log('No availability found for:', {
+                                        dateStr,
+                                        timeStr,
+                                        activityId: first.activity_id,
+                                        location: first.location
+                                    });
+                                }
                             }
                             // GÜNCELLEME: Pax Booked kesin olarak capacity - available / capacity olacak
                             let paxBooked = 0;
@@ -935,11 +1005,60 @@ const Manifest = () => {
                             if (found) {
                                 paxBooked = found.capacity - found.available;
                                 paxTotal = found.capacity;
+                                console.log('Using availability data for Pax Booked:', { paxBooked, paxTotal, found });
                             } else {
-                                paxBooked = '-';
-                                paxTotal = '-';
+                                // Fallback: try to get capacity from activity data or directly from availability endpoint
+                                console.log('No availability found, trying fallback with activity data:', {
+                                    activityLength: activity.length,
+                                    firstActivityId: first.activity_id,
+                                    firstLocation: first.location,
+                                    activityData: activity
+                                });
+                                
+                                const activityData = activity.find(a => a.location === first.location);
+                                console.log('Found activity data:', activityData);
+                                
+                                if (activityData && activityData.capacity) {
+                                    paxTotal = activityData.capacity;
+                                    // Calculate booked passengers from the current group
+                                    paxBooked = groupFlights.reduce((total, flight) => {
+                                        return total + (flight.passengers ? flight.passengers.length : 0);
+                                    }, 0);
+                                    console.log('Using fallback calculation:', { paxBooked, paxTotal, groupFlightsLength: groupFlights.length });
+                                } else {
+                                    // Last resort: set to default since we can't make async calls here
+                                    console.log('No activity data found, setting to default');
+                                    paxBooked = '-';
+                                    paxTotal = '-';
+                                }
                             }
-                            const status = found ? (found.available > 0 ? "Open" : "Closed") : getFlightStatus(first);
+                            
+                            console.log('Final Pax Booked values:', { paxBooked, paxTotal });
+                            // DISPLAY LOGIC UPDATE: Use current group's passenger count for booked, and availability capacity for total
+                            const paxBookedDisplay = groupFlights.reduce((sum, f) => sum + (f.passengers ? f.passengers.length : 0), 0);
+                            // Prefer capacity directly from matched availability; otherwise try to re-match using map
+                            let paxTotalDisplay = '-';
+                            if (found && typeof found.capacity === 'number') {
+                                paxTotalDisplay = found.capacity;
+                            } else {
+                                const dateStr = first.flight_date ? first.flight_date.substring(0,10) : null;
+                                let timeStr = null;
+                                if (first.time_slot) timeStr = first.time_slot.slice(0,5);
+                                else if (first.flight_date && first.flight_date.length >= 16) timeStr = first.flight_date.substring(11,16);
+                                else timeStr = '09:00';
+
+                                const aid = locationToActivityId[first.location] || first.activity_id;
+                                const reFound = availabilities.find(a => {
+                                    const aDate = a.date && a.date.length >= 10 ? a.date.substring(0,10) : null;
+                                    const aTime = a.time ? a.time.slice(0,5) : null;
+                                    const idMatch = aid ? (a.activity_id == aid) : false;
+                                    return (a.location === first.location || idMatch) && aDate === dateStr && aTime === timeStr;
+                                });
+                                if (reFound && typeof reFound.capacity === 'number') {
+                                    paxTotalDisplay = reFound.capacity;
+                                }
+                            }
+                             const status = found ? (found.available > 0 ? "Open" : "Closed") : getFlightStatus(first);
                             const balloonResource = first.balloon_resources || 'N/A';
                             const timeSlot = first.time_slot || 'N/A';
                             // Find the correct flight time from availability if found, always show as local time
@@ -962,12 +1081,12 @@ const Manifest = () => {
                                                 {/* Section başlığında activityName ve flight time birlikte gösterilecek */}
                                                 <Typography variant="h6">{activityName} - Flight Time: {displayFlightTime}</Typography>
                                                 <Box display="flex" alignItems="center" gap={3} mt={1}>
-                                                    <Typography>Pax Booked: {paxBooked} / {paxTotal}</Typography>
+                                                    <Typography>Pax Booked: {paxBookedDisplay} / {paxTotalDisplay}</Typography>
                                                     <Typography>Balloon Resource: {balloonResource}</Typography>
                                                     <Typography>Status: <span
-  style={{ color: status === 'Closed' ? 'red' : 'green', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
-  onClick={() => handleToggleGroupStatus(groupFlights)}
->{status}{statusLoadingGroup === first.id ? '...' : ''}</span></Typography>
+   style={{ color: status === 'Closed' ? 'red' : 'green', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+   onClick={() => handleToggleGroupStatus(groupFlights)}
+ >{status}{statusLoadingGroup === first.id ? '...' : ''}</span></Typography>
                                                     <Typography>Type: {first.flight_type}</Typography>
                                                 </Box>
                                             </Box>

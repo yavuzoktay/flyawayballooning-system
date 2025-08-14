@@ -1067,7 +1067,9 @@ const BookingPage = () => {
                                     data={filteredData.map(item => ({
                                         id: item.id || '', // Ensure id is always present
                                         created_at: item.created_at || '',
-                                        name: item.name || '',
+                                        name: (Array.isArray(item.passengers) && item.passengers.length > 0
+                                            ? `${item.passengers[0]?.first_name || ''} ${item.passengers[0]?.last_name || ''}`.trim() || item.name || ''
+                                            : item.name || ''),
                                         flight_type: item.flight_type || '',
                                         location: item.location || '',
                                         flight_date: item.flight_date_display || item.flight_date || '',

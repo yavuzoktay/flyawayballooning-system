@@ -1067,6 +1067,22 @@ app.get('/api/getBookingDetail', async (req, res) => {
                 else resolve([rows]);
             });
         });
+        // Eğer passenger kaydı yok ama booking.pax > 0 ise, placeholder passenger listesi üret
+        let passengers = passengerRows || [];
+        const paxCount = parseInt(booking.pax, 10) || 0;
+        if ((!passengers || passengers.length === 0) && paxCount > 0) {
+            passengers = Array.from({ length: paxCount }, (_, i) => ({
+                id: `placeholder-${booking_id}-${i + 1}`,
+                booking_id: booking_id,
+                first_name: '',
+                last_name: '',
+                weight: null,
+                price: null,
+                email: null,
+                phone: null,
+                ticket_type: booking.flight_type || null,
+            }));
+        }
         // 3. Notes (admin_notes)
         const [notesRows] = await new Promise((resolve, reject) => {
             con.query('SELECT * FROM admin_notes WHERE booking_id = ?', [booking_id], (err, rows) => {
@@ -1077,7 +1093,7 @@ app.get('/api/getBookingDetail', async (req, res) => {
         res.json({
             success: true,
             booking,
-            passengers: passengerRows,
+            passengers,
             notes: notesRows,
         });
     } catch (err) {
@@ -1592,24 +1608,40 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
 
 // Get availabilities filtered by location, flight type, and voucher types
 app.get('/api/availabilities/filter', (req, res) => {
-    const { location, flightType, voucherTypes, date, time } = req.query;
+    const { location, flightType, voucherTypes, date, time, activityId } = req.query;
     
-    if (!location) {
-        return res.status(400).json({ success: false, message: 'Location is required' });
+    if (!location && !activityId) {
+        return res.status(400).json({ success: false, message: 'Location or activityId is required' });
     }
     
-    // Debug: Log what flight types exist in the database for this location
+    // Debug: Log what flight types exist in the database for this filter
     const debugSql = `
         SELECT DISTINCT aa.flight_types, aa.voucher_types, COUNT(*) as count
         FROM activity_availability aa 
         JOIN activity a ON aa.activity_id = a.id 
-        WHERE a.location = ? AND a.status = 'Live' AND aa.status = 'open'
+        WHERE ${activityId ? 'aa.activity_id = ?' : 'a.location = ?'} AND a.status = 'Live' AND aa.status = 'open'
         GROUP BY aa.flight_types, aa.voucher_types
     `;
     
-    con.query(debugSql, [location], (debugErr, debugResult) => {
+    con.query(debugSql, [activityId || location], (debugErr, debugResult) => {
         if (!debugErr) {
-            console.log('Available flight_types and voucher_types in database for', location, ':', debugResult);
+            console.log('Available flight_types and voucher_types in database for', activityId ? `activity ${activityId}` : location, ':', debugResult);
+        }
+    });
+    
+    // Additional debug: Check what's actually in the database
+    const debugSql2 = `
+        SELECT aa.id, aa.date, aa.time, aa.status, aa.available, aa.capacity, a.location, a.status as activity_status
+        FROM activity_availability aa 
+        JOIN activity a ON aa.activity_id = a.id 
+        WHERE ${activityId ? 'aa.activity_id = ?' : 'a.location = ?'}
+        ORDER BY aa.date, aa.time
+        LIMIT 10
+    `;
+    
+    con.query(debugSql2, [activityId || location], (debugErr2, debugResult2) => {
+        if (!debugErr2) {
+            console.log('Raw database data for', activityId ? `activity ${activityId}` : location, ':', debugResult2);
         }
     });
     
@@ -1617,22 +1649,22 @@ app.get('/api/availabilities/filter', (req, res) => {
         SELECT aa.*, a.location, a.flight_type, a.voucher_type as activity_voucher_types
         FROM activity_availability aa 
         JOIN activity a ON aa.activity_id = a.id 
-        WHERE a.location = ? AND a.status = 'Live' AND aa.status = 'open'
+        WHERE ${activityId ? 'aa.activity_id = ?' : 'a.location = ?'} AND a.status = 'Live' AND aa.status = 'open'
     `;
     
-    const params = [location];
+    const params = [activityId || location];
     
     if (flightType && flightType !== 'All') {
-        sql += ` AND (aa.flight_types = 'All' OR aa.flight_types = ?)`;
-        params.push(flightType);
+        sql += ` AND (aa.flight_types = 'All' OR aa.flight_types = ? OR FIND_IN_SET(?, aa.flight_types) > 0)`;
+        params.push(flightType, flightType);
     } else {
         // If no flight type specified, show all flight types
         sql += ` AND (aa.flight_types = 'All' OR aa.flight_types IS NOT NULL)`;
     }
     
     if (voucherTypes && voucherTypes !== 'All') {
-        sql += ` AND (aa.voucher_types = 'All' OR aa.voucher_types = ?)`;
-        params.push(voucherTypes);
+        sql += ` AND (aa.voucher_types = 'All' OR aa.voucher_types = ? OR FIND_IN_SET(?, aa.voucher_types) > 0)`;
+        params.push(voucherTypes, voucherTypes);
     } else {
         // If no voucher type specified, show all voucher types
         sql += ` AND (aa.voucher_types = 'All' OR aa.voucher_types IS NOT NULL)`;
@@ -1653,17 +1685,18 @@ app.get('/api/availabilities/filter', (req, res) => {
     con.query(sql, params, (err, result) => {
         if (err) {
             console.error('Error fetching filtered availabilities:', err);
-            return res.status(500).json({ success: false, message: 'Database error', error: err });
+            return res.status(500).json({ success: false, message: 'Database error' });
         }
         
-        // Normalize date format to YYYY-MM-DD
+        // Normalize date format to YYYY-MM-DD and add debugging
         const normalizedResult = result.map(row => ({
             ...row,
-            date: row.date ? dayjs(row.date).format('YYYY-MM-DD') : row.date
+            date: row.date ? new Date(row.date).toISOString().split('T')[0] : row.date
         }));
         
-        console.log('Filtered availabilities:', { 
+        console.log('Filtered availabilities response:', { 
             location, 
+            activityId,
             flightType, 
             voucherTypes, 
             count: normalizedResult.length,
@@ -1672,18 +1705,21 @@ app.get('/api/availabilities/filter', (req, res) => {
             sampleData: normalizedResult.slice(0, 3).map(r => ({ 
                 id: r.id, 
                 date: r.date, 
+                status: r.status,
+                available: r.available,
+                capacity: r.capacity,
                 flight_types: r.flight_types, 
-                voucher_types: r.voucher_types,
-                status: r.status 
+                voucher_types: r.voucher_types
             }))
         });
-        res.json({ success: true, data: normalizedResult });
+        
+        return res.json({ success: true, data: normalizedResult || [] });
     });
 });
 
 // Get all activities (id, activity_name, status)
 app.get('/api/activities', (req, res) => {
-    const sql = 'SELECT id, activity_name, status FROM activity ORDER BY activity_name';
+    const sql = 'SELECT id, activity_name, status, capacity, location FROM activity ORDER BY activity_name';
     con.query(sql, (err, result) => {
         if (err) {
             console.error('Database error in /api/activities:', err);
@@ -2541,6 +2577,20 @@ app.get('/api/locationPricing/:location', (req, res) => {
                 private_charter_from_price: pricing.private_charter_from_price
             }
         });
+    });
+});
+
+// Get a single availability by activity, date and time
+app.get('/api/availabilityBySlot', (req, res) => {
+    const { activity_id, date, time } = req.query;
+    if (!activity_id || !date || !time) {
+        return res.status(400).json({ success: false, message: 'activity_id, date and time are required' });
+    }
+    const sql = 'SELECT id, capacity, available, status FROM activity_availability WHERE activity_id = ? AND DATE(date) = ? AND TIME(time) = ? LIMIT 1';
+    con.query(sql, [activity_id, date, time], (err, rows) => {
+        if (err) return res.status(500).json({ success: false, message: 'Database error' });
+        if (!rows || rows.length === 0) return res.json({ success: true, data: null });
+        return res.json({ success: true, data: rows[0] });
     });
 });
 
