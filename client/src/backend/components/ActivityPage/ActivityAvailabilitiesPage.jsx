@@ -155,7 +155,7 @@ const ActivityAvailabilitiesPage = () => {
                             <TableCell>
                                 {row.date ? (
                                     <a
-                                        href={`http://3.95.28.43:3000/manifest?date=${dayjs(row.date).format('YYYY-MM-DD')}`}
+                                        href={`https://flyawayballooning-system.com/manifest?date=${dayjs(row.date).format('YYYY-MM-DD')}`}
                                         style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
                                         onClick={e => e.stopPropagation()}
                                     >
