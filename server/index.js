@@ -55,9 +55,22 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+// Simple webhook test endpoint
+app.get('/api/webhook-test', (req, res) => {
+    res.json({ 
+        success: true, 
+        message: 'Webhook endpoint is accessible',
+        timestamp: new Date().toISOString(),
+        sessionStore: Object.keys(stripeSessionStore),
+        webhookSecret: process.env.STRIPE_WEBHOOK_SECRET ? 'SET' : 'NOT SET'
+    });
+});
+
 // Stripe Webhook endpoint
 app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (req, res) => {
     console.log('Stripe webhook endpoint hit!');
+    console.log('Webhook body length:', req.body ? req.body.length : 'undefined');
+    console.log('Webhook headers:', req.headers);
     
     const sig = req.headers['stripe-signature'];
     let event;
@@ -72,6 +85,8 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
         console.log('Webhook secret:', process.env.STRIPE_WEBHOOK_SECRET);
         event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
         console.log('Webhook signature verified successfully');
+        console.log('Webhook event type:', event.type);
+        console.log('Webhook event ID:', event.id);
     } catch (err) {
         console.error('Webhook signature verification failed:', err.message);
         return res.status(400).send(`Webhook Error: ${err.message}`);
@@ -81,13 +96,18 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
         if (event.type === 'checkout.session.completed') {
             const session = event.data.object;
             console.log('Checkout session completed:', session.id);
+            console.log('Session metadata:', session.metadata);
             
             const session_id = session.id;
             console.log('Using session ID:', session_id);
             
             const storeData = stripeSessionStore[session_id];
+            console.log('Store data found:', !!storeData);
+            console.log('Store data content:', storeData);
+            
             if (!storeData) {
                 console.error('Stripe session store data not found for session_id:', session_id);
+                console.log('Available session IDs in store:', Object.keys(stripeSessionStore));
                 return res.status(400).send('Session data not found');
             }
             
@@ -112,11 +132,13 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
                 if (storeData.type === 'booking') {
                     console.log('Creating booking via webhook:', storeData.bookingData);
                     // Direct database insertion instead of HTTP call
-                    await createBookingFromWebhook(storeData.bookingData);
+                    const bookingId = await createBookingFromWebhook(storeData.bookingData);
+                    console.log('Webhook booking creation completed, ID:', bookingId);
                 } else if (storeData.type === 'voucher') {
                     console.log('Creating voucher via webhook:', storeData.voucherData);
                     // Direct database insertion instead of HTTP call
-                    await createVoucherFromWebhook(storeData.voucherData);
+                    const voucherId = await createVoucherFromWebhook(storeData.voucherData);
+                    console.log('Webhook voucher creation completed, ID:', voucherId);
                 }
                 
                 // Session data temizle
@@ -128,6 +150,8 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
                 storeData.processed = false;
                 return res.status(500).send('Internal server error');
             }
+        } else {
+            console.log('Webhook event type not handled:', event.type);
         }
         
         res.json({received: true});
@@ -2369,8 +2393,37 @@ async function createBookingFromWebhook(bookingData) {
                     console.error('Webhook booking insertion error:', err);
                     return reject(err);
                 }
-                console.log('Webhook booking created successfully, ID:', result.insertId);
-                resolve(result.insertId);
+                
+                const bookingId = result.insertId;
+                console.log('Webhook booking created successfully, ID:', bookingId);
+                
+                // Now create passenger records
+                if (passengerData && passengerData.length > 0) {
+                    const passengerSql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund) VALUES ?';
+                    const passengerValues = passengerData.map(p => [
+                        bookingId,
+                        p.firstName || '',
+                        p.lastName || '',
+                        p.weight || null,
+                        p.email || null,
+                        p.phone || null,
+                        p.ticketType || chooseFlightType.type,
+                        p.weatherRefund ? 1 : 0
+                    ]);
+                    
+                    con.query(passengerSql, [passengerValues], (passengerErr, passengerResult) => {
+                        if (passengerErr) {
+                            console.error('Error creating passengers in webhook:', passengerErr);
+                            // Don't reject here, just log the error
+                            console.log('Booking created but passengers failed, continuing...');
+                        } else {
+                            console.log('Webhook passengers created successfully, count:', passengerResult.affectedRows);
+                        }
+                        resolve(bookingId);
+                    });
+                } else {
+                    resolve(bookingId);
+                }
             });
         }
 
@@ -2506,10 +2559,11 @@ app.post('/api/create-checkout-session', async (req, res) => {
                 },
             ],
             mode: 'payment',
-            success_url: `${baseUrl}/?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+            success_url: `${baseUrl}/?payment=success&session_id={CHECKOUT_SESSION_ID}&type=${type}`,
             cancel_url: `${baseUrl}/?payment=cancel`,
             metadata: {
-                type: type || (voucherData ? 'voucher' : 'booking')
+                type: type || (voucherData ? 'voucher' : 'booking'),
+                session_id: 'PLACEHOLDER' // Will be updated below
             }
         });
         
@@ -2520,7 +2574,8 @@ app.post('/api/create-checkout-session', async (req, res) => {
         stripeSessionStore[session_id] = {
             type: type || (voucherData ? 'voucher' : 'booking'),
             bookingData,
-            voucherData
+            voucherData,
+            timestamp: Date.now() // Add timestamp for debugging
         };
         
         // Stripe metadata'ya session_id ekle
@@ -2529,6 +2584,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
         });
         
         console.log('Session stored and metadata updated');
+        console.log('Session store contents:', Object.keys(stripeSessionStore));
         console.log('Sending response:', { success: true, sessionId: session_id });
         res.json({ success: true, sessionId: session_id });
     } catch (error) {
@@ -2592,6 +2648,90 @@ app.get('/api/availabilityBySlot', (req, res) => {
         if (!rows || rows.length === 0) return res.json({ success: true, data: null });
         return res.json({ success: true, data: rows[0] });
     });
+});
+
+// Test webhook endpoint
+app.post('/api/test-webhook', (req, res) => {
+    console.log('Test webhook endpoint hit!');
+    console.log('Request body:', req.body);
+    res.json({ success: true, message: 'Test webhook working' });
+});
+
+// Manual booking creation endpoint for testing
+app.post('/api/createTestBooking', (req, res) => {
+    console.log('Create test booking endpoint hit!');
+    console.log('Request body:', req.body);
+    
+    const testBookingData = {
+        activitySelect: 'Book Flight',
+        chooseLocation: 'Somerset',
+        chooseFlightType: { type: 'Shared Flight' },
+        passengerData: [
+            {
+                firstName: 'Test',
+                lastName: 'User',
+                weight: '70',
+                email: 'test@example.com',
+                phone: '1234567890',
+                weatherRefund: false
+            }
+        ],
+        selectedDate: '2025-08-15',
+        selectedTime: '09:00:00',
+        totalPrice: 180,
+        additionalInfo: { notes: 'Test booking' }
+    };
+    
+    createBookingFromWebhook(testBookingData)
+        .then(bookingId => {
+            console.log('Test booking created successfully, ID:', bookingId);
+            res.json({ success: true, bookingId });
+        })
+        .catch(error => {
+            console.error('Error creating test booking:', error);
+            res.status(500).json({ success: false, error: error.message });
+        });
+});
+
+// Fallback endpoint for creating bookings when webhook fails
+app.post('/api/createBookingFromSession', async (req, res) => {
+    try {
+        const { session_id, type } = req.body;
+        console.log('Create booking from session endpoint hit:', { session_id, type });
+        
+        if (!session_id) {
+            return res.status(400).json({ success: false, message: 'Session ID is required' });
+        }
+        
+        const storeData = stripeSessionStore[session_id];
+        if (!storeData) {
+            console.error('Session data not found for session_id:', session_id);
+            return res.status(400).json({ success: false, message: 'Session data not found' });
+        }
+        
+        console.log('Found session data:', storeData);
+        
+        let result;
+        if (type === 'booking' && storeData.bookingData) {
+            console.log('Creating booking from session data');
+            result = await createBookingFromWebhook(storeData.bookingData);
+            console.log('Booking created successfully, ID:', result);
+        } else if (type === 'voucher' && storeData.voucherData) {
+            console.log('Creating voucher from session data');
+            result = await createVoucherFromWebhook(storeData.voucherData);
+            console.log('Voucher created successfully, ID:', result);
+        } else {
+            return res.status(400).json({ success: false, message: 'Invalid type or missing data' });
+        }
+        
+        // Clean up session data
+        delete stripeSessionStore[session_id];
+        
+        res.json({ success: true, id: result, message: `${type} created successfully` });
+    } catch (error) {
+        console.error('Error creating from session:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
 });
 
 
