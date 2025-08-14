@@ -225,13 +225,80 @@ const Manifest = () => {
         if (flight.manual_status_override !== null && flight.manual_status_override !== undefined) {
             return flight.manual_status_override ? "Open" : "Closed";
         }
+        
         const currentDate = new Date(selectedDate);
         const flightDate = new Date(flight.flight_date);
-        const maxCapacity = activity.find((a) => a.id == flight.activity_id)?.capacity || 0;
         if (flightDate < currentDate) {
             return "Closed";
         }
-        return flight.passengers.length < maxCapacity ? "Open" : "Closed";
+        
+        // Calculate total passengers for this flight group
+        const totalPassengers = flights.filter(f => 
+            f.flight_date === flight.flight_date && 
+            f.location === flight.location && 
+            f.flight_type === flight.flight_type &&
+            f.time_slot === flight.time_slot
+        ).reduce((sum, f) => sum + (f.passengers ? f.passengers.length : 0), 0);
+        
+        // Get capacity from activity
+        const maxCapacity = activity.find((a) => a.id == flight.activity_id)?.capacity || 0;
+        
+        // Simple logic: if total passengers equals or exceeds capacity, then closed
+        if (totalPassengers >= maxCapacity && maxCapacity > 0) {
+            return "Closed";
+        }
+        
+        return "Open";
+    };
+
+    // Function to automatically update flight status based on passenger count
+    const autoUpdateFlightStatus = async (flight) => {
+        try {
+            // Calculate total passengers for this flight group
+            const totalPassengers = flights.filter(f => 
+                f.flight_date === flight.flight_date && 
+                f.location === flight.location && 
+                f.flight_type === flight.flight_type &&
+                f.time_slot === flight.time_slot
+            ).reduce((sum, f) => sum + (f.passengers ? f.passengers.length : 0), 0);
+            
+            // Get capacity from activity
+            const maxCapacity = activity.find((a) => a.id == flight.activity_id)?.capacity || 0;
+            
+            console.log(`Checking flight ${flight.id}: passengers ${totalPassengers}/${maxCapacity}, current status: ${getFlightStatus(flight)}`);
+            
+            // Simple logic: if total passengers equals or exceeds capacity, automatically close the flight
+            if (totalPassengers >= maxCapacity && maxCapacity > 0) {
+                const currentStatus = getFlightStatus(flight);
+                if (currentStatus === "Open") {
+                    console.log(`Auto-closing flight: ${flight.id} - passengers: ${totalPassengers}/${maxCapacity}`);
+                    
+                    // Update the flight status to Closed
+                    await axios.patch('/api/updateManifestStatus', {
+                        booking_id: flight.id,
+                        old_status: 'Open',
+                        new_status: 'Closed',
+                        flight_date: flight.flight_date,
+                        location: flight.location,
+                        total_pax: totalPassengers
+                    });
+                    
+                    // Update local state
+                    setFlights(prevFlights => prevFlights.map(f =>
+                        f.flight_date === flight.flight_date && 
+                        f.location === flight.location && 
+                        f.flight_type === flight.flight_type &&
+                        f.time_slot === flight.time_slot
+                            ? { ...f, manual_status_override: 0 } // 0 = Closed
+                            : f
+                    ));
+                    
+                    console.log(`Flight ${flight.id} status updated to Closed`);
+                }
+            }
+        } catch (error) {
+            console.error('Error auto-updating flight status:', error);
+        }
     };
 
     const toggleFlightStatus = async (flightId) => {
@@ -893,6 +960,56 @@ const Manifest = () => {
       });
     }, [bookingModalPax]);
 
+    // Auto-update flight statuses when flights data changes
+    useEffect(() => {
+        if (flights.length > 0 && activity.length > 0) {
+            console.log('Flights or activity changed, checking for auto-status updates');
+            
+            // Group flights by location, flight_type, and time_slot
+            const flightGroups = {};
+            flights.forEach(flight => {
+                const key = `${flight.location}||${flight.flight_type}||${flight.time_slot || (flight.flight_date && flight.flight_date.length >= 16 ? flight.flight_date.substring(11,16) : '')}`;
+                if (!flightGroups[key]) {
+                    flightGroups[key] = [];
+                }
+                flightGroups[key].push(flight);
+            });
+            
+            // Check each group and auto-update status if needed
+            Object.values(flightGroups).forEach(groupFlights => {
+                if (groupFlights.length > 0) {
+                    const firstFlight = groupFlights[0];
+                    autoUpdateFlightStatus(firstFlight);
+                }
+            });
+        }
+    }, [flights, activity]);
+
+    // Auto-update flight statuses when availabilities change
+    useEffect(() => {
+        if (availabilities.length > 0 && flights.length > 0) {
+            console.log('Availabilities changed, checking for auto-status updates');
+            
+            // Group flights by location, flight_type, and time_slot
+            const flightGroups = {};
+            flights.forEach(flight => {
+                const key = `${flight.location}||${flight.flight_type}||${flight.time_slot || (flight.flight_date && flight.flight_date.length >= 16 ? flight.flight_date.substring(11,16) : '')}`;
+                if (!flightGroups[key]) {
+                    flightGroups[key] = [];
+                }
+                flightGroups[key].push(flight);
+            });
+            
+            // Check each group and auto-update status if needed
+            Object.values(flightGroups).forEach(groupFlights => {
+                if (groupFlights.length > 0) {
+                    const firstFlight = groupFlights[0];
+                    autoUpdateFlightStatus(firstFlight);
+                }
+            });
+        }
+    }, [availabilities, flights]);
+
     return (
         <div className="final-menifest-wrap">
             <Container maxWidth="xl">
@@ -1058,8 +1175,65 @@ const Manifest = () => {
                                     paxTotalDisplay = reFound.capacity;
                                 }
                             }
-                             const status = found ? (found.available > 0 ? "Open" : "Closed") : getFlightStatus(first);
-                            const balloonResource = first.balloon_resources || 'N/A';
+                            
+                            // STATUS LOGIC: If Pax Booked equals capacity, status should be Closed
+                            let status;
+                            
+                            // Simple logic: if pax booked equals capacity, then closed
+                            if (paxBookedDisplay === paxTotalDisplay && paxTotalDisplay !== '-') {
+                                status = "Closed";
+                            } else {
+                                // Fallback to availability data or getFlightStatus
+                                if (found) {
+                                    status = found.available === 0 ? "Closed" : "Open";
+                                } else {
+                                    status = getFlightStatus(first);
+                                }
+                            }
+                            
+                            // Auto-update status to Closed if Pax Booked equals capacity
+                            if (status === "Closed" && paxBookedDisplay === paxTotalDisplay && paxTotalDisplay !== '-') {
+                                // Check if we need to update the database
+                                const currentFlightStatus = getFlightStatus(first);
+                                if (currentFlightStatus === "Open") {
+                                    console.log(`Auto-updating flight ${first.id} status to Closed (${paxBookedDisplay}/${paxTotalDisplay})`);
+                                    
+                                    // Update the flight status to Closed in the database
+                                    axios.patch("/api/updateManifestStatus", {
+                                        booking_id: first.id,
+                                        old_status: "Open",
+                                        new_status: "Closed",
+                                        flight_date: first.flight_date,
+                                        location: first.location,
+                                        total_pax: paxBookedDisplay
+                                    }).then(() => {
+                                        console.log(`Flight ${first.id} status updated to Closed in database`);
+                                        // Update local state
+                                        setFlights(prevFlights => prevFlights.map(f =>
+                                            f.flight_date === first.flight_date && 
+                                            f.location === first.location && 
+                                            f.flight_type === first.flight_type &&
+                                            f.time_slot === first.time_slot
+                                                ? { ...f, manual_status_override: 0 } // 0 = Closed
+                                                : f
+                                        ));
+                                    }).catch(error => {
+                                        console.error(`Error updating flight ${first.id} status:`, error);
+                                    });
+                                }
+                            }
+                            
+                            // Debug logging for status calculation
+                            console.log('Status calculation:', {
+                                paxBookedDisplay,
+                                paxTotalDisplay,
+                                calculatedStatus: status,
+                                flightId: first.id,
+                                location: first.location,
+                                flightType: first.flight_type
+                            });
+                             
+                             const balloonResource = first.balloon_resources || 'N/A';
                             const timeSlot = first.time_slot || 'N/A';
                             // Find the correct flight time from availability if found, always show as local time
                             let displayFlightTime = '';
