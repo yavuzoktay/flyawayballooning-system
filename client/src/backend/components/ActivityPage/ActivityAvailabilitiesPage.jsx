@@ -20,6 +20,7 @@ const columns = [
     { key: 'time', label: 'Time' },
     { key: 'capacity', label: 'Capacity' },
     { key: 'available', label: 'Available' },
+    { key: 'total_booked', label: 'Booked' },
     { key: 'flight_types', label: 'Flight Type' },
     { key: 'status', label: 'Status' },
     { key: 'channels', label: 'Channels' },
@@ -44,9 +45,27 @@ const ActivityAvailabilitiesPage = () => {
             }
         });
 
-        axios.get(`/api/activity/${id}/availabilities`).then(res => {
-            if (res.data.success) setAvailabilities(res.data.data);
-        });
+        // Fetch availabilities and auto-update statuses and available counts
+        const fetchAvailabilities = async () => {
+            try {
+                // First, update available counts and statuses
+                await axios.post(`/api/activity/${id}/updateAvailableCounts`);
+                
+                // Then fetch updated availabilities
+                const res = await axios.get(`/api/activity/${id}/availabilities`);
+                if (res.data.success) {
+                    setAvailabilities(res.data.data);
+                }
+            } catch (error) {
+                console.error('Error fetching availabilities:', error);
+                // Fallback: just fetch without auto-update
+                axios.get(`/api/activity/${id}/availabilities`).then(res => {
+                    if (res.data.success) setAvailabilities(res.data.data);
+                });
+            }
+        };
+
+        fetchAvailabilities();
     }, [id]);
 
     const handleRowClick = (row) => {
@@ -108,6 +127,38 @@ const ActivityAvailabilitiesPage = () => {
         });
     };
 
+    const handleAutoUpdateStatus = async () => {
+        try {
+            const response = await axios.post(`/api/activity/${id}/updateAvailabilityStatus`);
+            if (response.data.success) {
+                alert(`Successfully updated ${response.data.affectedRows} availability statuses!`);
+                // Refresh table to show updated statuses
+                axios.get(`/api/activity/${id}/availabilities`).then(res => {
+                    if (res.data.success) setAvailabilities(res.data.data);
+                });
+            }
+        } catch (error) {
+            console.error('Error auto-updating availability statuses:', error);
+            alert('Failed to auto-update availability statuses. Please try again.');
+        }
+    };
+
+    const handleUpdateAvailableCounts = async () => {
+        try {
+            const response = await axios.post(`/api/activity/${id}/updateAvailableCounts`);
+            if (response.data.success) {
+                alert(`Successfully updated ${response.data.updatedCount} availabilities with correct available counts and status!`);
+                // Refresh table to show updated data
+                axios.get(`/api/activity/${id}/availabilities`).then(res => {
+                    if (res.data.success) setAvailabilities(res.data.data);
+                });
+            }
+        } catch (error) {
+            console.error('Error updating available counts:', error);
+            alert('Failed to update available counts. Please try again.');
+        }
+    };
+
     return (
         <Container maxWidth="lg" style={{ marginTop: 40 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
@@ -123,6 +174,22 @@ const ActivityAvailabilitiesPage = () => {
                         onClick={handleBulkDelete}
                     >
                         Delete
+                    </Button>
+                    <Button 
+                        variant="contained" 
+                        color="secondary" 
+                        onClick={handleAutoUpdateStatus}
+                        title="Auto-update availability statuses based on current bookings"
+                    >
+                        Auto-Update Status
+                    </Button>
+                    <Button 
+                        variant="contained" 
+                        color="warning" 
+                        onClick={handleUpdateAvailableCounts}
+                        title="Update available counts and status based on actual bookings"
+                    >
+                        Update Available Counts
                     </Button>
                     <Button variant="contained" color="primary" onClick={() => setModalOpen(true)}>
                         Create Availabilities
@@ -167,6 +234,7 @@ const ActivityAvailabilitiesPage = () => {
                             <TableCell>{row.time ? row.time.slice(0,5) : ''}</TableCell>
                             <TableCell>{row.capacity}</TableCell>
                             <TableCell>{row.available}</TableCell>
+                            <TableCell>{row.total_booked}</TableCell>
                             <TableCell>
                                 {row.flight_types && row.flight_types !== 'All' ? 
                                     row.flight_types.split(',').map((type, index) => (
@@ -191,11 +259,22 @@ const ActivityAvailabilitiesPage = () => {
                             <TableCell>
                                 <Chip 
                                     label={row.status} 
-                                    color={row.status === 'Open' ? 'success' : 'default'} 
+                                    color={row.status === 'Open' ? 'success' : 'error'} 
                                     size="small"
                                     onClick={(e) => handleStatusToggle(row.id, row.status, e)}
                                     style={{ cursor: 'pointer' }}
+                                    title={`Click to toggle status. Current: ${row.status}`}
                                 />
+                                {row.total_booked >= row.capacity && row.status === 'Closed' && (
+                                    <Chip 
+                                        label="Full" 
+                                        color="warning" 
+                                        size="small" 
+                                        variant="outlined"
+                                        style={{ marginLeft: 4 }}
+                                        title="Capacity reached - automatically closed"
+                                    />
+                                )}
                             </TableCell>
                             <TableCell>
                                 <Chip label={row.channels} color="success" size="small" />

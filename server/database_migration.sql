@@ -1,3 +1,21 @@
+-- Select the database first
+USE flyawayballooning;
+
+-- Create passengers table if it doesn't exist
+CREATE TABLE IF NOT EXISTS passengers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    booking_id INT NOT NULL,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    email VARCHAR(255),
+    phone VARCHAR(20),
+    weight DECIMAL(5,2),
+    ticket_type VARCHAR(100),
+    weather_refund BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (booking_id) REFERENCES all_booking(id) ON DELETE CASCADE
+);
+
 -- Add new pricing columns to activity table
 ALTER TABLE activity ADD COLUMN shared_price DECIMAL(10,2) DEFAULT NULL;
 ALTER TABLE activity ADD COLUMN private_price DECIMAL(10,2) DEFAULT NULL;
@@ -58,3 +76,12 @@ ALTER TABLE activity_availability ADD COLUMN voucher_types VARCHAR(255) DEFAULT 
 
 -- Add voucher_type column to activity table
 ALTER TABLE activity ADD COLUMN voucher_type VARCHAR(255) DEFAULT 'All'; 
+
+-- Add new columns for experience and voucher type
+ALTER TABLE all_booking 
+ADD COLUMN experience VARCHAR(100) DEFAULT NULL COMMENT 'Selected experience (Shared Flight, Private Charter)',
+ADD COLUMN voucher_type VARCHAR(100) DEFAULT NULL COMMENT 'Selected voucher type (Weekday Morning, Flexible Weekday, Any Day Flight)';
+
+-- Update existing records with default values if needed
+UPDATE all_booking SET experience = 'Shared Flight' WHERE experience IS NULL;
+UPDATE all_booking SET voucher_type = 'Any Day Flight' WHERE voucher_type IS NULL; 

@@ -337,128 +337,27 @@ app.get("/api/getfilteredBookings", (req, res) => {
     });
 });
 
-// Get All Booking Data
-app.get("/api/getAllBookingData", (req, res) => {
-    console.log('getAllBookingData endpoint hit!');
-    console.log('Request headers:', req.headers);
-    console.log('Request query:', req.query);
+// Get all booking data
+app.get('/api/getAllBookingData', (req, res) => {
+    const sql = `
+        SELECT 
+            ab.*,
+            ab.name as passenger_name,
+            COALESCE(ab.voucher_type, 'Any Day Flight') as voucher_type,
+            DATE_FORMAT(ab.created_at, '%Y-%m-%d') as created_at_display,
+            DATE_FORMAT(ab.expires, '%d/%m/%Y') as expires_display
+        FROM all_booking ab
+        ORDER BY ab.created_at DESC
+    `;
     
-    const { flightType, location, search, status } = req.query;
-
-    let sql = "SELECT * FROM all_booking";
-    const values = [];
-    let whereClauses = [];
-
-    if (flightType) {
-        whereClauses.push("flight_type = ?");
-        values.push(flightType);
-    }
-    if (location) {
-        whereClauses.push("location = ?");
-        values.push(location);
-    }
-    if (status) {
-        if (status === 'Scheduled') {
-            whereClauses.push("(status = 'Scheduled' OR status = 'Confirmed')");
-        } else {
-            whereClauses.push("status = ?");
-            values.push(status);
-        }
-    }
-    if (search) {
-        console.log('Search term:', search);
-        
-        // Eğer DD/MM/YYYY formatındaysa, DATE() sorgularını da ekle
-        if (/^\d{2}\/\d{2}\/\d{4}$/.test(search)) {
-            const [d, m, y] = search.split('/');
-            const dateSearch = `${y}-${m}-${d}`;
-            console.log('Converted date:', dateSearch);
-            
-        whereClauses.push(`(
-            name LIKE ? OR
-            id LIKE ? OR
-                voucher_code LIKE ? OR
-                created_at LIKE ? OR
-                DATE_FORMAT(created_at, '%d/%m/%Y') LIKE ? OR
-                DATE(created_at) = ? OR
-                DATE(CONVERT_TZ(created_at, '+00:00', '+03:00')) = ?
-        )`);
-        const likeSearch = `%${search}%`;
-            values.push(likeSearch, likeSearch, likeSearch, likeSearch, likeSearch, dateSearch, dateSearch);
-        } else {
-            // Sadece LIKE aramaları yap, DATE() fonksiyonlarını kullanma
-            whereClauses.push(`(
-                name LIKE ? OR
-                id LIKE ? OR
-                voucher_code LIKE ? OR
-                created_at LIKE ? OR
-                DATE_FORMAT(created_at, '%d/%m/%Y') LIKE ?
-            )`);
-            const likeSearch = `%${search}%`;
-            values.push(likeSearch, likeSearch, likeSearch, likeSearch, likeSearch);
-        }
-        
-        console.log('SQL values:', values);
-    }
-    if (whereClauses.length > 0) {
-        sql += " WHERE " + whereClauses.join(" AND ");
-    }
-    sql += " ORDER BY created_at DESC";
-    
-    console.log('Final SQL:', sql);
-    console.log('Final values:', values);
-
-    con.query(sql, values, (err, result) => {
+    con.query(sql, (err, result) => {
         if (err) {
-            console.error("Error fetching booking data:", err);
-            return res.status(500).send({ success: false, message: "Database query failed" });
+            console.error('Error fetching all booking data:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err });
         }
         
-        console.log('Query result count:', result ? result.length : 0);
-        
-        // Debug: İlk birkaç kaydın created_at değerlerini göster
-        if (result && result.length > 0) {
-            console.log('Sample created_at values:');
-            result.slice(0, 3).forEach((row, index) => {
-                console.log(`Row ${index + 1}:`, row.created_at);
-            });
-        }
-        if (result && result.length > 0) {
-            // choose_add_on'u doğrudan string olarak döndür
-            const formatted = result.map(row => {
-                // Format flight_date as DD/MM/YYYY AM/PM if time exists
-                let flightDateFormatted = '';
-                if (row.status === 'Cancelled') {
-                    flightDateFormatted = '-';
-                } else if (row.flight_date) {
-                    // Try to parse as date+time
-                    const dateTime = moment(row.flight_date, ["YYYY-MM-DD HH:mm", "YYYY-MM-DDTHH:mm", "YYYY-MM-DD", "DD/MM/YYYY HH:mm", "DD/MM/YYYY"]);
-                    if (dateTime.isValid()) {
-                        const hour = dateTime.hour();
-                        const ampm = hour < 12 ? 'AM' : 'PM';
-                        flightDateFormatted = dateTime.format('DD/MM/YYYY') + (row.flight_date.length > 10 ? ' ' + ampm : '');
-                    } else {
-                        // Fallback: just show as is
-                        flightDateFormatted = row.flight_date;
-                    }
-                }
-                return {
-                    ...row,
-                    created_at: row.created_at ? moment(row.created_at).format('YYYY-MM-DD') : '',
-                    created_at_display: row.created_at ? moment(row.created_at).format('DD/MM/YYYY') : '',
-                    choose_add_on: row.choose_add_on || '',
-                    flight_date_display: flightDateFormatted,
-                    preferred_location: row.preferred_location || null,
-                    preferred_time: row.preferred_time || null,
-                    preferred_day: row.preferred_day || null
-                };
-            });
-            console.log('Sending response with', formatted.length, 'records');
-            res.send({ success: true, data: formatted });
-        } else {
-            console.log('No bookings found, sending empty response');
-            res.send({ success: false, message: "No bookings found" });
-        }
+        console.log(`Fetched ${result.length} bookings`);
+        res.json({ success: true, data: result });
     });
 });
 
@@ -764,7 +663,7 @@ app.post('/api/createBooking', (req, res) => {
                 preferred_location,
                 preferred_time,
                 preferred_day
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         // Debug log for choose_add_on and bookingValues
@@ -870,7 +769,7 @@ app.post('/api/createBooking', (req, res) => {
             // --- Availability güncelleme sonu ---
 
             function insertPassengers() {
-                const passengerSql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund) VALUES ?';
+                const passengerSql = 'INSERT INTO passengers (booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund) VALUES ?';
                 const passengerValues = passengerData.map(p => [
                     bookingId,
                     p.firstName,
@@ -1614,19 +1513,70 @@ app.post('/api/activity/:id/availabilities', (req, res) => {
 app.get('/api/activity/:id/availabilities', (req, res) => {
     const { id } = req.params;
     if (!id) return res.status(400).json({ success: false, message: 'Eksik bilgi!' });
-    // Join with activity to get location and flight_type
-    const sql = `SELECT aa.*, a.location, a.flight_type FROM activity_availability aa JOIN activity a ON aa.activity_id = a.id WHERE aa.activity_id = ? ORDER BY aa.date, aa.time`;
-    con.query(sql, [id], (err, result) => {
-        if (err) return res.status(500).json({ success: false, message: 'Database error', error: err });
+    
+    console.log(`Fetching availabilities for activity ${id}`);
+    
+    // Single optimized query with JOINs
+    const optimizedSql = `
+        SELECT 
+            aa.*,
+            a.location,
+            a.flight_type,
+            COALESCE(booking_counts.total_booked, 0) as total_booked,
+            CASE 
+                WHEN COALESCE(booking_counts.total_booked, 0) >= aa.capacity THEN 'Closed'
+                ELSE aa.status
+            END as calculated_status,
+            GREATEST(0, aa.capacity - COALESCE(booking_counts.total_booked, 0)) as calculated_available
+        FROM activity_availability aa 
+        JOIN activity a ON aa.activity_id = a.id 
+        LEFT JOIN (
+            SELECT 
+                DATE(ab.flight_date) as flight_date,
+                COUNT(*) as total_booked
+            FROM all_booking ab 
+            WHERE DATE(ab.flight_date) >= CURDATE() - INTERVAL 30 DAY
+            GROUP BY DATE(ab.flight_date)
+        ) as booking_counts ON DATE(aa.date) = booking_counts.flight_date
+        WHERE aa.activity_id = ? 
+        ORDER BY aa.date, aa.time
+    `;
+    
+    con.query(optimizedSql, [id], (err, result) => {
+        if (err) {
+            console.error('Error fetching availabilities:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err });
+        }
         
-        // Normalize date format to YYYY-MM-DD
-        const normalizedResult = result.map(row => ({
-            ...row,
-            date: row.date ? dayjs(row.date).format('YYYY-MM-DD') : row.date
-        }));
+        console.log(`Found ${result.length} availabilities for activity ${id}`);
         
-        console.log('Availabilities for activity', id, ':', normalizedResult);
-        res.json({ success: true, data: normalizedResult });
+        // Process results and update database if needed
+        const processedResult = result.map(row => {
+            const needsUpdate = row.calculated_status !== row.status || row.calculated_available !== row.available;
+            
+            // Update database if needed (non-blocking)
+            if (needsUpdate) {
+                const updateSql = 'UPDATE activity_availability SET status = ?, available = ? WHERE id = ?';
+                con.query(updateSql, [row.calculated_status, row.calculated_available, row.id], (updateErr) => {
+                    if (updateErr) {
+                        console.error('Error updating availability:', updateErr);
+                    } else {
+                        console.log(`Updated availability ${row.id}: status=${row.calculated_status}, available=${row.calculated_available}`);
+                    }
+                });
+            }
+            
+            return {
+                ...row,
+                date: row.date ? dayjs(row.date).format('YYYY-MM-DD') : row.date,
+                total_booked: row.total_booked || 0,
+                available: row.calculated_available,
+                status: row.calculated_status
+            };
+        });
+        
+        console.log(`Processed ${processedResult.length} availabilities`);
+        res.json({ success: true, data: processedResult });
     });
 });
 
@@ -1673,7 +1623,7 @@ app.get('/api/availabilities/filter', (req, res) => {
         SELECT aa.*, a.location, a.flight_type, a.voucher_type as activity_voucher_types
         FROM activity_availability aa 
         JOIN activity a ON aa.activity_id = a.id 
-        WHERE ${activityId ? 'aa.activity_id = ?' : 'a.location = ?'} AND a.status = 'Live' AND aa.status = 'open'
+        WHERE ${activityId ? 'aa.activity_id = ?' : 'a.location = ?'} AND a.status = 'Live'
     `;
     
     const params = [activityId || location];
@@ -1712,11 +1662,22 @@ app.get('/api/availabilities/filter', (req, res) => {
             return res.status(500).json({ success: false, message: 'Database error' });
         }
         
-        // Normalize date format to YYYY-MM-DD and add debugging
-        const normalizedResult = result.map(row => ({
-            ...row,
-            date: row.date ? new Date(row.date).toISOString().split('T')[0] : row.date
-        }));
+        // Normalize date format to YYYY-MM-DD using local timezone to prevent 1-day offset
+        const normalizedResult = result.map(row => {
+            if (!row.date) return row;
+            
+            // Parse the date and create a new date in local timezone
+            const dateObj = new Date(row.date);
+            const year = dateObj.getFullYear();
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            const localDateString = `${year}-${month}-${day}`;
+            
+            return {
+                ...row,
+                date: localDateString
+            };
+        });
         
         console.log('Filtered availabilities response:', { 
             location, 
@@ -1854,6 +1815,56 @@ app.post('/api/updateAvailabilityStatus', (req, res) => {
         res.json({ 
             success: true, 
             message: 'Availability statuses updated automatically',
+            affectedRows: result.affectedRows
+        });
+    });
+});
+
+// Auto-update availability status for a specific activity based on booking count
+app.post('/api/activity/:id/updateAvailabilityStatus', (req, res) => {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ success: false, message: 'Missing activity ID' });
+    
+    const sql = `
+        UPDATE activity_availability aa
+        JOIN (
+            SELECT 
+                DATE(ab.flight_date) as flight_date,
+                ab.location,
+                TIME(ab.time_slot) as time_slot,
+                COUNT(ab.id) as total_booked
+            FROM all_booking ab
+            WHERE ab.activity_id = ?
+            GROUP BY DATE(ab.flight_date), ab.location, TIME(ab.time_slot)
+        ) as booking_counts ON 
+            DATE(aa.date) = booking_counts.flight_date AND
+            TIME(aa.time) = booking_counts.time_slot AND
+            EXISTS (
+                SELECT 1 FROM activity a 
+                WHERE a.id = aa.activity_id 
+                AND a.location = booking_counts.location
+            )
+        SET 
+            aa.status = CASE 
+                WHEN booking_counts.total_booked >= aa.capacity THEN 'Closed'
+                ELSE 'Open'
+            END,
+            aa.available = GREATEST(0, aa.capacity - booking_counts.total_booked)
+        WHERE aa.activity_id = ?
+    `;
+    
+    console.log(`Updating availability status for activity ${id}`);
+    
+    con.query(sql, [id, id], (err, result) => {
+        if (err) {
+            console.error('Error updating availability status for activity:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err });
+        }
+        
+        console.log(`Updated ${result.affectedRows} availability statuses for activity ${id}`);
+        res.json({ 
+            success: true, 
+            message: `Updated ${result.affectedRows} availability statuses for activity ${id}`,
             affectedRows: result.affectedRows
         });
     });
@@ -2231,9 +2242,12 @@ const updateAvailabilityStatus = async () => {
 };
 
 // Start the server
-const PORT = process.env.PORT || 3002;
+const PORT = process.env.PORT || 3003;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
+    
+    // Run database migrations on server start
+    runDatabaseMigrations();
     
     // Run initial availability status update
     updateAvailabilityStatus();
@@ -2359,8 +2373,8 @@ async function createBookingFromWebhook(bookingData) {
                     name, flight_type, flight_date, pax, location, status, paid, due,
                     voucher_code, created_at, expires, additional_notes, hear_about_us,
                     ballooning_reason, prefer, weight, email, phone, choose_add_on,
-                    preferred_location, preferred_time, preferred_day
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    preferred_location, preferred_time, preferred_day, experience, voucher_type
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
 
             const bookingValues = [
@@ -2385,7 +2399,9 @@ async function createBookingFromWebhook(bookingData) {
                 emptyToNull(choose_add_on_str),
                 emptyToNull(preferred_location),
                 emptyToNull(preferred_time),
-                emptyToNull(preferred_day)
+                emptyToNull(preferred_day),
+                chooseFlightType.type, // experience
+                'Any Day Flight' // voucher_type (default)
             ];
 
             con.query(bookingSql, bookingValues, (err, result) => {
@@ -2399,7 +2415,7 @@ async function createBookingFromWebhook(bookingData) {
                 
                 // Now create passenger records
                 if (passengerData && passengerData.length > 0) {
-                    const passengerSql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund) VALUES ?';
+                    const passengerSql = 'INSERT INTO passengers (booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund) VALUES ?';
                     const passengerValues = passengerData.map(p => [
                         bookingId,
                         p.firstName || '',
@@ -2732,6 +2748,373 @@ app.post('/api/createBookingFromSession', async (req, res) => {
         console.error('Error creating from session:', error);
         res.status(500).json({ success: false, message: error.message });
     }
+});
+
+// Debug endpoint to check booking and availability data
+app.get('/api/debug/activity/:id/bookings', (req, res) => {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ success: false, message: 'Missing activity ID' });
+    
+    // Check all_booking data
+    const bookingSql = `
+        SELECT 
+            id, 
+            activity_id, 
+            flight_date, 
+            location, 
+            flight_type, 
+            time_slot,
+            created_at
+        FROM all_booking 
+        WHERE activity_id = ?
+        ORDER BY flight_date, time_slot
+    `;
+    
+    // Check activity_availability data
+    const availabilitySql = `
+        SELECT 
+            id, 
+            activity_id, 
+            date, 
+            time, 
+            capacity, 
+            available, 
+            status,
+            flight_types
+        FROM activity_availability 
+        WHERE activity_id = ?
+        ORDER BY date, time
+    `;
+    
+    con.query(bookingSql, [id], (bookingErr, bookingResult) => {
+        if (bookingErr) {
+            console.error('Error fetching booking data:', bookingErr);
+            return res.status(500).json({ success: false, message: 'Database error', error: bookingErr });
+        }
+        
+        con.query(availabilitySql, [id], (availabilityErr, availabilityResult) => {
+            if (availabilityErr) {
+                console.error('Error fetching availability data:', availabilityErr);
+                return res.status(500).json({ success: false, message: 'Database error', error: availabilityErr });
+            }
+            
+            res.json({
+                success: true,
+                data: {
+                    bookings: bookingResult,
+                    availabilities: availabilityResult,
+                    message: `Debug data for activity ${id}`
+                }
+            });
+        });
+    });
+});
+
+// Simple test endpoint to check booking data
+app.get('/api/test/booking-count/:activityId/:date/:time', (req, res) => {
+    const { activityId, date, time } = req.params;
+    
+    console.log(`\n=== Test endpoint called ===`);
+    console.log(`Activity ID: ${activityId}, Date: ${date}, Time: ${time}`);
+    
+    // First, get all bookings for this activity to debug
+    const debugSql = `
+        SELECT 
+            id, 
+            flight_date, 
+            location, 
+            time_slot,
+            DATE(flight_date) as date_only,
+            TIME(time_slot) as time_only
+        FROM all_booking 
+        WHERE activity_id = ?
+        ORDER BY flight_date, time_slot
+    `;
+    
+    con.query(debugSql, [activityId], (debugErr, debugResult) => {
+        if (debugErr) {
+            console.error('Debug query error:', debugErr);
+            return res.status(500).json({ success: false, error: debugErr.message });
+        }
+        
+        console.log('All bookings for this activity:', debugResult);
+        
+        // Then, get specific booking count
+        const testSql = `
+            SELECT 
+                COUNT(*) as total_booked,
+                GROUP_CONCAT(ab.id) as booking_ids,
+                GROUP_CONCAT(ab.flight_date) as flight_dates,
+                GROUP_CONCAT(ab.time_slot) as time_slots,
+                GROUP_CONCAT(ab.location) as locations
+            FROM all_booking ab 
+            WHERE ab.activity_id = ? 
+            AND DATE(ab.flight_date) = DATE(?)
+            AND TIME(ab.time_slot) = TIME(?)
+        `;
+        
+        console.log(`Test query params: activity_id=${activityId}, date=${date}, time=${time}`);
+        
+        con.query(testSql, [activityId, date, time], (err, result) => {
+            if (err) {
+                console.error('Test query error:', err);
+                return res.status(500).json({ success: false, error: err.message });
+            }
+            
+            const totalBooked = result[0].total_booked || 0;
+            console.log(`Result: totalBooked=${totalBooked}, bookingIds=${result[0].booking_ids}`);
+            
+            res.json({
+                success: true,
+                data: {
+                    activityId,
+                    date,
+                    time,
+                    totalBooked,
+                    bookingIds: result[0].booking_ids,
+                    flightDates: result[0].flight_dates,
+                    timeSlots: result[0].time_slots,
+                    locations: result[0].locations,
+                    debug: {
+                        allBookings: debugResult,
+                        query: testSql,
+                        params: [activityId, date, time]
+                    }
+                }
+            });
+        });
+    });
+});
+
+// Auto-update available counts and status for all availabilities
+app.post('/api/activity/:id/updateAvailableCounts', (req, res) => {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ success: false, message: 'Missing activity ID' });
+    
+    console.log(`Updating available counts for activity ${id}`);
+    
+    // First, get all availabilities for this activity
+    const getAvailabilitiesSql = `
+        SELECT aa.id, aa.date, aa.time, aa.capacity, aa.available, aa.status, a.location
+        FROM activity_availability aa 
+        JOIN activity a ON aa.activity_id = a.id 
+        WHERE aa.activity_id = ?
+    `;
+    
+    con.query(getAvailabilitiesSql, [id], (err, availabilities) => {
+        if (err) {
+            console.error('Error fetching availabilities:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err });
+        }
+        
+        console.log(`Found ${availabilities.length} availabilities to update`);
+        
+        let updatedCount = 0;
+        const updatePromises = availabilities.map(availability => {
+            return new Promise((resolve) => {
+                // Get actual booking count for this availability
+                const getBookingCountSql = `
+                    SELECT COUNT(*) as total_booked
+                    FROM all_booking ab 
+                    WHERE ab.activity_id = ? 
+                    AND DATE(ab.flight_date) = DATE(?)
+                    AND ab.location = ?
+                    AND TIME(ab.time_slot) = TIME(?)
+                `;
+                
+                con.query(getBookingCountSql, [id, availability.date, availability.location, availability.time], (bookingErr, bookingResult) => {
+                    if (bookingErr) {
+                        console.error('Error getting booking count:', bookingErr);
+                        resolve(false);
+                        return;
+                    }
+                    
+                    const totalBooked = bookingResult[0].total_booked || 0;
+                    const newAvailable = Math.max(0, availability.capacity - totalBooked);
+                    const newStatus = totalBooked >= availability.capacity ? 'Closed' : 'Open';
+                    
+                    // Only update if something changed
+                    if (newAvailable !== availability.available || newStatus !== availability.status) {
+                        const updateSql = `
+                            UPDATE activity_availability 
+                            SET available = ?, status = ? 
+                            WHERE id = ?
+                        `;
+                        
+                        con.query(updateSql, [newAvailable, newStatus, availability.id], (updateErr) => {
+                            if (updateErr) {
+                                console.error('Error updating availability:', updateErr);
+                                resolve(false);
+                            } else {
+                                console.log(`Updated availability ${availability.id}: available=${newAvailable}, status=${newStatus}, total_booked=${totalBooked}`);
+                                updatedCount++;
+                                resolve(true);
+                            }
+                        });
+                    } else {
+                        resolve(false);
+                    }
+                });
+            });
+        });
+        
+        Promise.all(updatePromises).then(() => {
+            console.log(`Updated ${updatedCount} availabilities for activity ${id}`);
+            res.json({
+                success: true,
+                message: `Updated ${updatedCount} availabilities for activity ${id}`,
+                updatedCount
+            });
+        });
+    });
+});
+
+// Duplicate function removed - using the existing one at line 2291
+
+// Test endpoint for creating a test booking
+app.post('/api/createTestBooking', (req, res) => {
+    const testBooking = {
+        customer_name: 'Test User',
+        email: 'test@example.com',
+        amount: 100.00,
+        flight_date: '2025-09-15 09:00:00',
+        time_slot: '09:00:00',
+        location: 'London',
+        activity_id: 29,
+        experience: 'Shared Flight',
+        voucher_type: 'Weekday Morning',
+        created_at: new Date()
+    };
+    
+    const sql = `
+        INSERT INTO all_booking (
+            customer_name, 
+            email, 
+            amount, 
+            flight_date, 
+            time_slot,
+            location,
+            activity_id,
+            experience,
+            voucher_type,
+            created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    
+    const values = [
+        testBooking.customer_name,
+        testBooking.email,
+        testBooking.amount,
+        testBooking.flight_date,
+        testBooking.time_slot,
+        testBooking.location,
+        testBooking.activity_id,
+        testBooking.experience,
+        testBooking.voucher_type,
+        testBooking.created_at
+    ];
+    
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error creating test booking:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err });
+        }
+        
+        console.log('Test booking created with ID:', result.insertId);
+        res.json({ success: true, message: 'Test booking created', bookingId: result.insertId });
+    });
+});
+
+// Database migration function
+const runDatabaseMigrations = () => {
+    console.log('Running database migrations...');
+    
+    // Create passengers table if it doesn't exist
+    const createPassengersTable = `
+        CREATE TABLE IF NOT EXISTS passengers (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            booking_id INT NOT NULL,
+            first_name VARCHAR(100) NOT NULL,
+            last_name VARCHAR(100) NOT NULL,
+            email VARCHAR(255),
+            phone VARCHAR(20),
+            weight DECIMAL(5,2),
+            ticket_type VARCHAR(100),
+            weather_refund BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (booking_id) REFERENCES all_booking(id) ON DELETE CASCADE
+        )
+    `;
+    
+    con.query(createPassengersTable, (err) => {
+        if (err) {
+            console.error('Error creating passengers table:', err);
+        } else {
+            console.log('✅ Passengers table ready');
+        }
+    });
+    
+    // Check if experience column exists
+    const checkExperienceColumn = "SHOW COLUMNS FROM all_booking LIKE 'experience'";
+    con.query(checkExperienceColumn, (err, result) => {
+        if (err) {
+            console.error('Error checking experience column:', err);
+            return;
+        }
+        
+        if (result.length === 0) {
+            console.log('Adding experience column...');
+            const addExperienceColumn = "ALTER TABLE all_booking ADD COLUMN experience VARCHAR(100) DEFAULT 'Shared Flight' COMMENT 'Selected experience (Shared Flight, Private Charter)'";
+            con.query(addExperienceColumn, (err) => {
+                if (err) {
+                    console.error('Error adding experience column:', err);
+                } else {
+                    console.log('✅ Experience column added successfully');
+                }
+            });
+        } else {
+            console.log('✅ Experience column already exists');
+        }
+    });
+    
+    // Check if voucher_type column exists
+    const checkVoucherTypeColumn = "SHOW COLUMNS FROM all_booking LIKE 'voucher_type'";
+    con.query(checkVoucherTypeColumn, (err, result) => {
+        if (err) {
+            console.error('Error checking voucher_type column:', err);
+            return;
+        }
+        
+        if (result.length === 0) {
+            console.log('Adding voucher_type column...');
+            const addVoucherTypeColumn = "ALTER TABLE all_booking ADD COLUMN voucher_type VARCHAR(100) DEFAULT 'Any Day Flight' COMMENT 'Selected voucher type (Weekday Morning, Flexible Weekday, Any Day Flight)'";
+            con.query(addVoucherTypeColumn, (err) => {
+                if (err) {
+                    console.error('Error adding voucher_type column:', err);
+                } else {
+                    console.log('✅ Voucher type column added successfully');
+                }
+            });
+        } else {
+            console.log('✅ Voucher type column already exists');
+        }
+    });
+};
+
+// Database migrations will run when the main server starts
+
+// Debug endpoint to check table structure
+app.get('/api/debug/table-structure', (req, res) => {
+    const sql = "DESCRIBE all_booking";
+    con.query(sql, (err, result) => {
+        if (err) {
+            console.error('Error checking table structure:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err });
+        }
+        
+        console.log('Table structure:', result);
+        res.json({ success: true, data: result });
+    });
 });
 
 

@@ -88,9 +88,23 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
             }
 
             if (shouldCreate) {
+                // Create date string in local timezone to prevent 1-day offset
+                const year = currentDate.getFullYear();
+                const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                const day = String(currentDate.getDate()).padStart(2, '0');
+                const localDateString = `${year}-${month}-${day}`;
+                
                 availabilities.push({
-                    date: currentDate.toISOString().split('T')[0],
-                    day_of_week: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayOfWeek]
+                    schedule: name,
+                    date: localDateString,
+                    day_of_week: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayOfWeek],
+                    time: startTime,
+                    capacity: parseInt(capacity),
+                    available: parseInt(available),
+                    status: visibility,
+                    channels: 'All',
+                    flight_types: flightTypes.length > 0 ? flightTypes.join(',') : 'All',
+                    voucher_types: voucherTypes.length > 0 ? voucherTypes.join(',') : 'All'
                 });
             }
             currentDate.setDate(currentDate.getDate() + 1);
@@ -131,9 +145,15 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
             }
 
             if (shouldCreate) {
+                // Create date string in local timezone to prevent 1-day offset
+                const year = currentDate.getFullYear();
+                const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                const day = String(currentDate.getDate()).padStart(2, '0');
+                const localDateString = `${year}-${month}-${day}`;
+                
                 availabilities.push({
                     schedule: name,
-                    date: currentDate.toISOString().split('T')[0],
+                    date: localDateString,
                     day_of_week: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayOfWeek],
                     time: startTime,
                     capacity: parseInt(capacity),

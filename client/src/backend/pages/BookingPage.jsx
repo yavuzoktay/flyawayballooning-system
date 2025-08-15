@@ -584,10 +584,10 @@ const BookingPage = () => {
         "created_at",
         "name",
         "flight_type",
+        "voucher_type",
+        "location",
         "flight_date",
         "pax",
-        "email",
-        "location",
         "status",
         "paid",
         "due",
@@ -936,6 +936,17 @@ const BookingPage = () => {
         }
     };
 
+    const columns = [
+        { key: 'created_at_display', label: 'Created' },
+        { key: 'passenger_name', label: 'Name' },
+        { key: 'flight_type', label: 'Flight Type' },
+        { key: 'voucher_type', label: 'Voucher Type' },
+        { key: 'status', label: 'Status' },
+        { key: 'location', label: 'Location' },
+        { key: 'flight_attempts', label: 'Flight attempts' },
+        { key: 'expires_display', label: 'Expires' }
+    ];
+
     return (
         <div className="booking-page-wrap">
             <Container maxWidth="xl">
@@ -1071,6 +1082,7 @@ const BookingPage = () => {
                                             ? `${item.passengers[0]?.first_name || ''} ${item.passengers[0]?.last_name || ''}`.trim() || item.name || ''
                                             : item.name || ''),
                                         flight_type: item.flight_type || '',
+                                        voucher_type: item.voucher_type || 'Any Day Flight',
                                         location: item.location || '',
                                         flight_date: item.flight_date_display || item.flight_date || '',
                                         pax: item.pax || '',
@@ -1085,6 +1097,7 @@ const BookingPage = () => {
                                         "created_at",
                                         "name",
                                         "flight_type",
+                                        "voucher_type",
                                         "location",
                                         "flight_date",
                                         "pax",

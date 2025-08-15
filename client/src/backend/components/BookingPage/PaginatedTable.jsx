@@ -79,7 +79,19 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                     {columns.map((col) => {
                         const id = getColId(col);
                         return (
-                            <col key={id} style={{ width: id === 'email' ? '240px' : id === 'name' ? '180px' : id === 'status' ? '120px' : 'auto', minWidth: id === 'email' ? '240px' : id === 'name' ? '180px' : id === 'status' ? '120px' : '80px', maxWidth: id === 'email' ? '240px' : undefined }} />
+                            <col key={id} style={{ 
+                                width: id === 'email' ? '240px' : 
+                                       id === 'name' ? '180px' : 
+                                       id === 'status' ? '120px' : 
+                                       id === 'voucher_type' ? '140px' :
+                                       'auto', 
+                                minWidth: id === 'email' ? '240px' : 
+                                         id === 'name' ? '180px' : 
+                                         id === 'status' ? '120px' : 
+                                         id === 'voucher_type' ? '140px' :
+                                         '80px', 
+                                maxWidth: id === 'email' ? '240px' : undefined 
+                            }} />
                         );
                     })}
                 </colgroup>
@@ -149,7 +161,7 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                                                     const urlDate = `${year}-${month}-${day}`;
                                                     return (
                                                         <a
-                                                            href={`http://34.205.25.8:3002/manifest?date=${urlDate}`}
+                                                            href={`https://flyawayballooning-system.com//manifest?date=${urlDate}`}
                                                             style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
                                                             target="_self"
                                                             rel="noopener noreferrer"
@@ -180,6 +192,8 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                                                     const year = date.getFullYear();
                                                     return `${day}/${month}/${year}`;
                                                 })()
+                                            ) : id === 'voucher_type' ? (
+                                                item[id] || 'Any Day Flight'
                                             ) : id === 'status' && item[id] === 'Confirmed' ? 'Scheduled' : item[id]}
                                         </td>
                                     );
