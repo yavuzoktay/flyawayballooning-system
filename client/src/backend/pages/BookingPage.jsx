@@ -171,21 +171,56 @@ const BookingPage = () => {
                 try {
                     const resp = await axios.get(`/api/getAllVoucherData`);
                     setVoucher(resp.data.data || []);
-                    setFilteredData((resp.data.data || []).map(item => ({
-                        ...item,
-                        created: item.created_at || '',
-                        name: item.name || '',
-                        flight_type: item.flight_type || '',
-                        voucher_type: item.voucher_type || '',
-                        email: item.email || '',
-                        phone: item.phone || '',
-                        expires: item.expires || '',
-                        redeemed: item.redeemed || '',
-                        paid: item.paid || '',
-                        offer_code: item.offer_code || '',
-                        voucher_ref: item.voucher_ref || '',
-                        _original: item // _original her zaman eklensin
-                    })));
+                    console.log('Voucher data from API:', resp.data.data);
+                    setFilteredData((resp.data.data || []).map(item => {
+                        console.log('Processing voucher item:', item);
+                        console.log('created_at value:', item.created_at);
+                        console.log('created_at type:', typeof item.created_at);
+                        
+                        let formattedDate = '';
+                        if (item.created_at) {
+                            try {
+                                // Backend'den gelen format: "16/08/2025 18:32" (DD/MM/YYYY HH:mm)
+                                // Bu formatı dayjs ile parse etmek için önce standart formata çevirelim
+                                let dateString = item.created_at;
+                                
+                                // Eğer "DD/MM/YYYY HH:mm" formatındaysa, "DD/MM/YYYY" kısmını alalım
+                                if (dateString.includes(' ') && dateString.includes('/')) {
+                                    const datePart = dateString.split(' ')[0]; // "16/08/2025" kısmını al
+                                    const [day, month, year] = datePart.split('/');
+                                    // YYYY-MM-DD formatına çevir
+                                    dateString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                                }
+                                
+                                const date = dayjs(dateString);
+                                if (date.isValid()) {
+                                    formattedDate = date.format('DD/MM/YYYY');
+                                } else {
+                                    console.log('Invalid date for item:', item.id, 'created_at:', item.created_at, 'parsed:', dateString);
+                                    formattedDate = 'N/A';
+                                }
+                            } catch (error) {
+                                console.log('Error formatting date for item:', item.id, 'error:', error);
+                                formattedDate = 'N/A';
+                            }
+                        }
+                        
+                        return {
+                            ...item,
+                            created: formattedDate,
+                            name: item.name || '',
+                            flight_type: item.flight_type || '',
+                            voucher_type: item.voucher_type || '',
+                            email: item.email || '',
+                            phone: item.phone || '',
+                            expires: item.expires || '',
+                            redeemed: item.redeemed || '',
+                            paid: item.paid || '',
+                            offer_code: item.offer_code || '',
+                            voucher_ref: item.voucher_ref || '',
+                            _original: item // _original her zaman eklensin
+                        };
+                    }));
                 } catch (err) {
                     setVoucher([]);
                     setFilteredData([]);
@@ -201,7 +236,7 @@ const BookingPage = () => {
                         number: item.phone || "",
                         email: item.email || "",
                         location: item.location || "",
-                        date_requested: item.requested_date || item.created_at || "",
+                        date_requested: item.requested_date ? dayjs(item.requested_date).format('DD/MM/YYYY') : (item.created_at ? dayjs(item.created_at).format('DD/MM/YYYY') : ""),
                         id: item.id || "",
                         _original: item // _original burada da eklensin
                     })));
@@ -216,20 +251,48 @@ const BookingPage = () => {
     // filteredData'yı voucher tablosu için backend key'lerine göre map'le
     useEffect(() => {
         if (activeTab === "vouchers") {
-            setFilteredData(voucher.map(item => ({
-                created: item.created_at || '',
-                name: item.name || '',
-                flight_type: item.flight_type || '',
-                voucher_type: item.voucher_type || '',
-                email: item.email || '',
-                phone: item.phone || '',
-                expires: item.expires || '',
-                redeemed: item.redeemed || '',
-                paid: item.paid || '',
-                offer_code: item.offer_code || '',
-                voucher_ref: item.voucher_ref || '',
-                _original: item // _original her zaman eklensin
-            })));
+            setFilteredData(voucher.map(item => {
+                let formattedDate = '';
+                if (item.created_at) {
+                    try {
+                        // Backend'den gelen format: "16/08/2025 18:32" (DD/MM/YYYY HH:mm)
+                        // Bu formatı dayjs ile parse etmek için önce standart formata çevirelim
+                        let dateString = item.created_at;
+                        
+                        // Eğer "DD/MM/YYYY HH:mm" formatındaysa, "DD/MM/YYYY" kısmını alalım
+                        if (dateString.includes(' ') && dateString.includes('/')) {
+                            const datePart = dateString.split(' ')[0]; // "16/08/2025" kısmını al
+                            const [day, month, year] = datePart.split('/');
+                            // YYYY-MM-DD formatına çevir
+                            dateString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                        }
+                        
+                        const date = dayjs(dateString);
+                        if (date.isValid()) {
+                            formattedDate = date.format('DD/MM/YYYY');
+                        } else {
+                            formattedDate = 'N/A';
+                        }
+                    } catch (error) {
+                        formattedDate = 'N/A';
+                    }
+                }
+                
+                return {
+                    created: formattedDate,
+                    name: item.name || '',
+                    flight_type: item.flight_type || '',
+                    voucher_type: item.voucher_type || '',
+                    email: item.email || '',
+                    phone: item.phone || '',
+                    expires: item.expires || '',
+                    redeemed: item.redeemed || '',
+                    paid: item.paid || '',
+                    offer_code: item.offer_code || '',
+                    voucher_ref: item.voucher_ref || '',
+                    _original: item // _original her zaman eklensin
+                };
+            }));
         }
     }, [voucher, activeTab]);
 
@@ -1077,7 +1140,7 @@ const BookingPage = () => {
                                 <PaginatedTable
                                     data={filteredData.map(item => ({
                                         id: item.id || '', // Ensure id is always present
-                                        created_at: item.created_at || '',
+                                        created_at: item.created_at ? dayjs(item.created_at).format('DD/MM/YYYY') : '',
                                         name: (Array.isArray(item.passengers) && item.passengers.length > 0
                                             ? `${item.passengers[0]?.first_name || ''} ${item.passengers[0]?.last_name || ''}`.trim() || item.name || ''
                                             : item.name || ''),
@@ -1220,7 +1283,7 @@ const BookingPage = () => {
                                         flight_type: item.flight_type || "",
                                         email: item.email || "",
                                         location: item.location || "",
-                                        date_requested: item.requested_date || item.created_at || ""
+                                        date_requested: item.requested_date ? dayjs(item.requested_date).format('DD/MM/YYYY') : (item.created_at ? dayjs(item.created_at).format('DD/MM/YYYY') : "")
                                     }))}
                                     columns={["name", "number", "flight_type", "email", "location", "date_requested"]}
                                     onNameClick={handleDateRequestNameClick}
@@ -1288,7 +1351,7 @@ const BookingPage = () => {
                                             <Grid item xs={12} md={6}>
                                                 <Box sx={{ background: '#fff', borderRadius: 2, p: 3, boxShadow: 1 }}>
                                                     <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>Dates</Typography>
-                                                    <Typography><b>Created:</b> {dayjs(bookingDetail.voucher.created_at).format('DD/MM/YYYY HH:mm')}</Typography>
+                                                    <Typography><b>Created:</b> {dayjs(bookingDetail.voucher.created_at).format('DD/MM/YYYY')}</Typography>
                                                     <Typography><b>Expires:</b> {bookingDetail.voucher.expires ? dayjs(bookingDetail.voucher.expires).format('DD/MM/YYYY') : 'N/A'}</Typography>
                                                 </Box>
                                             </Grid>
@@ -1491,7 +1554,7 @@ const BookingPage = () => {
                                                         <Typography><b>Status:</b> {v.status || '-'}</Typography>
                                                         <Typography><b>Voucher Code:</b> {v.voucher_code || '-'}</Typography>
                                                         <Typography><b>Flight Attempts:</b> {v.flight_attempts || '-'}</Typography>
-                                                        <Typography><b>Created At:</b> {v.created_at ? dayjs(v.created_at).format('DD/MM/YYYY HH:mm') : '-'}</Typography>
+                                                        <Typography><b>Created At:</b> {v.created_at ? dayjs(v.created_at).format('DD/MM/YYYY') : '-'}</Typography>
                                                         <Typography><b>Updated At:</b> {v.updated_at ? dayjs(v.updated_at).format('DD/MM/YYYY HH:mm') : '-'}</Typography>
                                                     </>;
                                                 })()}
@@ -1854,7 +1917,7 @@ const BookingPage = () => {
                                                     </TableHead>
                                                     <TableBody>
                                                         <TableRow>
-                                                                <TableCell>{bookingDetail.booking?.created_at ? dayjs(bookingDetail.booking.created_at).format('DD/MM/YYYY HH:mm') : '-'}</TableCell>
+                                                                <TableCell>{bookingDetail.booking?.created_at ? dayjs(bookingDetail.booking.created_at).format('DD/MM/YYYY') : '-'}</TableCell>
                                                                 <TableCell>{bookingDetail.booking?.flight_type || '-'}</TableCell>
                                                                 <TableCell>{bookingDetail.booking?.location || '-'}</TableCell>
                                                             <TableCell>Scheduled</TableCell>

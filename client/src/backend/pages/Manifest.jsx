@@ -1752,7 +1752,7 @@ const Manifest = () => {
                                                 </TableHead>
                                                 <TableBody>
                                                     <TableRow>
-                                                        <TableCell>{bookingDetail.booking.created_at ? dayjs(bookingDetail.booking.created_at).format('DD/MM/YYYY HH:mm') : '-'}</TableCell>
+                                                        <TableCell>{bookingDetail.booking.created_at ? dayjs(bookingDetail.booking.created_at).format('DD/MM/YYYY') : '-'}</TableCell>
                                                         <TableCell>{bookingDetail.booking.flight_type || '-'}</TableCell>
                                                         <TableCell>{bookingDetail.booking.location || '-'}</TableCell>
                                                         <TableCell>Scheduled</TableCell>

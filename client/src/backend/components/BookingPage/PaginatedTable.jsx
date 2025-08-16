@@ -84,11 +84,13 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                                        id === 'name' ? '180px' : 
                                        id === 'status' ? '120px' : 
                                        id === 'voucher_type' ? '140px' :
+                                       id === 'created_at' || id === 'created' ? '120px' :
                                        'auto', 
                                 minWidth: id === 'email' ? '240px' : 
                                          id === 'name' ? '180px' : 
                                          id === 'status' ? '120px' : 
                                          id === 'voucher_type' ? '140px' :
+                                         id === 'created_at' || id === 'created' ? '120px' :
                                          '80px', 
                                 maxWidth: id === 'email' ? '240px' : undefined 
                             }} />
