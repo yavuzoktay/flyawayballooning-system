@@ -3,14 +3,14 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import Index from './backend/pages/Index';
 import MainLayout from './backend/layout/MainLayout';
 import '../src/assets/css/backend/style.css';
+import '../src/assets/css/backend/settings.css';
 import BookingPage from './backend/pages/BookingPage';
 import Manifest from './backend/pages/Manifest';
 import Profile from './backend/pages/Profile';
 import Activity from './backend/pages/Activity';
 import SpecificActivity from './backend/pages/SpecificActivity';
 import ActivityAvailabilitiesPage from './backend/components/ActivityPage/ActivityAvailabilitiesPage';
-
-const Settings = () => <div style={{ padding: 40, textAlign: 'center' }}><h2>Settings page coming soon.</h2></div>;
+import Settings from './backend/pages/Settings';
 
 function App() {
   return (

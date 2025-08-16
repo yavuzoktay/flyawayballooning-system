@@ -23,6 +23,7 @@
     "http-browserify": "^1.7.0",
     "https-browserify": "^1.0.0",
     "lodash": "^4.17.21",
+    "lucide-react": "^0.539.0",
     "react": "^19.0.0",
     "react-bootstrap": "^2.10.7",
     "react-dom": "^19.0.0",
@@ -44,7 +45,7 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
-  "proxy": "http://localhost:3002",
+  "proxy": "http://localhost:3003",
   "eslintConfig": {
     "extends": [
       "react-app",

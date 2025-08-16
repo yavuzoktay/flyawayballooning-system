@@ -15,6 +15,10 @@ const multer = require('multer');
 const dotenv = require('dotenv');
 dotenv.config();
 
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 // Stripe configuration - environment-based keys
 const isProduction = process.env.NODE_ENV === 'production';
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -53,6 +57,328 @@ app.use(cors({
 // Health check endpoint
 app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// ===== VOUCHER CODE API ENDPOINTS =====
+
+// Get all voucher codes
+app.get('/api/voucher-codes', (req, res) => {
+    const sql = `
+        SELECT 
+            vc.*,
+            COUNT(vcu.id) as total_uses,
+            CASE 
+                WHEN vc.max_uses IS NULL THEN 'Unlimited'
+                ELSE CONCAT(vc.current_uses, '/', vc.max_uses)
+            END as usage_status
+        FROM voucher_codes vc
+        LEFT JOIN voucher_code_usage vcu ON vc.id = vcu.voucher_code_id
+        GROUP BY vc.id
+        ORDER BY vc.created_at DESC
+    `;
+    
+    con.query(sql, (err, result) => {
+        if (err) {
+            console.error('Error fetching voucher codes:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        res.json({ success: true, data: result });
+    });
+});
+
+// Create new voucher code
+app.post('/api/voucher-codes', (req, res) => {
+    const {
+        code,
+        title,
+        discount_type,
+        discount_value,
+        min_booking_amount,
+        max_discount,
+        valid_from,
+        valid_until,
+        max_uses,
+        applicable_locations,
+        applicable_experiences,
+        applicable_voucher_types
+    } = req.body;
+    
+    // Validation
+    if (!code || !title || !discount_type || !discount_value) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: code, title, discount_type, discount_value' });
+    }
+    
+    if (discount_type === 'percentage' && (discount_value <= 0 || discount_value > 100)) {
+        return res.status(400).json({ success: false, message: 'Invalid percentage value' });
+    }
+    
+    if (discount_type === 'fixed_amount' && discount_value <= 0) {
+        return res.status(400).json({ success: false, message: 'Invalid fixed amount value' });
+    }
+    
+    const sql = `
+        INSERT INTO voucher_codes (
+            code, title, discount_type, discount_value, min_booking_amount, 
+            max_discount, valid_from, valid_until, max_uses, 
+            applicable_locations, applicable_experiences, applicable_voucher_types
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    
+    const values = [
+        code.toUpperCase(),
+        title,
+        discount_type,
+        discount_value,
+        min_booking_amount || 0,
+        max_discount || null,
+        valid_from || null,
+        valid_until || null,
+        max_uses || null,
+        applicable_locations || null,
+        applicable_experiences || null,
+        applicable_voucher_types || null
+    ];
+    
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error creating voucher code:', err);
+            if (err.code === 'ER_DUP_ENTRY') {
+                return res.status(400).json({ success: false, message: 'Voucher code already exists' });
+            }
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        res.json({ success: true, message: 'Voucher code created successfully', id: result.insertId });
+    });
+});
+
+// Update voucher code
+app.put('/api/voucher-codes/:id', (req, res) => {
+    const { id } = req.params;
+    const {
+        code,
+        title,
+        discount_type,
+        discount_value,
+        min_booking_amount,
+        max_discount,
+        valid_from,
+        valid_until,
+        max_uses,
+        applicable_locations,
+        applicable_experiences,
+        applicable_voucher_types,
+        is_active
+    } = req.body;
+    
+    // Validation
+    if (!code || !title || !discount_type || !discount_value) {
+        return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+    
+    const sql = `
+        UPDATE voucher_codes SET 
+            code = ?, title = ?, discount_type = ?, discount_value = ?, 
+            min_booking_amount = ?, max_discount = ?, valid_from = ?, valid_until = ?, 
+            max_uses = ?, applicable_locations = ?, applicable_experiences = ?, 
+            applicable_voucher_types = ?, is_active = ?, updated_at = NOW()
+        WHERE id = ?
+    `;
+    
+    const values = [
+        code.toUpperCase(),
+        title,
+        discount_type,
+        discount_value,
+        min_booking_amount || 0,
+        max_discount || null,
+        valid_from || null,
+        valid_until || null,
+        max_uses || null,
+        applicable_locations || null,
+        applicable_experiences || null,
+        applicable_voucher_types || null,
+        is_active !== undefined ? is_active : 1,
+        id
+    ];
+    
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error updating voucher code:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Voucher code not found' });
+        }
+        
+        res.json({ success: true, message: 'Voucher code updated successfully' });
+    });
+});
+
+// Delete voucher code
+app.delete('/api/voucher-codes/:id', (req, res) => {
+    const { id } = req.params;
+    
+    const sql = 'DELETE FROM voucher_codes WHERE id = ?';
+    con.query(sql, [id], (err, result) => {
+        if (err) {
+            console.error('Error deleting voucher code:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Voucher code not found' });
+        }
+        
+        res.json({ success: true, message: 'Voucher code deleted successfully' });
+    });
+});
+
+// Validate voucher code
+app.post('/api/voucher-codes/validate', (req, res) => {
+    const {
+        code,
+        location,
+        experience,
+        voucher_type,
+        booking_amount
+    } = req.body;
+    
+    console.log('Voucher validation request:', { code, location, experience, voucher_type, booking_amount });
+    
+    if (!code) {
+        return res.status(400).json({ success: false, message: 'Voucher code is required' });
+    }
+    
+    const sql = `
+        SELECT * FROM voucher_codes 
+        WHERE code = ? AND is_active = 1
+        AND (valid_from IS NULL OR valid_from <= NOW())
+        AND (valid_until IS NULL OR valid_until >= NOW())
+        AND (max_uses IS NULL OR current_uses < max_uses)
+    `;
+    
+    console.log('SQL query:', sql);
+    console.log('SQL params:', [code.toUpperCase()]);
+    
+    con.query(sql, [code.toUpperCase()], (err, result) => {
+        if (err) {
+            console.error('Error validating voucher code:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        console.log('Database result:', result);
+        
+        if (result.length === 0) {
+            console.log('No voucher found - checking conditions...');
+            // Let's check what's in the database for this code
+            con.query('SELECT * FROM voucher_codes WHERE code = ?', [code.toUpperCase()], (err2, checkResult) => {
+                if (err2) {
+                    console.error('Error checking voucher details:', err2);
+                } else {
+                    console.log('Voucher details found:', checkResult);
+                    if (checkResult.length > 0) {
+                        const v = checkResult[0];
+                        console.log('Voucher status:', {
+                            is_active: v.is_active,
+                            valid_from: v.valid_from,
+                            valid_until: v.valid_until,
+                            current_uses: v.current_uses,
+                            max_uses: v.max_uses,
+                            now: new Date()
+                        });
+                    }
+                }
+            });
+            return res.json({ success: false, message: 'Invalid or expired voucher code' });
+        }
+        
+        const voucher = result[0];
+        
+        // Check location restrictions
+        if (voucher.applicable_locations && location) {
+            const locations = voucher.applicable_locations.split(',');
+            if (!locations.includes(location)) {
+                return res.json({ success: false, message: 'Voucher code not valid for this location' });
+            }
+        }
+        
+        // Check experience restrictions
+        if (voucher.applicable_experiences && experience) {
+            const experiences = voucher.applicable_experiences.split(',');
+            if (!experiences.includes(experience)) {
+                return res.json({ success: false, message: 'Voucher code not valid for this experience' });
+            }
+        }
+        
+        // Check voucher type restrictions
+        if (voucher.applicable_voucher_types && voucher_type) {
+            const types = voucher.applicable_voucher_types.split(',');
+            if (!types.includes(voucher_type)) {
+                return res.json({ success: false, message: 'Voucher code not valid for this voucher type' });
+            }
+        }
+        
+        // Check minimum booking amount
+        if (voucher.min_booking_amount > 0 && booking_amount < voucher.min_booking_amount) {
+            return res.json({ 
+                success: false, 
+                message: `Minimum booking amount required: £${voucher.min_booking_amount}` 
+            });
+        }
+        
+        // Calculate discount
+        let discount = 0;
+        if (voucher.discount_type === 'percentage') {
+            discount = (booking_amount * voucher.discount_value) / 100;
+            if (voucher.max_discount > 0) {
+                discount = Math.min(discount, voucher.max_discount);
+            }
+        } else {
+            discount = voucher.discount_value;
+        }
+        
+        res.json({
+            success: true,
+            message: 'Voucher code is valid',
+            data: {
+                ...voucher,
+                calculated_discount: discount,
+                final_amount: booking_amount - discount
+            }
+        });
+    });
+});
+
+// Get voucher code usage
+app.get('/api/voucher-codes/:id/usage', (req, res) => {
+    const { id } = req.params;
+    
+    const sql = `
+        SELECT 
+            vcu.*,
+            ab.booking_reference,
+            ab.customer_name,
+            ab.customer_email,
+            ab.total_amount as original_amount,
+            ab.voucher_discount,
+            (ab.total_amount - ab.voucher_discount) as final_amount
+        FROM voucher_code_usage vcu
+        LEFT JOIN all_booking ab ON vcu.booking_id = ab.id
+        WHERE vcu.voucher_code_id = ?
+        ORDER BY vcu.used_at DESC
+    `;
+    
+    con.query(sql, [id], (err, result) => {
+        if (err) {
+            console.error('Error fetching voucher usage:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        res.json({ success: true, data: result });
+    });
 });
 
 // Simple webhook test endpoint
@@ -2208,13 +2534,6 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
 });
 
 // Place this at the very end, after all API endpoints:
-app.use(express.static(path.join(__dirname, '../client/build')));
-app.get('*', (req, res) => {
-    if (req.path.startsWith("/api/")) {
-        return res.status(404).json({ message: 'API route not found' });
-    }
-    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
-});
 
 // Function to auto-update availability status
 const updateAvailabilityStatus = async () => {
@@ -3101,6 +3420,158 @@ const runDatabaseMigrations = () => {
     });
 };
 
+// Voucher code endpoints moved to the top of the file
+
+// ===== VOUCHER CODE DATABASE MIGRATION =====
+
+// Create voucher_codes table if it doesn't exist
+const createVoucherCodesTable = `
+    CREATE TABLE IF NOT EXISTS voucher_codes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        code VARCHAR(50) UNIQUE NOT NULL COMMENT 'Unique voucher code (e.g., SUMMER2024, WELCOME10)',
+        title VARCHAR(255) NOT NULL COMMENT 'Voucher title/description',
+        discount_type ENUM('percentage', 'fixed_amount') NOT NULL COMMENT 'Type of discount',
+        discount_value DECIMAL(10,2) NOT NULL COMMENT 'Discount value (percentage or fixed amount)',
+        min_booking_amount DECIMAL(10,2) DEFAULT 0 COMMENT 'Minimum booking amount required',
+        max_discount DECIMAL(10,2) DEFAULT NULL COMMENT 'Maximum discount amount (for percentage discounts)',
+        valid_from DATE NOT NULL COMMENT 'Start date of validity',
+        valid_until DATE NOT NULL COMMENT 'End date of validity',
+        max_uses INT DEFAULT NULL COMMENT 'Maximum number of times this code can be used (NULL = unlimited)',
+        current_uses INT DEFAULT 0 COMMENT 'Current number of times used',
+        applicable_locations TEXT COMMENT 'Comma-separated list of applicable locations (NULL = all locations)',
+        applicable_experiences TEXT COMMENT 'Comma-separated list of applicable experiences (NULL = all experiences)',
+        applicable_voucher_types TEXT COMMENT 'Comma-separated list of applicable voucher types (NULL = all types)',
+        is_active BOOLEAN DEFAULT TRUE COMMENT 'Whether the voucher code is active',
+        created_by VARCHAR(100) DEFAULT 'admin' COMMENT 'Who created this voucher code',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_code (code),
+        INDEX idx_valid_until (valid_until),
+        INDEX idx_is_active (is_active)
+    )
+`;
+
+// Create voucher_code_usage table if it doesn't exist
+const createVoucherCodeUsageTable = `
+    CREATE TABLE IF NOT EXISTS voucher_code_usage (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        voucher_code_id INT NOT NULL,
+        booking_id INT NOT NULL,
+        customer_email VARCHAR(255) NOT NULL,
+        discount_applied DECIMAL(10,2) NOT NULL COMMENT 'Actual discount amount applied',
+        original_amount DECIMAL(10,2) NOT NULL COMMENT 'Original booking amount',
+        final_amount DECIMAL(10,2) NOT NULL COMMENT 'Final amount after discount',
+        used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (voucher_code_id) REFERENCES voucher_codes(id) ON DELETE CASCADE,
+        FOREIGN KEY (booking_id) REFERENCES all_booking(id) ON DELETE CASCADE,
+        INDEX idx_voucher_code_id (voucher_code_id),
+        INDEX idx_booking_id (booking_id),
+        INDEX idx_customer_email (customer_email)
+    )
+`;
+
+// Add voucher code columns to all_booking table if they don't exist
+const addVoucherColumnsToBooking = `
+    ALTER TABLE all_booking 
+    ADD COLUMN voucher_code VARCHAR(50) DEFAULT NULL COMMENT 'Applied voucher code',
+    ADD COLUMN voucher_discount DECIMAL(10,2) DEFAULT 0 COMMENT 'Discount amount from voucher code',
+    ADD COLUMN original_amount DECIMAL(10,2) DEFAULT NULL COMMENT 'Original amount before voucher discount'
+`;
+
+// Run voucher code migrations
+const runVoucherCodeMigrations = () => {
+    console.log('Running voucher code migrations...');
+    
+    // Create voucher_codes table
+    con.query(createVoucherCodesTable, (err) => {
+        if (err) {
+            console.error('Error creating voucher_codes table:', err);
+        } else {
+            console.log('✅ Voucher codes table ready');
+        }
+    });
+    
+    // Create voucher_code_usage table
+    con.query(createVoucherCodeUsageTable, (err) => {
+        if (err) {
+            console.error('Error creating voucher_code_usage table:', err);
+        } else {
+            console.log('✅ Voucher code usage table ready');
+        }
+    });
+    
+    // Add voucher columns to all_booking table (one by one to handle existing columns)
+    const addVoucherCodeColumn = "ALTER TABLE all_booking ADD COLUMN voucher_code VARCHAR(50) DEFAULT NULL COMMENT 'Applied voucher code'";
+    const addVoucherDiscountColumn = "ALTER TABLE all_booking ADD COLUMN voucher_discount DECIMAL(10,2) DEFAULT 0 COMMENT 'Discount amount from voucher code'";
+    const addOriginalAmountColumn = "ALTER TABLE all_booking ADD COLUMN original_amount DECIMAL(10,2) DEFAULT NULL COMMENT 'Original amount before voucher discount'";
+    
+    // Add voucher_code column
+    con.query(addVoucherCodeColumn, (err) => {
+        if (err && err.code !== 'ER_DUP_FIELDNAME') {
+            console.error('Error adding voucher_code column:', err);
+        } else if (err && err.code === 'ER_DUP_FIELDNAME') {
+            console.log('✅ voucher_code column already exists');
+        } else {
+            console.log('✅ voucher_code column added');
+        }
+    });
+    
+    // Add voucher_discount column
+    con.query(addVoucherDiscountColumn, (err) => {
+        if (err && err.code !== 'ER_DUP_FIELDNAME') {
+            console.error('Error adding voucher_discount column:', err);
+        } else if (err && err.code === 'ER_DUP_FIELDNAME') {
+            console.log('✅ voucher_discount column already exists');
+        } else {
+            console.log('✅ voucher_discount column added');
+        }
+    });
+    
+    // Add original_amount column
+    con.query(addOriginalAmountColumn, (err) => {
+        if (err && err.code !== 'ER_DUP_FIELDNAME') {
+            console.error('Error adding original_amount column:', err);
+        } else if (err && err.code === 'ER_DUP_FIELDNAME') {
+            console.log('✅ original_amount column already exists');
+        } else {
+            console.log('✅ original_amount column added');
+        }
+    });
+    
+    // Insert sample voucher codes if table is empty
+    const checkVoucherCodes = "SELECT COUNT(*) as count FROM voucher_codes";
+    con.query(checkVoucherCodes, (err, result) => {
+        if (err) {
+            console.error('Error checking voucher codes count:', err);
+            return;
+        }
+        
+        if (result[0].count === 0) {
+            console.log('Inserting sample voucher codes...');
+            const sampleVouchers = `
+                INSERT INTO voucher_codes (code, title, discount_type, discount_value, min_booking_amount, max_discount, valid_from, valid_until, max_uses, applicable_locations, applicable_experiences, applicable_voucher_types) VALUES
+                ('WELCOME10', 'Welcome Discount 10%', 'percentage', 10.00, 100.00, 50.00, '2024-01-01', '2025-12-31', 100, 'Somerset,United Kingdom', 'Shared Flight,Private Charter', 'Weekday Morning,Flexible Weekday,Any Day Flight'),
+                ('SUMMER2024', 'Summer Special 15%', 'percentage', 15.00, 150.00, 75.00, '2024-06-01', '2024-08-31', 50, 'Somerset', 'Shared Flight', 'Weekday Morning'),
+                ('SAVE20', 'Save £20', 'fixed_amount', 20.00, 200.00, NULL, '2024-01-01', '2025-12-31', 200, 'United Kingdom', 'Private Charter', 'Any Day Flight'),
+                ('FIRSTFLIGHT', 'First Flight 25%', 'percentage', 25.00, 100.00, 100.00, '2024-01-01', '2025-12-31', 75, 'Somerset,United Kingdom', 'Shared Flight', 'Weekday Morning')
+            `;
+            
+            con.query(sampleVouchers, (err) => {
+                if (err) {
+                    console.error('Error inserting sample voucher codes:', err);
+                } else {
+                    console.log('✅ Sample voucher codes inserted');
+                }
+            });
+        } else {
+            console.log('✅ Voucher codes table already has data');
+        }
+    });
+};
+
+// Run voucher code migrations when server starts
+runVoucherCodeMigrations();
+
 // Database migrations will run when the main server starts
 
 // Debug endpoint to check table structure
@@ -3117,4 +3588,5 @@ app.get('/api/debug/table-structure', (req, res) => {
     });
 });
 
-
+// Place this at the very end, after all API endpoints:
+app.use(express.static(path.join(__dirname, '../client/build')));
