@@ -3,7 +3,7 @@
 echo "=== Deploying Backend ==="
 
 # Navigate to the backend directory
-cd /home/ec2-user/flyawayballooning-system
+cd /home/ec2-user/flyawayballooning-system-backend
 
 # Navigate to server directory
 cd server

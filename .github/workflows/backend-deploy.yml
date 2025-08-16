@@ -69,7 +69,7 @@ jobs:
           chmod 600 deploy_key
           ssh -i deploy_key -o StrictHostKeyChecking=no ec2-user@34.205.25.8 '
             echo "Starting deployment process..."
-            cd ~/flyawayballooning-system
+            cd ~/flyawayballooning-system-backend
             
             echo "Downloading deployment package from S3..."
             aws s3 cp s3://flyawayballooning-backend/backend-deploy.zip .
@@ -104,8 +104,8 @@ jobs:
             sudo chmod -R 755 server/public
             
             echo "Setting SELinux context for server/public..."
-            sudo semanage fcontext -a -t httpd_sys_content_t "/home/ec2-user/flyawayballooning-system/server/public(/.*)?" 2>/dev/null || true
-            sudo restorecon -Rv /home/ec2-user/flyawayballooning-system/server/public
+            sudo semanage fcontext -a -t httpd_sys_content_t "/home/ec2-user/flyawayballooning-system-backend/server/public(/.*)?" 2>/dev/null || true
+            sudo restorecon -Rv /home/ec2-user/flyawayballooning-system-backend/server/public
             
             echo "Installing server dependencies..."
             cd server
@@ -146,5 +146,5 @@ jobs:
             
             echo "Deployment completed successfully!"
             echo "Current server/public contents:"
-            ls -la /home/ec2-user/flyawayballooning-system/server/public/
+            ls -la /home/ec2-user/flyawayballooning-system-backend/server/public/
           ' 
