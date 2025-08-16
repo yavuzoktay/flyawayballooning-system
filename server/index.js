@@ -92,10 +92,6 @@ app.post('/api/voucher-codes', (req, res) => {
     const {
         code,
         title,
-        discount_type,
-        discount_value,
-        min_booking_amount,
-        max_discount,
         valid_from,
         valid_until,
         max_uses,
@@ -105,33 +101,20 @@ app.post('/api/voucher-codes', (req, res) => {
     } = req.body;
     
     // Validation
-    if (!code || !title || !discount_type || !discount_value) {
-        return res.status(400).json({ success: false, message: 'Missing required fields: code, title, discount_type, discount_value' });
-    }
-    
-    if (discount_type === 'percentage' && (discount_value <= 0 || discount_value > 100)) {
-        return res.status(400).json({ success: false, message: 'Invalid percentage value' });
-    }
-    
-    if (discount_type === 'fixed_amount' && discount_value <= 0) {
-        return res.status(400).json({ success: false, message: 'Invalid fixed amount value' });
+    if (!code || !title) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: code and title' });
     }
     
     const sql = `
         INSERT INTO voucher_codes (
-            code, title, discount_type, discount_value, min_booking_amount, 
-            max_discount, valid_from, valid_until, max_uses, 
+            code, title, valid_from, valid_until, max_uses, 
             applicable_locations, applicable_experiences, applicable_voucher_types
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
     
     const values = [
         code.toUpperCase(),
         title,
-        discount_type,
-        discount_value,
-        min_booking_amount || 0,
-        max_discount || null,
         valid_from || null,
         valid_until || null,
         max_uses || null,
@@ -159,10 +142,6 @@ app.put('/api/voucher-codes/:id', (req, res) => {
     const {
         code,
         title,
-        discount_type,
-        discount_value,
-        min_booking_amount,
-        max_discount,
         valid_from,
         valid_until,
         max_uses,
@@ -173,14 +152,13 @@ app.put('/api/voucher-codes/:id', (req, res) => {
     } = req.body;
     
     // Validation
-    if (!code || !title || !discount_type || !discount_value) {
-        return res.status(400).json({ success: false, message: 'Missing required fields' });
+    if (!code || !title) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: code and title' });
     }
     
     const sql = `
         UPDATE voucher_codes SET 
-            code = ?, title = ?, discount_type = ?, discount_value = ?, 
-            min_booking_amount = ?, max_discount = ?, valid_from = ?, valid_until = ?, 
+            code = ?, title = ?, valid_from = ?, valid_until = ?, 
             max_uses = ?, applicable_locations = ?, applicable_experiences = ?, 
             applicable_voucher_types = ?, is_active = ?, updated_at = NOW()
         WHERE id = ?
@@ -189,10 +167,6 @@ app.put('/api/voucher-codes/:id', (req, res) => {
     const values = [
         code.toUpperCase(),
         title,
-        discount_type,
-        discount_value,
-        min_booking_amount || 0,
-        max_discount || null,
         valid_from || null,
         valid_until || null,
         max_uses || null,
@@ -289,6 +263,20 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                             max_uses: v.max_uses,
                             now: new Date()
                         });
+                        
+                        // Daha detaylı hata mesajları
+                        if (!v.is_active) {
+                            return res.json({ success: false, message: 'Voucher code is inactive' });
+                        }
+                        if (v.valid_from && new Date() < new Date(v.valid_from)) {
+                            return res.json({ success: false, message: 'Voucher code is not yet valid' });
+                        }
+                        if (v.valid_until && new Date() > new Date(v.valid_until)) {
+                            return res.json({ success: false, message: 'Voucher code has expired' });
+                        }
+                        if (v.max_uses && v.current_uses >= v.max_uses) {
+                            return res.json({ success: false, message: `Voucher code usage limit reached (${v.current_uses}/${v.max_uses})` });
+                        }
                     }
                 }
             });
@@ -321,32 +309,13 @@ app.post('/api/voucher-codes/validate', (req, res) => {
             }
         }
         
-        // Check minimum booking amount
-        if (voucher.min_booking_amount > 0 && booking_amount < voucher.min_booking_amount) {
-            return res.json({ 
-                success: false, 
-                message: `Minimum booking amount required: £${voucher.min_booking_amount}` 
-            });
-        }
-        
-        // Calculate discount
-        let discount = 0;
-        if (voucher.discount_type === 'percentage') {
-            discount = (booking_amount * voucher.discount_value) / 100;
-            if (voucher.max_discount > 0) {
-                discount = Math.min(discount, voucher.max_discount);
-            }
-        } else {
-            discount = voucher.discount_value;
-        }
-        
+        // Voucher code is valid (no discount calculation needed)
         res.json({
             success: true,
             message: 'Voucher code is valid',
             data: {
                 ...voucher,
-                calculated_discount: discount,
-                final_amount: booking_amount - discount
+                final_amount: booking_amount // No discount applied
             }
         });
     });
@@ -374,6 +343,35 @@ app.get('/api/voucher-codes/:id/usage', (req, res) => {
     con.query(sql, [id], (err, result) => {
         if (err) {
             console.error('Error fetching voucher usage:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        res.json({ success: true, data: result });
+    });
+});
+
+// Get voucher code usage statistics
+app.get('/api/voucher-codes/usage/stats', (req, res) => {
+    const sql = `
+        SELECT 
+            vc.code,
+            vc.title,
+            vc.current_uses,
+            vc.max_uses,
+            vc.is_active,
+            vc.valid_from,
+            vc.valid_until,
+            COUNT(vcu.id) as total_usage_records,
+            SUM(vcu.discount_applied) as total_discounts_given
+        FROM voucher_codes vc
+        LEFT JOIN voucher_code_usage vcu ON vc.id = vcu.voucher_code_id
+        GROUP BY vc.id
+        ORDER BY vc.created_at DESC
+    `;
+    
+    con.query(sql, (err, result) => {
+        if (err) {
+            console.error('Error fetching voucher usage stats:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
         
@@ -1253,38 +1251,143 @@ app.post('/api/createVoucher', (req, res) => {
     const now = moment().format('YYYY-MM-DD HH:mm:ss');
     let expiresFinal = expires && expires !== '' ? expires : moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
 
-    const insertSql = `INSERT INTO all_vouchers 
-        (name, weight, flight_type, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    const values = [
-        emptyToNull(name),
-        emptyToNull(weight),
-        emptyToNull(flight_type),
-        emptyToNull(voucher_type),
-        emptyToNull(email),
-        emptyToNull(phone),
-        emptyToNull(mobile),
-        emptyToNull(expiresFinal),
-        emptyToNull(redeemed),
-        paid,
-        emptyToNull(offer_code),
-        emptyToNull(voucher_ref),
-        now,
-        emptyToNull(recipient_name),
-        emptyToNull(recipient_email),
-        emptyToNull(recipient_phone),
-        emptyToNull(recipient_gift_date),
-        emptyToNull(preferred_location),
-        emptyToNull(preferred_time),
-        emptyToNull(preferred_day)
-    ];
-    con.query(insertSql, values, (err, result) => {
-        if (err) {
-            console.error('Error creating voucher:', err);
-            return res.status(500).json({ success: false, error: 'Database query failed to create voucher' });
+    // Eğer Redeem Voucher ise, voucher code usage'ını güncelle
+    if (voucher_type === 'Redeem Voucher' && voucher_ref) {
+        // Önce voucher code'un mevcut olup olmadığını ve kullanılabilir olup olmadığını kontrol et
+        const checkVoucherSql = `
+            SELECT id, current_uses, max_uses, is_active, valid_from, valid_until 
+            FROM voucher_codes 
+            WHERE code = ? AND is_active = 1
+            AND (valid_from IS NULL OR valid_from <= NOW())
+            AND (valid_until IS NULL OR valid_until >= NOW())
+            AND (max_uses IS NULL OR current_uses < max_uses)
+        `;
+        
+        con.query(checkVoucherSql, [voucher_ref.toUpperCase()], (err, voucherResult) => {
+            if (err) {
+                console.error('Error checking voucher code:', err);
+                return res.status(500).json({ success: false, error: 'Database query failed to check voucher code' });
+            }
+            
+            if (voucherResult.length === 0) {
+                return res.status(400).json({ success: false, error: 'Invalid or expired voucher code' });
+            }
+            
+            const voucher = voucherResult[0];
+            
+            // Voucher code usage'ını güncelle
+            const updateVoucherSql = `
+                UPDATE voucher_codes 
+                SET current_uses = current_uses + 1 
+                WHERE id = ?
+            `;
+            
+            con.query(updateVoucherSql, [voucher.id], (err, updateResult) => {
+                if (err) {
+                    console.error('Error updating voucher code usage:', err);
+                    return res.status(500).json({ success: false, error: 'Failed to update voucher code usage' });
+                }
+                
+                // Şimdi voucher usage kaydını ekle
+                const insertUsageSql = `
+                    INSERT INTO voucher_code_usage 
+                    (voucher_code_id, booking_id, customer_email, discount_applied, original_amount, final_amount) 
+                    VALUES (?, ?, ?, ?, ?, ?)
+                `;
+                
+                const usageValues = [
+                    voucher.id,
+                    null, // booking_id henüz yok
+                    email || 'unknown',
+                    0, // discount_applied - Redeem Voucher için 0
+                    paid, // original_amount
+                    paid  // final_amount
+                ];
+                
+                con.query(insertUsageSql, usageValues, (err, usageResult) => {
+                    if (err) {
+                        console.error('Error inserting voucher usage:', err);
+                        // Usage kaydı başarısız olsa bile voucher oluşturmaya devam et
+                    }
+                    
+                    // Ana voucher kaydını oluştur
+                    createVoucherRecord();
+                });
+            });
+        });
+        
+        // Ana voucher kaydını oluşturan fonksiyon
+        function createVoucherRecord() {
+            const insertSql = `INSERT INTO all_vouchers 
+                (name, weight, flight_type, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+            const values = [
+                emptyToNull(name),
+                emptyToNull(weight),
+                emptyToNull(flight_type),
+                emptyToNull(voucher_type),
+                emptyToNull(email),
+                emptyToNull(phone),
+                emptyToNull(mobile),
+                emptyToNull(expiresFinal),
+                emptyToNull(redeemed),
+                paid,
+                emptyToNull(offer_code),
+                emptyToNull(voucher_ref),
+                now,
+                emptyToNull(recipient_name),
+                emptyToNull(recipient_email),
+                emptyToNull(recipient_phone),
+                emptyToNull(recipient_gift_date),
+                emptyToNull(preferred_location),
+                emptyToNull(preferred_time),
+                emptyToNull(preferred_day)
+            ];
+            
+            con.query(insertSql, values, (err, result) => {
+                if (err) {
+                    console.error('Error creating voucher:', err);
+                    return res.status(500).json({ success: false, error: 'Database query failed to create voucher' });
+                }
+                res.status(201).json({ success: true, message: 'Voucher created successfully!', voucherId: result.insertId });
+            });
         }
-        res.status(201).json({ success: true, message: 'Voucher created successfully!', voucherId: result.insertId });
-    });
+    } else {
+        // Flight Voucher veya Gift Voucher için normal işlem
+        const insertSql = `INSERT INTO all_vouchers 
+            (name, weight, flight_type, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const values = [
+            emptyToNull(name),
+            emptyToNull(weight),
+            emptyToNull(flight_type),
+            emptyToNull(voucher_type),
+            emptyToNull(email),
+            emptyToNull(phone),
+            emptyToNull(mobile),
+            emptyToNull(expiresFinal),
+            emptyToNull(redeemed),
+            paid,
+            emptyToNull(offer_code),
+            emptyToNull(voucher_ref),
+            now,
+            emptyToNull(recipient_name),
+            emptyToNull(recipient_email),
+            emptyToNull(recipient_phone),
+            emptyToNull(recipient_gift_date),
+            emptyToNull(preferred_location),
+            emptyToNull(preferred_time),
+            emptyToNull(preferred_day)
+        ];
+        
+        con.query(insertSql, values, (err, result) => {
+            if (err) {
+                console.error('Error creating voucher:', err);
+                return res.status(500).json({ success: false, error: 'Database query failed to create voucher' });
+            }
+            res.status(201).json({ success: true, message: 'Voucher created successfully!', voucherId: result.insertId });
+        });
+    }
 });
 
 // Get Booking Detail (all info for popup)

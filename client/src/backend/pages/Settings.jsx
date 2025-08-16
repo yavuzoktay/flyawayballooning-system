@@ -26,10 +26,6 @@ const Settings = () => {
     const [formData, setFormData] = useState({
         code: '',
         title: '',
-        discount_type: 'percentage',
-        discount_value: '',
-        min_booking_amount: '',
-        max_discount: '',
         valid_from: '',
         valid_until: '',
         max_uses: '',
@@ -65,18 +61,8 @@ const Settings = () => {
         e.preventDefault();
         
         // Form validation
-        if (!formData.code || !formData.title || !formData.discount_type || !formData.discount_value) {
-            alert('Please fill in all required fields: Code, Title, Discount Type, and Discount Value');
-            return;
-        }
-        
-        if (formData.discount_type === 'percentage' && (parseFloat(formData.discount_value) <= 0 || parseFloat(formData.discount_value) > 100)) {
-            alert('Percentage discount must be between 0 and 100');
-            return;
-        }
-        
-        if (formData.discount_type === 'fixed_amount' && parseFloat(formData.discount_value) <= 0) {
-            alert('Fixed amount discount must be greater than 0');
+        if (!formData.code || !formData.title) {
+            alert('Please fill in all required fields: Code and Title');
             return;
         }
         
@@ -102,10 +88,6 @@ const Settings = () => {
         setFormData({
             code: voucher.code,
             title: voucher.title,
-            discount_type: voucher.discount_type,
-            discount_value: voucher.discount_value,
-            min_booking_amount: voucher.min_booking_amount,
-            max_discount: voucher.max_discount,
             valid_from: voucher.valid_from,
             valid_until: voucher.valid_until,
             max_uses: voucher.max_uses,
@@ -146,10 +128,6 @@ const Settings = () => {
         setFormData({
             code: '',
             title: '',
-            discount_type: 'percentage',
-            discount_value: '',
-            min_booking_amount: '',
-            max_discount: '',
             valid_from: '',
             valid_until: '',
             max_uses: '',
@@ -189,12 +167,7 @@ const Settings = () => {
         return <span className="status-badge active">Active</span>;
     };
 
-    const getDiscountText = (voucher) => {
-        if (voucher.discount_type === 'percentage') {
-            return `${voucher.discount_value}% off`;
-        }
-        return `£${voucher.discount_value} off`;
-    };
+
 
 
 
@@ -279,8 +252,6 @@ const Settings = () => {
                                             <tr>
                                                 <th>Code</th>
                                                 <th>Title</th>
-                                                <th>Discount</th>
-                                                <th>Min Amount</th>
                                                 <th>Valid From</th>
                                                 <th>Valid Until</th>
                                                 <th>Usage</th>
@@ -305,27 +276,6 @@ const Settings = () => {
                                                                 <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
                                                                     📍 {voucher.applicable_locations}
                                                                 </div>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        <div className="discount-cell">
-                                                            <div style={{ fontWeight: '600', color: '#059669' }}>
-                                                                {getDiscountText(voucher)}
-                                                            </div>
-                                                            {voucher.max_discount && voucher.discount_type === 'percentage' && (
-                                                                <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                                                                    Max: £{voucher.max_discount}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        <div className="min-amount-cell">
-                                                            {voucher.min_booking_amount > 0 ? (
-                                                                <span style={{ color: '#dc2626' }}>£{voucher.min_booking_amount}</span>
-                                                            ) : (
-                                                                <span style={{ color: '#059669' }}>No minimum</span>
                                                             )}
                                                         </div>
                                                     </td>
@@ -431,61 +381,7 @@ const Settings = () => {
                                 </div>
                             </div>
                             
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Discount Type *</label>
-                                    <select
-                                        value={formData.discount_type}
-                                        onChange={(e) => setFormData({...formData, discount_type: e.target.value})}
-                                        required
-                                    >
-                                        <option value="percentage">Percentage (%)</option>
-                                        <option value="fixed_amount">Fixed Amount (£)</option>
-                                    </select>
-                                </div>
-                                
-                                <div className="form-group">
-                                    <label>Discount Value *</label>
-                                    <input
-                                        type="number"
-                                        value={formData.discount_value}
-                                        onChange={(e) => setFormData({...formData, discount_value: e.target.value})}
-                                        placeholder={formData.discount_type === 'percentage' ? '10' : '20'}
-                                        step="0.01"
-                                        min="0"
-                                        max={formData.discount_type === 'percentage' ? '100' : ''}
-                                        required
-                                    />
-                                </div>
-                            </div>
-                            
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Minimum Booking Amount (£)</label>
-                                    <input
-                                        type="number"
-                                        value={formData.min_booking_amount}
-                                        onChange={(e) => setFormData({...formData, min_booking_amount: e.target.value})}
-                                        placeholder="0"
-                                        step="0.01"
-                                        min="0"
-                                    />
-                                </div>
-                                
-                                {formData.discount_type === 'percentage' && (
-                                    <div className="form-group">
-                                        <label>Maximum Discount (£)</label>
-                                        <input
-                                            type="number"
-                                            value={formData.max_discount}
-                                            onChange={(e) => setFormData({...formData, max_discount: e.target.value})}
-                                            placeholder="50"
-                                            step="0.01"
-                                            min="0"
-                                        />
-                                    </div>
-                                )}
-                            </div>
+
                             
                             <div className="form-row">
                                 <div className="form-group">
