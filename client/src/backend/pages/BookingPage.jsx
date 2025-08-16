@@ -1118,6 +1118,24 @@ const BookingPage = () => {
                                         </div>
                                         <div className="booking-filter-field">
                                             <FormControl sx={{ m: 1, minWidth: 120 }} size="small">
+                                                <InputLabel id="book-voucher-type-label">Voucher Type</InputLabel>
+                                                <Select
+                                                    labelId="book-voucher-type-label"
+                                                    value={filters.voucherType}
+                                                    onChange={(e) => handleFilterChange("voucherType", e.target.value)}
+                                                    label="Voucher Type"
+                                                >
+                                                    <MenuItem value="">
+                                                        <em>Select</em>
+                                                    </MenuItem>
+                                                    <MenuItem value="Weekday Morning">Weekday Morning</MenuItem>
+                                                    <MenuItem value="Flexible Weekday">Flexible Weekday</MenuItem>
+                                                    <MenuItem value="Any Day Flight">Any Day Flight</MenuItem>
+                                                </Select>
+                                            </FormControl>
+                                        </div>
+                                        <div className="booking-filter-field">
+                                            <FormControl sx={{ m: 1, minWidth: 120 }} size="small">
                                                 <InputLabel id="book-location-label">Location</InputLabel>
                                                 <Select
                                                     labelId="book-location-label"
@@ -1137,8 +1155,32 @@ const BookingPage = () => {
                                         </div>
                                     </div>
                                 </div>
+                                {/* Apply client-side filtering for bookings */}
                                 <PaginatedTable
-                                    data={filteredData.map(item => ({
+                                    data={filteredData.filter(item => {
+                                        // Flight Type filter
+                                        if (filters.flightType && item.flight_type !== filters.flightType) return false;
+                                        // Status filter
+                                        if (filters.status && item.status !== filters.status) return false;
+                                        // Location filter
+                                        if (filters.location && item.location !== filters.location) return false;
+                                        // Voucher Type filter
+                                        if (filters.voucherType && item.voucher_type !== filters.voucherType) return false;
+                                        // Search filter (case-insensitive, partial match)
+                                        if (filters.search && filters.search.trim() !== "") {
+                                            const search = filters.search.trim().toLowerCase();
+                                            const name = (item.name || "").toLowerCase();
+                                            const email = (item.email || "").toLowerCase();
+                                            const location = (item.location || "").toLowerCase();
+                                            const flightType = (item.flight_type || "").toLowerCase();
+                                            const status = (item.status || "").toLowerCase();
+                                            const voucherType = (item.voucher_type || "").toLowerCase();
+                                            if (!name.includes(search) && !email.includes(search) && !location.includes(search) && !flightType.includes(search) && !status.includes(search) && !voucherType.includes(search)) {
+                                                return false;
+                                            }
+                                        }
+                                        return true;
+                                    }).map(item => ({
                                         id: item.id || '', // Ensure id is always present
                                         created_at: item.created_at ? dayjs(item.created_at).format('DD/MM/YYYY') : '',
                                         name: (Array.isArray(item.passengers) && item.passengers.length > 0
