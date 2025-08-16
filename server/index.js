@@ -3590,3 +3590,8 @@ app.get('/api/debug/table-structure', (req, res) => {
 
 // Place this at the very end, after all API endpoints:
 app.use(express.static(path.join(__dirname, '../client/build')));
+
+// Catch-all route for SPA - must be at the very end
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/build/index.html'));
+});
