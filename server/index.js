@@ -2716,7 +2716,15 @@ app.get('/api/analytics', async (req, res) => {
                     addOnRows.forEach(row => {
                         try {
                             if (!row.choose_add_on || typeof row.choose_add_on !== 'string' || row.choose_add_on.trim() === '') return;
-                            const arr = JSON.parse(row.choose_add_on);
+                            let arr = [];
+                            try {
+                                if (row.choose_add_on && row.choose_add_on.trim() !== "" && row.choose_add_on.startsWith("[")) {
+                                    arr = JSON.parse(row.choose_add_on);
+                                }
+                            } catch (e) { 
+                                console.error('AddOn JSON parse error:', e); 
+                                arr = []; 
+                            }
                             if (Array.isArray(arr)) {
                                 arr.forEach(a => {
                                     if (!a.name || !a.price) return;
@@ -2793,7 +2801,15 @@ app.get('/api/analytics', async (req, res) => {
                                         refRows.forEach(row => {
                                             try {
                                                 if (!row.choose_add_on || typeof row.choose_add_on !== 'string' || row.choose_add_on.trim() === '') return;
-                                                const arr = JSON.parse(row.choose_add_on);
+                                                let arr = [];
+                                                try {
+                                                    if (row.choose_add_on && row.choose_add_on.trim() !== "" && row.choose_add_on.startsWith("[")) {
+                                                        arr = JSON.parse(row.choose_add_on);
+                                                    }
+                                                } catch (e) { 
+                                                    console.error('Refundable JSON parse error:', e); 
+                                                    arr = []; 
+                                                }
                                                 if (Array.isArray(arr)) {
                                                     arr.forEach(a => {
                                                         if (a.name && a.name.toLowerCase().includes('wx')) {
