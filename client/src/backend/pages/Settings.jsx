@@ -826,20 +826,21 @@ const Settings = () => {
 
             <div className="settings-content">
                 {/* Voucher Codes Management Section */}
-                <div className="voucher-codes-section">
+                <div className="settings-card" style={{ marginBottom: '24px' }}>
                     <div 
-                        className="section-header"
+                        className="card-header"
                         onClick={() => setVoucherCodesExpanded(!voucherCodesExpanded)}
-                        style={{
-                            display: 'flex',
+                        style={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between', 
                             alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '16px 20px',
-                            background: '#f8fafc',
+                            padding: '20px',
+                            background: '#ffffff',
                             border: '1px solid #e2e8f0',
-                            borderRadius: '8px',
+                            borderRadius: '12px',
                             cursor: 'pointer',
-                            marginBottom: voucherCodesExpanded ? '20px' : '0'
+                            transition: 'all 0.2s ease',
+                            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
                         }}
                     >
                         <div>
@@ -911,7 +912,11 @@ const Settings = () => {
                                 </button>
                             </div>
                             
-                            <div className="voucher-codes-table-container">
+                            <div className="voucher-codes-table-container" style={{ 
+                                width: '100%', 
+                                overflowX: 'auto',
+                                minHeight: '400px'
+                            }}>
                                 {/* Admin Created Codes Tab */}
                                 {activeTab === 'admin' && (
                                     <>
@@ -1105,20 +1110,21 @@ const Settings = () => {
                 </div>
 
                 {/* Experiences Section */}
-                <div className="experiences-section" style={{ marginTop: '30px' }}>
+                <div className="settings-card" style={{ marginBottom: '24px' }}>
                     <div 
-                        className="section-header"
+                        className="card-header"
                         onClick={() => setExperiencesExpanded(!experiencesExpanded)}
-                        style={{
-                            display: 'flex',
+                        style={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between', 
                             alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '16px 20px',
-                            background: '#f8fafc',
+                            padding: '20px',
+                            background: '#ffffff',
                             border: '1px solid #e2e8f0',
-                            borderRadius: '8px',
+                            borderRadius: '12px',
                             cursor: 'pointer',
-                            marginBottom: experiencesExpanded ? '20px' : '0'
+                            transition: 'all 0.2s ease',
+                            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
                         }}
                     >
                         <div>
@@ -1186,87 +1192,93 @@ const Settings = () => {
                                     </div>
                                 </div>
                             ) : (
-                                <table className="experiences-table">
-                                    <thead>
-                                        <tr>
-                                            <th>TITLE</th>
-                                            <th>DESCRIPTION</th>
-                                            <th>PRICE</th>
-                                            <th>MAX PASSENGERS</th>
-                                            <th>STATUS</th>
-                                            <th>ACTIONS</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {experiences.map((experience) => (
-                                            <tr key={experience.id}>
-                                                <td>
-                                                    <div>
-                                                        <div style={{ fontWeight: '600' }}>{experience.title}</div>
-                                                        {experience.image_url && (
-                                                            <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                                                                {experience.image_url.startsWith('/uploads/') ? (
-                                                                    <img 
-                                                                        src={experience.image_url} 
-                                                                        alt={experience.title}
-                                                                        style={{ 
-                                                                            width: '60px', 
-                                                                            height: '40px', 
-                                                                            objectFit: 'cover',
-                                                                            borderRadius: '4px',
-                                                                            marginTop: '4px'
-                                                                        }}
-                                                                    />
-                                                                ) : (
-                                                                    `Image: ${experience.image_url}`
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div style={{ maxWidth: '300px', fontSize: '14px' }}>
-                                                        {experience.description}
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div style={{ fontWeight: '600' }}>
-                                                        £{experience.price_from}
-                                                        <span style={{ fontSize: '12px', color: '#6b7280', marginLeft: '4px' }}>
-                                                            {experience.price_unit}
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                <td>{experience.max_passengers}</td>
-                                                <td>
-                                                    {experience.is_active ? (
-                                                        <span className="status-badge active">Active</span>
-                                                    ) : (
-                                                        <span className="status-badge inactive">Inactive</span>
-                                                    )}
-                                                </td>
-                                                <td>
-                                                    <div className="action-buttons">
-                                                        <button
-                                                            className="btn btn-icon"
-                                                            onClick={() => handleEditExperience(experience)}
-                                                            title="Edit"
-                                                        >
-                                                            <Edit size={16} />
-                                                        </button>
-                                                        <button
-                                                            className="btn btn-icon btn-danger"
-                                                            onClick={() => handleDeleteExperience(experience.id)}
-                                                            title="Delete"
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </button>
-                                                    </div>
-                                                </td>
+                                <div className="experiences-table-container" style={{ 
+                                    width: '100%', 
+                                    overflowX: 'auto',
+                                    minHeight: '400px'
+                                }}>
+                                    <table className="experiences-table">
+                                        <thead>
+                                            <tr>
+                                                <th>TITLE</th>
+                                                <th>DESCRIPTION</th>
+                                                <th>PRICE</th>
+                                                <th>MAX PASSENGERS</th>
+                                                <th>STATUS</th>
+                                                <th>ACTIONS</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody>
+                                            {experiences.map((experience) => (
+                                                <tr key={experience.id}>
+                                                    <td>
+                                                        <div>
+                                                            <div style={{ fontWeight: '600' }}>{experience.title}</div>
+                                                            {experience.image_url && (
+                                                                <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                                                                    {experience.image_url.startsWith('/uploads/') ? (
+                                                                        <img 
+                                                                            src={experience.image_url} 
+                                                                            alt={experience.title}
+                                                                            style={{ 
+                                                                                width: '60px', 
+                                                                                height: '40px', 
+                                                                                objectFit: 'cover',
+                                                                                borderRadius: '4px',
+                                                                                marginTop: '4px'
+                                                                            }}
+                                                                        />
+                                                                    ) : (
+                                                                        `Image: ${experience.image_url}`
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <div style={{ maxWidth: '300px', fontSize: '14px' }}>
+                                                            {experience.description}
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <div style={{ fontWeight: '600' }}>
+                                                            £{experience.price_from}
+                                                            <span style={{ fontSize: '12px', color: '#6b7280', marginLeft: '4px' }}>
+                                                                {experience.price_unit}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td>{experience.max_passengers}</td>
+                                                    <td>
+                                                        {experience.is_active ? (
+                                                            <span className="status-badge active">Active</span>
+                                                        ) : (
+                                                            <span className="status-badge inactive">Inactive</span>
+                                                        )}
+                                                    </td>
+                                                    <td>
+                                                        <div className="action-buttons">
+                                                            <button
+                                                                className="btn btn-icon"
+                                                                onClick={() => handleEditExperience(experience)}
+                                                                title="Edit"
+                                                            >
+                                                                <Edit size={16} />
+                                                            </button>
+                                                            <button
+                                                                className="btn btn-icon btn-danger"
+                                                                onClick={() => handleDeleteExperience(experience.id)}
+                                                                title="Delete"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             )}
                         </>
                     )}
@@ -1362,112 +1374,118 @@ const Settings = () => {
                                 </div>
                             </div>
                         ) : (
-                            <table className="add-to-booking-table">
-                                <thead>
-                                    <tr>
-                                        <th>ITEM</th>
-                                        <th>DESCRIPTION</th>
-                                        <th>PRICE</th>
-                                        <th>CATEGORY</th>
-                                        <th>STOCK</th>
-                                        <th>WEIGHT</th>
-                                        <th>STATUS</th>
-                                        <th>ACTIONS</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {addToBookingItems.map((item) => (
-                                        <tr key={item.id}>
-                                            <td>
-                                                <div>
-                                                    <div style={{ fontWeight: '600' }}>{item.title}</div>
-                                                    {item.image_url && (
-                                                        <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                                                            {item.image_url.startsWith('/uploads/') ? (
-                                                                <img 
-                                                                    src={item.image_url} 
-                                                                    alt={item.title}
-                                                                    style={{ 
-                                                                        width: '60px', 
-                                                                        height: '40px', 
-                                                                        objectFit: 'cover',
-                                                                        borderRadius: '4px',
-                                                                        marginTop: '4px'
-                                                                    }}
-                                                                />
-                                                            ) : (
-                                                                `Image: ${item.image_url}`
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div style={{ maxWidth: '300px', fontSize: '14px' }}>
-                                                    {item.description}
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div style={{ fontWeight: '600' }}>
-                                                    £{item.price}
-                                                    <span style={{ fontSize: '12px', color: '#6b7280', marginLeft: '4px' }}>
-                                                        {item.price_unit === 'pp' ? 'pp' : 'fixed'}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <span style={{
-                                                    padding: '4px 8px',
-                                                    borderRadius: '12px',
-                                                    fontSize: '12px',
-                                                    fontWeight: '500',
-                                                    backgroundColor: item.category === 'Merchandise' ? '#dbeafe' : '#fef3c7',
-                                                    color: item.category === 'Merchandise' ? '#1e40af' : '#92400e'
-                                                }}>
-                                                    {item.category}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                {item.stock_quantity === 0 ? (
-                                                    <span style={{ color: '#10b981', fontSize: '12px' }}>Unlimited</span>
-                                                ) : (
-                                                    <span style={{ color: item.stock_quantity > 10 ? '#10b981' : item.stock_quantity > 5 ? '#f59e0b' : '#ef4444' }}>
-                                                        {item.stock_quantity}
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td>
-                                                {item.weight_grams > 0 ? `${item.weight_grams}g` : '-'}
-                                            </td>
-                                            <td>
-                                                {item.is_active ? (
-                                                    <span className="status-badge active">Active</span>
-                                                ) : (
-                                                    <span className="status-badge inactive">Inactive</span>
-                                                )}
-                                            </td>
-                                            <td>
-                                                <div className="action-buttons">
-                                                    <button
-                                                        className="btn btn-icon"
-                                                        onClick={() => handleEditAddToBookingItem(item)}
-                                                        title="Edit"
-                                                    >
-                                                        <Edit size={16} />
-                                                    </button>
-                                                    <button
-                                                        className="btn btn-icon btn-danger"
-                                                        onClick={() => handleDeleteAddToBookingItem(item.id)}
-                                                        title="Delete"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                </div>
-                                            </td>
+                            <div className="add-to-booking-table-container" style={{ 
+                                width: '100%', 
+                                overflowX: 'auto',
+                                minHeight: '400px'
+                            }}>
+                                <table className="add-to-booking-table">
+                                    <thead>
+                                        <tr>
+                                            <th>ITEM</th>
+                                            <th>DESCRIPTION</th>
+                                            <th>PRICE</th>
+                                            <th>CATEGORY</th>
+                                            <th>STOCK</th>
+                                            <th>WEIGHT</th>
+                                            <th>STATUS</th>
+                                            <th>ACTIONS</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {addToBookingItems.map((item) => (
+                                            <tr key={item.id}>
+                                                <td>
+                                                    <div>
+                                                        <div style={{ fontWeight: '600' }}>{item.title}</div>
+                                                        {item.image_url && (
+                                                            <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                                                                {item.image_url.startsWith('/uploads/') ? (
+                                                                    <img 
+                                                                        src={item.image_url} 
+                                                                        alt={item.title}
+                                                                        style={{ 
+                                                                            width: '60px', 
+                                                                            height: '40px', 
+                                                                            objectFit: 'cover',
+                                                                            borderRadius: '4px',
+                                                                            marginTop: '4px'
+                                                                        }}
+                                                                    />
+                                                                ) : (
+                                                                    `Image: ${item.image_url}`
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div style={{ maxWidth: '300px', fontSize: '14px' }}>
+                                                        {item.description}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div style={{ fontWeight: '600' }}>
+                                                        £{item.price}
+                                                        <span style={{ fontSize: '12px', color: '#6b7280', marginLeft: '4px' }}>
+                                                            {item.price_unit === 'pp' ? 'pp' : 'fixed'}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span style={{
+                                                        padding: '4px 8px',
+                                                        borderRadius: '12px',
+                                                        fontSize: '12px',
+                                                        fontWeight: '500',
+                                                        backgroundColor: item.category === 'Merchandise' ? '#dbeafe' : '#fef3c7',
+                                                        color: item.category === 'Merchandise' ? '#1e40af' : '#92400e'
+                                                    }}>
+                                                        {item.category}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    {item.stock_quantity === 0 ? (
+                                                        <span style={{ color: '#10b981', fontSize: '12px' }}>Unlimited</span>
+                                                    ) : (
+                                                        <span style={{ color: item.stock_quantity > 10 ? '#10b981' : item.stock_quantity > 5 ? '#f59e0b' : '#ef4444' }}>
+                                                            {item.stock_quantity}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    {item.weight_grams > 0 ? `${item.weight_grams}g` : '-'}
+                                                </td>
+                                                <td>
+                                                    {item.is_active ? (
+                                                        <span className="status-badge active">Active</span>
+                                                    ) : (
+                                                        <span className="status-badge inactive">Inactive</span>
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    <div className="action-buttons">
+                                                        <button
+                                                            className="btn btn-icon"
+                                                            onClick={() => handleEditAddToBookingItem(item)}
+                                                            title="Edit"
+                                                        >
+                                                            <Edit size={16} />
+                                                        </button>
+                                                        <button
+                                                            className="btn btn-icon btn-danger"
+                                                            onClick={() => handleDeleteAddToBookingItem(item.id)}
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         )}
                     </>
                 )}
@@ -1556,91 +1574,97 @@ const Settings = () => {
                                 </div>
                             </div>
                         ) : (
-                            <table className="voucher-types-table">
-                                <thead>
-                                    <tr>
-                                        <th>TITLE</th>
-                                        <th>DESCRIPTION</th>
-                                        <th>PRICE</th>
-                                        <th>FLIGHT DAYS</th>
-                                        <th>FLIGHT TIME</th>
-                                        <th>VALIDITY</th>
-                                        <th>STATUS</th>
-                                        <th>ACTIONS</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {voucherTypes.map((voucherType) => (
-                                        <tr key={voucherType.id}>
-                                            <td>
-                                                <div>
-                                                    <div style={{ fontWeight: '600' }}>{voucherType.title}</div>
-                                                    {voucherType.image_url && (
-                                                        <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                                                            {voucherType.image_url.startsWith('/uploads/') ? (
-                                                                <img 
-                                                                    src={voucherType.image_url} 
-                                                                    alt={voucherType.title}
-                                                                    style={{ 
-                                                                        width: '60px', 
-                                                                        height: '40px', 
-                                                                        objectFit: 'cover',
-                                                                        borderRadius: '4px',
-                                                                        marginTop: '4px'
-                                                                    }}
-                                                                />
-                                                            ) : (
-                                                                `Image: ${voucherType.image_url}`
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div style={{ maxWidth: '300px', fontSize: '14px' }}>
-                                                    {voucherType.description}
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div style={{ fontWeight: '600' }}>
-                                                    £{voucherType.price_per_person}
-                                                    <span style={{ fontSize: '12px', color: '#6b7280', marginLeft: '4px' }}>
-                                                        {voucherType.price_unit}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td>{voucherType.flight_days}</td>
-                                            <td>{voucherType.flight_time}</td>
-                                            <td>{voucherType.validity_months} months</td>
-                                            <td>
-                                                {voucherType.is_active ? (
-                                                    <span className="status-badge active">Active</span>
-                                                ) : (
-                                                    <span className="status-badge inactive">Inactive</span>
-                                                )}
-                                            </td>
-                                            <td>
-                                                <div className="action-buttons">
-                                                    <button
-                                                        className="btn btn-icon"
-                                                        onClick={() => handleEditVoucherType(voucherType)}
-                                                        title="Edit"
-                                                    >
-                                                        <Edit size={16} />
-                                                    </button>
-                                                    <button
-                                                        className="btn btn-icon btn-danger"
-                                                        onClick={() => handleDeleteVoucherType(voucherType.id)}
-                                                        title="Delete"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                </div>
-                                            </td>
+                            <div className="voucher-types-table-container" style={{ 
+                                width: '100%', 
+                                overflowX: 'auto',
+                                minHeight: '400px'
+                            }}>
+                                <table className="voucher-types-table">
+                                    <thead>
+                                        <tr>
+                                            <th>TITLE</th>
+                                            <th>DESCRIPTION</th>
+                                            <th>PRICE</th>
+                                            <th>FLIGHT DAYS</th>
+                                            <th>FLIGHT TIME</th>
+                                            <th>VALIDITY</th>
+                                            <th>STATUS</th>
+                                            <th>ACTIONS</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {voucherTypes.map((voucherType) => (
+                                            <tr key={voucherType.id}>
+                                                <td>
+                                                    <div>
+                                                        <div style={{ fontWeight: '600' }}>{voucherType.title}</div>
+                                                        {voucherType.image_url && (
+                                                            <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                                                                {voucherType.image_url.startsWith('/uploads/') ? (
+                                                                    <img 
+                                                                        src={voucherType.image_url} 
+                                                                        alt={voucherType.title}
+                                                                        style={{ 
+                                                                            width: '60px', 
+                                                                            height: '40px', 
+                                                                            objectFit: 'cover',
+                                                                            borderRadius: '4px',
+                                                                            marginTop: '4px'
+                                                                        }}
+                                                                    />
+                                                                ) : (
+                                                                    `Image: ${voucherType.image_url}`
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div style={{ maxWidth: '300px', fontSize: '14px' }}>
+                                                        {voucherType.description}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div style={{ fontWeight: '600' }}>
+                                                        £{voucherType.price_per_person}
+                                                        <span style={{ fontSize: '12px', color: '#6b7280', marginLeft: '4px' }}>
+                                                            {voucherType.price_unit}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td>{voucherType.flight_days}</td>
+                                                <td>{voucherType.flight_time}</td>
+                                                <td>{voucherType.validity_months} months</td>
+                                                <td>
+                                                    {voucherType.is_active ? (
+                                                        <span className="status-badge active">Active</span>
+                                                    ) : (
+                                                        <span className="status-badge inactive">Inactive</span>
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    <div className="action-buttons">
+                                                        <button
+                                                            className="btn btn-icon"
+                                                            onClick={() => handleEditVoucherType(voucherType)}
+                                                            title="Edit"
+                                                        >
+                                                            <Edit size={16} />
+                                                        </button>
+                                                        <button
+                                                            className="btn btn-icon btn-danger"
+                                                            onClick={() => handleDeleteVoucherType(voucherType.id)}
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         )}
                     </>
                 )}
@@ -1741,119 +1765,125 @@ const Settings = () => {
                                 </div>
                             </div>
                         ) : (
-                            <table className="additional-info-table">
-                                <thead>
-                                    <tr>
-                                        <th>QUESTION</th>
-                                        <th>TYPE</th>
-                                        <th>OPTIONS</th>
-                                        <th>CATEGORY</th>
-                                        <th>REQUIRED</th>
-                                        <th>HELP TEXT</th>
-                                        <th>STATUS</th>
-                                        <th>ACTIONS</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {additionalInfoQuestions.map((question) => (
-                                        <tr key={question.id}>
-                                            <td>
-                                                <div>
-                                                    <div style={{ fontWeight: '600' }}>{question.question_text}</div>
-                                                    {question.placeholder_text && (
-                                                        <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                                                            Placeholder: {question.placeholder_text}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <span style={{
-                                                    padding: '4px 8px',
-                                                    borderRadius: '12px',
-                                                    fontSize: '12px',
-                                                    fontWeight: '500',
-                                                    backgroundColor: question.question_type === 'dropdown' ? '#dbeafe' : 
-                                                                   question.question_type === 'text' ? '#fef3c7' :
-                                                                   question.question_type === 'radio' ? '#fce7f3' : '#dcfce7',
-                                                    color: question.question_type === 'dropdown' ? '#1e40af' : 
-                                                           question.question_type === 'text' ? '#92400e' :
-                                                           question.question_type === 'radio' ? '#be185d' : '#166534'
-                                                }}>
-                                                    {question.question_type}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                {question.options && question.options !== '[]' ? (
-                                                    <div style={{ maxWidth: '200px', fontSize: '12px' }}>
-                                                        {JSON.parse(question.options).slice(0, 3).join(', ')}
-                                                        {JSON.parse(question.options).length > 3 && '...'}
-                                                    </div>
-                                                ) : (
-                                                    <span style={{ color: '#9ca3af', fontSize: '12px' }}>No options</span>
-                                                )}
-                                            </td>
-                                            <td>
-                                                <span style={{
-                                                    padding: '4px 8px',
-                                                    borderRadius: '12px',
-                                                    fontSize: '12px',
-                                                    fontWeight: '500',
-                                                    backgroundColor: question.category === 'General' ? '#f3f4f6' : 
-                                                                   question.category === 'Communication' ? '#dbeafe' :
-                                                                   question.category === 'Marketing' ? '#fef3c7' : '#fce7f3',
-                                                    color: question.category === 'General' ? '#374151' : 
-                                                           question.category === 'Communication' ? '#1e40af' :
-                                                           question.category === 'Marketing' ? '#92400e' : '#be185d'
-                                                }}>
-                                                    {question.category}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                {question.is_required ? (
-                                                    <span style={{ color: '#ef4444', fontSize: '12px', fontWeight: '600' }}>Required</span>
-                                                ) : (
-                                                    <span style={{ color: '#6b7280', fontSize: '12px' }}>Optional</span>
-                                                )}
-                                            </td>
-                                            <td>
-                                                {question.help_text ? (
-                                                    <div style={{ maxWidth: '200px', fontSize: '12px', color: '#6b7280' }}>
-                                                        {question.help_text}
-                                                    </div>
-                                                ) : (
-                                                    <span style={{ color: '#9ca3af', fontSize: '12px' }}>No help text</span>
-                                                )}
-                                            </td>
-                                            <td>
-                                                {question.is_active ? (
-                                                    <span className="status-badge active">Active</span>
-                                                ) : (
-                                                    <span className="status-badge inactive">Inactive</span>
-                                                )}
-                                            </td>
-                                            <td>
-                                                <div className="action-buttons">
-                                                    <button
-                                                        className="btn btn-icon"
-                                                        onClick={() => handleEditAdditionalInfoQuestion(question)}
-                                                        title="Edit"
-                                                    >
-                                                        <Edit size={16} />
-                                                    </button>
-                                                    <button
-                                                        className="btn btn-icon btn-danger"
-                                                        onClick={() => handleDeleteAdditionalInfoQuestion(question.id)}
-                                                        title="Delete"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                </div>
-                                            </td>
+                            <div className="additional-info-table-container" style={{ 
+                                width: '100%', 
+                                overflowX: 'auto',
+                                minHeight: '400px'
+                            }}>
+                                <table className="additional-info-table">
+                                    <thead>
+                                        <tr>
+                                            <th>QUESTION</th>
+                                            <th>TYPE</th>
+                                            <th>OPTIONS</th>
+                                            <th>CATEGORY</th>
+                                            <th>REQUIRED</th>
+                                            <th>HELP TEXT</th>
+                                            <th>STATUS</th>
+                                            <th>ACTIONS</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {additionalInfoQuestions.map((question) => (
+                                            <tr key={question.id}>
+                                                <td>
+                                                    <div>
+                                                        <div style={{ fontWeight: '600' }}>{question.question_text}</div>
+                                                        {question.placeholder_text && (
+                                                            <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                                                                Placeholder: {question.placeholder_text}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span style={{
+                                                        padding: '4px 8px',
+                                                        borderRadius: '12px',
+                                                        fontSize: '12px',
+                                                        fontWeight: '500',
+                                                        backgroundColor: question.question_type === 'dropdown' ? '#dbeafe' : 
+                                                                       question.question_type === 'text' ? '#fef3c7' :
+                                                                       question.question_type === 'radio' ? '#fce7f3' : '#dcfce7',
+                                                        color: question.question_type === 'dropdown' ? '#1e40af' : 
+                                                               question.question_type === 'text' ? '#92400e' :
+                                                               question.question_type === 'radio' ? '#be185d' : '#166534'
+                                                    }}>
+                                                        {question.question_type}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    {question.options && question.options !== '[]' ? (
+                                                        <div style={{ maxWidth: '200px', fontSize: '12px' }}>
+                                                            {JSON.parse(question.options).slice(0, 3).join(', ')}
+                                                            {JSON.parse(question.options).length > 3 && '...'}
+                                                        </div>
+                                                    ) : (
+                                                        <span style={{ color: '#9ca3af', fontSize: '12px' }}>No options</span>
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    <span style={{
+                                                        padding: '4px 8px',
+                                                        borderRadius: '12px',
+                                                        fontSize: '12px',
+                                                        fontWeight: '500',
+                                                        backgroundColor: question.category === 'General' ? '#f3f4f6' : 
+                                                                       question.category === 'Communication' ? '#dbeafe' :
+                                                                       question.category === 'Marketing' ? '#fef3c7' : '#fce7f3',
+                                                        color: question.category === 'General' ? '#374151' : 
+                                                               question.category === 'Communication' ? '#1e40af' :
+                                                               question.category === 'Marketing' ? '#92400e' : '#be185d'
+                                                    }}>
+                                                        {question.category}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    {question.is_required ? (
+                                                        <span style={{ color: '#ef4444', fontSize: '12px', fontWeight: '600' }}>Required</span>
+                                                    ) : (
+                                                        <span style={{ color: '#6b7280', fontSize: '12px' }}>Optional</span>
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    {question.help_text ? (
+                                                        <div style={{ maxWidth: '200px', fontSize: '12px', color: '#6b7280' }}>
+                                                            {question.help_text}
+                                                        </div>
+                                                    ) : (
+                                                        <span style={{ color: '#9ca3af', fontSize: '12px' }}>No help text</span>
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    {question.is_active ? (
+                                                        <span className="status-badge active">Active</span>
+                                                    ) : (
+                                                        <span className="status-badge inactive">Inactive</span>
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    <div className="action-buttons">
+                                                        <button
+                                                            className="btn btn-icon"
+                                                            onClick={() => handleEditAdditionalInfoQuestion(question)}
+                                                            title="Edit"
+                                                        >
+                                                            <Edit size={16} />
+                                                        </button>
+                                                        <button
+                                                            className="btn btn-icon btn-danger"
+                                                            onClick={() => handleDeleteAdditionalInfoQuestion(question.id)}
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         )}
                     </>
                 )}
@@ -1958,7 +1988,11 @@ const Settings = () => {
                                 </div>
                             </div>
                         ) : (
-                            <div className="terms-table-container">
+                            <div className="terms-table-container" style={{ 
+                                width: '100%', 
+                                overflowX: 'auto',
+                                minHeight: '400px'
+                            }}>
                                 <table className="terms-table">
                                     <thead>
                                         <tr>
@@ -2776,7 +2810,7 @@ const Settings = () => {
                                     value={addToBookingFormData.description}
                                     onChange={(e) => setAddToBookingFormData({...addToBookingFormData, description: e.target.value})}
                                     placeholder="Detailed description of the item..."
-                                    rows="3"
+                                    rows="4"
                                     required
                                 />
                             </div>
@@ -2789,7 +2823,7 @@ const Settings = () => {
                                     onChange={(e) => setAddToBookingFormData({...addToBookingFormData, image_file: e.target.files[0]})}
                                 />
                                 {addToBookingFormData.image_url && !addToBookingFormData.image_file && (
-                                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>
                                         Current image: {addToBookingFormData.image_url}
                                     </div>
                                 )}
