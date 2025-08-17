@@ -765,6 +765,185 @@ app.delete('/api/experiences/:id', (req, res) => {
     });
 });
 
+// ==================== VOUCHER TYPES API ENDPOINTS ====================
+
+// Get all voucher types
+app.get('/api/voucher-types', (req, res) => {
+    console.log('GET /api/voucher-types called');
+    const sql = `SELECT * FROM voucher_types ORDER BY sort_order ASC, created_at DESC`;
+    console.log('SQL Query:', sql);
+    
+    con.query(sql, (err, result) => {
+        if (err) {
+            console.error('Error fetching voucher types:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        console.log('Query result:', result);
+        console.log('Result length:', result ? result.length : 'undefined');
+        res.json({ success: true, data: result });
+    });
+});
+
+// Create new voucher type
+app.post('/api/voucher-types', experiencesUpload.single('voucher_type_image'), (req, res) => {
+    const {
+        title,
+        description,
+        price_per_person,
+        price_unit,
+        max_passengers,
+        validity_months,
+        flight_days,
+        flight_time,
+        features,
+        terms,
+        sort_order,
+        is_active
+    } = req.body;
+    
+    // Validation
+    if (!title || !description || !price_per_person) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: title, description, and price_per_person' });
+    }
+    
+    // Handle image upload
+    let image_url = req.body.image_url; // Keep existing image if no new file uploaded
+    if (req.file) {
+        image_url = `/uploads/experiences/${req.file.filename}`;
+    }
+    
+    const sql = `
+        INSERT INTO voucher_types (
+            title, description, image_url, price_per_person, price_unit, max_passengers,
+            validity_months, flight_days, flight_time, features, terms, sort_order, is_active
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    
+    const values = [
+        title,
+        description,
+        image_url,
+        price_per_person,
+        price_unit || 'pp',
+        max_passengers || 8,
+        validity_months || 18,
+        flight_days || 'Monday - Friday',
+        flight_time || 'AM',
+        features || '[]',
+        terms || '',
+        sort_order || 0,
+        is_active !== undefined ? is_active : true
+    ];
+    
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error creating voucher type:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Voucher type created successfully',
+            id: result.insertId
+        });
+    });
+});
+
+// Update voucher type
+app.put('/api/voucher-types/:id', experiencesUpload.single('voucher_type_image'), (req, res) => {
+    const { id } = req.params;
+    const {
+        title,
+        description,
+        price_per_person,
+        price_unit,
+        max_passengers,
+        validity_months,
+        flight_days,
+        flight_time,
+        features,
+        terms,
+        sort_order,
+        is_active
+    } = req.body;
+    
+    // Validation
+    if (!title || !description || !price_per_person) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: title, description, and price_per_person' });
+    }
+    
+    // Handle image upload
+    let image_url = req.body.image_url; // Keep existing image if no new file uploaded
+    if (req.file) {
+        image_url = `/uploads/experiences/${req.file.filename}`;
+    }
+    
+    const sql = `
+        UPDATE voucher_types SET 
+            title = ?, description = ?, image_url = ?, price_per_person = ?, 
+            price_unit = ?, max_passengers = ?, validity_months = ?, flight_days = ?,
+            flight_time = ?, features = ?, terms = ?, sort_order = ?, is_active = ?
+        WHERE id = ?
+    `;
+    
+    const values = [
+        title,
+        description,
+        image_url,
+        price_per_person,
+        price_unit || 'pp',
+        max_passengers || 8,
+        validity_months || 18,
+        flight_days || 'Monday - Friday',
+        flight_time || 'AM',
+        features || '[]',
+        terms || '',
+        sort_order || 0,
+        is_active !== undefined ? is_active : true,
+        id
+    ];
+    
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error updating voucher type:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Voucher type not found' });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Voucher type updated successfully',
+            image_url: image_url
+        });
+    });
+});
+
+// Delete voucher type
+app.delete('/api/voucher-types/:id', (req, res) => {
+    const { id } = req.params;
+    
+    const sql = 'DELETE FROM voucher_types WHERE id = ?';
+    
+    con.query(sql, [id], (err, result) => {
+        if (err) {
+            console.error('Error deleting voucher type:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Voucher type not found' });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Voucher type deleted successfully'
+        });
+    });
+});
+
 // Simple webhook test endpoint
 app.get('/api/webhook-test', (req, res) => {
     res.json({ 

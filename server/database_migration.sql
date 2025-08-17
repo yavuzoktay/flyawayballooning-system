@@ -164,3 +164,55 @@ CREATE TABLE IF NOT EXISTS experiences (
 INSERT INTO experiences (title, description, image_url, price_from, price_unit, max_passengers, sort_order) VALUES
 ('Shared Flight', 'Join a Shared Flight with a maximum of 8 passengers. Perfect for Solo Travellers, Couples and Groups looking to Celebrate Special Occasions or Experience Ballooning.', '/images/experiences/shared-flight.jpg', 180.00, 'pp', 8, 1),
 ('Private Charter', 'Private Charter balloon flights for 2,3,4 or 8 passengers. Mostly purchased for Significant Milestones, Proposals, Major Birthdays, Families or Groups of Friends.', '/images/experiences/private-charter.jpg', 900.00, 'total', 8, 2); 
+
+-- Experiences tablosuna sadece gerekli kolonları ekleme
+USE flyawayballooning;
+
+-- Sadece temel ve gerekli kolonları ekle
+ALTER TABLE experiences 
+ADD COLUMN IF NOT EXISTS image_file VARCHAR(255) DEFAULT NULL COMMENT 'Uploaded image file name',
+ADD COLUMN IF NOT EXISTS category VARCHAR(100) DEFAULT 'Flight' COMMENT 'Experience category',
+ADD COLUMN IF NOT EXISTS duration VARCHAR(50) DEFAULT '2-3 hours' COMMENT 'Flight duration',
+ADD COLUMN IF NOT EXISTS min_passengers INT DEFAULT 1 COMMENT 'Minimum passengers required';
+
+-- Basit index ekle
+ALTER TABLE experiences 
+ADD INDEX idx_category (category);
+
+-- Mevcut verileri güncelle
+UPDATE experiences SET 
+    category = 'Flight',
+    duration = '2-3 hours',
+    min_passengers = 1
+WHERE id > 0;
+
+-- Voucher Types tablosu oluşturma
+CREATE TABLE IF NOT EXISTS voucher_types (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL COMMENT 'Voucher type title (e.g., Weekday Morning, Flexible Weekday)',
+    description TEXT COMMENT 'Detailed description of the voucher type',
+    image_url VARCHAR(500) DEFAULT NULL COMMENT 'Image URL for the voucher type',
+    image_file VARCHAR(255) DEFAULT NULL COMMENT 'Uploaded image file name',
+    price_per_person DECIMAL(10,2) NOT NULL COMMENT 'Price per person',
+    price_unit ENUM('pp', 'total') DEFAULT 'pp' COMMENT 'Price unit (pp = per person, total = total price)',
+    max_passengers INT DEFAULT 8 COMMENT 'Maximum passengers allowed',
+    validity_months INT DEFAULT 18 COMMENT 'Validity period in months',
+    flight_days VARCHAR(100) DEFAULT 'Monday - Friday' COMMENT 'Available flight days',
+    flight_time VARCHAR(100) DEFAULT 'AM' COMMENT 'Available flight time (AM, PM, AM & PM)',
+    features TEXT COMMENT 'JSON array of features (e.g., ["1 Hour Air Time", "Complimentary Drink"])',
+    terms TEXT COMMENT 'Terms and conditions',
+    sort_order INT DEFAULT 0 COMMENT 'Sort order for display',
+    is_active BOOLEAN DEFAULT TRUE COMMENT 'Whether this voucher type is active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    INDEX idx_title (title),
+    INDEX idx_is_active (is_active),
+    INDEX idx_sort_order (sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Voucher types for different flight experiences';
+
+-- Örnek voucher types ekleme
+INSERT INTO voucher_types (title, description, price_per_person, price_unit, max_passengers, validity_months, flight_days, flight_time, features, terms, sort_order, is_active) VALUES
+('Weekday Morning', 'Non-refundable weekday morning flights with maximum flexibility for your ballooning experience.', 180.00, 'pp', 8, 18, 'Monday - Friday', 'AM', '["Around 1 Hour of Air Time", "Complimentary Drink", "Inflight Photos and 3D Flight Track", "Upgradeable at Later Date"]', 'Flights subject to weather – your voucher will remain valid and re-bookable within its validity period if cancelled due to weather.', 1, TRUE),
+('Flexible Weekday', 'Non-refundable flexible weekday flights with both morning and afternoon options for maximum convenience.', 200.00, 'pp', 8, 18, 'Monday - Friday', 'AM & PM', '["Around 1 Hour of Air Time", "Complimentary Drink", "Inflight Photos and 3D Flight Track", "Upgradeable at Later Date"]', 'Flights subject to weather – your voucher will remain valid and re-bookable within its validity period if cancelled due to weather.', 2, TRUE),
+('Any Day Flight', 'Non-refundable flights available any day of the week with maximum flexibility for your schedule.', 250.00, 'pp', 8, 18, 'Any Day', 'AM & PM', '["Around 1 Hour of Air Time", "Complimentary Drink", "Inflight Photos and 3D Flight Track", "Upgradeable at Later Date"]', 'Flights subject to weather – your voucher will remain valid and re-bookable within its validity period if cancelled due to weather.', 3, TRUE); 

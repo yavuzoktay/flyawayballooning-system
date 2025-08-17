@@ -45,9 +45,32 @@ const Settings = () => {
         is_active: true
     });
     
+    // Voucher Types state
+    const [voucherTypes, setVoucherTypes] = useState([]);
+    const [showVoucherTypesForm, setShowVoucherTypesForm] = useState(false);
+    const [showEditVoucherTypeForm, setShowEditVoucherTypeForm] = useState(false);
+    const [selectedVoucherType, setSelectedVoucherType] = useState(null);
+    const [voucherTypeFormData, setVoucherTypeFormData] = useState({
+        title: '',
+        description: '',
+        image_url: '',
+        image_file: null,
+        price_per_person: '',
+        price_unit: 'pp',
+        max_passengers: 8,
+        validity_months: 18,
+        flight_days: 'Monday - Friday',
+        flight_time: 'AM',
+        features: '[]',
+        terms: '',
+        sort_order: 0,
+        is_active: true
+    });
+    
     // Collapsible sections state
     const [voucherCodesExpanded, setVoucherCodesExpanded] = useState(true);
     const [experiencesExpanded, setExperiencesExpanded] = useState(false);
+    const [voucherTypesExpanded, setVoucherTypesExpanded] = useState(false);
     
     const [formData, setFormData] = useState({
         code: '',
@@ -63,11 +86,12 @@ const Settings = () => {
 
     const locations = ['Somerset', 'United Kingdom'];
     const experienceTypes = ['Shared Flight', 'Private Charter'];
-    const voucherTypes = ['Weekday Morning', 'Flexible Weekday', 'Any Day Flight'];
+    const voucherTypeOptions = ['Weekday Morning', 'Flexible Weekday', 'Any Day Flight'];
 
     useEffect(() => {
         fetchVoucherCodes();
         fetchExperiences();
+        fetchVoucherTypes();
     }, []);
 
     const fetchVoucherCodes = async () => {
@@ -94,6 +118,17 @@ const Settings = () => {
             }
         } catch (error) {
             console.error('Error fetching experiences:', error);
+        }
+    };
+
+    const fetchVoucherTypes = async () => {
+        try {
+            const response = await axios.get('/api/voucher-types');
+            if (response.data.success) {
+                setVoucherTypes(response.data.data);
+            }
+        } catch (error) {
+            console.error('Error fetching voucher types:', error);
         }
     };
 
@@ -254,6 +289,113 @@ const Settings = () => {
             console.error('Error fetching usage data:', error);
             alert('Error fetching usage data');
         }
+    };
+
+    // Voucher Types form handling
+    const handleVoucherTypeSubmit = async (e) => {
+        e.preventDefault();
+        
+        // Form validation
+        if (!voucherTypeFormData.title || !voucherTypeFormData.description || !voucherTypeFormData.price_per_person) {
+            alert('Please fill in all required fields: Title, Description, and Price Per Person');
+            return;
+        }
+        
+        try {
+            // Create FormData for file upload
+            const formData = new FormData();
+            formData.append('title', voucherTypeFormData.title);
+            formData.append('description', voucherTypeFormData.description);
+            formData.append('price_per_person', voucherTypeFormData.price_per_person);
+            formData.append('price_unit', voucherTypeFormData.price_unit);
+            formData.append('max_passengers', voucherTypeFormData.max_passengers);
+            formData.append('validity_months', voucherTypeFormData.validity_months);
+            formData.append('flight_days', voucherTypeFormData.flight_days);
+            formData.append('flight_time', voucherTypeFormData.flight_time);
+            formData.append('features', voucherTypeFormData.features);
+            formData.append('terms', voucherTypeFormData.terms);
+            formData.append('sort_order', voucherTypeFormData.sort_order);
+            formData.append('is_active', voucherTypeFormData.is_active);
+            
+            // Add image file if selected
+            if (voucherTypeFormData.image_file) {
+                formData.append('voucher_type_image', voucherTypeFormData.image_file);
+            } else if (voucherTypeFormData.image_url) {
+                // Keep existing image URL if no new file selected
+                formData.append('image_url', voucherTypeFormData.image_url);
+            }
+            
+            if (showEditVoucherTypeForm) {
+                await axios.put(`/api/voucher-types/${selectedVoucherType.id}`, formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+            } else {
+                await axios.post('/api/voucher-types', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+            }
+            
+            fetchVoucherTypes();
+            resetVoucherTypeForm();
+            setShowVoucherTypesForm(false);
+            setShowEditVoucherTypeForm(false);
+        } catch (error) {
+            console.error('Error saving voucher type:', error);
+            alert(error.response?.data?.message || 'Error saving voucher type');
+        }
+    };
+
+    const handleEditVoucherType = (voucherType) => {
+        setSelectedVoucherType(voucherType);
+        setVoucherTypeFormData({
+            title: voucherType.title,
+            description: voucherType.description,
+            image_url: voucherType.image_url || '',
+            image_file: null,
+            price_per_person: voucherType.price_per_person,
+            price_unit: voucherType.price_unit || 'pp',
+            max_passengers: voucherType.max_passengers || 8,
+            validity_months: voucherType.validity_months || 18,
+            flight_days: voucherType.flight_days || 'Monday - Friday',
+            flight_time: voucherType.flight_time || 'AM',
+            features: voucherType.features || '[]',
+            terms: voucherType.terms || '',
+            sort_order: voucherType.sort_order || 0,
+            is_active: voucherType.is_active
+        });
+        setShowEditVoucherTypeForm(true);
+    };
+
+    const handleDeleteVoucherType = async (id) => {
+        if (window.confirm('Are you sure you want to delete this voucher type?')) {
+            try {
+                await axios.delete(`/api/voucher-types/${id}`);
+                fetchVoucherTypes();
+            } catch (error) {
+                console.error('Error deleting voucher type:', error);
+                alert(error.response?.data?.message || 'Error deleting voucher type');
+            }
+        }
+    };
+
+    const resetVoucherTypeForm = () => {
+        setVoucherTypeFormData({
+            title: '',
+            description: '',
+            image_url: '',
+            image_file: null,
+            price_per_person: '',
+            price_unit: 'pp',
+            max_passengers: 8,
+            validity_months: 18,
+            flight_days: 'Monday - Friday',
+            flight_time: 'AM',
+            features: '[]',
+            terms: '',
+            sort_order: 0,
+            is_active: true
+        });
+        setSelectedVoucherType(null);
     };
 
     const resetForm = () => {
@@ -758,6 +900,179 @@ const Settings = () => {
                 </div>
             </div>
 
+            {/* Voucher Types Section */}
+            <div className="settings-card" style={{ marginBottom: '24px' }}>
+                <div 
+                    className="card-header"
+                    onClick={() => setVoucherTypesExpanded(!voucherTypesExpanded)}
+                    style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        padding: '20px',
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                    }}
+                >
+                    <div>
+                        <h2 style={{ margin: 0, color: '#1f2937' }}>Voucher Types</h2>
+                        <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
+                            Manage voucher types for balloning-book Select Voucher Type section.
+                        </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button 
+                            className="btn btn-primary"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowVoucherTypesForm(true);
+                            }}
+                            style={{ margin: 0 }}
+                        >
+                            <Plus size={20} />
+                            Create Voucher Type
+                        </button>
+                        {voucherTypesExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+                    </div>
+                </div>
+                
+                {voucherTypesExpanded && (
+                    <>
+                        <div className="voucher-types-stats" style={{ 
+                            display: 'flex', 
+                            gap: '20px', 
+                            marginBottom: '20px',
+                            padding: '16px',
+                            background: '#f8fafc',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0'
+                        }}>
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#1f2937' }}>
+                                    {voucherTypes.length}
+                                </div>
+                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Total Voucher Types</div>
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#10b981' }}>
+                                    {voucherTypes.filter(vt => vt.is_active).length}
+                                </div>
+                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Active</div>
+                            </div>
+                        </div>
+                        
+                        {voucherTypes.length === 0 ? (
+                            <div className="no-voucher-types-message">
+                                <div style={{ textAlign: 'center', padding: '40px' }}>
+                                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎫</div>
+                                    <h3 style={{ color: '#6b7280', marginBottom: '8px' }}>No Voucher Types Yet</h3>
+                                    <p style={{ color: '#9ca3af', marginBottom: '20px' }}>
+                                        Create your first voucher type to display in the balloning-book Select Voucher Type section.
+                                    </p>
+                                    <button 
+                                        className="btn btn-primary"
+                                        onClick={() => setShowVoucherTypesForm(true)}
+                                    >
+                                        <Plus size={20} />
+                                        Create First Voucher Type
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <table className="voucher-types-table">
+                                <thead>
+                                    <tr>
+                                        <th>TITLE</th>
+                                        <th>DESCRIPTION</th>
+                                        <th>PRICE</th>
+                                        <th>FLIGHT DAYS</th>
+                                        <th>FLIGHT TIME</th>
+                                        <th>VALIDITY</th>
+                                        <th>STATUS</th>
+                                        <th>ACTIONS</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {voucherTypes.map((voucherType) => (
+                                        <tr key={voucherType.id}>
+                                            <td>
+                                                <div>
+                                                    <div style={{ fontWeight: '600' }}>{voucherType.title}</div>
+                                                    {voucherType.image_url && (
+                                                        <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                                                            {voucherType.image_url.startsWith('/uploads/') ? (
+                                                                <img 
+                                                                    src={voucherType.image_url} 
+                                                                    alt={voucherType.title}
+                                                                    style={{ 
+                                                                        width: '60px', 
+                                                                        height: '40px', 
+                                                                        objectFit: 'cover',
+                                                                        borderRadius: '4px',
+                                                                        marginTop: '4px'
+                                                                    }}
+                                                                />
+                                                            ) : (
+                                                                `Image: ${voucherType.image_url}`
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div style={{ maxWidth: '300px', fontSize: '14px' }}>
+                                                    {voucherType.description}
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div style={{ fontWeight: '600' }}>
+                                                    £{voucherType.price_per_person}
+                                                    <span style={{ fontSize: '12px', color: '#6b7280', marginLeft: '4px' }}>
+                                                        {voucherType.price_unit}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td>{voucherType.flight_days}</td>
+                                            <td>{voucherType.flight_time}</td>
+                                            <td>{voucherType.validity_months} months</td>
+                                            <td>
+                                                {voucherType.is_active ? (
+                                                    <span className="status-badge active">Active</span>
+                                                ) : (
+                                                    <span className="status-badge inactive">Inactive</span>
+                                                )}
+                                            </td>
+                                            <td>
+                                                <div className="action-buttons">
+                                                    <button
+                                                        className="btn btn-icon"
+                                                        onClick={() => handleEditVoucherType(voucherType)}
+                                                        title="Edit"
+                                                    >
+                                                        <Edit size={16} />
+                                                    </button>
+                                                    <button
+                                                        className="btn btn-icon btn-danger"
+                                                        onClick={() => handleDeleteVoucherType(voucherType.id)}
+                                                        title="Delete"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </>
+                )}
+            </div>
+
             {/* Create/Edit Voucher Form Modal */}
             {(showCreateForm || showEditForm) && (
                 <div className="modal-overlay">
@@ -998,6 +1313,195 @@ const Settings = () => {
                                 </button>
                                 <button type="submit" className="btn btn-primary">
                                     {showEditExperienceForm ? 'Update Experience' : 'Create Experience'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Create/Edit Voucher Type Form Modal */}
+            {(showVoucherTypesForm || showEditVoucherTypeForm) && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h3>{showEditVoucherTypeForm ? 'Edit Voucher Type' : 'Create New Voucher Type'}</h3>
+                            <button 
+                                className="close-btn"
+                                onClick={() => {
+                                    setShowVoucherTypesForm(false);
+                                    setShowEditVoucherTypeForm(false);
+                                    resetVoucherTypeForm();
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        
+                        <form onSubmit={handleVoucherTypeSubmit} className="voucher-type-form">
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Title *</label>
+                                    <input
+                                        type="text"
+                                        value={voucherTypeFormData.title}
+                                        onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, title: e.target.value})}
+                                        placeholder="e.g., Weekday Morning"
+                                        required
+                                    />
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label>Price Per Person *</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        value={voucherTypeFormData.price_per_person}
+                                        onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, price_per_person: e.target.value})}
+                                        placeholder="e.g., 180.00"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Price Unit</label>
+                                    <select
+                                        value={voucherTypeFormData.price_unit}
+                                        onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, price_unit: e.target.value})}
+                                    >
+                                        <option value="pp">Per Person (pp)</option>
+                                        <option value="total">Total</option>
+                                    </select>
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label>Max Passengers</label>
+                                    <input
+                                        type="number"
+                                        value={voucherTypeFormData.max_passengers}
+                                        onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, max_passengers: e.target.value})}
+                                        placeholder="8"
+                                        min="1"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Flight Days</label>
+                                    <input
+                                        type="text"
+                                        value={voucherTypeFormData.flight_days}
+                                        onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, flight_days: e.target.value})}
+                                        placeholder="e.g., Monday - Friday"
+                                    />
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label>Flight Time</label>
+                                    <select
+                                        value={voucherTypeFormData.flight_time}
+                                        onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, flight_time: e.target.value})}
+                                    >
+                                        <option value="AM">AM</option>
+                                        <option value="PM">PM</option>
+                                        <option value="AM & PM">AM & PM</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Validity (Months)</label>
+                                    <input
+                                        type="number"
+                                        value={voucherTypeFormData.validity_months}
+                                        onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, validity_months: e.target.value})}
+                                        placeholder="18"
+                                        min="1"
+                                    />
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label>Sort Order</label>
+                                    <input
+                                        type="number"
+                                        value={voucherTypeFormData.sort_order}
+                                        onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, sort_order: e.target.value})}
+                                        placeholder="0"
+                                        min="0"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Description *</label>
+                                <textarea
+                                    value={voucherTypeFormData.description}
+                                    onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, description: e.target.value})}
+                                    placeholder="Detailed description of the voucher type..."
+                                    rows="3"
+                                    required
+                                />
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Features (JSON Array)</label>
+                                <textarea
+                                    value={voucherTypeFormData.features}
+                                    onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, features: e.target.value})}
+                                    placeholder='["Around 1 Hour of Air Time", "Complimentary Drink", "Inflight Photos and 3D Flight Track"]'
+                                    rows="2"
+                                />
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Terms & Conditions</label>
+                                <textarea
+                                    value={voucherTypeFormData.terms}
+                                    onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, terms: e.target.value})}
+                                    placeholder="Terms and conditions for this voucher type..."
+                                    rows="3"
+                                />
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Image</label>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, image_file: e.target.files[0]})}
+                                />
+                                {voucherTypeFormData.image_url && !voucherTypeFormData.image_file && (
+                                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                                        Current image: {voucherTypeFormData.image_url}
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Status</label>
+                                <select
+                                    value={voucherTypeFormData.is_active}
+                                    onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, is_active: e.target.value === 'true'})}
+                                >
+                                    <option value={true}>Active</option>
+                                    <option value={false}>Inactive</option>
+                                </select>
+                            </div>
+                            
+                            <div className="form-actions">
+                                <button type="button" className="btn btn-secondary" onClick={() => {
+                                    setShowVoucherTypesForm(false);
+                                    setShowEditVoucherTypeForm(false);
+                                    resetVoucherTypeForm();
+                                }}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn btn-primary">
+                                    {showEditVoucherTypeForm ? 'Update Voucher Type' : 'Create Voucher Type'}
                                 </button>
                             </div>
                         </form>
