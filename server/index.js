@@ -13,6 +13,7 @@ const dayjs = require("dayjs");
 const moment = require('moment');
 const multer = require('multer');
 const dotenv = require('dotenv');
+const axios = require('axios');
 dotenv.config();
 
 // Middleware
@@ -60,6 +61,156 @@ app.get('/api/health', (req, res) => {
 });
 
 // ===== VOUCHER CODE API ENDPOINTS =====
+
+// Generate automatic voucher code for Flight Voucher bookings
+app.post('/api/generate-voucher-code', async (req, res) => {
+    const {
+        flight_category,
+        customer_name,
+        customer_email,
+        location,
+        experience_type,
+        voucher_type,
+        paid_amount,
+        expires_date
+    } = req.body;
+
+    try {
+        // Generate voucher code based on the pattern: F/G + Category + Year + Serial
+        const year = new Date().getFullYear().toString().slice(-2); // Get last 2 digits of year (25 for 2025)
+        
+        // Map flight categories to codes
+        const categoryMap = {
+            'Weekday Morning': 'WM',
+            'Weekday Flex': 'WF', 
+            'Anytime': 'AT',
+            'Any Day Flight': 'AT' // Default mapping
+        };
+        
+        const categoryCode = categoryMap[flight_category] || 'AT';
+        
+        // Determine prefix based on voucher type
+        let prefix = 'F'; // Default for Flight Voucher
+        if (voucher_type === 'Buy Gift' || voucher_type === 'Gift Voucher') {
+            prefix = 'G';
+        }
+        
+        // Generate unique serial (3 characters)
+        const generateSerial = () => {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let result = '';
+            for (let i = 0; i < 3; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        };
+        
+        // Generate unique voucher code
+        let voucherCode;
+        let isUnique = false;
+        let attempts = 0;
+        const maxAttempts = 10;
+        
+        // Use async/await pattern for database operations
+        const generateUniqueCode = async () => {
+            while (!isUnique && attempts < maxAttempts) {
+                const serial = generateSerial();
+                voucherCode = `${prefix}${categoryCode}${year}${serial}`;
+                
+                // Check if code already exists using Promise
+                const checkCode = () => {
+                    return new Promise((resolve, reject) => {
+                        const checkSql = 'SELECT id FROM voucher_codes WHERE code = ?';
+                        con.query(checkSql, [voucherCode], (err, result) => {
+                            if (err) {
+                                reject(err);
+                            } else {
+                                resolve(result.length === 0);
+                            }
+                        });
+                    });
+                };
+                
+                try {
+                    const codeAvailable = await checkCode();
+                    if (codeAvailable) {
+                        isUnique = true;
+                        break;
+                    }
+                } catch (err) {
+                    console.error('Error checking voucher code uniqueness:', err);
+                    return res.status(500).json({ success: false, message: 'Database error' });
+                }
+                
+                attempts++;
+            }
+            
+            if (!isUnique) {
+                return res.status(500).json({ success: false, message: 'Could not generate unique voucher code' });
+            }
+        };
+        
+        // Generate the unique code
+        await generateUniqueCode();
+        
+        // Create title for the voucher code
+        const title = `${customer_name} - ${flight_category} - ${location}`;
+        
+        // Insert into voucher_codes table
+        const insertSql = `
+            INSERT INTO voucher_codes (
+                code, title, valid_from, valid_until, max_uses, current_uses,
+                applicable_locations, applicable_experiences, applicable_voucher_types,
+                is_active, created_at, updated_at, source_type, customer_email, paid_amount
+            ) VALUES (?, ?, NOW(), ?, 1, 0, ?, ?, ?, 1, NOW(), NOW(), 'user_generated', ?, ?)
+        `;
+        
+        // Set default expiration date if none provided (1 year from now)
+        const defaultExpiryDate = expires_date || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        
+        const values = [
+            voucherCode,
+            title,
+            defaultExpiryDate,
+            location || null,
+            experience_type || null,
+            voucher_type || null,
+            customer_email || null,
+            paid_amount || 0
+        ];
+        
+        // Use Promise for database insertion
+        const insertVoucherCode = () => {
+            return new Promise((resolve, reject) => {
+                con.query(insertSql, values, (err, result) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(result);
+                    }
+                });
+            });
+        };
+        
+        try {
+            const result = await insertVoucherCode();
+            res.json({
+                success: true,
+                message: 'Voucher code generated successfully',
+                voucher_code: voucherCode,
+                voucher_id: result.insertId,
+                title: title
+            });
+        } catch (insertError) {
+            console.error('Error creating voucher code:', insertError);
+            res.status(500).json({ success: false, message: 'Database error', error: insertError.message });
+        }
+        
+    } catch (error) {
+        console.error('Error generating voucher code:', error);
+        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    }
+});
 
 // Get all voucher codes
 app.get('/api/voucher-codes', (req, res) => {
@@ -460,14 +611,38 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
                     console.log('Webhook booking creation completed, ID:', bookingId);
                 } else if (storeData.type === 'voucher') {
                     console.log('Creating voucher via webhook:', storeData.voucherData);
+                    
+                    // Check if session was already processed to prevent duplicate creation
+                    if (storeData.processed) {
+                        console.log('Session already processed by webhook, skipping duplicate creation');
+                        return res.json({ received: true });
+                    }
+                    
+                    // Webhook only creates the voucher, voucher code generation will be done by frontend
+                    console.log('Voucher created by webhook, voucher code generation will be done by frontend');
+                    
                     // Direct database insertion instead of HTTP call
                     const voucherId = await createVoucherFromWebhook(storeData.voucherData);
                     console.log('Webhook voucher creation completed, ID:', voucherId);
+                    
+                    // Store voucher ID in session data to prevent duplicate creation
+                    storeData.voucherData.voucher_id = voucherId;
+                    
+                    // Mark session as processed to prevent duplicate calls
+                    storeData.processed = true;
+                    
+                    // Webhook does NOT generate voucher code - this will be done by frontend
+                    console.log('Voucher code generation skipped in webhook - will be done by frontend');
+                    
+                    // Immediately return to prevent further processing
+                    return res.json({ received: true });
                 }
                 
-                // Session data temizle
-                delete stripeSessionStore[session_id];
-                console.log('Session data cleaned up for:', session_id);
+                // Session data temizle (only for non-voucher types)
+                if (storeData.type !== 'voucher') {
+                    delete stripeSessionStore[session_id];
+                    console.log('Session data cleaned up for:', session_id);
+                }
             } catch (error) {
                 console.error('Error processing webhook:', error);
                 // Hata durumunda processed flag'ini geri al
@@ -3150,14 +3325,69 @@ app.post('/api/createBookingFromSession', async (req, res) => {
         console.log('Found session data:', storeData);
         
         let result;
+        let voucherCode = null;
         if (type === 'booking' && storeData.bookingData) {
             console.log('Creating booking from session data');
             result = await createBookingFromWebhook(storeData.bookingData);
             console.log('Booking created successfully, ID:', result);
-        } else if (type === 'voucher' && storeData.voucherData) {
+                        } else if (type === 'voucher' && storeData.voucherData) {
             console.log('Creating voucher from session data');
-            result = await createVoucherFromWebhook(storeData.voucherData);
-            console.log('Voucher created successfully, ID:', result);
+            
+            // Check if session was already processed by webhook
+            if (storeData.processed) {
+                console.log('Session already processed by webhook, using existing data');
+                result = storeData.voucherData.voucher_id;
+                voucherCode = storeData.voucherData.generated_voucher_code;
+            } else {
+                // Create voucher only if not already created
+                result = await createVoucherFromWebhook(storeData.voucherData);
+                console.log('Voucher created successfully, ID:', result);
+                
+                                        // Voucher code generation is now handled by frontend only
+                        // Webhook only creates the voucher entry
+                        console.log('Voucher code generation skipped - will be handled by frontend');
+                        
+                        // For Buy Gift vouchers, also generate voucher code
+                        if (storeData.voucherData.voucher_type === 'Buy Gift' || storeData.voucherData.voucher_type === 'Gift Voucher') {
+                            try {
+                                console.log('Generating voucher code for Buy Gift...');
+                                
+                                // Determine flight category from voucher data
+                                let flightCategory = 'Any Day Flight'; // Default
+                                if (storeData.voucherData.voucher_type_detail) {
+                                    flightCategory = storeData.voucherData.voucher_type_detail;
+                                }
+                                
+                                // Generate voucher code
+                                const voucherCodeResponse = await axios.post(`${req.protocol}://${req.get('host')}/api/generate-voucher-code`, {
+                                    flight_category: flightCategory,
+                                    customer_name: storeData.voucherData.name || 'Unknown Customer',
+                                    customer_email: storeData.voucherData.email || '',
+                                    location: storeData.voucherData.preferred_location || 'Somerset',
+                                    experience_type: storeData.voucherData.flight_type || 'Shared Flight',
+                                    voucher_type: 'Buy Gift',
+                                    paid_amount: storeData.voucherData.paid || 0,
+                                    expires_date: storeData.voucherData.expires || null
+                                });
+                                
+                                if (voucherCodeResponse.data.success) {
+                                    console.log('Buy Gift voucher code generated successfully:', voucherCodeResponse.data.voucher_code);
+                                    voucherCode = voucherCodeResponse.data.voucher_code;
+                                    
+                                    // Store the voucher code in the session data to prevent regeneration
+                                    storeData.voucherData.generated_voucher_code = voucherCode;
+                                } else {
+                                    console.error('Failed to generate Buy Gift voucher code:', voucherCodeResponse.data.message);
+                                }
+                            } catch (voucherCodeError) {
+                                console.error('Error generating Buy Gift voucher code:', voucherCodeError);
+                                // Continue even if code generation fails
+                            }
+                        }
+                
+                // Mark session as processed to prevent duplicate creation
+                storeData.processed = true;
+            }
         } else {
             return res.status(400).json({ success: false, message: 'Invalid type or missing data' });
         }
@@ -3165,7 +3395,15 @@ app.post('/api/createBookingFromSession', async (req, res) => {
         // Clean up session data
         delete stripeSessionStore[session_id];
         
-        res.json({ success: true, id: result, message: `${type} created successfully` });
+        res.json({ 
+            success: true, 
+            id: result, 
+            message: `${type} created successfully`,
+            voucher_code: voucherCode || storeData.voucherData?.generated_voucher_code || null,
+            customer_name: storeData.voucherData?.name || storeData.bookingData?.name || null,
+            customer_email: storeData.voucherData?.email || storeData.bookingData?.email || null,
+            paid_amount: storeData.voucherData?.paid || storeData.bookingData?.totalPrice || null
+        });
     } catch (error) {
         console.error('Error creating from session:', error);
         res.status(500).json({ success: false, message: error.message });

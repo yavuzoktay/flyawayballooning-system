@@ -16,7 +16,9 @@ import {
 } from 'lucide-react';
 
 const Settings = () => {
+    const [activeTab, setActiveTab] = useState('admin'); // 'admin' or 'user_generated'
     const [voucherCodes, setVoucherCodes] = useState([]);
+    const [userGeneratedCodes, setUserGeneratedCodes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [showEditForm, setShowEditForm] = useState(false);
@@ -48,7 +50,9 @@ const Settings = () => {
             setLoading(true);
             const response = await axios.get('/api/voucher-codes');
             if (response.data.success) {
-                setVoucherCodes(response.data.data);
+                const allCodes = response.data.data;
+                setVoucherCodes(allCodes.filter(code => code.source_type === 'admin_created'));
+                setUserGeneratedCodes(allCodes.filter(code => code.source_type === 'user_generated'));
             }
         } catch (error) {
             console.error('Error fetching voucher codes:', error);
@@ -197,140 +201,308 @@ const Settings = () => {
                     <h2>Voucher Codes Management</h2>
                     <p>Create and manage discount voucher codes for your customers.</p>
                     
+                    {/* Tab Navigation */}
+                    <div className="voucher-tabs" style={{ 
+                        display: 'flex', 
+                        gap: '2px', 
+                        marginBottom: '20px',
+                        background: '#e5e7eb',
+                        borderRadius: '8px',
+                        padding: '4px'
+                    }}>
+                        <button
+                            className={`voucher-tab ${activeTab === 'admin' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('admin')}
+                            style={{
+                                flex: 1,
+                                padding: '12px 16px',
+                                border: 'none',
+                                borderRadius: '6px',
+                                background: activeTab === 'admin' ? '#ffffff' : 'transparent',
+                                color: activeTab === 'admin' ? '#1f2937' : '#6b7280',
+                                fontWeight: activeTab === 'admin' ? '600' : '500',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            Admin Created Codes ({voucherCodes.length})
+                        </button>
+                        <button
+                            className={`voucher-tab ${activeTab === 'user_generated' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('user_generated')}
+                            style={{
+                                flex: 1,
+                                padding: '12px 16px',
+                                border: 'none',
+                                borderRadius: '6px',
+                                background: activeTab === 'user_generated' ? '#ffffff' : 'transparent',
+                                color: activeTab === 'user_generated' ? '#1f2937' : '#6b7280',
+                                fontWeight: activeTab === 'user_generated' ? '600' : '500',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            User Generated Codes ({userGeneratedCodes.length})
+                        </button>
+                    </div>
+                    
                     <div className="voucher-codes-table-container">
-                        {voucherCodes.length === 0 ? (
-                            <div className="no-vouchers-message">
-                                <div style={{ textAlign: 'center', padding: '40px' }}>
-                                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎫</div>
-                                    <h3 style={{ color: '#6b7280', marginBottom: '8px' }}>No Voucher Codes Yet</h3>
-                                    <p style={{ color: '#9ca3af', marginBottom: '20px' }}>
-                                        Create your first voucher code to start offering discounts to your customers.
-                                    </p>
-                                    <button 
-                                        className="btn btn-primary"
-                                        onClick={() => setShowCreateForm(true)}
-                                    >
-                                        <Plus size={20} />
-                                        Create First Voucher Code
-                                    </button>
-                                </div>
-                            </div>
-                        ) : (
+                        {/* Admin Created Codes Tab */}
+                        {activeTab === 'admin' && (
                             <>
-                                <div className="voucher-stats" style={{ 
-                                    display: 'flex', 
-                                    gap: '20px', 
-                                    marginBottom: '20px',
-                                    padding: '16px',
-                                    background: '#f8fafc',
-                                    borderRadius: '8px',
-                                    border: '1px solid #e2e8f0'
-                                }}>
-                                    <div style={{ textAlign: 'center' }}>
-                                        <div style={{ fontSize: '24px', fontWeight: '600', color: '#1f2937' }}>
-                                            {voucherCodes.length}
+                                {voucherCodes.length === 0 ? (
+                                    <div className="no-vouchers-message">
+                                        <div style={{ textAlign: 'center', padding: '40px' }}>
+                                            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎫</div>
+                                            <h3 style={{ color: '#6b7280', marginBottom: '8px' }}>No Admin Voucher Codes Yet</h3>
+                                            <p style={{ color: '#9ca3af', marginBottom: '20px' }}>
+                                                Create your first admin voucher code to start offering discounts to your customers.
+                                            </p>
+                                            <button 
+                                                className="btn btn-primary"
+                                                onClick={() => setShowCreateForm(true)}
+                                            >
+                                                <Plus size={20} />
+                                                Create First Voucher Code
+                                            </button>
                                         </div>
-                                        <div style={{ fontSize: '14px', color: '#6b7280' }}>Total Codes</div>
                                     </div>
-                                    <div style={{ textAlign: 'center' }}>
-                                        <div style={{ fontSize: '24px', fontWeight: '600', color: '#10b981' }}>
-                                            {voucherCodes.filter(v => v.is_active).length}
+                                ) : (
+                                    <>
+                                        <div className="voucher-stats" style={{ 
+                                            display: 'flex', 
+                                            gap: '20px', 
+                                            marginBottom: '20px',
+                                            padding: '16px',
+                                            background: '#f8fafc',
+                                            borderRadius: '8px',
+                                            border: '1px solid #e2e8f0'
+                                        }}>
+                                            <div style={{ textAlign: 'center' }}>
+                                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#1f2937' }}>
+                                                    {voucherCodes.length}
+                                                </div>
+                                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Total Codes</div>
+                                            </div>
+                                            <div style={{ textAlign: 'center' }}>
+                                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#10b981' }}>
+                                                    {voucherCodes.filter(v => v.is_active).length}
+                                                </div>
+                                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Active</div>
+                                            </div>
+                                            <div style={{ textAlign: 'center' }}>
+                                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#f59e0b' }}>
+                                                    {voucherCodes.filter(v => v.valid_until && new Date(v.valid_until) > new Date()).length}
+                                                </div>
+                                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Valid</div>
+                                            </div>
                                         </div>
-                                        <div style={{ fontSize: '14px', color: '#6b7280' }}>Active</div>
-                                    </div>
-                                    <div style={{ textAlign: 'center' }}>
-                                        <div style={{ fontSize: '24px', fontWeight: '600', color: '#f59e0b' }}>
-                                            {voucherCodes.filter(v => v.valid_until && new Date(v.valid_until) > new Date()).length}
-                                        </div>
-                                        <div style={{ fontSize: '14px', color: '#6b7280' }}>Valid</div>
-                                    </div>
-                                </div>
-                                
-                                <div className="voucher-codes-table">
-                                    <table>
-                                        <thead>
-                                            <tr>
-                                                <th>Code</th>
-                                                <th>Title</th>
-                                                <th>Valid From</th>
-                                                <th>Valid Until</th>
-                                                <th>Usage</th>
-                                                <th>Status</th>
-                                                <th>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {voucherCodes.map((voucher) => (
-                                                <tr key={voucher.id}>
-                                                    <td>
-                                                        <div className="voucher-code-cell">
-                                                            <span className="voucher-code-badge">{voucher.code}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        <div className="voucher-title-cell">
-                                                            <div style={{ fontWeight: '600', color: '#1f2937' }}>
-                                                                {voucher.title}
-                                                            </div>
-                                                            {voucher.applicable_locations && (
-                                                                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                                                                    📍 {voucher.applicable_locations}
+                                        
+                                        <div className="voucher-codes-table">
+                                            <table>
+                                                <thead>
+                                                    <tr>
+                                                        <th>Code</th>
+                                                        <th>Title</th>
+                                                        <th>Valid From</th>
+                                                        <th>Valid Until</th>
+                                                        <th>Usage</th>
+                                                        <th>Status</th>
+                                                        <th>Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {voucherCodes.map((voucher) => (
+                                                        <tr key={voucher.id}>
+                                                            <td>
+                                                                <div className="voucher-code-cell">
+                                                                    <span className="voucher-code-badge">{voucher.code}</span>
                                                                 </div>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        <div className="date-cell">
-                                                            {voucher.valid_from ? formatDate(voucher.valid_from) : 'No start date'}
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        <div className="date-cell">
-                                                            {voucher.valid_until ? formatDate(voucher.valid_until) : 'No end date'}
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        <div className="usage-cell">
-                                                            {voucher.usage_status || '0/Unlimited'}
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        <div className="status-cell">
-                                                            {getStatusBadge(voucher)}
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        <div className="actions-cell">
-                                                            <button 
-                                                                className="btn btn-sm btn-outline"
-                                                                onClick={() => handleViewUsage(voucher)}
-                                                                title="View Usage"
-                                                            >
-                                                                <Eye size={16} />
-                                                            </button>
-                                                            
-                                                            <button 
-                                                                className="btn btn-sm btn-outline"
-                                                                onClick={() => handleEdit(voucher)}
-                                                                title="Edit"
-                                                            >
-                                                                <Edit size={16} />
-                                                            </button>
-                                                            
-                                                            <button 
-                                                                className="btn btn-sm btn-danger"
-                                                                onClick={() => handleDelete(voucher.id)}
-                                                                title="Delete"
-                                                            >
-                                                                <Trash2 size={16} />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <div className="voucher-title-cell">
+                                                                    <div style={{ fontWeight: '600', color: '#1f2937' }}>
+                                                                        {voucher.title}
+                                                                    </div>
+                                                                    {voucher.applicable_locations && (
+                                                                        <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                                                                            📍 {voucher.applicable_locations}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <div className="date-cell">
+                                                                    {voucher.valid_from ? formatDate(voucher.valid_from) : 'No start date'}
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <div className="date-cell">
+                                                                    {voucher.valid_until ? formatDate(voucher.valid_until) : 'No end date'}
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <div className="usage-cell">
+                                                                    {voucher.usage_status || '0/Unlimited'}
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <div className="status-cell">
+                                                                    {getStatusBadge(voucher)}
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <div className="actions-cell">
+                                                                    <button 
+                                                                        className="btn btn-sm btn-outline"
+                                                                        onClick={() => handleViewUsage(voucher)}
+                                                                        title="View Usage"
+                                                                    >
+                                                                        <Eye size={16} />
+                                                                    </button>
+                                                                    
+                                                                    <button 
+                                                                        className="btn btn-sm btn-outline"
+                                                                        onClick={() => handleEdit(voucher)}
+                                                                        title="Edit"
+                                                                    >
+                                                                        <Edit size={16} />
+                                                                    </button>
+                                                                    
+                                                                    <button 
+                                                                        className="btn btn-sm btn-danger"
+                                                                        onClick={() => handleDelete(voucher.id)}
+                                                                        title="Delete"
+                                                                    >
+                                                                        <Trash2 size={16} />
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </>
+                                )}
+                            </>
+                        )}
+                        
+                        {/* User Generated Codes Tab */}
+                        {activeTab === 'user_generated' && (
+                            <>
+                                {userGeneratedCodes.length === 0 ? (
+                                    <div className="no-vouchers-message">
+                                        <div style={{ textAlign: 'center', padding: '40px' }}>
+                                            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎫</div>
+                                            <h3 style={{ color: '#6b7280', marginBottom: '8px' }}>No User Generated Codes Yet</h3>
+                                            <p style={{ color: '#9ca3af', marginBottom: '20px' }}>
+                                                User generated voucher codes will appear here after Flight Voucher purchases.
+                                            </p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="voucher-stats" style={{ 
+                                            display: 'flex', 
+                                            gap: '20px', 
+                                            marginBottom: '20px',
+                                            padding: '16px',
+                                            background: '#f8fafc',
+                                            borderRadius: '8px',
+                                            border: '1px solid #e2e8f0'
+                                        }}>
+                                            <div style={{ textAlign: 'center' }}>
+                                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#1f2937' }}>
+                                                    {userGeneratedCodes.length}
+                                                </div>
+                                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Total Codes</div>
+                                            </div>
+                                            <div style={{ textAlign: 'center' }}>
+                                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#10b981' }}>
+                                                    {userGeneratedCodes.filter(v => v.is_active).length}
+                                                </div>
+                                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Active</div>
+                                            </div>
+                                            <div style={{ textAlign: 'center' }}>
+                                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#f59e0b' }}>
+                                                    {userGeneratedCodes.filter(v => v.valid_until && new Date(v.valid_until) > new Date()).length}
+                                                </div>
+                                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Valid</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="voucher-codes-table">
+                                            <table>
+                                                <thead>
+                                                    <tr>
+                                                        <th>Code</th>
+                                                        <th>Title</th>
+                                                        <th>Customer</th>
+                                                        <th>Paid Amount</th>
+                                                        <th>Valid Until</th>
+                                                        <th>Status</th>
+                                                        <th>Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {userGeneratedCodes.map((voucher) => (
+                                                        <tr key={voucher.id}>
+                                                            <td>
+                                                                <div className="voucher-code-cell">
+                                                                    <span className="voucher-code-badge" style={{ background: '#3b82f6' }}>{voucher.code}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <div className="voucher-title-cell">
+                                                                    <div style={{ fontWeight: '600', color: '#1f2937' }}>
+                                                                        {voucher.title}
+                                                                    </div>
+                                                                    {voucher.customer_email && (
+                                                                        <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                                                                            📧 {voucher.customer_email}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <div className="customer-cell">
+                                                                    {voucher.customer_email ? voucher.customer_email.split('@')[0] : 'Unknown'}
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <div className="amount-cell">
+                                                                    £{voucher.paid_amount || 0}
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <div className="date-cell">
+                                                                    {voucher.valid_until ? formatDate(voucher.valid_until) : 'No end date'}
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <div className="status-cell">
+                                                                    {getStatusBadge(voucher)}
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <div className="actions-cell">
+                                                                    <button
+                                                                        className="action-btn view-btn"
+                                                                        onClick={() => handleViewUsage(voucher)}
+                                                                        title="View Usage"
+                                                                    >
+                                                                        <Eye size={16} />
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </>
+                                )}
                             </>
                         )}
                     </div>

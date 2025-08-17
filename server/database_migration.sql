@@ -93,12 +93,8 @@ CREATE TABLE IF NOT EXISTS voucher_codes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     code VARCHAR(50) UNIQUE NOT NULL COMMENT 'Unique voucher code (e.g., SUMMER2024, WELCOME10)',
     title VARCHAR(255) NOT NULL COMMENT 'Voucher title/description',
-    discount_type ENUM('percentage', 'fixed_amount') NOT NULL COMMENT 'Type of discount',
-    discount_value DECIMAL(10,2) NOT NULL COMMENT 'Discount value (percentage or fixed amount)',
-    min_booking_amount DECIMAL(10,2) DEFAULT 0 COMMENT 'Minimum booking amount required',
-    max_discount DECIMAL(10,2) DEFAULT NULL COMMENT 'Maximum discount amount (for percentage discounts)',
-    valid_from DATE NOT NULL COMMENT 'Start date of validity',
-    valid_until DATE NOT NULL COMMENT 'End date of validity',
+    valid_from DATE DEFAULT NULL COMMENT 'Start date of validity',
+    valid_until DATE DEFAULT NULL COMMENT 'End date of validity',
     max_uses INT DEFAULT NULL COMMENT 'Maximum number of times this code can be used (NULL = unlimited)',
     current_uses INT DEFAULT 0 COMMENT 'Current number of times used',
     applicable_locations TEXT COMMENT 'Comma-separated list of applicable locations (NULL = all locations)',
@@ -106,11 +102,16 @@ CREATE TABLE IF NOT EXISTS voucher_codes (
     applicable_voucher_types TEXT COMMENT 'Comma-separated list of applicable voucher types (NULL = all types)',
     is_active BOOLEAN DEFAULT TRUE COMMENT 'Whether the voucher code is active',
     created_by VARCHAR(100) DEFAULT 'admin' COMMENT 'Who created this voucher code',
+    source_type ENUM('admin_created', 'user_generated') DEFAULT 'admin_created' COMMENT 'Source of voucher code creation',
+    customer_email VARCHAR(255) DEFAULT NULL COMMENT 'Customer email for user-generated codes',
+    paid_amount DECIMAL(10,2) DEFAULT 0 COMMENT 'Amount paid for user-generated codes',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_code (code),
     INDEX idx_valid_until (valid_until),
-    INDEX idx_is_active (is_active)
+    INDEX idx_is_active (is_active),
+    INDEX idx_source_type (source_type),
+    INDEX idx_customer_email (customer_email)
 );
 
 -- Create voucher_code_usage table to track usage
@@ -138,8 +139,8 @@ ADD COLUMN original_amount DECIMAL(10,2) DEFAULT NULL COMMENT 'Original amount b
 ADD FOREIGN KEY (voucher_code) REFERENCES voucher_codes(code) ON DELETE SET NULL;
 
 -- Insert sample voucher codes for testing
-INSERT INTO voucher_codes (code, title, discount_type, discount_value, min_booking_amount, max_discount, valid_from, valid_until, max_uses, applicable_locations, applicable_experiences, applicable_voucher_types) VALUES
-('WELCOME10', 'Welcome Discount 10%', 'percentage', 10.00, 100.00, 50.00, '2024-01-01', '2025-12-31', 100, 'Somerset,United Kingdom', 'Shared Flight,Private Charter', 'Weekday Morning,Flexible Weekday,Any Day Flight'),
-('SUMMER2024', 'Summer Special 15%', 'percentage', 15.00, 150.00, 75.00, '2024-06-01', '2024-08-31', 50, 'Somerset', 'Shared Flight', 'Weekday Morning'),
-('SAVE20', 'Save £20', 'fixed_amount', 20.00, 200.00, NULL, '2024-01-01', '2025-12-31', 200, 'United Kingdom', 'Private Charter', 'Any Day Flight'),
-('FIRSTFLIGHT', 'First Flight 25%', 'percentage', 25.00, 100.00, 100.00, '2024-01-01', '2025-12-31', 75, 'Somerset,United Kingdom', 'Shared Flight', 'Weekday Morning'); 
+INSERT INTO voucher_codes (code, title, valid_from, valid_until, max_uses, applicable_locations, applicable_experiences, applicable_voucher_types, source_type) VALUES
+('WELCOME10', 'Welcome Discount 10%', '2024-01-01', '2025-12-31', 100, 'Somerset,United Kingdom', 'Shared Flight,Private Charter', 'Weekday Morning,Flexible Weekday,Any Day Flight', 'admin_created'),
+('SUMMER2024', 'Summer Special 15%', '2024-06-01', '2024-08-31', 50, 'Somerset', 'Shared Flight', 'Weekday Morning', 'admin_created'),
+('SAVE20', 'Save £20', '2024-01-01', '2025-12-31', 200, 'United Kingdom', 'Private Charter', 'Any Day Flight', 'admin_created'),
+('FIRSTFLIGHT', 'First Flight 25%', '2024-01-01', '2025-12-31', 75, 'Somerset,United Kingdom', 'Shared Flight', 'Weekday Morning', 'admin_created'); 
