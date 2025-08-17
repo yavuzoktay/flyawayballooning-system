@@ -87,12 +87,30 @@ app.post('/api/generate-voucher-code', async (req, res) => {
             'Any Day Flight': 'AT' // Default mapping
         };
         
-        const categoryCode = categoryMap[flight_category] || 'AT';
+        // Determine flight category based on voucher type if not provided
+        let finalFlightCategory = flight_category;
+        console.log('Received flight_category:', flight_category);
+        console.log('Received voucher_type:', voucher_type);
+        
+        if (!finalFlightCategory && voucher_type) {
+            // If voucher type is provided but flight category is not, try to determine from voucher type
+            if (voucher_type === 'Book Flight' || voucher_type === 'Flight Voucher' || voucher_type === 'Buy Gift') {
+                // For these types, we need to get the flight category from the request
+                // This will be handled by the frontend sending the correct voucher type detail
+                finalFlightCategory = 'Any Day Flight'; // Default fallback
+            }
+        }
+        
+        console.log('Final Flight Category:', finalFlightCategory);
+        const categoryCode = categoryMap[finalFlightCategory] || 'AT';
+        console.log('Generated Category Code:', categoryCode);
         
         // Determine prefix based on voucher type
         let prefix = 'F'; // Default for Flight Voucher
         if (voucher_type === 'Buy Gift' || voucher_type === 'Gift Voucher') {
             prefix = 'G';
+        } else if (voucher_type === 'Book Flight') {
+            prefix = 'B';
         }
         
         // Generate unique serial (3 characters)
@@ -3330,7 +3348,56 @@ app.post('/api/createBookingFromSession', async (req, res) => {
             console.log('Creating booking from session data');
             result = await createBookingFromWebhook(storeData.bookingData);
             console.log('Booking created successfully, ID:', result);
-                        } else if (type === 'voucher' && storeData.voucherData) {
+            
+            // For Book Flight, generate voucher code
+            try {
+                console.log('Generating voucher code for Book Flight...');
+                console.log('Full storeData.bookingData:', JSON.stringify(storeData.bookingData, null, 2));
+                
+                // Determine flight category from booking data
+                let flightCategory = 'Any Day Flight'; // Default
+                if (storeData.bookingData.selectedVoucherType) {
+                    // Map voucher type title to flight category
+                    const voucherTypeTitle = storeData.bookingData.selectedVoucherType.title;
+                    console.log('Voucher Type Title:', voucherTypeTitle);
+                    console.log('Full selectedVoucherType:', JSON.stringify(storeData.bookingData.selectedVoucherType, null, 2));
+                    
+                    if (voucherTypeTitle === 'Weekday Morning') {
+                        flightCategory = 'Weekday Morning';
+                    } else if (voucherTypeTitle === 'Flexible Weekday') {
+                        flightCategory = 'Weekday Flex';
+                    } else if (voucherTypeTitle === 'Any Day Flight') {
+                        flightCategory = 'Any Day Flight';
+                    }
+                    
+                    console.log('Mapped Flight Category:', flightCategory);
+                } else {
+                    console.log('No selectedVoucherType found in bookingData');
+                }
+                
+                // Generate voucher code
+                const voucherCodeResponse = await axios.post(`${req.protocol}://${req.get('host')}/api/generate-voucher-code`, {
+                    flight_category: flightCategory,
+                    customer_name: storeData.bookingData.passengerData?.[0]?.firstName + ' ' + storeData.bookingData.passengerData?.[0]?.lastName || 'Unknown Customer',
+                    customer_email: storeData.bookingData.passengerData?.[0]?.email || '',
+                    location: storeData.bookingData.chooseLocation || 'Somerset',
+                    experience_type: storeData.bookingData.chooseFlightType?.type || 'Shared Flight',
+                    voucher_type: 'Book Flight',
+                    paid_amount: storeData.bookingData.totalPrice || 0,
+                    expires_date: null // Will use default (1 year)
+                });
+                
+                if (voucherCodeResponse.data.success) {
+                    console.log('Book Flight voucher code generated successfully:', voucherCodeResponse.data.voucher_code);
+                    voucherCode = voucherCodeResponse.data.voucher_code;
+                } else {
+                    console.error('Failed to generate Book Flight voucher code:', voucherCodeResponse.data.message);
+                }
+            } catch (voucherCodeError) {
+                console.error('Error generating Book Flight voucher code:', voucherCodeError);
+                // Continue even if code generation fails
+            }
+        } else if (type === 'voucher' && storeData.voucherData) {
             console.log('Creating voucher from session data');
             
             // Check if session was already processed by webhook
