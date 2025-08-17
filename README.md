@@ -12,3 +12,4 @@
 # Test nginx.conf inclusion - Wed Aug  6 01:30:56 +03 2025
 # Test Node.js 20 update - Wed Aug  6 01:36:27 +03 2025
 # Test nginx.conf fallback fix - Wed Aug  6 01:46:16 +03 2025
+# Trigger deployment Sun Aug 17 20:43:15 BST 2025
