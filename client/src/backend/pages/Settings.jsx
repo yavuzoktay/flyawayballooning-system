@@ -104,12 +104,26 @@ const Settings = () => {
         is_active: true
     });
     
+    // Terms & Conditions state
+    const [termsAndConditions, setTermsAndConditions] = useState([]);
+    const [showTermsForm, setShowTermsForm] = useState(false);
+    const [showEditTermsForm, setShowEditTermsForm] = useState(false);
+    const [selectedTerms, setSelectedTerms] = useState(null);
+    const [termsFormData, setTermsFormData] = useState({
+        title: '',
+        content: '',
+        voucher_type_ids: [],
+        is_active: true,
+        sort_order: 0
+    });
+    
     // Collapsible sections state
     const [voucherCodesExpanded, setVoucherCodesExpanded] = useState(true);
     const [experiencesExpanded, setExperiencesExpanded] = useState(false);
     const [voucherTypesExpanded, setVoucherTypesExpanded] = useState(false);
     const [addToBookingExpanded, setAddToBookingExpanded] = useState(false);
     const [additionalInfoExpanded, setAdditionalInfoExpanded] = useState(false);
+    const [termsExpanded, setTermsExpanded] = useState(false);
     
     const [formData, setFormData] = useState({
         code: '',
@@ -133,6 +147,7 @@ const Settings = () => {
         fetchVoucherTypes();
         fetchAddToBookingItems();
         fetchAdditionalInfoQuestions();
+        fetchTermsAndConditions();
     }, []);
 
     const fetchVoucherCodes = async () => {
@@ -192,6 +207,17 @@ const Settings = () => {
             }
         } catch (error) {
             console.error('Error fetching additional information questions:', error);
+        }
+    };
+
+    const fetchTermsAndConditions = async () => {
+        try {
+            const response = await axios.get('/api/terms-and-conditions');
+            if (response.data.success) {
+                setTermsAndConditions(response.data.data);
+            }
+        } catch (error) {
+            console.error('Error fetching terms and conditions:', error);
         }
     };
 
@@ -630,6 +656,119 @@ const Settings = () => {
             is_active: true
         });
         setSelectedAdditionalInfoQuestion(null);
+    };
+
+    // Terms & Conditions form handling
+    const handleTermsSubmit = async (e) => {
+        e.preventDefault();
+        
+        // Debug log
+        console.log('Terms form data:', termsFormData);
+        console.log('voucher_type_ids type:', typeof termsFormData.voucher_type_ids);
+        console.log('voucher_type_ids value:', termsFormData.voucher_type_ids);
+        console.log('voucher_type_ids isArray:', Array.isArray(termsFormData.voucher_type_ids));
+        
+        // Ensure voucher_type_ids is an array
+        const formDataToSend = {
+            ...termsFormData,
+            voucher_type_ids: Array.isArray(termsFormData.voucher_type_ids) ? termsFormData.voucher_type_ids : []
+        };
+        
+        console.log('Form data to send:', formDataToSend);
+        
+        // Form validation
+        if (!formDataToSend.title || !formDataToSend.content || formDataToSend.voucher_type_ids.length === 0) {
+            alert('Please fill in all required fields: Title, Content, and select at least one Voucher Type');
+            return;
+        }
+        
+        try {
+            if (showEditTermsForm) {
+                await axios.put(`/api/terms-and-conditions/${selectedTerms.id}`, formDataToSend);
+            } else {
+                await axios.post('/api/terms-and-conditions', formDataToSend);
+            }
+            
+            fetchTermsAndConditions();
+            resetTermsForm();
+            setShowTermsForm(false);
+            setShowEditTermsForm(false);
+        } catch (error) {
+            console.error('Error saving terms and conditions:', error);
+            alert(error.response?.data?.message || 'Error saving terms and conditions');
+        }
+    };
+
+    const handleEditTerms = (terms) => {
+        setSelectedTerms(terms);
+        setTermsFormData({
+            title: terms.title,
+            content: terms.content,
+            voucher_type_ids: (() => {
+                try {
+                    if (terms.voucher_type_ids) {
+                        const parsed = JSON.parse(terms.voucher_type_ids);
+                        return Array.isArray(parsed) ? parsed : [];
+                    }
+                    return [];
+                } catch (error) {
+                    console.error('Error parsing voucher_type_ids:', error);
+                    return [];
+                }
+            })(),
+            is_active: terms.is_active,
+            sort_order: terms.sort_order || 0
+        });
+        setShowEditTermsForm(true);
+    };
+
+    const handleDeleteTerms = async (id) => {
+        if (window.confirm('Are you sure you want to delete these terms and conditions?')) {
+            try {
+                await axios.delete(`/api/terms-and-conditions/${id}`);
+                fetchTermsAndConditions();
+            } catch (error) {
+                console.error('Error deleting terms and conditions:', error);
+                alert(error.response?.data?.message || 'Error deleting terms and conditions');
+            }
+        }
+    };
+
+    const resetTermsForm = () => {
+        setTermsFormData({
+            title: '',
+            content: '',
+            voucher_type_ids: [],
+            is_active: true,
+            sort_order: 0
+        });
+        setSelectedTerms(null);
+    };
+
+    const handleVoucherTypeToggle = (voucherTypeId) => {
+        console.log('Toggle voucher type:', voucherTypeId);
+        console.log('Current voucher_type_ids:', termsFormData.voucher_type_ids);
+        
+        setTermsFormData(prev => {
+            const currentIds = Array.isArray(prev.voucher_type_ids) ? prev.voucher_type_ids : [];
+            console.log('Current IDs array:', currentIds);
+            
+            let newIds;
+            if (currentIds.includes(voucherTypeId)) {
+                newIds = currentIds.filter(id => id !== voucherTypeId);
+                console.log('Removing ID:', voucherTypeId);
+            } else {
+                newIds = [...currentIds, voucherTypeId];
+                console.log('Adding ID:', voucherTypeId);
+            }
+            
+            console.log('New IDs array:', newIds);
+            
+            return {
+                ...prev,
+                voucher_type_ids: newIds
+            };
+        });
     };
 
     const resetForm = () => {
@@ -1720,6 +1859,211 @@ const Settings = () => {
                 )}
             </div>
 
+            {/* Terms & Conditions Section */}
+            <div className="settings-card" style={{ marginBottom: '24px' }}>
+                <div 
+                    className="card-header"
+                    onClick={() => setTermsExpanded(!termsExpanded)}
+                    style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        padding: '20px',
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                    }}
+                >
+                    <div>
+                        <h2 style={{ margin: 0, color: '#1f2937' }}>Terms & Conditions</h2>
+                        <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
+                            Manage terms and conditions for different voucher types.
+                        </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button 
+                            className="btn btn-primary"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowTermsForm(true);
+                            }}
+                            style={{ margin: 0 }}
+                        >
+                            <Plus size={20} />
+                            Create Terms
+                        </button>
+                        {termsExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+                    </div>
+                </div>
+                
+                {termsExpanded && (
+                    <>
+                        <div className="terms-stats" style={{ 
+                            display: 'flex', 
+                            gap: '20px', 
+                            marginBottom: '20px',
+                            padding: '16px',
+                            background: '#f8fafc',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0'
+                        }}>
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#1f2937' }}>
+                                    {termsAndConditions.length}
+                                </div>
+                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Total Terms</div>
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#10b981' }}>
+                                    {termsAndConditions.filter(t => t.is_active).length}
+                                </div>
+                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Active</div>
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#3b82f6' }}>
+                                    {termsAndConditions.filter(t => {
+                                        try {
+                                            if (t.voucher_type_ids) {
+                                                const voucherTypeIds = JSON.parse(t.voucher_type_ids);
+                                                return Array.isArray(voucherTypeIds) && voucherTypeIds.length > 0;
+                                            }
+                                            return false;
+                                        } catch (error) {
+                                            return false;
+                                        }
+                                    }).length}
+                                </div>
+                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Linked to Voucher Types</div>
+                            </div>
+                        </div>
+                        
+                        {termsAndConditions.length === 0 ? (
+                            <div className="no-terms-message">
+                                <div style={{ textAlign: 'center', padding: '40px' }}>
+                                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
+                                    <h3 style={{ color: '#6b7280', marginBottom: '8px' }}>No Terms Yet</h3>
+                                    <p style={{ color: '#9ca3af', marginBottom: '20px' }}>
+                                        Create your first terms and conditions to display in the balloning-book Terms & Conditions section.
+                                    </p>
+                                    <button 
+                                        className="btn btn-primary"
+                                        onClick={() => setShowTermsForm(true)}
+                                    >
+                                        <Plus size={20} />
+                                        Create First Terms
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="terms-table-container">
+                                <table className="terms-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Title</th>
+                                            <th>Content Preview</th>
+                                            <th>Voucher Types</th>
+                                            <th>Sort Order</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {termsAndConditions.map((terms) => (
+                                            <tr key={terms.id}>
+                                                <td>
+                                                    <div style={{ fontWeight: '500', color: '#1f2937' }}>
+                                                        {terms.title}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div style={{ 
+                                                        maxWidth: '300px', 
+                                                        fontSize: '12px', 
+                                                        color: '#6b7280',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        whiteSpace: 'nowrap'
+                                                    }}>
+                                                        {terms.content.substring(0, 100)}
+                                                        {terms.content.length > 100 && '...'}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    {terms.voucher_type_ids ? (
+                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                                            {(() => {
+                                                                try {
+                                                                    const voucherTypeIds = JSON.parse(terms.voucher_type_ids);
+                                                                    if (Array.isArray(voucherTypeIds)) {
+                                                                        return voucherTypeIds.map((voucherTypeId) => {
+                                                                            const voucherType = voucherTypes.find(vt => vt.id === voucherTypeId);
+                                                                            return voucherType ? (
+                                                                                <span key={voucherTypeId} style={{
+                                                                                    padding: '2px 8px',
+                                                                                    borderRadius: '12px',
+                                                                                    fontSize: '11px',
+                                                                                    backgroundColor: '#dbeafe',
+                                                                                    color: '#1e40af'
+                                                                                }}>
+                                                                                    {voucherType.title}
+                                                                                </span>
+                                                                            ) : null;
+                                                                        });
+                                                                    }
+                                                                    return <span style={{ color: '#9ca3af', fontSize: '12px' }}>Invalid format</span>;
+                                                                } catch (error) {
+                                                                    console.error('Error parsing voucher_type_ids:', error);
+                                                                    return <span style={{ color: '#ef4444', fontSize: '12px' }}>Parse error</span>;
+                                                                }
+                                                            })()}
+                                                        </div>
+                                                    ) : (
+                                                        <span style={{ color: '#9ca3af', fontSize: '12px' }}>No voucher types</span>
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    <span style={{ color: '#6b7280', fontSize: '12px' }}>
+                                                        {terms.sort_order}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    {terms.is_active ? (
+                                                        <span className="status-badge active">Active</span>
+                                                    ) : (
+                                                        <span className="status-badge inactive">Inactive</span>
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    <div className="action-buttons">
+                                                        <button
+                                                            className="btn btn-icon"
+                                                            onClick={() => handleEditTerms(terms)}
+                                                            title="Edit"
+                                                        >
+                                                            <Edit size={16} />
+                                                        </button>
+                                                        <button
+                                                            className="btn btn-icon btn-danger"
+                                                            onClick={() => handleDeleteTerms(terms.id)}
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+
             {/* Create/Edit Voucher Form Modal */}
             {(showCreateForm || showEditForm) && (
                 <div className="modal-overlay">
@@ -2472,6 +2816,133 @@ const Settings = () => {
                                 </button>
                                 <button type="submit" className="btn btn-primary">
                                     {showEditAddToBookingForm ? 'Update Item' : 'Create Item'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Create/Edit Terms & Conditions Form Modal */}
+            {(showTermsForm || showEditTermsForm) && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h3>{showEditTermsForm ? 'Edit Terms & Conditions' : 'Create New Terms & Conditions'}</h3>
+                            <button 
+                                className="close-btn"
+                                onClick={() => {
+                                    setShowTermsForm(false);
+                                    setShowEditTermsForm(false);
+                                    resetTermsForm();
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        
+                        <form onSubmit={handleTermsSubmit} className="terms-form">
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Title *</label>
+                                    <input
+                                        type="text"
+                                        value={termsFormData.title}
+                                        onChange={(e) => setTermsFormData({...termsFormData, title: e.target.value})}
+                                        placeholder="e.g., Weekday Morning Terms, Any Day Flight Terms"
+                                        required
+                                    />
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label>Sort Order</label>
+                                    <input
+                                        type="number"
+                                        value={termsFormData.sort_order}
+                                        onChange={(e) => setTermsFormData({...termsFormData, sort_order: parseInt(e.target.value)})}
+                                        placeholder="0"
+                                        min="0"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Content *</label>
+                                <textarea
+                                    value={termsFormData.content}
+                                    onChange={(e) => setTermsFormData({...termsFormData, content: e.target.value})}
+                                    placeholder="Enter the terms and conditions text content..."
+                                    rows="8"
+                                    required
+                                    style={{ fontFamily: 'inherit', lineHeight: '1.5' }}
+                                />
+                                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                                    Use \n for line breaks. This content will be displayed in the balloning-book Terms & Conditions section.
+                                </div>
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Voucher Types *</label>
+                                <div style={{ 
+                                    border: '1px solid #d1d5db', 
+                                    borderRadius: '8px', 
+                                    padding: '16px',
+                                    background: '#f9fafb'
+                                }}>
+                                    <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
+                                        Select which voucher types these terms apply to:
+                                    </div>
+                                    {voucherTypes.map((voucherType) => (
+                                        <label key={voucherType.id} style={{ 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            marginBottom: '8px',
+                                            cursor: 'pointer'
+                                        }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={Array.isArray(termsFormData.voucher_type_ids) && termsFormData.voucher_type_ids.includes(voucherType.id)}
+                                                onChange={() => {
+                                                    console.log('Checkbox clicked for voucher type:', voucherType.id);
+                                                    console.log('Current checked state:', Array.isArray(termsFormData.voucher_type_ids) && termsFormData.voucher_type_ids.includes(voucherType.id));
+                                                    handleVoucherTypeToggle(voucherType.id);
+                                                }}
+                                                style={{ marginRight: '8px' }}
+                                            />
+                                            <span style={{ fontSize: '14px' }}>
+                                                {voucherType.title} - {voucherType.description}
+                                            </span>
+                                        </label>
+                                    ))}
+                                    {voucherTypes.length === 0 && (
+                                        <div style={{ color: '#9ca3af', fontSize: '14px', fontStyle: 'italic' }}>
+                                            No voucher types available. Please create voucher types first.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Status</label>
+                                <select
+                                    value={termsFormData.is_active}
+                                    onChange={(e) => setTermsFormData({...termsFormData, is_active: e.target.value === 'true'})}
+                                >
+                                    <option value={true}>Active</option>
+                                    <option value={false}>Inactive</option>
+                                </select>
+                            </div>
+                            
+                            <div className="form-actions">
+                                <button type="button" className="btn btn-secondary" onClick={() => {
+                                    setShowTermsForm(false);
+                                    setShowEditTermsForm(false);
+                                    resetTermsForm();
+                                }}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn btn-primary">
+                                    {showEditTermsForm ? 'Update Terms' : 'Create Terms'}
                                 </button>
                             </div>
                         </form>

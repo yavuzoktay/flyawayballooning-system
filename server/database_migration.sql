@@ -275,4 +275,26 @@ INSERT INTO additional_information_questions (question_text, question_type, is_r
 ('How did you hear about us?', 'dropdown', TRUE, '["Please select", "Google Search", "Social Media", "Friend/Family", "Travel Agent", "Other"]', NULL, 'This helps us improve our marketing efforts', 'Marketing', 2, TRUE),
 ('Why Hot Air Ballooning?', 'dropdown', TRUE, '["Please select", "Bucket List", "Anniversary", "Birthday", "Proposal", "Adventure", "Gift", "Other"]', NULL, 'Tell us what makes this special for you', 'Experience', 3, TRUE),
 ('Any special requirements or requests?', 'text', FALSE, NULL, 'Please let us know if you have any special needs...', 'We will do our best to accommodate your requests', 'Special Requirements', 4, TRUE),
-('Preferred contact method', 'radio', FALSE, '["Email", "Phone", "SMS", "WhatsApp"]', NULL, 'How would you prefer us to contact you?', 'Communication', 5, TRUE); 
+('Preferred contact method', 'radio', FALSE, '["Email", "Phone", "SMS", "WhatsApp"]', NULL, 'How would you prefer us to contact you?', 'Communication', 5, TRUE);
+
+-- Terms & Conditions tablosu oluşturma
+CREATE TABLE IF NOT EXISTS terms_and_conditions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL COMMENT 'Terms & Conditions title (e.g., Weekday Morning Terms)',
+    content TEXT NOT NULL COMMENT 'The actual terms and conditions text content',
+    voucher_type_ids JSON COMMENT 'Array of voucher type IDs this applies to (e.g., [1, 2, 3])',
+    is_active BOOLEAN DEFAULT TRUE COMMENT 'Whether these terms are active',
+    sort_order INT DEFAULT 0 COMMENT 'Sort order for display',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    INDEX idx_title (title),
+    INDEX idx_is_active (is_active),
+    INDEX idx_sort_order (sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Terms and conditions for different voucher types';
+
+-- Örnek terms and conditions ekleme
+INSERT INTO terms_and_conditions (title, content, voucher_type_ids, sort_order, is_active) VALUES
+('Weekday Morning Terms', 'Your voucher is valid for weekday morning flights only. You may upgrade your voucher at any time to include weekday evenings or weekends if you wish.\n\nBallooning is a weather-dependent activity.\n\nYour voucher is valid for 18 months from the date of purchase.\n\nVouchers are non-refundable under any circumstances but remain fully re-bookable within the 18-month validity period.\n\nIf 6 separate flight attempts within the 18 months are cancelled by us due to weather, we will extend your voucher for an additional 12 months free of charge.\n\nNo changes or cancellations can be made within 48 hours of your scheduled flight.\n\nYour flight will never expire as long as you continue to meet the terms & conditions outlined above.', '[1]', 1, TRUE),
+('Flexible Weekday Terms', 'Your voucher is valid for flexible weekday flights (morning and evening). You may upgrade your voucher at any time to include weekends if you wish.\n\nBallooning is a weather-dependent activity.\n\nYour voucher is valid for 18 months from the date of purchase.\n\nVouchers are non-refundable under any circumstances but remain fully re-bookable within the 18-month validity period.\n\nIf 6 separate flight attempts within the 18 months are cancelled by us due to weather, we will extend your voucher for an additional 12 months free of charge.\n\nNo changes or cancellations can be made within 48 hours of your scheduled flight.\n\nYour flight will never expire as long as you continue to meet the terms & conditions outlined above.', '[2]', 2, TRUE),
+('Any Day Flight Terms', 'Your voucher is valid for flights on any day of the week (morning and evening).\n\nBallooning is a weather-dependent activity.\n\nYour voucher is valid for 18 months from the date of purchase.\n\nVouchers are non-refundable under any circumstances but remain fully re-bookable within the 18-month validity period.\n\nIf 6 separate flight attempts within the 18 months are cancelled by us due to weather, we will extend your voucher for an additional 12 months free of charge.\n\nNo changes or cancellations can be made within 48 hours of your scheduled flight.\n\nYour flight will never expire as long as you continue to meet the terms & conditions outlined above.', '[3]', 3, TRUE); 

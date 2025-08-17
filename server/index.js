@@ -1266,6 +1266,165 @@ app.delete('/api/additional-information-questions/:id', (req, res) => {
     });
 });
 
+// ==================== TERMS & CONDITIONS API ENDPOINTS ====================
+
+// Get all terms and conditions
+app.get('/api/terms-and-conditions', (req, res) => {
+    console.log('GET /api/terms-and-conditions called');
+    const sql = `SELECT * FROM terms_and_conditions ORDER BY sort_order ASC, created_at DESC`;
+    console.log('SQL Query:', sql);
+    
+    con.query(sql, (err, result) => {
+        if (err) {
+            console.error('Error fetching terms and conditions:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        console.log('Query result:', result);
+        console.log('Result length:', result ? result.length : 'undefined');
+        res.json({ success: true, data: result });
+    });
+});
+
+// Get terms and conditions by voucher type
+app.get('/api/terms-and-conditions/voucher-type/:voucherTypeId', (req, res) => {
+    const { voucherTypeId } = req.params;
+    console.log('GET /api/terms-and-conditions/voucher-type/' + voucherTypeId + ' called');
+    
+    const sql = `SELECT * FROM terms_and_conditions WHERE JSON_CONTAINS(voucher_type_ids, ?) AND is_active = 1 ORDER BY sort_order ASC`;
+    console.log('SQL Query:', sql);
+    
+    con.query(sql, [JSON.stringify(parseInt(voucherTypeId))], (err, result) => {
+        if (err) {
+            console.error('Error fetching terms and conditions for voucher type:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        console.log('Query result:', result);
+        res.json({ success: true, data: result });
+    });
+});
+
+// Create new terms and conditions
+app.post('/api/terms-and-conditions', (req, res) => {
+    const {
+        title,
+        content,
+        voucher_type_ids,
+        is_active,
+        sort_order
+    } = req.body;
+    
+    // Validation
+    if (!title || !content || !voucher_type_ids) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: title, content, and voucher_type_ids' });
+    }
+    
+    const sql = `
+        INSERT INTO terms_and_conditions (
+            title, content, voucher_type_ids, is_active, sort_order
+        ) VALUES (?, ?, ?, ?, ?)
+    `;
+    
+    const values = [
+        title,
+        content,
+        JSON.stringify(voucher_type_ids),
+        is_active !== undefined ? is_active : true,
+        sort_order || 0
+    ];
+    
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error creating terms and conditions:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Terms and conditions created successfully',
+            id: result.insertId
+        });
+    });
+});
+
+// Update terms and conditions
+app.put('/api/terms-and-conditions/:id', (req, res) => {
+    const { id } = req.params;
+    const {
+        title,
+        content,
+        voucher_type_ids,
+        is_active,
+        sort_order
+    } = req.body;
+    
+    console.log('PUT /api/terms-and-conditions/' + id + ' called');
+    console.log('Request body:', req.body);
+    console.log('voucher_type_ids type:', typeof voucher_type_ids);
+    console.log('voucher_type_ids value:', voucher_type_ids);
+    
+    // Validation
+    if (!title || !content || !voucher_type_ids) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: title, content, and voucher_type_ids' });
+    }
+    
+    const sql = `
+        UPDATE terms_and_conditions SET 
+            title = ?, content = ?, voucher_type_ids = ?, is_active = ?, sort_order = ?
+        WHERE id = ?
+    `;
+    
+    const values = [
+        title,
+        content,
+        JSON.stringify(voucher_type_ids),
+        is_active !== undefined ? is_active : true,
+        sort_order || 0,
+        id
+    ];
+    
+    console.log('SQL values:', values);
+    
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error updating terms and conditions:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Terms and conditions not found' });
+        }
+        
+        console.log('Terms and conditions updated successfully');
+        res.json({
+            success: true,
+            message: 'Terms and conditions updated successfully'
+        });
+    });
+});
+
+// Delete terms and conditions
+app.delete('/api/terms-and-conditions/:id', (req, res) => {
+    const { id } = req.params;
+    
+    const sql = 'DELETE FROM terms_and_conditions WHERE id = ?';
+    
+    con.query(sql, [id], (err, result) => {
+        if (err) {
+            console.error('Error deleting terms and conditions:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Terms and conditions not found' });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Terms and conditions deleted successfully'
+        });
+    });
+});
+
 // Simple webhook test endpoint
 app.get('/api/webhook-test', (req, res) => {
     res.json({ 
