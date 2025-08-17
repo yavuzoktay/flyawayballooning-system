@@ -16,6 +16,8 @@ const dotenv = require('dotenv');
 const axios = require('axios');
 dotenv.config();
 
+
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -569,6 +571,200 @@ app.get('/api/voucher-codes/usage/stats', (req, res) => {
     });
 });
 
+// ===== EXPERIENCES API ENDPOINTS =====
+
+// Get all experiences
+app.get('/api/experiences', (req, res) => {
+    console.log('GET /api/experiences called');
+    
+    const sql = `
+        SELECT * FROM experiences 
+        ORDER BY sort_order ASC, created_at DESC
+    `;
+    
+    console.log('SQL Query:', sql);
+    
+    con.query(sql, (err, result) => {
+        if (err) {
+            console.error('Error fetching experiences:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        console.log('Query result:', result);
+        console.log('Result length:', result ? result.length : 'undefined');
+        
+        res.json({ success: true, data: result });
+    });
+});
+
+// Configure multer for experiences image uploads
+const experiencesUpload = multer({
+    storage: multer.diskStorage({
+        destination: function (req, file, cb) {
+            const uploadDir = path.join(__dirname, 'uploads', 'experiences');
+            // Create directory if it doesn't exist
+            if (!fs.existsSync(uploadDir)) {
+                fs.mkdirSync(uploadDir, { recursive: true });
+            }
+            cb(null, uploadDir);
+        },
+        filename: function (req, file, cb) {
+            // Generate unique filename with timestamp
+            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+            cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+        }
+    }),
+    limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB limit
+    },
+    fileFilter: function (req, file, cb) {
+        // Allow only image files
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only image files are allowed!'), false);
+        }
+    }
+});
+
+// Create new experience with image upload
+app.post('/api/experiences', experiencesUpload.single('experience_image'), (req, res) => {
+    const {
+        title,
+        description,
+        price_from,
+        price_unit,
+        max_passengers,
+        sort_order
+    } = req.body;
+    
+    // Validation
+    if (!title || !description || !price_from) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: title, description, and price_from' });
+    }
+    
+    // Handle image upload
+    let image_url = null;
+    if (req.file) {
+        image_url = `/uploads/experiences/${req.file.filename}`;
+    }
+    
+    const sql = `
+        INSERT INTO experiences (
+            title, description, image_url, price_from, price_unit, 
+            max_passengers, sort_order
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `;
+    
+    const values = [
+        title,
+        description,
+        image_url,
+        price_from,
+        price_unit || 'pp',
+        max_passengers || 8,
+        sort_order || 0
+    ];
+    
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error creating experience:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Experience created successfully',
+            id: result.insertId,
+            image_url: image_url
+        });
+    });
+});
+
+// Update experience with image upload
+app.put('/api/experiences/:id', experiencesUpload.single('experience_image'), (req, res) => {
+    const { id } = req.params;
+    const {
+        title,
+        description,
+        price_from,
+        price_unit,
+        max_passengers,
+        sort_order,
+        is_active
+    } = req.body;
+    
+    // Validation
+    if (!title || !description || !price_from) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: title, description, and price_from' });
+    }
+    
+    // Handle image upload
+    let image_url = req.body.image_url; // Keep existing image if no new file uploaded
+    if (req.file) {
+        image_url = `/uploads/experiences/${req.file.filename}`;
+    }
+    
+    const sql = `
+        UPDATE experiences SET 
+            title = ?, description = ?, image_url = ?, price_from = ?, 
+            price_unit = ?, max_passengers = ?, sort_order = ?, is_active = ?
+        WHERE id = ?
+    `;
+    
+    const values = [
+        title,
+        description,
+        image_url,
+        price_from,
+        price_unit || 'pp',
+        max_passengers || 8,
+        sort_order || 0,
+        is_active !== undefined ? is_active : true,
+        id
+    ];
+    
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error updating experience:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Experience not found' });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Experience updated successfully',
+            image_url: image_url
+        });
+    });
+});
+
+// Delete experience
+app.delete('/api/experiences/:id', (req, res) => {
+    const { id } = req.params;
+    
+    const sql = 'DELETE FROM experiences WHERE id = ?';
+    
+    con.query(sql, [id], (err, result) => {
+        if (err) {
+            console.error('Error deleting experience:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Experience not found' });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Experience deleted successfully'
+        });
+    });
+});
+
 // Simple webhook test endpoint
 app.get('/api/webhook-test', (req, res) => {
     res.json({ 
@@ -715,10 +911,17 @@ const con = mysql.createPool({
     multipleStatements: true
 });
 
-// Multer storage config for activities
+// Multer storage config for activities and experiences
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, path.join(__dirname, 'uploads/activities'));
+        // Determine destination based on field name or route
+        let uploadDir;
+        if (file.fieldname === 'experience_image') {
+            uploadDir = path.join(__dirname, 'uploads/experiences');
+        } else {
+            uploadDir = path.join(__dirname, 'uploads/activities');
+        }
+        cb(null, uploadDir);
     },
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -730,6 +933,7 @@ const upload = multer({ storage });
 // Ensure uploads directories exist
 const uploadsPath = path.join(__dirname, 'uploads');
 const activitiesPath = path.join(uploadsPath, 'activities');
+const experiencesPath = path.join(uploadsPath, 'experiences');
 
 if (!fs.existsSync(uploadsPath)) {
     fs.mkdirSync(uploadsPath, { recursive: true });
@@ -739,6 +943,11 @@ if (!fs.existsSync(uploadsPath)) {
 if (!fs.existsSync(activitiesPath)) {
     fs.mkdirSync(activitiesPath, { recursive: true });
     console.log('Created activities directory:', activitiesPath);
+}
+
+if (!fs.existsSync(experiencesPath)) {
+    fs.mkdirSync(experiencesPath, { recursive: true });
+    console.log('Created experiences directory:', experiencesPath);
 }
 
 // Statik olarak uploads klasörünü sun

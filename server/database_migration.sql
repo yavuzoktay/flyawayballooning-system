@@ -144,3 +144,23 @@ INSERT INTO voucher_codes (code, title, valid_from, valid_until, max_uses, appli
 ('SUMMER2024', 'Summer Special 15%', '2024-06-01', '2024-08-31', 50, 'Somerset', 'Shared Flight', 'Weekday Morning', 'admin_created'),
 ('SAVE20', 'Save £20', '2024-01-01', '2025-12-31', 200, 'United Kingdom', 'Private Charter', 'Any Day Flight', 'admin_created'),
 ('FIRSTFLIGHT', 'First Flight 25%', '2024-01-01', '2025-12-31', 75, 'Somerset,United Kingdom', 'Shared Flight', 'Weekday Morning', 'admin_created'); 
+
+-- Create experiences table for managing flight experiences
+CREATE TABLE IF NOT EXISTS experiences (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    image_url VARCHAR(500),
+    price_from DECIMAL(10,2) NOT NULL,
+    price_unit VARCHAR(50) DEFAULT 'pp', -- pp (per person) or total
+    max_passengers INT DEFAULT 8,
+    is_active BOOLEAN DEFAULT TRUE,
+    sort_order INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Insert sample experiences
+INSERT INTO experiences (title, description, image_url, price_from, price_unit, max_passengers, sort_order) VALUES
+('Shared Flight', 'Join a Shared Flight with a maximum of 8 passengers. Perfect for Solo Travellers, Couples and Groups looking to Celebrate Special Occasions or Experience Ballooning.', '/images/experiences/shared-flight.jpg', 180.00, 'pp', 8, 1),
+('Private Charter', 'Private Charter balloon flights for 2,3,4 or 8 passengers. Mostly purchased for Significant Milestones, Proposals, Major Birthdays, Families or Groups of Friends.', '/images/experiences/private-charter.jpg', 900.00, 'total', 8, 2); 
