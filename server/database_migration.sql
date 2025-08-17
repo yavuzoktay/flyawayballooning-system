@@ -215,4 +215,64 @@ CREATE TABLE IF NOT EXISTS voucher_types (
 INSERT INTO voucher_types (title, description, price_per_person, price_unit, max_passengers, validity_months, flight_days, flight_time, features, terms, sort_order, is_active) VALUES
 ('Weekday Morning', 'Non-refundable weekday morning flights with maximum flexibility for your ballooning experience.', 180.00, 'pp', 8, 18, 'Monday - Friday', 'AM', '["Around 1 Hour of Air Time", "Complimentary Drink", "Inflight Photos and 3D Flight Track", "Upgradeable at Later Date"]', 'Flights subject to weather – your voucher will remain valid and re-bookable within its validity period if cancelled due to weather.', 1, TRUE),
 ('Flexible Weekday', 'Non-refundable flexible weekday flights with both morning and afternoon options for maximum convenience.', 200.00, 'pp', 8, 18, 'Monday - Friday', 'AM & PM', '["Around 1 Hour of Air Time", "Complimentary Drink", "Inflight Photos and 3D Flight Track", "Upgradeable at Later Date"]', 'Flights subject to weather – your voucher will remain valid and re-bookable within its validity period if cancelled due to weather.', 2, TRUE),
-('Any Day Flight', 'Non-refundable flights available any day of the week with maximum flexibility for your schedule.', 250.00, 'pp', 8, 18, 'Any Day', 'AM & PM', '["Around 1 Hour of Air Time", "Complimentary Drink", "Inflight Photos and 3D Flight Track", "Upgradeable at Later Date"]', 'Flights subject to weather – your voucher will remain valid and re-bookable within its validity period if cancelled due to weather.', 3, TRUE); 
+('Any Day Flight', 'Non-refundable flights available any day of the week with maximum flexibility for your schedule.', 250.00, 'pp', 8, 18, 'Any Day', 'AM & PM', '["Around 1 Hour of Air Time", "Complimentary Drink", "Inflight Photos and 3D Flight Track", "Upgradeable at Later Date"]', 'Flights subject to weather – your voucher will remain valid and re-bookable within its validity period if cancelled due to weather.', 3, TRUE);
+
+-- Add to Booking Items tablosu oluşturma
+CREATE TABLE IF NOT EXISTS add_to_booking_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL COMMENT 'Item title (e.g., FAB Cap, FAB Mug)',
+    description TEXT COMMENT 'Detailed description of the item',
+    image_url VARCHAR(500) DEFAULT NULL COMMENT 'Image URL for the item',
+    image_file VARCHAR(255) DEFAULT NULL COMMENT 'Uploaded image file name',
+    price DECIMAL(10,2) NOT NULL COMMENT 'Item price',
+    price_unit ENUM('fixed', 'pp') DEFAULT 'fixed' COMMENT 'Price unit (fixed = fixed price, pp = per person)',
+    category VARCHAR(100) DEFAULT 'Merchandise' COMMENT 'Item category (e.g., Merchandise, Food, Service)',
+    stock_quantity INT DEFAULT 0 COMMENT 'Available stock quantity (0 = unlimited)',
+    is_physical_item BOOLEAN DEFAULT TRUE COMMENT 'Whether this is a physical item that needs shipping',
+    weight_grams INT DEFAULT 0 COMMENT 'Item weight in grams (for shipping calculations)',
+    sort_order INT DEFAULT 0 COMMENT 'Sort order for display',
+    is_active BOOLEAN DEFAULT TRUE COMMENT 'Whether this item is active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    INDEX idx_title (title),
+    INDEX idx_category (category),
+    INDEX idx_is_active (is_active),
+    INDEX idx_sort_order (sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Additional items that can be added to bookings';
+
+-- Örnek add to booking items ekleme
+INSERT INTO add_to_booking_items (title, description, price, price_unit, category, stock_quantity, is_physical_item, weight_grams, sort_order, is_active) VALUES
+('FAB Cap', 'High-quality embroidered cap with FlyAway Ballooning logo. Perfect souvenir from your ballooning experience.', 20.00, 'fixed', 'Merchandise', 100, TRUE, 150, 1, TRUE),
+('FAB Mug', 'Ceramic mug featuring beautiful ballooning artwork. Great for your morning coffee or tea.', 15.00, 'fixed', 'Merchandise', 75, TRUE, 300, 2, TRUE),
+('Flight Certificate', 'Personalized flight certificate to commemorate your ballooning adventure. Includes your name, date, and flight details.', 25.00, 'fixed', 'Service', 0, FALSE, 0, 3, TRUE),
+('Photo Package', 'Professional photo package including 10 high-resolution images from your flight. Delivered digitally.', 35.00, 'fixed', 'Service', 0, FALSE, 0, 4, TRUE);
+
+-- Additional Information Questions tablosu oluşturma
+CREATE TABLE IF NOT EXISTS additional_information_questions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    question_text TEXT NOT NULL COMMENT 'The question text to display to users',
+    question_type ENUM('dropdown', 'text', 'radio', 'checkbox') DEFAULT 'dropdown' COMMENT 'Type of input field',
+    is_required BOOLEAN DEFAULT FALSE COMMENT 'Whether this question is mandatory',
+    options TEXT COMMENT 'JSON array of options for dropdown/radio/checkbox (e.g., ["Option 1", "Option 2"])',
+    placeholder_text VARCHAR(255) DEFAULT NULL COMMENT 'Placeholder text for text inputs',
+    help_text VARCHAR(500) DEFAULT NULL COMMENT 'Additional help text below the question',
+    category VARCHAR(100) DEFAULT 'General' COMMENT 'Question category for grouping',
+    sort_order INT DEFAULT 0 COMMENT 'Sort order for display',
+    is_active BOOLEAN DEFAULT TRUE COMMENT 'Whether this question is active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    INDEX idx_question_type (question_type),
+    INDEX idx_category (category),
+    INDEX idx_is_active (is_active),
+    INDEX idx_sort_order (sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Additional information questions for booking forms';
+
+-- Örnek additional information questions ekleme
+INSERT INTO additional_information_questions (question_text, question_type, is_required, options, placeholder_text, help_text, category, sort_order, is_active) VALUES
+('Would you like to receive short notice flight availability?', 'dropdown', FALSE, '["Please select", "Yes", "No", "Maybe"]', NULL, 'We may contact you if flights become available at short notice', 'Communication', 1, TRUE),
+('How did you hear about us?', 'dropdown', TRUE, '["Please select", "Google Search", "Social Media", "Friend/Family", "Travel Agent", "Other"]', NULL, 'This helps us improve our marketing efforts', 'Marketing', 2, TRUE),
+('Why Hot Air Ballooning?', 'dropdown', TRUE, '["Please select", "Bucket List", "Anniversary", "Birthday", "Proposal", "Adventure", "Gift", "Other"]', NULL, 'Tell us what makes this special for you', 'Experience', 3, TRUE),
+('Any special requirements or requests?', 'text', FALSE, NULL, 'Please let us know if you have any special needs...', 'We will do our best to accommodate your requests', 'Special Requirements', 4, TRUE),
+('Preferred contact method', 'radio', FALSE, '["Email", "Phone", "SMS", "WhatsApp"]', NULL, 'How would you prefer us to contact you?', 'Communication', 5, TRUE); 

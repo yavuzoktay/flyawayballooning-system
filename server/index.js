@@ -944,6 +944,328 @@ app.delete('/api/voucher-types/:id', (req, res) => {
     });
 });
 
+// ==================== ADD TO BOOKING ITEMS API ENDPOINTS ====================
+
+// Get all add to booking items
+app.get('/api/add-to-booking-items', (req, res) => {
+    console.log('GET /api/add-to-booking-items called');
+    const sql = `SELECT * FROM add_to_booking_items ORDER BY sort_order ASC, created_at DESC`;
+    console.log('SQL Query:', sql);
+    
+    con.query(sql, (err, result) => {
+        if (err) {
+            console.error('Error fetching add to booking items:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        console.log('Query result:', result);
+        console.log('Result length:', result ? result.length : 'undefined');
+        res.json({ success: true, data: result });
+    });
+});
+
+// Create new add to booking item
+app.post('/api/add-to-booking-items', experiencesUpload.single('add_to_booking_item_image'), (req, res) => {
+    const {
+        title,
+        description,
+        price,
+        price_unit,
+        category,
+        stock_quantity,
+        is_physical_item,
+        weight_grams,
+        sort_order,
+        is_active
+    } = req.body;
+    
+    // Validation
+    if (!title || !description || !price) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: title, description, and price' });
+    }
+    
+    // Handle image upload
+    let image_url = req.body.image_url; // Keep existing image if no new file uploaded
+    if (req.file) {
+        image_url = `/uploads/experiences/${req.file.filename}`;
+    }
+    
+    const sql = `
+        INSERT INTO add_to_booking_items (
+            title, description, image_url, price, price_unit, category,
+            stock_quantity, is_physical_item, weight_grams, sort_order, is_active
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    
+    const values = [
+        title,
+        description,
+        image_url,
+        price,
+        price_unit || 'fixed',
+        category || 'Merchandise',
+        stock_quantity || 0,
+        is_physical_item !== undefined ? is_physical_item : true,
+        weight_grams || 0,
+        sort_order || 0,
+        is_active !== undefined ? is_active : true
+    ];
+    
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error creating add to booking item:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Add to booking item created successfully',
+            id: result.insertId
+        });
+    });
+});
+
+// Update add to booking item
+app.put('/api/add-to-booking-items/:id', experiencesUpload.single('add_to_booking_item_image'), (req, res) => {
+    const { id } = req.params;
+    const {
+        title,
+        description,
+        price,
+        price_unit,
+        category,
+        stock_quantity,
+        is_physical_item,
+        weight_grams,
+        sort_order,
+        is_active
+    } = req.body;
+    
+    // Validation
+    if (!title || !description || !price) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: title, description, and price' });
+    }
+    
+    // Handle image upload
+    let image_url = req.body.image_url; // Keep existing image if no new file uploaded
+    if (req.file) {
+        image_url = `/uploads/experiences/${req.file.filename}`;
+    }
+    
+    const sql = `
+        UPDATE add_to_booking_items SET 
+            title = ?, description = ?, image_url = ?, price = ?, 
+            price_unit = ?, category = ?, stock_quantity = ?, is_physical_item = ?,
+            weight_grams = ?, sort_order = ?, is_active = ?
+        WHERE id = ?
+    `;
+    
+    const values = [
+        title,
+        description,
+        image_url,
+        price,
+        price_unit || 'fixed',
+        category || 'Merchandise',
+        stock_quantity || 0,
+        is_physical_item !== undefined ? is_physical_item : true,
+        weight_grams || 0,
+        sort_order || 0,
+        is_active !== undefined ? is_active : true,
+        id
+    ];
+    
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error updating add to booking item:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Add to booking item not found' });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Add to booking item updated successfully',
+            image_url: image_url
+        });
+    });
+});
+
+// Delete add to booking item
+app.delete('/api/add-to-booking-items/:id', (req, res) => {
+    const { id } = req.params;
+    
+    const sql = 'DELETE FROM add_to_booking_items WHERE id = ?';
+    
+    con.query(sql, [id], (err, result) => {
+        if (err) {
+            console.error('Error deleting add to booking item:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Add to booking item not found' });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Add to booking item deleted successfully'
+        });
+    });
+});
+
+// ==================== ADDITIONAL INFORMATION QUESTIONS API ENDPOINTS ====================
+
+// Get all additional information questions
+app.get('/api/additional-information-questions', (req, res) => {
+    console.log('GET /api/additional-information-questions called');
+    const sql = `SELECT * FROM additional_information_questions ORDER BY sort_order ASC, created_at DESC`;
+    console.log('SQL Query:', sql);
+    
+    con.query(sql, (err, result) => {
+        if (err) {
+            console.error('Error fetching additional information questions:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        console.log('Query result:', result);
+        console.log('Result length:', result ? result.length : 'undefined');
+        res.json({ success: true, data: result });
+    });
+});
+
+// Create new additional information question
+app.post('/api/additional-information-questions', (req, res) => {
+    const {
+        question_text,
+        question_type,
+        is_required,
+        options,
+        placeholder_text,
+        help_text,
+        category,
+        sort_order,
+        is_active
+    } = req.body;
+    
+    // Validation
+    if (!question_text || !question_type) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: question_text and question_type' });
+    }
+    
+    const sql = `
+        INSERT INTO additional_information_questions (
+            question_text, question_type, is_required, options,
+            placeholder_text, help_text, category, sort_order, is_active
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    
+    const values = [
+        question_text,
+        question_type,
+        is_required !== undefined ? is_required : false,
+        options || '[]',
+        placeholder_text || null,
+        help_text || null,
+        category || 'General',
+        sort_order || 0,
+        is_active !== undefined ? is_active : true
+    ];
+    
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error creating additional information question:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Additional information question created successfully',
+            id: result.insertId
+        });
+    });
+});
+
+// Update additional information question
+app.put('/api/additional-information-questions/:id', (req, res) => {
+    const { id } = req.params;
+    const {
+        question_text,
+        question_type,
+        is_required,
+        options,
+        placeholder_text,
+        help_text,
+        category,
+        sort_order,
+        is_active
+    } = req.body;
+    
+    // Validation
+    if (!question_text || !question_type) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: question_text and question_type' });
+    }
+    
+    const sql = `
+        UPDATE additional_information_questions SET 
+            question_text = ?, question_type = ?, is_required = ?, options = ?,
+            placeholder_text = ?, help_text = ?, category = ?, sort_order = ?, is_active = ?
+        WHERE id = ?
+    `;
+    
+    const values = [
+        question_text,
+        question_type,
+        is_required !== undefined ? is_required : false,
+        options || '[]',
+        placeholder_text || null,
+        help_text || null,
+        category || 'General',
+        sort_order || 0,
+        is_active !== undefined ? is_active : true,
+        id
+    ];
+    
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error updating additional information question:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Additional information question not found' });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Additional information question updated successfully'
+        });
+    });
+});
+
+// Delete additional information question
+app.delete('/api/additional-information-questions/:id', (req, res) => {
+    const { id } = req.params;
+    
+    const sql = 'DELETE FROM additional_information_questions WHERE id = ?';
+    
+    con.query(sql, [id], (err, result) => {
+        if (err) {
+            console.error('Error deleting additional information question:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Additional information question not found' });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Additional information question deleted successfully'
+        });
+    });
+});
+
 // Simple webhook test endpoint
 app.get('/api/webhook-test', (req, res) => {
     res.json({ 

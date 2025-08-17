@@ -67,10 +67,49 @@ const Settings = () => {
         is_active: true
     });
     
+    // Add to Booking Items state
+    const [addToBookingItems, setAddToBookingItems] = useState([]);
+    const [showAddToBookingForm, setShowAddToBookingForm] = useState(false);
+    const [showEditAddToBookingForm, setShowEditAddToBookingForm] = useState(false);
+    const [selectedAddToBookingItem, setSelectedAddToBookingItem] = useState(null);
+    const [addToBookingFormData, setAddToBookingFormData] = useState({
+        title: '',
+        description: '',
+        image_url: '',
+        image_file: null,
+        price: '',
+        price_unit: 'fixed',
+        category: 'Merchandise',
+        stock_quantity: 0,
+        is_physical_item: true,
+        weight_grams: 0,
+        sort_order: 0,
+        is_active: true
+    });
+    
+    // Additional Information Questions state
+    const [additionalInfoQuestions, setAdditionalInfoQuestions] = useState([]);
+    const [showAdditionalInfoForm, setShowAdditionalInfoForm] = useState(false);
+    const [showEditAdditionalInfoForm, setShowEditAdditionalInfoForm] = useState(false);
+    const [selectedAdditionalInfoQuestion, setSelectedAdditionalInfoQuestion] = useState(null);
+    const [additionalInfoFormData, setAdditionalInfoFormData] = useState({
+        question_text: '',
+        question_type: 'dropdown',
+        is_required: false,
+        options: '[]',
+        placeholder_text: '',
+        help_text: '',
+        category: 'General',
+        sort_order: 0,
+        is_active: true
+    });
+    
     // Collapsible sections state
     const [voucherCodesExpanded, setVoucherCodesExpanded] = useState(true);
     const [experiencesExpanded, setExperiencesExpanded] = useState(false);
     const [voucherTypesExpanded, setVoucherTypesExpanded] = useState(false);
+    const [addToBookingExpanded, setAddToBookingExpanded] = useState(false);
+    const [additionalInfoExpanded, setAdditionalInfoExpanded] = useState(false);
     
     const [formData, setFormData] = useState({
         code: '',
@@ -92,6 +131,8 @@ const Settings = () => {
         fetchVoucherCodes();
         fetchExperiences();
         fetchVoucherTypes();
+        fetchAddToBookingItems();
+        fetchAdditionalInfoQuestions();
     }, []);
 
     const fetchVoucherCodes = async () => {
@@ -129,6 +170,28 @@ const Settings = () => {
             }
         } catch (error) {
             console.error('Error fetching voucher types:', error);
+        }
+    };
+
+    const fetchAddToBookingItems = async () => {
+        try {
+            const response = await axios.get('/api/add-to-booking-items');
+            if (response.data.success) {
+                setAddToBookingItems(response.data.data);
+            }
+        } catch (error) {
+            console.error('Error fetching add to booking items:', error);
+        }
+    };
+
+    const fetchAdditionalInfoQuestions = async () => {
+        try {
+            const response = await axios.get('/api/additional-information-questions');
+            if (response.data.success) {
+                setAdditionalInfoQuestions(response.data.data);
+            }
+        } catch (error) {
+            console.error('Error fetching additional information questions:', error);
         }
     };
 
@@ -396,6 +459,177 @@ const Settings = () => {
             is_active: true
         });
         setSelectedVoucherType(null);
+    };
+
+    // Add to Booking Items form handling
+    const handleAddToBookingSubmit = async (e) => {
+        e.preventDefault();
+        
+        // Form validation
+        if (!addToBookingFormData.title || !addToBookingFormData.description || !addToBookingFormData.price) {
+            alert('Please fill in all required fields: Title, Description, and Price');
+            return;
+        }
+        
+        try {
+            // Create FormData for file upload
+            const formData = new FormData();
+            formData.append('title', addToBookingFormData.title);
+            formData.append('description', addToBookingFormData.description);
+            formData.append('price', addToBookingFormData.price);
+            formData.append('price_unit', addToBookingFormData.price_unit);
+            formData.append('category', addToBookingFormData.category);
+            formData.append('stock_quantity', addToBookingFormData.stock_quantity);
+            formData.append('is_physical_item', addToBookingFormData.is_physical_item);
+            formData.append('weight_grams', addToBookingFormData.weight_grams);
+            formData.append('sort_order', addToBookingFormData.sort_order);
+            formData.append('is_active', addToBookingFormData.is_active);
+            
+            // Add image file if selected
+            if (addToBookingFormData.image_file) {
+                formData.append('add_to_booking_item_image', addToBookingFormData.image_file);
+            } else if (addToBookingFormData.image_url) {
+                // Keep existing image URL if no new file selected
+                formData.append('image_url', addToBookingFormData.image_url);
+            }
+            
+            if (showEditAddToBookingForm) {
+                await axios.put(`/api/add-to-booking-items/${selectedAddToBookingItem.id}`, formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+            } else {
+                await axios.post('/api/add-to-booking-items', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+            }
+            
+            fetchAddToBookingItems();
+            resetAddToBookingForm();
+            setShowAddToBookingForm(false);
+            setShowEditAddToBookingForm(false);
+        } catch (error) {
+            console.error('Error saving add to booking item:', error);
+            alert(error.response?.data?.message || 'Error saving add to booking item');
+        }
+    };
+
+    const handleEditAddToBookingItem = (item) => {
+        setSelectedAddToBookingItem(item);
+        setAddToBookingFormData({
+            title: item.title,
+            description: item.description,
+            image_url: item.image_url || '',
+            image_file: null,
+            price: item.price,
+            price_unit: item.price_unit || 'fixed',
+            category: item.category || 'Merchandise',
+            stock_quantity: item.stock_quantity || 0,
+            is_physical_item: item.is_physical_item,
+            weight_grams: item.weight_grams || 0,
+            sort_order: item.sort_order || 0,
+            is_active: item.is_active
+        });
+        setShowEditAddToBookingForm(true);
+    };
+
+    const handleDeleteAddToBookingItem = async (id) => {
+        if (window.confirm('Are you sure you want to delete this add to booking item?')) {
+            try {
+                await axios.delete(`/api/add-to-booking-items/${id}`);
+                fetchAddToBookingItems();
+            } catch (error) {
+                console.error('Error deleting add to booking item:', error);
+                alert(error.response?.data?.message || 'Error deleting add to booking item');
+            }
+        }
+    };
+
+    const resetAddToBookingForm = () => {
+        setAddToBookingFormData({
+            title: '',
+            description: '',
+            image_url: '',
+            image_file: null,
+            price: '',
+            price_unit: 'fixed',
+            category: 'Merchandise',
+            stock_quantity: 0,
+            is_physical_item: true,
+            weight_grams: 0,
+            sort_order: 0,
+            is_active: true
+        });
+        setSelectedAddToBookingItem(null);
+    };
+
+    // Additional Information Questions form handling
+    const handleAdditionalInfoSubmit = async (e) => {
+        e.preventDefault();
+        
+        // Form validation
+        if (!additionalInfoFormData.question_text || !additionalInfoFormData.question_type) {
+            alert('Please fill in all required fields: Question Text and Question Type');
+            return;
+        }
+        
+        try {
+            if (showEditAdditionalInfoForm) {
+                await axios.put(`/api/additional-information-questions/${selectedAdditionalInfoQuestion.id}`, additionalInfoFormData);
+            } else {
+                await axios.post('/api/additional-information-questions', additionalInfoFormData);
+            }
+            
+            fetchAdditionalInfoQuestions();
+            resetAdditionalInfoForm();
+            setShowAdditionalInfoForm(false);
+            setShowEditAdditionalInfoForm(false);
+        } catch (error) {
+            console.error('Error saving additional information question:', error);
+            alert(error.response?.data?.message || 'Error saving additional information question');
+        }
+    };
+
+    const handleEditAdditionalInfoQuestion = (question) => {
+        setSelectedAdditionalInfoQuestion(question);
+        setAdditionalInfoFormData({
+            question_text: question.question_text,
+            question_type: question.question_type,
+            is_required: question.is_required,
+            options: question.options || '[]',
+            placeholder_text: question.placeholder_text || '',
+            help_text: question.help_text || '',
+            category: question.category || 'General',
+            sort_order: question.sort_order || 0,
+            is_active: question.is_active
+        });
+        setShowEditAdditionalInfoForm(true);
+    };
+
+    const handleDeleteAdditionalInfoQuestion = async (id) => {
+        if (window.confirm('Are you sure you want to delete this question?')) {
+            try {
+                await axios.delete(`/api/additional-information-questions/${id}`);
+                fetchAdditionalInfoQuestions();
+            } catch (error) {
+                console.error('Error deleting additional information question:', error);
+                alert(error.response?.data?.message || 'Error deleting additional information question');
+            }
+        }
+    };
+
+    const resetAdditionalInfoForm = () => {
+        setAdditionalInfoFormData({
+            question_text: '',
+            question_type: 'dropdown',
+            is_required: false,
+            options: '[]',
+            placeholder_text: '',
+            help_text: '',
+            category: 'General',
+            sort_order: 0,
+            is_active: true
+        });
+        setSelectedAdditionalInfoQuestion(null);
     };
 
     const resetForm = () => {
@@ -900,6 +1134,206 @@ const Settings = () => {
                 </div>
             </div>
 
+            {/* Add to Booking Section */}
+            <div className="settings-card" style={{ marginBottom: '24px' }}>
+                <div 
+                    className="card-header"
+                    onClick={() => setAddToBookingExpanded(!addToBookingExpanded)}
+                    style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        padding: '20px',
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                    }}
+                >
+                    <div>
+                        <h2 style={{ margin: 0, color: '#1f2937' }}>Add to Booking</h2>
+                        <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
+                            Manage additional items that can be added to bookings (merchandise, services, etc.).
+                        </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button 
+                            className="btn btn-primary"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowAddToBookingForm(true);
+                            }}
+                            style={{ margin: 0 }}
+                        >
+                            <Plus size={20} />
+                            Create Item
+                        </button>
+                        {addToBookingExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+                    </div>
+                </div>
+                
+                {addToBookingExpanded && (
+                    <>
+                        <div className="add-to-booking-stats" style={{ 
+                            display: 'flex', 
+                            gap: '20px', 
+                            marginBottom: '20px',
+                            padding: '16px',
+                            background: '#f8fafc',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0'
+                        }}>
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#1f2937' }}>
+                                    {addToBookingItems.length}
+                                </div>
+                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Total Items</div>
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#10b981' }}>
+                                    {addToBookingItems.filter(item => item.is_active).length}
+                                </div>
+                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Active</div>
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#3b82f6' }}>
+                                    {addToBookingItems.filter(item => item.category === 'Merchandise').length}
+                                </div>
+                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Merchandise</div>
+                            </div>
+                        </div>
+                        
+                        {addToBookingItems.length === 0 ? (
+                            <div className="no-add-to-booking-message">
+                                <div style={{ textAlign: 'center', padding: '40px' }}>
+                                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>🛍️</div>
+                                    <h3 style={{ color: '#6b7280', marginBottom: '8px' }}>No Items Yet</h3>
+                                    <p style={{ color: '#9ca3af', marginBottom: '20px' }}>
+                                        Create your first item to display in the balloning-book Add to Booking section.
+                                    </p>
+                                    <button 
+                                        className="btn btn-primary"
+                                        onClick={() => setShowAddToBookingForm(true)}
+                                    >
+                                        <Plus size={20} />
+                                        Create First Item
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <table className="add-to-booking-table">
+                                <thead>
+                                    <tr>
+                                        <th>ITEM</th>
+                                        <th>DESCRIPTION</th>
+                                        <th>PRICE</th>
+                                        <th>CATEGORY</th>
+                                        <th>STOCK</th>
+                                        <th>WEIGHT</th>
+                                        <th>STATUS</th>
+                                        <th>ACTIONS</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {addToBookingItems.map((item) => (
+                                        <tr key={item.id}>
+                                            <td>
+                                                <div>
+                                                    <div style={{ fontWeight: '600' }}>{item.title}</div>
+                                                    {item.image_url && (
+                                                        <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                                                            {item.image_url.startsWith('/uploads/') ? (
+                                                                <img 
+                                                                    src={item.image_url} 
+                                                                    alt={item.title}
+                                                                    style={{ 
+                                                                        width: '60px', 
+                                                                        height: '40px', 
+                                                                        objectFit: 'cover',
+                                                                        borderRadius: '4px',
+                                                                        marginTop: '4px'
+                                                                    }}
+                                                                />
+                                                            ) : (
+                                                                `Image: ${item.image_url}`
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div style={{ maxWidth: '300px', fontSize: '14px' }}>
+                                                    {item.description}
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div style={{ fontWeight: '600' }}>
+                                                    £{item.price}
+                                                    <span style={{ fontSize: '12px', color: '#6b7280', marginLeft: '4px' }}>
+                                                        {item.price_unit === 'pp' ? 'pp' : 'fixed'}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span style={{
+                                                    padding: '4px 8px',
+                                                    borderRadius: '12px',
+                                                    fontSize: '12px',
+                                                    fontWeight: '500',
+                                                    backgroundColor: item.category === 'Merchandise' ? '#dbeafe' : '#fef3c7',
+                                                    color: item.category === 'Merchandise' ? '#1e40af' : '#92400e'
+                                                }}>
+                                                    {item.category}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                {item.stock_quantity === 0 ? (
+                                                    <span style={{ color: '#10b981', fontSize: '12px' }}>Unlimited</span>
+                                                ) : (
+                                                    <span style={{ color: item.stock_quantity > 10 ? '#10b981' : item.stock_quantity > 5 ? '#f59e0b' : '#ef4444' }}>
+                                                        {item.stock_quantity}
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td>
+                                                {item.weight_grams > 0 ? `${item.weight_grams}g` : '-'}
+                                            </td>
+                                            <td>
+                                                {item.is_active ? (
+                                                    <span className="status-badge active">Active</span>
+                                                ) : (
+                                                    <span className="status-badge inactive">Inactive</span>
+                                                )}
+                                            </td>
+                                            <td>
+                                                <div className="action-buttons">
+                                                    <button
+                                                        className="btn btn-icon"
+                                                        onClick={() => handleEditAddToBookingItem(item)}
+                                                        title="Edit"
+                                                    >
+                                                        <Edit size={16} />
+                                                    </button>
+                                                    <button
+                                                        className="btn btn-icon btn-danger"
+                                                        onClick={() => handleDeleteAddToBookingItem(item.id)}
+                                                        title="Delete"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </>
+                )}
+            </div>
+
             {/* Voucher Types Section */}
             <div className="settings-card" style={{ marginBottom: '24px' }}>
                 <div 
@@ -1058,6 +1492,219 @@ const Settings = () => {
                                                     <button
                                                         className="btn btn-icon btn-danger"
                                                         onClick={() => handleDeleteVoucherType(voucherType.id)}
+                                                        title="Delete"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </>
+                )}
+            </div>
+
+            {/* Additional Information Section */}
+            <div className="settings-card" style={{ marginBottom: '24px' }}>
+                <div 
+                    className="card-header"
+                    onClick={() => setAdditionalInfoExpanded(!additionalInfoExpanded)}
+                    style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        padding: '20px',
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                    }}
+                >
+                    <div>
+                        <h2 style={{ margin: 0, color: '#1f2937' }}>Additional Information</h2>
+                        <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
+                            Manage additional information questions for booking forms (dropdowns, text fields, etc.).
+                        </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button 
+                            className="btn btn-primary"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowAdditionalInfoForm(true);
+                            }}
+                            style={{ margin: 0 }}
+                        >
+                            <Plus size={20} />
+                            Create Question
+                        </button>
+                        {additionalInfoExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+                    </div>
+                </div>
+                
+                {additionalInfoExpanded && (
+                    <>
+                        <div className="additional-info-stats" style={{ 
+                            display: 'flex', 
+                            gap: '20px', 
+                            marginBottom: '20px',
+                            padding: '16px',
+                            background: '#f8fafc',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0'
+                        }}>
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#1f2937' }}>
+                                    {additionalInfoQuestions.length}
+                                </div>
+                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Total Questions</div>
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#10b981' }}>
+                                    {additionalInfoQuestions.filter(q => q.is_active).length}
+                                </div>
+                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Active</div>
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#3b82f6' }}>
+                                    {additionalInfoQuestions.filter(q => q.is_required).length}
+                                </div>
+                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Required</div>
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#f59e0b' }}>
+                                    {additionalInfoQuestions.filter(q => q.question_type === 'dropdown').length}
+                                </div>
+                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Dropdowns</div>
+                            </div>
+                        </div>
+                        
+                        {additionalInfoQuestions.length === 0 ? (
+                            <div className="no-additional-info-message">
+                                <div style={{ textAlign: 'center', padding: '40px' }}>
+                                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>❓</div>
+                                    <h3 style={{ color: '#6b7280', marginBottom: '8px' }}>No Questions Yet</h3>
+                                    <p style={{ color: '#9ca3af', marginBottom: '20px' }}>
+                                        Create your first question to display in the balloning-book Additional Information section.
+                                    </p>
+                                    <button 
+                                        className="btn btn-primary"
+                                        onClick={() => setShowAdditionalInfoForm(true)}
+                                    >
+                                        <Plus size={20} />
+                                        Create First Question
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <table className="additional-info-table">
+                                <thead>
+                                    <tr>
+                                        <th>QUESTION</th>
+                                        <th>TYPE</th>
+                                        <th>OPTIONS</th>
+                                        <th>CATEGORY</th>
+                                        <th>REQUIRED</th>
+                                        <th>HELP TEXT</th>
+                                        <th>STATUS</th>
+                                        <th>ACTIONS</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {additionalInfoQuestions.map((question) => (
+                                        <tr key={question.id}>
+                                            <td>
+                                                <div>
+                                                    <div style={{ fontWeight: '600' }}>{question.question_text}</div>
+                                                    {question.placeholder_text && (
+                                                        <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                                                            Placeholder: {question.placeholder_text}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span style={{
+                                                    padding: '4px 8px',
+                                                    borderRadius: '12px',
+                                                    fontSize: '12px',
+                                                    fontWeight: '500',
+                                                    backgroundColor: question.question_type === 'dropdown' ? '#dbeafe' : 
+                                                                   question.question_type === 'text' ? '#fef3c7' :
+                                                                   question.question_type === 'radio' ? '#fce7f3' : '#dcfce7',
+                                                    color: question.question_type === 'dropdown' ? '#1e40af' : 
+                                                           question.question_type === 'text' ? '#92400e' :
+                                                           question.question_type === 'radio' ? '#be185d' : '#166534'
+                                                }}>
+                                                    {question.question_type}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                {question.options && question.options !== '[]' ? (
+                                                    <div style={{ maxWidth: '200px', fontSize: '12px' }}>
+                                                        {JSON.parse(question.options).slice(0, 3).join(', ')}
+                                                        {JSON.parse(question.options).length > 3 && '...'}
+                                                    </div>
+                                                ) : (
+                                                    <span style={{ color: '#9ca3af', fontSize: '12px' }}>No options</span>
+                                                )}
+                                            </td>
+                                            <td>
+                                                <span style={{
+                                                    padding: '4px 8px',
+                                                    borderRadius: '12px',
+                                                    fontSize: '12px',
+                                                    fontWeight: '500',
+                                                    backgroundColor: question.category === 'General' ? '#f3f4f6' : 
+                                                                   question.category === 'Communication' ? '#dbeafe' :
+                                                                   question.category === 'Marketing' ? '#fef3c7' : '#fce7f3',
+                                                    color: question.category === 'General' ? '#374151' : 
+                                                           question.category === 'Communication' ? '#1e40af' :
+                                                           question.category === 'Marketing' ? '#92400e' : '#be185d'
+                                                }}>
+                                                    {question.category}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                {question.is_required ? (
+                                                    <span style={{ color: '#ef4444', fontSize: '12px', fontWeight: '600' }}>Required</span>
+                                                ) : (
+                                                    <span style={{ color: '#6b7280', fontSize: '12px' }}>Optional</span>
+                                                )}
+                                            </td>
+                                            <td>
+                                                {question.help_text ? (
+                                                    <div style={{ maxWidth: '200px', fontSize: '12px', color: '#6b7280' }}>
+                                                        {question.help_text}
+                                                    </div>
+                                                ) : (
+                                                    <span style={{ color: '#9ca3af', fontSize: '12px' }}>No help text</span>
+                                                )}
+                                            </td>
+                                            <td>
+                                                {question.is_active ? (
+                                                    <span className="status-badge active">Active</span>
+                                                ) : (
+                                                    <span className="status-badge inactive">Inactive</span>
+                                                )}
+                                            </td>
+                                            <td>
+                                                <div className="action-buttons">
+                                                    <button
+                                                        className="btn btn-icon"
+                                                        onClick={() => handleEditAdditionalInfoQuestion(question)}
+                                                        title="Edit"
+                                                    >
+                                                        <Edit size={16} />
+                                                    </button>
+                                                    <button
+                                                        className="btn btn-icon btn-danger"
+                                                        onClick={() => handleDeleteAdditionalInfoQuestion(question.id)}
                                                         title="Delete"
                                                     >
                                                         <Trash2 size={16} />
@@ -1502,6 +2149,329 @@ const Settings = () => {
                                 </button>
                                 <button type="submit" className="btn btn-primary">
                                     {showEditVoucherTypeForm ? 'Update Voucher Type' : 'Create Voucher Type'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Create/Edit Additional Information Question Form Modal */}
+            {(showAdditionalInfoForm || showEditAdditionalInfoForm) && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h3>{showEditAdditionalInfoForm ? 'Edit Question' : 'Create New Question'}</h3>
+                            <button 
+                                className="close-btn"
+                                onClick={() => {
+                                    setShowAdditionalInfoForm(false);
+                                    setShowEditAdditionalInfoForm(false);
+                                    resetAdditionalInfoForm();
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        
+                        <form onSubmit={handleAdditionalInfoSubmit} className="additional-info-form">
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Question Text *</label>
+                                    <input
+                                        type="text"
+                                        value={additionalInfoFormData.question_text}
+                                        onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, question_text: e.target.value})}
+                                        placeholder="e.g., How did you hear about us?"
+                                        required
+                                    />
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label>Question Type *</label>
+                                    <select
+                                        value={additionalInfoFormData.question_type}
+                                        onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, question_type: e.target.value})}
+                                        required
+                                    >
+                                        <option value="dropdown">Dropdown</option>
+                                        <option value="text">Text Input</option>
+                                        <option value="radio">Radio Buttons</option>
+                                        <option value="checkbox">Checkbox</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Category</label>
+                                    <select
+                                        value={additionalInfoFormData.category}
+                                        onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, category: e.target.value})}
+                                    >
+                                        <option value="General">General</option>
+                                        <option value="Communication">Communication</option>
+                                        <option value="Marketing">Marketing</option>
+                                        <option value="Experience">Experience</option>
+                                        <option value="Special Requirements">Special Requirements</option>
+                                    </select>
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label>Sort Order</label>
+                                    <input
+                                        type="number"
+                                        value={additionalInfoFormData.sort_order}
+                                        onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, sort_order: e.target.value})}
+                                        placeholder="0"
+                                        min="0"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Required Field</label>
+                                    <select
+                                        value={additionalInfoFormData.is_required}
+                                        onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, is_required: e.target.value === 'true'})}
+                                    >
+                                        <option value={false}>Optional</option>
+                                        <option value={true}>Required</option>
+                                    </select>
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label>Status</label>
+                                    <select
+                                        value={additionalInfoFormData.is_active}
+                                        onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, is_active: e.target.value === 'true'})}
+                                    >
+                                        <option value={true}>Active</option>
+                                        <option value={false}>Inactive</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            {(additionalInfoFormData.question_type === 'dropdown' || additionalInfoFormData.question_type === 'radio' || additionalInfoFormData.question_type === 'checkbox') && (
+                                <div className="form-group">
+                                    <label>Options (JSON array)</label>
+                                    <textarea
+                                        value={additionalInfoFormData.options}
+                                        onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, options: e.target.value})}
+                                        placeholder='["Option 1", "Option 2", "Option 3"]'
+                                        rows="3"
+                                        style={{ fontFamily: 'monospace' }}
+                                    />
+                                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                                        Enter options as a JSON array. Example: ["Yes", "No", "Maybe"]
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {additionalInfoFormData.question_type === 'text' && (
+                                <div className="form-group">
+                                    <label>Placeholder Text</label>
+                                    <input
+                                        type="text"
+                                        value={additionalInfoFormData.placeholder_text}
+                                        onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, placeholder_text: e.target.value})}
+                                        placeholder="e.g., Please enter your special requirements..."
+                                    />
+                                </div>
+                            )}
+                            
+                            <div className="form-group">
+                                <label>Help Text</label>
+                                <textarea
+                                    value={additionalInfoFormData.help_text}
+                                    onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, help_text: e.target.value})}
+                                    placeholder="Additional help text to display below the question..."
+                                    rows="2"
+                                />
+                            </div>
+                            
+                            <div className="form-actions">
+                                <button type="button" className="btn btn-secondary" onClick={() => {
+                                    setShowAdditionalInfoForm(false);
+                                    setShowEditAdditionalInfoForm(false);
+                                    resetAdditionalInfoForm();
+                                }}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn btn-primary">
+                                    {showEditAdditionalInfoForm ? 'Update Question' : 'Create Question'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Create/Edit Add to Booking Item Form Modal */}
+            {(showAddToBookingForm || showEditAddToBookingForm) && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h3>{showEditAddToBookingForm ? 'Edit Add to Booking Item' : 'Create New Add to Booking Item'}</h3>
+                            <button 
+                                className="close-btn"
+                                onClick={() => {
+                                    setShowAddToBookingForm(false);
+                                    setShowEditAddToBookingForm(false);
+                                    resetAddToBookingForm();
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        
+                        <form onSubmit={handleAddToBookingSubmit} className="add-to-booking-form">
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Title *</label>
+                                    <input
+                                        type="text"
+                                        value={addToBookingFormData.title}
+                                        onChange={(e) => setAddToBookingFormData({...addToBookingFormData, title: e.target.value})}
+                                        placeholder="e.g., FAB Cap, FAB Mug"
+                                        required
+                                    />
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label>Price *</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        value={addToBookingFormData.price}
+                                        onChange={(e) => setAddToBookingFormData({...addToBookingFormData, price: e.target.value})}
+                                        placeholder="e.g., 20.00"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Price Unit</label>
+                                    <select
+                                        value={addToBookingFormData.price_unit}
+                                        onChange={(e) => setAddToBookingFormData({...addToBookingFormData, price_unit: e.target.value})}
+                                    >
+                                        <option value="fixed">Fixed Price</option>
+                                        <option value="pp">Per Person</option>
+                                    </select>
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label>Category</label>
+                                    <select
+                                        value={addToBookingFormData.category}
+                                        onChange={(e) => setAddToBookingFormData({...addToBookingFormData, category: e.target.value})}
+                                    >
+                                        <option value="Merchandise">Merchandise</option>
+                                        <option value="Service">Service</option>
+                                        <option value="Food">Food & Beverage</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Stock Quantity</label>
+                                    <input
+                                        type="number"
+                                        value={addToBookingFormData.stock_quantity}
+                                        onChange={(e) => setAddToBookingFormData({...addToBookingFormData, stock_quantity: e.target.value})}
+                                        placeholder="0 = unlimited"
+                                        min="0"
+                                    />
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label>Weight (grams)</label>
+                                    <input
+                                        type="number"
+                                        value={addToBookingFormData.weight_grams}
+                                        onChange={(e) => setAddToBookingFormData({...addToBookingFormData, weight_grams: e.target.value})}
+                                        placeholder="0"
+                                        min="0"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Sort Order</label>
+                                    <input
+                                        type="number"
+                                        value={addToBookingFormData.sort_order}
+                                        onChange={(e) => setAddToBookingFormData({...addToBookingFormData, sort_order: e.target.value})}
+                                        placeholder="0"
+                                        min="0"
+                                    />
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label>Physical Item</label>
+                                    <select
+                                        value={addToBookingFormData.is_physical_item}
+                                        onChange={(e) => setAddToBookingFormData({...addToBookingFormData, is_physical_item: e.target.value === 'true'})}
+                                    >
+                                        <option value={true}>Yes (needs shipping)</option>
+                                        <option value={false}>No (digital/service)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Description *</label>
+                                <textarea
+                                    value={addToBookingFormData.description}
+                                    onChange={(e) => setAddToBookingFormData({...addToBookingFormData, description: e.target.value})}
+                                    placeholder="Detailed description of the item..."
+                                    rows="3"
+                                    required
+                                />
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Image</label>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => setAddToBookingFormData({...addToBookingFormData, image_file: e.target.files[0]})}
+                                />
+                                {addToBookingFormData.image_url && !addToBookingFormData.image_file && (
+                                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                                        Current image: {addToBookingFormData.image_url}
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Status</label>
+                                <select
+                                    value={addToBookingFormData.is_active}
+                                    onChange={(e) => setAddToBookingFormData({...addToBookingFormData, is_active: e.target.value === 'true'})}
+                                >
+                                    <option value={true}>Active</option>
+                                    <option value={false}>Inactive</option>
+                                </select>
+                            </div>
+                            
+                            <div className="form-actions">
+                                <button type="button" className="btn btn-secondary" onClick={() => {
+                                    setShowAddToBookingForm(false);
+                                    setShowEditAddToBookingForm(false);
+                                    resetAddToBookingForm();
+                                }}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn btn-primary">
+                                    {showEditAddToBookingForm ? 'Update Item' : 'Create Item'}
                                 </button>
                             </div>
                         </form>
