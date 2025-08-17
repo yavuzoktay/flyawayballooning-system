@@ -401,6 +401,7 @@ app.post('/api/voucher-codes/validate', (req, res) => {
         AND (valid_from IS NULL OR valid_from <= NOW())
         AND (valid_until IS NULL OR valid_until >= NOW())
         AND (max_uses IS NULL OR current_uses < max_uses)
+        AND (source_type = 'admin_created' OR source_type = 'user_generated')
     `;
     
     console.log('SQL query:', sql);
@@ -430,6 +431,7 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                             valid_until: v.valid_until,
                             current_uses: v.current_uses,
                             max_uses: v.max_uses,
+                            source_type: v.source_type,
                             now: new Date()
                         });
                         
@@ -446,6 +448,9 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                         if (v.max_uses && v.current_uses >= v.max_uses) {
                             return res.json({ success: false, message: `Voucher code usage limit reached (${v.current_uses}/${v.max_uses})` });
                         }
+                        if (v.source_type && v.source_type !== 'admin_created' && v.source_type !== 'user_generated') {
+                            return res.json({ success: false, message: 'Voucher code source type is invalid' });
+                        }
                     }
                 }
             });
@@ -454,27 +459,43 @@ app.post('/api/voucher-codes/validate', (req, res) => {
         
         const voucher = result[0];
         
-        // Check location restrictions
-        if (voucher.applicable_locations && location) {
-            const locations = voucher.applicable_locations.split(',');
-            if (!locations.includes(location)) {
-                return res.json({ success: false, message: 'Voucher code not valid for this location' });
-            }
-        }
+        console.log('Voucher found:', {
+            id: voucher.id,
+            code: voucher.code,
+            source_type: voucher.source_type,
+            is_active: voucher.is_active,
+            valid_from: voucher.valid_from,
+            valid_until: voucher.valid_until,
+            current_uses: voucher.current_uses,
+            max_uses: voucher.max_uses
+        });
         
-        // Check experience restrictions
-        if (voucher.applicable_experiences && experience) {
-            const experiences = voucher.applicable_experiences.split(',');
-            if (!experiences.includes(experience)) {
-                return res.json({ success: false, message: 'Voucher code not valid for this experience' });
+        // For user generated codes, skip strict location/experience/voucher_type checks
+        if (voucher.source_type === 'user_generated') {
+            console.log('User generated voucher code - skipping strict validation checks');
+        } else {
+            // Check location restrictions (only for admin created codes)
+            if (voucher.applicable_locations && location) {
+                const locations = voucher.applicable_locations.split(',');
+                if (!locations.includes(location)) {
+                    return res.json({ success: false, message: 'Voucher code not valid for this location' });
+                }
             }
-        }
-        
-        // Check voucher type restrictions
-        if (voucher.applicable_voucher_types && voucher_type) {
-            const types = voucher.applicable_voucher_types.split(',');
-            if (!types.includes(voucher_type)) {
-                return res.json({ success: false, message: 'Voucher code not valid for this voucher type' });
+            
+            // Check experience restrictions (only for admin created codes)
+            if (voucher.applicable_experiences && experience) {
+                const experiences = voucher.applicable_experiences.split(',');
+                if (!experiences.includes(experience)) {
+                    return res.json({ success: false, message: 'Voucher code not valid for this experience' });
+                }
+            }
+            
+            // Check voucher type restrictions (only for admin created codes)
+            if (voucher.applicable_voucher_types && voucher_type) {
+                const types = voucher.applicable_voucher_types.split(',');
+                if (!types.includes(voucher_type)) {
+                    return res.json({ success: false, message: 'Voucher code not valid for this voucher type' });
+                }
             }
         }
         
