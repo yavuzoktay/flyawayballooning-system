@@ -2176,29 +2176,29 @@ app.post('/api/createBooking', (req, res) => {
                 console.log('Parsed bookingDate:', bookingDate);
                 console.log('Parsed bookingTime:', bookingTime);
                 if (bookingTime && req.body.activity_id) {
-                    // Doğrudan activity_id ile güncelle
-                    const updateAvailSql = `UPDATE activity_availability SET available = available - ? WHERE date = ? AND time = ? AND activity_id = ? AND available >= ?`;
+                    // Use the new specific availability update function
                     console.log('=== REBOOK AVAILABILITY UPDATE ===');
                     console.log('UPDATE AVAILABILITY PARAMS:', chooseFlightType.passengerCount, bookingDate, bookingTime, req.body.activity_id, chooseFlightType.passengerCount);
                     console.log('Request body activity_id:', req.body.activity_id);
                     console.log('Request body:', req.body);
-                    con.query(updateAvailSql, [chooseFlightType.passengerCount, bookingDate, bookingTime, req.body.activity_id, chooseFlightType.passengerCount], (err2, result2) => {
-                        if (err2) {
-                            console.error('Error updating availability:', err2);
-                        } else {
-                            console.log('Availability updated successfully:', result2.affectedRows, 'rows affected');
-                            console.log('=== END REBOOK AVAILABILITY UPDATE ===');
-                        }
-                    });
+                    
+                    updateSpecificAvailability(bookingDate, bookingTime, req.body.activity_id, chooseFlightType.passengerCount);
+                    console.log('=== END REBOOK AVAILABILITY UPDATE ===');
                 } else if (bookingTime) {
-                    // Eski yöntem: alt sorgu ile activity_id bul
-                    const updateAvailSql = `UPDATE activity_availability SET available = available - ? WHERE date = ? AND time = ? AND activity_id = (SELECT id FROM activity WHERE location = ? AND status = 'Live' LIMIT 1) AND available >= ?`;
+                    // Get activity_id first, then update availability
                     console.log('UPDATE AVAILABILITY PARAMS (alt sorgu):', chooseFlightType.passengerCount, bookingDate, bookingTime, chooseLocation, chooseFlightType.passengerCount);
-                    con.query(updateAvailSql, [chooseFlightType.passengerCount, bookingDate, bookingTime, chooseLocation, chooseFlightType.passengerCount], (err2, result2) => {
-                        if (err2) {
-                            console.error('Error updating availability (alt sorgu):', err2);
+                    
+                    const activitySql = `SELECT id FROM activity WHERE location = ? AND status = 'Live' LIMIT 1`;
+                    con.query(activitySql, [chooseLocation], (activityErr, activityResult) => {
+                        if (activityErr) {
+                            console.error('Error getting activity_id for availability update:', activityErr);
+                        } else if (activityResult.length > 0) {
+                            const activityId = activityResult[0].id;
+                            console.log('Found activity_id for availability update:', activityId);
+                            
+                            updateSpecificAvailability(bookingDate, bookingTime, activityId, chooseFlightType.passengerCount);
                         } else {
-                            console.log('Availability updated (alt sorgu):', result2.affectedRows, 'rows');
+                            console.error('No activity found for location:', chooseLocation);
                         }
                     });
                 }
@@ -2222,8 +2222,8 @@ app.post('/api/createBooking', (req, res) => {
                         console.error('Error creating passengers:', err);
                         return res.status(500).json({ success: false, error: 'Database query failed to create passengers' });
                     }
-                    // Update availability status after booking creation
-                    updateAvailabilityStatus();
+                    // Availability is already updated by updateSpecificAvailability function
+                    // No need to call updateAvailabilityStatus() here
                     
                     res.status(201).json({ success: true, message: 'Booking created successfully!', bookingId: bookingId, created_at: createdAt });
                 });
@@ -3095,7 +3095,7 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
     
     console.log(`Fetching availabilities for activity ${id}`);
     
-    // Single optimized query with JOINs
+    // Single optimized query with JOINs - FIXED to only affect specific time slots
     const optimizedSql = `
         SELECT 
             aa.*,
@@ -3112,11 +3112,12 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
         LEFT JOIN (
             SELECT 
                 DATE(ab.flight_date) as flight_date,
+                TIME(ab.flight_date) as flight_time,
                 COUNT(*) as total_booked
             FROM all_booking ab 
             WHERE DATE(ab.flight_date) >= CURDATE() - INTERVAL 30 DAY
-            GROUP BY DATE(ab.flight_date)
-        ) as booking_counts ON DATE(aa.date) = booking_counts.flight_date
+            GROUP BY DATE(ab.flight_date), TIME(ab.flight_date)
+        ) as booking_counts ON DATE(aa.date) = booking_counts.flight_date AND TIME(aa.time) = booking_counts.flight_time
         WHERE aa.activity_id = ? 
         ORDER BY aa.date, aa.time
     `;
@@ -3129,12 +3130,23 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
         
         console.log(`Found ${result.length} availabilities for activity ${id}`);
         
+        // Log some sample results for debugging
+        if (result.length > 0) {
+            console.log('Sample availability records:');
+            result.slice(0, 3).forEach((row, index) => {
+                console.log(`  ${index + 1}. ID: ${row.id}, Date: ${row.date}, Time: ${row.time}, Available: ${row.available}, Status: ${row.status}, Total Booked: ${row.total_booked}`);
+            });
+        }
+        
         // Process results and update database if needed
         const processedResult = result.map(row => {
+            // IMPORTANT: Only calculate availability for this specific time slot, not for the entire date
+            // The booking count should be specific to this date+time combination, not just the date
             const needsUpdate = row.calculated_status !== row.status || row.calculated_available !== row.available;
             
-            // Update database if needed (non-blocking)
+            // Update database if needed (non-blocking) - but only for this specific record
             if (needsUpdate) {
+                console.log(`Updating availability ${row.id}: date=${row.date}, time=${row.time}, status=${row.calculated_status}, available=${row.calculated_available}`);
                 const updateSql = 'UPDATE activity_availability SET status = ?, available = ? WHERE id = ?';
                 con.query(updateSql, [row.calculated_status, row.calculated_available, row.id], (updateErr) => {
                     if (updateErr) {
@@ -3788,9 +3800,14 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
 
 // Place this at the very end, after all API endpoints:
 
-// Function to auto-update availability status
+// Function to auto-update availability status (only for maintenance, not for specific bookings)
 const updateAvailabilityStatus = async () => {
     try {
+        // This function is now only used for maintenance purposes
+        // Specific availability updates are handled by updateSpecificAvailability function
+        console.log('updateAvailabilityStatus called - this function is deprecated for booking operations');
+        
+        // Only update status for records that need it, but don't change availability numbers
         const sql = `
             UPDATE activity_availability 
             SET status = CASE 
@@ -3798,18 +3815,164 @@ const updateAvailabilityStatus = async () => {
                 WHEN available > 0 THEN 'Open'
                 ELSE status
             END
-            WHERE available = 0 OR available > 0
+            WHERE (available = 0 OR available > 0) AND (status IS NULL OR status = '')
         `;
         
         con.query(sql, (err, result) => {
             if (err) {
                 console.error('Error auto-updating availability status:', err);
             } else {
-                console.log(`Auto-updated ${result.affectedRows} availability statuses`);
+                console.log(`Auto-updated ${result.affectedRows} availability statuses (maintenance only)`);
             }
         });
     } catch (error) {
         console.error('Error in updateAvailabilityStatus:', error);
+    }
+};
+
+// Function to update availability for a specific time slot
+const updateSpecificAvailability = async (date, time, activityId, passengerCount) => {
+    try {
+        console.log(`=== UPDATE SPECIFIC AVAILABILITY START ===`);
+        console.log(`Parameters: date=${date}, time=${time}, activityId=${activityId}, passengerCount=${passengerCount}`);
+        
+        // First, let's check what availability records exist for this date/time/activity
+        const checkSql = `SELECT id, date, time, activity_id, available, capacity, status FROM activity_availability WHERE date = ? AND time = ? AND activity_id = ?`;
+        
+        con.query(checkSql, [date, time, activityId], (checkErr, checkResult) => {
+            if (checkErr) {
+                console.error('Error checking availability records:', checkErr);
+                return;
+            }
+            
+            console.log(`Found ${checkResult.length} availability records for date=${date}, time=${time}, activityId=${activityId}:`);
+            checkResult.forEach((record, index) => {
+                console.log(`  Record ${index + 1}: id=${record.id}, available=${record.available}, capacity=${record.capacity}, status=${record.status}`);
+            });
+            
+            if (checkResult.length === 0) {
+                console.error('No availability records found for the specified date/time/activity combination');
+                return;
+            }
+            
+            if (checkResult.length > 1) {
+                console.warn('Multiple availability records found for the same date/time/activity - this might cause issues');
+            }
+            
+            // Update the specific time slot availability
+            const updateSql = `UPDATE activity_availability SET available = available - ? WHERE date = ? AND time = ? AND activity_id = ? AND available >= ?`;
+            console.log(`Executing SQL: ${updateSql}`);
+            console.log(`SQL Parameters: [${passengerCount}, ${date}, ${time}, ${activityId}, ${passengerCount}]`);
+            
+            con.query(updateSql, [passengerCount, date, time, activityId, passengerCount], (err, result) => {
+                if (err) {
+                    console.error('Error updating specific availability:', err);
+                } else {
+                    console.log(`Specific availability updated successfully: ${result.affectedRows} rows affected`);
+                    
+                    if (result.affectedRows === 0) {
+                        console.warn('No rows were updated - this might indicate a problem with the WHERE clause');
+                    }
+                    
+                    // Verify the update by checking the new values
+                    const verifySql = `SELECT id, available, capacity, status FROM activity_availability WHERE date = ? AND time = ? AND activity_id = ?`;
+                    con.query(verifySql, [date, time, activityId], (verifyErr, verifyResult) => {
+                        if (verifyErr) {
+                            console.error('Error verifying availability update:', verifyErr);
+                        } else {
+                            console.log('Verification after update:');
+                            verifyResult.forEach((record, index) => {
+                                console.log(`  Record ${index + 1}: id=${record.id}, available=${record.available}, capacity=${record.capacity}, status=${record.status}`);
+                            });
+                        }
+                    });
+                    
+                    // Update the status for this specific slot only
+                    const statusSql = `UPDATE activity_availability SET status = CASE WHEN available = 0 THEN 'Closed' WHEN available > 0 THEN 'Open' ELSE status END WHERE date = ? AND time = ? AND activity_id = ?`;
+                    
+                    con.query(statusSql, [date, time, activityId], (statusErr, statusResult) => {
+                        if (statusErr) {
+                            console.error('Error updating availability status:', statusErr);
+                        } else {
+                            console.log(`Availability status updated for specific slot: ${statusResult.affectedRows} rows affected`);
+                        }
+                    });
+                }
+            });
+        });
+        
+        console.log(`=== UPDATE SPECIFIC AVAILABILITY END ===`);
+    } catch (error) {
+        console.error('Error in updateSpecificAvailability:', error);
+    }
+};
+
+// Function to check and fix duplicate availability records
+const checkAndFixDuplicateAvailability = async () => {
+    try {
+        console.log('=== CHECKING FOR DUPLICATE AVAILABILITY RECORDS ===');
+        
+        // Find duplicate records
+        const duplicateSql = `
+            SELECT date, time, activity_id, COUNT(*) as count
+            FROM activity_availability 
+            GROUP BY date, time, activity_id 
+            HAVING COUNT(*) > 1
+        `;
+        
+        con.query(duplicateSql, (err, duplicates) => {
+            if (err) {
+                console.error('Error checking for duplicates:', err);
+                return;
+            }
+            
+            if (duplicates.length === 0) {
+                console.log('No duplicate availability records found');
+                return;
+            }
+            
+            console.log(`Found ${duplicates.length} duplicate combinations:`);
+            duplicates.forEach((dup, index) => {
+                console.log(`  ${index + 1}. date=${dup.date}, time=${dup.time}, activity_id=${dup.activity_id}, count=${dup.count}`);
+            });
+            
+            // For each duplicate, keep only one record and delete the others
+            // Use a simpler approach to avoid deadlocks
+            duplicates.forEach((dup, index) => {
+                // First, get the ID of the record to keep
+                const getKeepIdSql = `SELECT id FROM activity_availability WHERE date = ? AND time = ? AND activity_id = ? ORDER BY id ASC LIMIT 1`;
+                
+                con.query(getKeepIdSql, [dup.date, dup.time, dup.activity_id], (getErr, getResult) => {
+                    if (getErr) {
+                        console.error(`Error getting keep ID for ${dup.date} ${dup.time} activity_id=${dup.activity_id}:`, getErr);
+                        return;
+                    }
+                    
+                    if (getResult.length === 0) {
+                        console.error(`No records found for ${dup.date} ${dup.time} activity_id=${dup.activity_id}`);
+                        return;
+                    }
+                    
+                    const keepId = getResult[0].id;
+                    console.log(`Keeping record ID ${keepId} for ${dup.date} ${dup.time} activity_id=${dup.activity_id}`);
+                    
+                    // Delete all other records for this date/time/activity combination
+                    const deleteDuplicatesSql = `DELETE FROM activity_availability WHERE date = ? AND time = ? AND activity_id = ? AND id != ?`;
+                    
+                    con.query(deleteDuplicatesSql, [dup.date, dup.time, dup.activity_id, keepId], (deleteErr, deleteResult) => {
+                        if (deleteErr) {
+                            console.error(`Error removing duplicates for ${dup.date} ${dup.time} activity_id=${dup.activity_id}:`, deleteErr);
+                        } else {
+                            console.log(`Removed ${deleteResult.affectedRows} duplicate records for ${dup.date} ${dup.time} activity_id=${dup.activity_id}`);
+                        }
+                    });
+                });
+            });
+        });
+        
+        console.log('=== DUPLICATE CHECK COMPLETE ===');
+    } catch (error) {
+        console.error('Error in checkAndFixDuplicateAvailability:', error);
     }
 };
 
@@ -3821,10 +3984,13 @@ app.listen(PORT, '0.0.0.0', () => {
     // Run database migrations on server start
     runDatabaseMigrations();
     
-    // Run initial availability status update
+    // Check and fix duplicate availability records
+    checkAndFixDuplicateAvailability();
+    
+    // Run initial availability status update (maintenance only)
     updateAvailabilityStatus();
     
-    // Set up periodic updates every 5 minutes
+    // Set up periodic updates every 5 minutes (maintenance only)
     setInterval(updateAvailabilityStatus, 5 * 60 * 1000);
 });
 
@@ -3845,8 +4011,10 @@ app.delete('/api/deleteBooking/:id', (req, res) => {
             return res.status(404).json({ success: false, message: 'Booking not found' });
         }
         
-        // Update availability status after booking deletion
-        updateAvailabilityStatus();
+        // TODO: Restore availability for the specific time slot when booking is deleted
+        // This requires getting the booking details first to know which time slot to restore
+        // For now, we'll skip this to prevent incorrect availability updates
+        console.log('Booking deleted - availability restoration not yet implemented');
         
         res.json({ success: true, message: 'Booking deleted successfully' });
     });
@@ -4014,6 +4182,54 @@ async function createBookingFromWebhook(bookingData) {
                     resolve(bookingId);
                 }
             });
+            
+            // Update availability for the specific time slot after booking creation
+            if (selectedDate && selectedTime && chooseFlightType && chooseFlightType.passengerCount && chooseLocation) {
+                console.log('=== WEBHOOK AVAILABILITY UPDATE ===');
+                console.log('selectedDate:', selectedDate, 'Type:', typeof selectedDate);
+                console.log('selectedTime:', selectedTime);
+                console.log('chooseFlightType:', chooseFlightType);
+                console.log('chooseLocation:', chooseLocation);
+                
+                let bookingDate = selectedDate;
+                let bookingTime = selectedTime;
+                
+                // Parse date if it's a string with time
+                if (typeof selectedDate === 'string' && selectedDate.includes(' ')) {
+                    const parts = selectedDate.split(' ');
+                    bookingDate = parts[0];
+                    if (!bookingTime) {
+                        bookingTime = parts[1];
+                    }
+                } else if (typeof selectedDate === 'string' && selectedDate.length === 10) {
+                    // Date is already in YYYY-MM-DD format
+                    bookingDate = selectedDate;
+                } else if (selectedDate instanceof Date) {
+                    bookingDate = moment(selectedDate).format('YYYY-MM-DD');
+                }
+                
+                console.log('Parsed bookingDate:', bookingDate);
+                console.log('Parsed bookingTime:', bookingTime);
+                
+                if (bookingDate && bookingTime) {
+                    // Get activity_id for the location
+                    const activitySql = `SELECT id FROM activity WHERE location = ? AND status = 'Live' LIMIT 1`;
+                    con.query(activitySql, [chooseLocation], (activityErr, activityResult) => {
+                        if (activityErr) {
+                            console.error('Error getting activity_id for availability update:', activityErr);
+                        } else if (activityResult.length > 0) {
+                            const activityId = activityResult[0].id;
+                            console.log('Found activity_id for availability update:', activityId);
+                            
+                            // Update availability for this specific time slot
+                            updateSpecificAvailability(bookingDate, bookingTime, activityId, chooseFlightType.passengerCount);
+                        } else {
+                            console.error('No activity found for location:', chooseLocation);
+                        }
+                    });
+                }
+                console.log('=== END WEBHOOK AVAILABILITY UPDATE ===');
+            }
         }
 
         // Calculate expires date
@@ -4821,6 +5037,29 @@ const runDatabaseMigrations = () => {
             });
         } else {
             console.log('✅ Voucher type column already exists');
+        }
+    });
+    
+    // Ensure activity_availability table has proper constraints
+    const checkAvailabilityConstraints = "SHOW INDEX FROM activity_availability WHERE Key_name = 'unique_date_time_activity'";
+    con.query(checkAvailabilityConstraints, (err, result) => {
+        if (err) {
+            console.error('Error checking availability constraints:', err);
+            return;
+        }
+        
+        if (result.length === 0) {
+            console.log('Adding unique constraint to activity_availability...');
+            const addUniqueConstraint = "ALTER TABLE activity_availability ADD UNIQUE INDEX unique_date_time_activity (date, time, activity_id)";
+            con.query(addUniqueConstraint, (err) => {
+                if (err) {
+                    console.error('Error adding unique constraint:', err);
+                } else {
+                    console.log('✅ Unique constraint added to activity_availability');
+                }
+            });
+        } else {
+            console.log('✅ Unique constraint already exists on activity_availability');
         }
     });
 };
