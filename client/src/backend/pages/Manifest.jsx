@@ -748,37 +748,63 @@ const Manifest = () => {
     const handleSavePassengerEdit = async (p) => {
         setSavingPassengerEdit(true);
         try {
-            if (editPassengerFirstName !== p.first_name) {
-                await axios.patch('/api/updatePassengerField', {
-                    passenger_id: p.id,
-                    field: 'first_name',
-                    value: editPassengerFirstName
+            const isPlaceholder = typeof p.id !== 'number' || (typeof p.id === 'string' && p.id.startsWith('placeholder-'));
+            if (isPlaceholder) {
+                // Create real passenger row first
+                const createResp = await axios.post('/api/addPassenger', {
+                    booking_id: bookingDetail.booking.id,
+                    first_name: editPassengerFirstName || '',
+                    last_name: editPassengerLastName || '',
+                    email: bookingDetail.booking.email || null,
+                    phone: bookingDetail.booking.phone || null,
+                    ticket_type: p.ticket_type || bookingDetail.booking.flight_type,
+                    weight: editPassengerWeight || null
                 });
-            }
-            if (editPassengerLastName !== p.last_name) {
-                await axios.patch('/api/updatePassengerField', {
-                    passenger_id: p.id,
-                    field: 'last_name',
-                    value: editPassengerLastName
-                });
-            }
-            if (editPassengerWeight !== p.weight) {
-                await axios.patch('/api/updatePassengerField', {
-                    passenger_id: p.id,
-                    field: 'weight',
-                    value: editPassengerWeight
-                });
-            }
-            if (editPassengerPrice !== p.price) {
-                await axios.patch('/api/updatePassengerField', {
-                    passenger_id: p.id,
-                    field: 'price',
-                    value: editPassengerPrice
-                });
+                // If price was entered, set it after creation
+                if (editPassengerPrice) {
+                    const newPassengerId = createResp?.data?.passengerId;
+                    if (newPassengerId) {
+                        await axios.patch('/api/updatePassengerField', {
+                            passenger_id: newPassengerId,
+                            field: 'price',
+                            value: editPassengerPrice
+                        });
+                    }
+                }
+            } else {
+                if (editPassengerFirstName !== p.first_name) {
+                    await axios.patch('/api/updatePassengerField', {
+                        passenger_id: p.id,
+                        field: 'first_name',
+                        value: editPassengerFirstName
+                    });
+                }
+                if (editPassengerLastName !== p.last_name) {
+                    await axios.patch('/api/updatePassengerField', {
+                        passenger_id: p.id,
+                        field: 'last_name',
+                        value: editPassengerLastName
+                    });
+                }
+                if (editPassengerWeight !== p.weight) {
+                    await axios.patch('/api/updatePassengerField', {
+                        passenger_id: p.id,
+                        field: 'weight',
+                        value: editPassengerWeight
+                    });
+                }
+                if (editPassengerPrice !== p.price) {
+                    await axios.patch('/api/updatePassengerField', {
+                        passenger_id: p.id,
+                        field: 'price',
+                        value: editPassengerPrice
+                    });
+                }
             }
             await fetchBookingDetail(bookingDetail.booking.id);
             setEditingPassenger(null);
-        } catch (err) {
+        } catch (e) {
+            console.error('Failed to save passenger edit', e);
             alert('Failed to update passenger details');
         } finally {
             setSavingPassengerEdit(false);
