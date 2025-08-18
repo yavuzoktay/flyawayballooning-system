@@ -400,17 +400,25 @@ const Manifest = () => {
 
     const handleSaveGuests = async () => {
         if (!bookingDetail?.booking?.id) return;
-        // Add each guest
-        for (const g of guestForms) {
-            await axios.post('/api/addPassenger', {
-                booking_id: bookingDetail.booking.id,
-                first_name: g.firstName,
-                last_name: g.lastName,
-                email: g.email,
-                phone: g.phone,
-                ticket_type: g.ticketType,
-                weight: g.weight
-            });
+        const existingCount = Array.isArray(bookingDetail?.passengers) ? bookingDetail.passengers.length : 0;
+        // Add each guest (auto-fill names if missing)
+        for (let idx = 0; idx < guestForms.length; idx++) {
+            const g = guestForms[idx];
+            const firstName = (g.firstName || '').trim() || `Guest ${existingCount + idx + 1}`;
+            const lastName = (g.lastName || '').trim() || 'Guest';
+            try {
+                await axios.post('/api/addPassenger', {
+                    booking_id: bookingDetail.booking.id,
+                    first_name: firstName,
+                    last_name: lastName,
+                    email: (g.email || '').trim() || null,
+                    phone: (g.phone || '').trim() || null,
+                    ticket_type: g.ticketType,
+                    weight: (g.weight || '').toString().trim() || null
+                });
+            } catch (err) {
+                console.error('Failed to add guest passenger', err);
+            }
         }
         // Fetch updated passengers
         const res = await axios.get(`/api/getBookingDetail?booking_id=${bookingDetail.booking.id}`);
@@ -429,6 +437,8 @@ const Manifest = () => {
         ));
         // Refetch passengers to update UI
         await fetchBookingDetail(bookingDetail.booking.id);
+        // Also refresh overall flights state to recalc Pax Booked
+        setFlights(prev => prev.map(f => f.id === bookingDetail.booking.id ? { ...f, passengers: updatedPassengers } : f));
         setAddGuestDialogOpen(false);
     };
 
@@ -1177,10 +1187,12 @@ const Manifest = () => {
                             }
                             
                             console.log('Final Pax Booked values:', { paxBooked, paxTotal });
-                            // DISPLAY LOGIC UPDATE: Prefer availability data (capacity - available) for booked; fallback to counting group passengers
-                            const paxBookedDisplay = (found && typeof found.capacity === 'number' && typeof found.available === 'number')
+                            // DISPLAY LOGIC UPDATE: Compare availability count vs actual passenger count and use the larger to include newly added guests immediately
+                            const passengerCountDisplay = groupFlights.reduce((sum, f) => sum + (f.passengers ? f.passengers.length : 0), 0);
+                            const availabilityCountDisplay = (found && typeof found.capacity === 'number' && typeof found.available === 'number')
                                 ? (found.capacity - found.available)
-                                : groupFlights.reduce((sum, f) => sum + (f.passengers ? f.passengers.length : 0), 0);
+                                : passengerCountDisplay;
+                            const paxBookedDisplay = Math.max(availabilityCountDisplay, passengerCountDisplay);
                             // Prefer capacity directly from matched availability; otherwise try to re-match using map
                             let paxTotalDisplay = '-';
                             if (found && typeof found.capacity === 'number') {
