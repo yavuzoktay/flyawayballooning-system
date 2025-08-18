@@ -2186,7 +2186,7 @@ app.post('/api/createBooking', (req, res) => {
             // --- Availability güncelleme sonu ---
 
             function insertPassengers() {
-                const passengerSql = 'INSERT INTO passengers (booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund) VALUES ?';
+                const passengerSql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund) VALUES ?';
                 const passengerValues = passengerData.map(p => [
                     bookingId,
                     p.firstName,
@@ -3947,7 +3947,7 @@ async function createBookingFromWebhook(bookingData) {
                 
                 // Now create passenger records
                 if (passengerData && passengerData.length > 0) {
-                    const passengerSql = 'INSERT INTO passengers (booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund) VALUES ?';
+                    const passengerSql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund) VALUES ?';
                     const passengerValues = passengerData.map(p => [
                         bookingId,
                         p.firstName || '',
