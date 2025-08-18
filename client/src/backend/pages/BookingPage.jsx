@@ -1547,6 +1547,7 @@ const BookingPage = () => {
                                                     <IconButton size="small" onClick={() => handleEditClick('email', bookingDetail.booking.email)}><EditIcon fontSize="small" /></IconButton>
                                                 </>
                                             )}</Typography>
+                                            <Typography><b>Flight Attempts:</b> {bookingDetail.booking.flight_attempts || '-'}</Typography>
                                             <Typography><b>Paid:</b> {editField === 'paid' ? (
                                                         <>
                                                     <input value={editValue} onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} style={{marginRight: 8}} />

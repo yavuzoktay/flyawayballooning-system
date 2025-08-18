@@ -1758,12 +1758,19 @@ app.get("/api/getfilteredBookings", (req, res) => {
 app.get('/api/getAllBookingData', (req, res) => {
     const sql = `
         SELECT 
-            ab.*,
+            ab.*, 
             ab.name as passenger_name,
             ab.voucher_type as voucher_type,
+            COALESCE(ab.voucher_code, vc.code, vcu_map.code) as voucher_code,
             DATE_FORMAT(ab.created_at, '%Y-%m-%d') as created_at_display,
             DATE_FORMAT(ab.expires, '%d/%m/%Y') as expires_display
         FROM all_booking ab
+        LEFT JOIN voucher_codes vc 
+            ON vc.code = ab.voucher_code
+        LEFT JOIN voucher_code_usage vcu
+            ON vcu.booking_id = ab.id OR (vcu.customer_email IS NOT NULL AND vcu.customer_email = ab.email)
+        LEFT JOIN voucher_codes vcu_map
+            ON vcu_map.id = vcu.voucher_code_id
         ORDER BY ab.created_at DESC
     `;
     
@@ -1773,8 +1780,16 @@ app.get('/api/getAllBookingData', (req, res) => {
             return res.status(500).json({ success: false, message: 'Database error', error: err });
         }
         
+        // If voucher_code is still null, fallback to joined usage mapping
+        const enriched = result.map(r => {
+            if (!r.voucher_code && r.vcu_map_code) {
+                r.voucher_code = r.vcu_map_code;
+            }
+            return r;
+        });
+        
         console.log(`Fetched ${result.length} bookings`);
-        res.json({ success: true, data: result });
+        res.json({ success: true, data: enriched });
     });
 });
 
@@ -1782,10 +1797,12 @@ app.get('/api/getAllBookingData', (req, res) => {
 app.get('/api/getAllVoucherData', (req, res) => {
     // Join all_vouchers with all_booking and passenger (if available)
     const voucher = `
-        SELECT v.*, b.email as booking_email, b.phone as booking_phone, b.id as booking_id, p.weight as passenger_weight
+        SELECT v.*, b.email as booking_email, b.phone as booking_phone, b.id as booking_id, p.weight as passenger_weight,
+               vc.code as vc_code
         FROM all_vouchers v
         LEFT JOIN all_booking b ON v.voucher_ref = b.voucher_code
         LEFT JOIN passenger p ON b.id = p.booking_id
+        LEFT JOIN voucher_codes vc ON vc.code = v.voucher_ref OR (vc.customer_email IS NOT NULL AND vc.customer_email = v.email)
         ORDER BY v.created_at DESC
     `;
     con.query(voucher, (err, result) => {
@@ -1800,8 +1817,11 @@ app.get('/api/getAllVoucherData', (req, res) => {
                 if (!expiresVal && row.created_at) {
                     expiresVal = moment(row.created_at).add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
                 }
+                // Prefer explicit voucher_ref; if null, fill from vc_code
+                const voucher_ref = row.voucher_ref || row.vc_code || null;
                 return {
                     ...row,
+                    voucher_ref,
                     name: row.name ?? '',
                     flight_type: row.flight_type ?? '',
                     voucher_type: row.voucher_type ?? '',
@@ -1811,7 +1831,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     redeemed: row.redeemed ?? '',
                     paid: row.paid ?? '',
                     offer_code: row.offer_code ?? '',
-                    voucher_ref: row.voucher_ref ?? '',
+                    voucher_ref: voucher_ref ?? '',
                     created_at: row.created_at ? moment(row.created_at).format('DD/MM/YYYY HH:mm') : '',
                     booking_email: row.booking_email ?? '',
                     booking_phone: row.booking_phone ?? '',
@@ -1819,9 +1839,9 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     passenger_weight: row.passenger_weight ?? ''
                 };
             });
-            res.send({ success: true, data: formatted });
+            res.json({ success: true, data: formatted });
         } else {
-            res.send({ success: false, message: "No bookings found" });
+            res.json({ success: true, data: [] });
         }
     });
 });
@@ -2573,7 +2593,16 @@ app.post('/api/addPassenger', (req, res) => {
             console.error('Error adding passenger:', err);
             return res.status(500).json({ success: false, message: 'Database error' });
         }
-        res.status(201).json({ success: true, passengerId: result.insertId });
+        // After insert, recompute pax for this booking from passenger table to keep counts in sync
+        const updatePaxSql = `UPDATE all_booking SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?) WHERE id = ?`;
+        con.query(updatePaxSql, [booking_id, booking_id], (err2) => {
+            if (err2) {
+                console.error('Error updating pax after addPassenger:', err2);
+                // Still return success for passenger creation
+                return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: false });
+            }
+            res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true });
+        });
     });
 });
 
@@ -4341,6 +4370,23 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                 if (voucherCodeResponse.data.success) {
                     console.log('Book Flight voucher code generated successfully:', voucherCodeResponse.data.voucher_code);
                     voucherCode = voucherCodeResponse.data.voucher_code;
+                    // Persist voucher code to booking row
+                    try {
+                        await new Promise((resolve) => {
+                            con.query('UPDATE all_booking SET voucher_code = ? WHERE id = ?', [voucherCode, result], (err) => {
+                                if (err) {
+                                    console.error('Error updating booking with voucher_code:', err);
+                                } else {
+                                    console.log('Booking updated with voucher_code:', voucherCode);
+                                }
+                                resolve();
+                            });
+                        });
+                        // Keep in memory for subsequent calls
+                        storeData.bookingData.voucher_code = voucherCode;
+                    } catch (e) {
+                        console.error('Voucher code persist exception:', e);
+                    }
                 } else {
                     console.error('Failed to generate Book Flight voucher code:', voucherCodeResponse.data.message);
                 }

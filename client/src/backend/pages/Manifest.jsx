@@ -1519,7 +1519,7 @@ const Manifest = () => {
                                                 <IconButton size="small" onClick={() => handleEditClick('email', bookingDetail.booking.email)}><EditIcon fontSize="small" /></IconButton>
                                             </>
                                         )}</Typography>
-                                        <Typography><b>Flight Attempts:</b> -</Typography>
+                                        <Typography><b>Flight Attempts:</b> {bookingDetail.booking.flight_attempts || '-'}</Typography>
                                         <Typography><b>Expires:</b> {editField === 'expires' ? (
   <LocalizationProvider dateAdapter={AdapterDayjs}>
     <DatePicker
