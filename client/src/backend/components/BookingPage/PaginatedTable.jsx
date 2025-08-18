@@ -163,7 +163,7 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                                                     const urlDate = `${year}-${month}-${day}`;
                                                     return (
                                                         <a
-                                                            href={`https://flyawayballooning-system.com//manifest?date=${urlDate}`}
+                                                            href={`https://flyawayballooning-system.com/manifest?date=${urlDate}`}
                                                             style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
                                                             target="_self"
                                                             rel="noopener noreferrer"

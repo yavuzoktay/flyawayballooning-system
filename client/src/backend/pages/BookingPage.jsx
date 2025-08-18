@@ -1074,7 +1074,7 @@ const BookingPage = () => {
                                         <Button variant="outlined" color="primary" onClick={handleExportCSV} style={{ height: 40 }}>
                                             Export
                                         </Button>
-                                        <OutlinedInput placeholder="Search here" value={filters.search}
+                                        <OutlinedInput placeholder="Search by name, email, phone, location..." value={filters.search}
                                             onChange={(e) => handleFilterChange("search", e.target.value)} />
                                     </div>
                                     <div className="booking-filter-wrap">
@@ -1155,6 +1155,24 @@ const BookingPage = () => {
                                         </div>
                                     </div>
                                 </div>
+                                {/* Search results count */}
+                                {filters.search && filters.search.trim() !== "" && (
+                                    <div style={{ marginBottom: 16, padding: '8px 16px', background: '#f0f8ff', borderRadius: 8, border: '1px solid #e3f2fd' }}>
+                                        <Typography variant="body2" color="primary">
+                                            🔍 Search results for "{filters.search}": {filteredData.filter(item => {
+                                                const search = filters.search.trim().toLowerCase();
+                                                const name = (item.name || "").toLowerCase();
+                                                const email = (item.email || "").toLowerCase();
+                                                const phone = (item.phone || "").toLowerCase();
+                                                const location = (item.location || "").toLowerCase();
+                                                const flightType = (item.flight_type || "").toLowerCase();
+                                                const status = (item.status || "").toLowerCase();
+                                                const voucherType = (item.voucher_type || "").toLowerCase();
+                                                return name.includes(search) || email.includes(search) || phone.includes(search) || location.includes(search) || flightType.includes(search) || status.includes(search) || voucherType.includes(search);
+                                            }).length} bookings found
+                                        </Typography>
+                                    </div>
+                                )}
                                 {/* Apply client-side filtering for bookings */}
                                 <PaginatedTable
                                     data={filteredData.filter(item => {
@@ -1171,11 +1189,12 @@ const BookingPage = () => {
                                             const search = filters.search.trim().toLowerCase();
                                             const name = (item.name || "").toLowerCase();
                                             const email = (item.email || "").toLowerCase();
+                                            const phone = (item.phone || "").toLowerCase();
                                             const location = (item.location || "").toLowerCase();
                                             const flightType = (item.flight_type || "").toLowerCase();
                                             const status = (item.status || "").toLowerCase();
                                             const voucherType = (item.voucher_type || "").toLowerCase();
-                                            if (!name.includes(search) && !email.includes(search) && !location.includes(search) && !flightType.includes(search) && !status.includes(search) && !voucherType.includes(search)) {
+                                            if (!name.includes(search) && !email.includes(search) && !phone.includes(search) && !location.includes(search) && !flightType.includes(search) && !status.includes(search) && !voucherType.includes(search)) {
                                                 return false;
                                             }
                                         }
@@ -1227,7 +1246,7 @@ const BookingPage = () => {
                                         <Button variant="outlined" color="primary" onClick={handleExportCSV} style={{ height: 40 }}>
                                             Export
                                         </Button>
-                                        <OutlinedInput placeholder="Search here" value={filters.search}
+                                        <OutlinedInput placeholder="Search by name, email, phone, voucher ref, offer code..." value={filters.search}
                                             onChange={(e) => handleFilterChange("search", e.target.value)} />
                                     </div>
                                     <div className="booking-filter-wrap">
@@ -1284,6 +1303,24 @@ const BookingPage = () => {
                                         </div>
                                     </div>
                                 </div>
+                                {/* Search results count */}
+                                {filters.search && filters.search.trim() !== "" && (
+                                    <div style={{ marginBottom: 16, padding: '8px 16px', background: '#f0f8ff', borderRadius: 8, border: '1px solid #e3f2fd' }}>
+                                        <Typography variant="body2" color="primary">
+                                            🔍 Search results for "{filters.search}": {filteredData.filter(item => {
+                                                const search = filters.search.trim().toLowerCase();
+                                                const name = (item.name || "").toLowerCase();
+                                                const email = (item.email || "").toLowerCase();
+                                                const phone = (item.phone || "").toLowerCase();
+                                                const voucherRef = (item.voucher_ref || "").toLowerCase();
+                                                const offerCode = (item.offer_code || "").toLowerCase();
+                                                const flightType = (item.flight_type || "").toLowerCase();
+                                                const voucherType = (item.voucher_type || "").toLowerCase();
+                                                return name.includes(search) || email.includes(search) || phone.includes(search) || voucherRef.includes(search) || offerCode.includes(search) || flightType.includes(search) || voucherType.includes(search);
+                                            }).length} vouchers found
+                                        </Typography>
+                                    </div>
+                                )}
                                 {/* Apply client-side filtering for vouchers */}
                                 <PaginatedTable
                                     data={filteredData.filter(item => {
@@ -1300,7 +1337,16 @@ const BookingPage = () => {
                                             const email = (item.email || "").toLowerCase();
                                             const phone = (item.phone || "").toLowerCase();
                                             const voucherRef = (item.voucher_ref || "").toLowerCase();
-                                            if (!name.includes(search) && !email.includes(search) && !phone.includes(search) && !voucherRef.includes(search)) {
+                                            const offerCode = (item.offer_code || "").toLowerCase();
+                                            const flightType = (item.flight_type || "").toLowerCase();
+                                            const voucherType = (item.voucher_type || "").toLowerCase();
+                                            
+                                            // Debug logging for search
+                                            if (search && (name.includes(search) || email.includes(search) || phone.includes(search) || voucherRef.includes(search) || offerCode.includes(search) || flightType.includes(search) || voucherType.includes(search))) {
+                                                console.log('Search match found:', { search, name, email, phone, voucherRef, offerCode, flightType, voucherType });
+                                            }
+                                            
+                                            if (!name.includes(search) && !email.includes(search) && !phone.includes(search) && !voucherRef.includes(search) && !offerCode.includes(search) && !flightType.includes(search) && !voucherType.includes(search)) {
                                                 return false;
                                             }
                                         }
