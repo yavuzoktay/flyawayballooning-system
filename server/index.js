@@ -2515,17 +2515,29 @@ app.get('/api/getBookingDetail', async (req, res) => {
         // Eğer passenger kaydı yok ama booking.pax > 0 ise, placeholder passenger listesi üret
         let passengers = passengerRows || [];
         const paxCount = parseInt(booking.pax, 10) || 0;
+        // Booking name'den ad/soyad çıkarımı
+        const fullName = (booking.name || '').trim();
+        const nameParts = fullName.split(/\s+/).filter(Boolean);
+        const fallbackFirstName = nameParts.length > 0 ? nameParts[0] : '';
+        const fallbackLastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
         if ((!passengers || passengers.length === 0) && paxCount > 0) {
             passengers = Array.from({ length: paxCount }, (_, i) => ({
                 id: `placeholder-${booking_id}-${i + 1}`,
                 booking_id: booking_id,
-                first_name: '',
-                last_name: '',
+                first_name: fallbackFirstName,
+                last_name: fallbackLastName,
                 weight: null,
                 price: null,
-                email: null,
-                phone: null,
+                email: booking.email || null,
+                phone: booking.phone || null,
                 ticket_type: booking.flight_type || null,
+            }));
+        } else if (Array.isArray(passengers) && passengers.length > 0) {
+            // Mevcut kayıtlarda isim alanları boşsa booking.name'i fallback olarak dön
+            passengers = passengers.map(p => ({
+                ...p,
+                first_name: p.first_name && String(p.first_name).trim() !== '' ? p.first_name : fallbackFirstName,
+                last_name: p.last_name && String(p.last_name).trim() !== '' ? p.last_name : fallbackLastName,
             }));
         }
         // 3. Notes (admin_notes)
