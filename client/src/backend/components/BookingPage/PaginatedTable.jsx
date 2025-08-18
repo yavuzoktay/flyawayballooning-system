@@ -195,7 +195,7 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                                                     return `${day}/${month}/${year}`;
                                                 })()
                                             ) : id === 'voucher_type' ? (
-                                                item[id] || 'Any Day Flight'
+                                                item[id] || ''
                                             ) : id === 'status' && item[id] === 'Confirmed' ? 'Scheduled' : item[id]}
                                         </td>
                                     );

@@ -1187,7 +1187,7 @@ const BookingPage = () => {
                                             ? `${item.passengers[0]?.first_name || ''} ${item.passengers[0]?.last_name || ''}`.trim() || item.name || ''
                                             : item.name || ''),
                                         flight_type: item.flight_type || '',
-                                        voucher_type: item.voucher_type || 'Any Day Flight',
+                                        voucher_type: item.voucher_type || '',
                                         location: item.location || '',
                                         flight_date: item.flight_date_display || item.flight_date || '',
                                         pax: item.pax || '',

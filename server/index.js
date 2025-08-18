@@ -1500,10 +1500,20 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
             
             try {
                 if (storeData.type === 'booking') {
+                    // If already processed with a booking id, skip duplicate creation
+                    if (storeData.processed && storeData.bookingData?.booking_id) {
+                        console.log('Webhook: booking already created for session, skipping.');
+                        return res.json({ received: true });
+                    }
                     console.log('Creating booking via webhook:', storeData.bookingData);
                     // Direct database insertion instead of HTTP call
                     const bookingId = await createBookingFromWebhook(storeData.bookingData);
                     console.log('Webhook booking creation completed, ID:', bookingId);
+                    // Mark processed and store created id to avoid duplicate creation by fallback
+                    storeData.processed = true;
+                    if (!storeData.bookingData) storeData.bookingData = {};
+                    storeData.bookingData.booking_id = bookingId;
+                    return res.json({ received: true });
                 } else if (storeData.type === 'voucher') {
                     console.log('Creating voucher via webhook:', storeData.voucherData);
                     
@@ -1750,7 +1760,7 @@ app.get('/api/getAllBookingData', (req, res) => {
         SELECT 
             ab.*,
             ab.name as passenger_name,
-            COALESCE(ab.voucher_type, 'Any Day Flight') as voucher_type,
+            ab.voucher_type as voucher_type,
             DATE_FORMAT(ab.created_at, '%Y-%m-%d') as created_at_display,
             DATE_FORMAT(ab.expires, '%d/%m/%Y') as expires_display
         FROM all_booking ab
@@ -3922,7 +3932,8 @@ async function createBookingFromWebhook(bookingData) {
                 emptyToNull(preferred_time),
                 emptyToNull(preferred_day),
                 chooseFlightType.type, // experience
-                'Any Day Flight' // voucher_type (default)
+                // Persist the selected voucher type if provided from frontend
+                emptyToNull(bookingData?.voucher_type || bookingData?.selectedVoucherType?.title || 'Any Day Flight')
             ];
 
             con.query(bookingSql, bookingValues, (err, result) => {
@@ -4248,12 +4259,34 @@ app.post('/api/createBookingFromSession', async (req, res) => {
         
         console.log('Found session data:', storeData);
         
+        // If already processed by webhook or previous call, short-circuit
+        if (storeData.processed) {
+            if (type === 'booking' && storeData.bookingData?.booking_id) {
+                return res.json({ success: true, id: storeData.bookingData.booking_id, message: 'booking already created', voucher_code: storeData.bookingData.voucher_code || null });
+            }
+            if (type === 'voucher' && storeData.voucherData?.voucher_id) {
+                return res.json({ success: true, id: storeData.voucherData.voucher_id, message: 'voucher already created', voucher_code: storeData.voucherData.generated_voucher_code || null });
+            }
+        }
+        
         let result;
         let voucherCode = null;
         if (type === 'booking' && storeData.bookingData) {
+            if (storeData.processing) {
+                return res.status(202).json({ success: false, message: 'Booking creation already in progress' });
+            }
+            if (storeData.processed && storeData.bookingData?.booking_id) {
+                return res.json({ success: true, id: storeData.bookingData.booking_id, message: 'booking already created' });
+            }
             console.log('Creating booking from session data');
+            // Acquire a simple in-memory lock
+            storeData.processing = true;
             result = await createBookingFromWebhook(storeData.bookingData);
             console.log('Booking created successfully, ID:', result);
+            // mark processed and store id to avoid duplicates
+            storeData.processed = true;
+            storeData.processing = false;
+            storeData.bookingData.booking_id = result;
             
             // For Book Flight, generate voucher code
             try {
@@ -4365,8 +4398,8 @@ app.post('/api/createBookingFromSession', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid type or missing data' });
         }
         
-        // Clean up session data
-        delete stripeSessionStore[session_id];
+        // Clean up session data (keep minimal info to allow status checks for a short time)
+        stripeSessionStore[session_id] = { ...stripeSessionStore[session_id], processed: true };
         
         res.json({ 
             success: true, 
@@ -4908,4 +4941,12 @@ app.use(express.static(path.join(__dirname, '../client/build')));
 // Catch-all route for SPA - must be at the very end
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/build/index.html'));
+});
+
+// Session status endpoint to avoid duplicate creation from client
+app.get('/api/session-status', (req, res) => {
+    const { session_id } = req.query;
+    if (!session_id) return res.status(400).json({ processed: false, message: 'session_id is required' });
+    const data = stripeSessionStore[session_id];
+    return res.json({ processed: !!(data && (data.processed || data.processing)), type: data?.type || null });
 });
