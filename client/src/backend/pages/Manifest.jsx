@@ -1151,8 +1151,10 @@ const Manifest = () => {
                             }
                             
                             console.log('Final Pax Booked values:', { paxBooked, paxTotal });
-                            // DISPLAY LOGIC UPDATE: Use current group's passenger count for booked, and availability capacity for total
-                            const paxBookedDisplay = groupFlights.reduce((sum, f) => sum + (f.passengers ? f.passengers.length : 0), 0);
+                            // DISPLAY LOGIC UPDATE: Prefer availability data (capacity - available) for booked; fallback to counting group passengers
+                            const paxBookedDisplay = (found && typeof found.capacity === 'number' && typeof found.available === 'number')
+                                ? (found.capacity - found.available)
+                                : groupFlights.reduce((sum, f) => sum + (f.passengers ? f.passengers.length : 0), 0);
                             // Prefer capacity directly from matched availability; otherwise try to re-match using map
                             let paxTotalDisplay = '-';
                             if (found && typeof found.capacity === 'number') {
