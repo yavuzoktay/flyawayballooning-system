@@ -344,12 +344,40 @@ const Manifest = () => {
     // flights'i location, flight_type ve flight time bazında grupla
     const groupBy = (arr, keyFn) => arr.reduce((acc, item) => {
         const key = keyFn(item);
-        if (!acc[key]) acc[key] = [];
-        acc[key].push(item);
+        (acc[key] = acc[key] || []).push(item);
         return acc;
     }, {});
 
-    const groupedFlights = groupBy(filteredFlights, f => `${f.location}||${f.flight_type}||${f.time_slot || (f.flight_date && f.flight_date.length >= 16 ? f.flight_date.substring(11,16) : '')}`);
+    // Normalize group key so the same activity/time collapses to a single section
+    const normalizeTime = (f) => {
+        const formatTime = (val) => {
+            try {
+                const raw = String(val ?? '').trim();
+                if (!raw) return '';
+                const parts = raw.split(':');
+                const hh = parts[0] ? parts[0].padStart(2, '0') : '00';
+                const mm = parts[1] ? parts[1].padStart(2, '0') : '00';
+                return `${hh}:${mm}`;
+            } catch (_) { return ''; }
+        };
+        try {
+            if (f.time_slot) return formatTime(f.time_slot);
+            if (f.flight_date && typeof f.flight_date === 'string') {
+                const t = f.flight_date.length >= 16 ? f.flight_date.substring(11,16) : f.flight_date;
+                return formatTime(t);
+            }
+        } catch (_) {}
+        return '';
+    };
+    const normalizeText = (v) => (v ? String(v).trim().toLowerCase() : '');
+
+    const groupedFlights = groupBy(filteredFlights, f => {
+        const loc = normalizeText(f.location);
+        const type = normalizeText(f.flight_type);
+        const time = normalizeTime(f);
+        const key = `${loc}||${type}||${time}`;
+        return key;
+    });
 
     const handleNameClick = (bookingId) => {
         setSelectedBookingId(bookingId);
@@ -1000,18 +1028,15 @@ const Manifest = () => {
     useEffect(() => {
         if (flights.length > 0 && activity.length > 0) {
             console.log('Flights or activity changed, checking for auto-status updates');
-            
-            // Group flights by location, flight_type, and time_slot
+            // Group flights by normalized location, type, and time
             const flightGroups = {};
             flights.forEach(flight => {
-                const key = `${flight.location}||${flight.flight_type}||${flight.time_slot || (flight.flight_date && flight.flight_date.length >= 16 ? flight.flight_date.substring(11,16) : '')}`;
-                if (!flightGroups[key]) {
-                    flightGroups[key] = [];
-                }
-                flightGroups[key].push(flight);
+                const loc = normalizeText(flight.location);
+                const type = normalizeText(flight.flight_type);
+                const time = normalizeTime(flight);
+                const key = `${loc}||${type}||${time}`;
+                (flightGroups[key] = flightGroups[key] || []).push(flight);
             });
-            
-            // Check each group and auto-update status if needed
             Object.values(flightGroups).forEach(groupFlights => {
                 if (groupFlights.length > 0) {
                     const firstFlight = groupFlights[0];
@@ -1025,18 +1050,15 @@ const Manifest = () => {
     useEffect(() => {
         if (availabilities.length > 0 && flights.length > 0) {
             console.log('Availabilities changed, checking for auto-status updates');
-            
-            // Group flights by location, flight_type, and time_slot
+            // Group flights by normalized location, type, and time
             const flightGroups = {};
             flights.forEach(flight => {
-                const key = `${flight.location}||${flight.flight_type}||${flight.time_slot || (flight.flight_date && flight.flight_date.length >= 16 ? flight.flight_date.substring(11,16) : '')}`;
-                if (!flightGroups[key]) {
-                    flightGroups[key] = [];
-                }
-                flightGroups[key].push(flight);
+                const loc = normalizeText(flight.location);
+                const type = normalizeText(flight.flight_type);
+                const time = normalizeTime(flight);
+                const key = `${loc}||${type}||${time}`;
+                (flightGroups[key] = flightGroups[key] || []).push(flight);
             });
-            
-            // Check each group and auto-update status if needed
             Object.values(flightGroups).forEach(groupFlights => {
                 if (groupFlights.length > 0) {
                     const firstFlight = groupFlights[0];
@@ -1231,6 +1253,14 @@ const Manifest = () => {
                                 }
                             }
                             
+                            // Compute total weight using passengers if present, otherwise fallback to booking weight
+                            const totalWeightDisplay = groupFlights.reduce((sum, f) => {
+                                const passengerWeight = Array.isArray(f.passengers) && f.passengers.length > 0
+                                    ? f.passengers.reduce((s, p) => s + (parseFloat(p.weight) || 0), 0)
+                                    : (parseFloat(f.weight) || 0);
+                                return sum + passengerWeight;
+                            }, 0);
+                            
                             // Auto-update status to Closed if Pax Booked equals capacity
                             if (status === "Closed" && paxBookedDisplay === paxTotalDisplay && paxTotalDisplay !== '-') {
                                 // Check if we need to update the database
@@ -1359,6 +1389,16 @@ const Manifest = () => {
                                                                         onClick={() => handleNameClick(flight.id)}>
                                                                         {firstPassenger ? `${firstPassenger.first_name || ''} ${firstPassenger.last_name || ''}`.trim() : (flight.name || '')}
                                                                     </span>
+                                                                    {/* Render additional guests under the main name */}
+                                                                    {Array.isArray(flight.passengers) && flight.passengers.length > 1 && (
+                                                                        <div style={{ marginTop: 4, fontSize: 12, color: '#555' }}>
+                                                                            {flight.passengers.slice(1).map((p, i) => (
+                                                                                <div key={`${flight.id}-p-${i+1}`}>
+                                                                                    {`${p.first_name || ''} ${p.last_name || ''}`.trim()} {p.weight ? `(${p.weight}kg)` : ''}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
                                                                 </TableCell>
                                                                 <TableCell>{firstPassenger ? firstPassenger.weight : ''}</TableCell>
                                                                 <TableCell>{flight.phone || ''}</TableCell>
@@ -1411,9 +1451,9 @@ const Manifest = () => {
                                                     {/* Move the summary row here, inside TableBody */}
                                                     <TableRow>
                                                         <TableCell colSpan={10} style={{ textAlign: 'right', fontWeight: 600, background: '#f5f5f5' }}>
-                                                            Total Price: £{groupFlights.reduce((sum, f) => sum + (parseFloat(f.paid) || 0), 0)} &nbsp;&nbsp;|
-                                                            Total Weight: {groupFlights.reduce((sum, f) => sum + (f.passengers ? f.passengers.reduce((s, p) => s + (parseFloat(p.weight) || 0), 0) : 0), 0)} kg &nbsp;&nbsp;|
-                                                            Total Pax: {groupFlights.reduce((sum, f) => sum + (f.passengers ? f.passengers.length : 0), 0)}
+                                                                                                            Total Price: £{groupFlights.reduce((sum, f) => sum + (parseFloat(f.paid) || 0), 0)} &nbsp;&nbsp;|
+                                                Total Weight: {totalWeightDisplay} kg &nbsp;&nbsp;|
+                                                Total Pax: {passengerCountDisplay}
                                                         </TableCell>
                                                     </TableRow>
                                                 </TableBody>
