@@ -47,7 +47,7 @@ app.use(cors({
         'http://flyawayballooning-system.com',
         'http://localhost:3000', 
         'http://localhost:3001',
-        'http://localhost:3003',
+        'http://localhost:3002',
         'http://localhost:3004',
         'http://localhost:3006',
         'http://34.205.25.8:3002'
@@ -2136,6 +2136,7 @@ app.post('/api/createBooking', (req, res) => {
                 voucher_code,
                 created_at,
                 expires,
+                manual_status_override,
                 additional_notes,
                 hear_about_us,
                 ballooning_reason,
@@ -2146,8 +2147,15 @@ app.post('/api/createBooking', (req, res) => {
                 choose_add_on,
                 preferred_location,
                 preferred_time,
-                preferred_day
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                preferred_day,
+                flight_attempts,
+                activity_id,
+                time_slot,
+                experience,
+                voucher_type,
+                voucher_discount,
+                original_amount
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         // Debug log for choose_add_on and bookingValues
@@ -2169,6 +2177,7 @@ app.post('/api/createBooking', (req, res) => {
             voucher_code || null,
             nowDate,
             expiresDateFinal,
+            0, // manual_status_override
             (additionalInfo && additionalInfo.notes) || null,
             (additionalInfo && additionalInfo.hearAboutUs) || null,
             (additionalInfo && additionalInfo.reason) || null,
@@ -2181,7 +2190,14 @@ app.post('/api/createBooking', (req, res) => {
             choose_add_on_str,
             preferred_location || null,
             preferred_time || null,
-            preferred_day || null
+            preferred_day || null,
+            flight_attempts || 0, // flight_attempts
+            req.body.activity_id || null, // activity_id
+            selectedTime || null, // time_slot
+            chooseFlightType.type, // experience
+            chooseFlightType.type, // voucher_type
+            0, // voucher_discount
+            totalPrice // original_amount
         ];
         console.log('bookingValues:', bookingValues);
 
@@ -4024,7 +4040,7 @@ const checkAndFixDuplicateAvailability = async () => {
 };
 
 // Start the server
-const PORT = process.env.PORT || 3003;
+const PORT = process.env.PORT || 3002;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
     
@@ -4046,24 +4062,71 @@ app.delete('/api/deleteBooking/:id', (req, res) => {
     const { id } = req.params;
     if (!id) return res.status(400).json({ success: false, message: 'Missing booking id' });
     
-    // Delete the booking (passengers will be deleted automatically due to ON DELETE CASCADE)
-    const sql = 'DELETE FROM all_booking WHERE id = ?';
-    con.query(sql, [id], (err, result) => {
+    // First get the booking details to know which time slot to restore
+    const getBookingSql = 'SELECT activity_id, flight_date FROM all_booking WHERE id = ?';
+    con.query(getBookingSql, [id], (err, bookingResult) => {
         if (err) {
-            console.error('Error deleting booking:', err);
+            console.error('Error getting booking details:', err);
             return res.status(500).json({ success: false, message: 'Database error' });
         }
         
-        if (result.affectedRows === 0) {
+        if (bookingResult.length === 0) {
             return res.status(404).json({ success: false, message: 'Booking not found' });
         }
         
-        // TODO: Restore availability for the specific time slot when booking is deleted
-        // This requires getting the booking details first to know which time slot to restore
-        // For now, we'll skip this to prevent incorrect availability updates
-        console.log('Booking deleted - availability restoration not yet implemented');
+        const booking = bookingResult[0];
         
-        res.json({ success: true, message: 'Booking deleted successfully' });
+        // Parse the flight_date to extract date and time
+        let bookingDate = null;
+        let bookingTime = null;
+        
+        if (booking.flight_date) {
+            if (typeof booking.flight_date === 'string' && booking.flight_date.includes(' ')) {
+                const parts = booking.flight_date.split(' ');
+                bookingDate = parts[0];
+                bookingTime = parts[1];
+            } else if (typeof booking.flight_date === 'string') {
+                bookingDate = booking.flight_date;
+                bookingTime = null;
+            }
+        }
+        
+        // Delete the booking (passengers will be deleted automatically due to ON DELETE CASCADE)
+        const deleteSql = 'DELETE FROM all_booking WHERE id = ?';
+        con.query(deleteSql, [id], (err, deleteResult) => {
+            if (err) {
+                console.error('Error deleting booking:', err);
+                return res.status(500).json({ success: false, message: 'Database error' });
+            }
+            
+            if (deleteResult.affectedRows === 0) {
+                return res.status(404).json({ success: false, message: 'Booking not found' });
+            }
+            
+            // Restore availability for the specific time slot if we have date and time
+            if (bookingDate && bookingTime && booking.activity_id) {
+                const restoreAvailabilitySql = `
+                    UPDATE activity_availability 
+                    SET available_seats = available_seats + 1 
+                    WHERE activity_id = ? AND date = ? AND time = ?
+                `;
+                
+                con.query(restoreAvailabilitySql, [booking.activity_id, bookingDate, bookingTime], (restoreErr) => {
+                    if (restoreErr) {
+                        console.error('Error restoring availability:', restoreErr);
+                        // Don't fail the delete operation if availability restoration fails
+                        console.warn('Availability restoration failed, but booking was deleted');
+                    } else {
+                        console.log('Availability restored for activity_id:', booking.activity_id, 'date:', bookingDate, 'time:', bookingTime);
+                    }
+                    
+                    res.json({ success: true, message: 'Booking deleted successfully and availability restored' });
+                });
+            } else {
+                console.log('No date/time information available for availability restoration');
+                res.json({ success: true, message: 'Booking deleted successfully (availability restoration skipped)' });
+            }
+        });
     });
 });
 
@@ -4158,10 +4221,11 @@ async function createBookingFromWebhook(bookingData) {
             const bookingSql = `
                 INSERT INTO all_booking (
                     name, flight_type, flight_date, pax, location, status, paid, due,
-                    voucher_code, created_at, expires, additional_notes, hear_about_us,
+                    voucher_code, created_at, expires, manual_status_override, additional_notes, hear_about_us,
                     ballooning_reason, prefer, weight, email, phone, choose_add_on,
-                    preferred_location, preferred_time, preferred_day, experience, voucher_type
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    preferred_location, preferred_time, preferred_day, flight_attempts,
+                    activity_id, time_slot, experience, voucher_type, voucher_discount, original_amount
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
 
             const bookingValues = [
@@ -4176,6 +4240,7 @@ async function createBookingFromWebhook(bookingData) {
                 voucher_code || null,
                 nowDate,
                 expiresDateFinal,
+                0, // manual_status_override
                 emptyToNull(additionalInfo?.notes),
                 emptyToNull(additionalInfo?.hearAboutUs),
                 emptyToNull(additionalInfo?.reason),
@@ -4187,9 +4252,14 @@ async function createBookingFromWebhook(bookingData) {
                 emptyToNull(preferred_location),
                 emptyToNull(preferred_time),
                 emptyToNull(preferred_day),
+                emptyToNull(flight_attempts) || 0, // flight_attempts
+                emptyToNull(bookingData?.activity_id), // activity_id
+                emptyToNull(selectedTime), // time_slot
                 chooseFlightType.type, // experience
                 // Persist the selected voucher type if provided from frontend
-                emptyToNull(bookingData?.voucher_type || bookingData?.selectedVoucherType?.title || 'Any Day Flight')
+                emptyToNull(bookingData?.voucher_type || bookingData?.selectedVoucherType?.title || 'Any Day Flight'), // voucher_type
+                0, // voucher_discount
+                totalPrice // original_amount
             ];
 
             con.query(bookingSql, bookingValues, (err, result) => {
