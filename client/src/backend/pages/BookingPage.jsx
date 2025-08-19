@@ -439,10 +439,10 @@ const BookingPage = () => {
             
             // Fetch updated passengers
             const res = await axios.get(`/api/getBookingDetail?booking_id=${selectedBookingId}`);
-            const updatedPassengers = res.data.passengers;
+            const updatedPassengers = res.data.passengers || [];
             
             // Recalculate prices
-            const paid = parseFloat(res.data.booking.paid) || 0;
+            const paid = parseFloat(res.data.booking?.paid) || 0;
             const n = updatedPassengers.length;
             const perPassenger = n > 0 ? parseFloat((paid / n).toFixed(2)) : 0;
             
@@ -455,17 +455,16 @@ const BookingPage = () => {
                 })
             ));
             
-            // Update the booking table with new pax count
-            if (lastUpdatedPax !== null) {
-                setBooking(prev => prev.map(b => 
-                    b.id === selectedBookingId ? { ...b, pax: lastUpdatedPax } : b
-                ));
-                setFilteredData(prev => prev.map(b => 
-                    b.id === selectedBookingId ? { ...b, pax: lastUpdatedPax } : b
-                ));
-            }
+            // Update the booking table with new pax count (use fresh count from fetched passengers)
+            const updatedPax = n;
+            setBooking(prev => prev.map(b => 
+                b.id === selectedBookingId ? { ...b, pax: updatedPax } : b
+            ));
+            setFilteredData(prev => prev.map(b => 
+                b.id === selectedBookingId ? { ...b, pax: updatedPax } : b
+            ));
             
-            // Refetch passengers to update UI
+            // Refetch passengers to update dialog UI
             await fetchPassengers(selectedBookingId);
             setAddGuestDialogOpen(false);
         } catch (error) {

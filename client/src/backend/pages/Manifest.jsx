@@ -966,6 +966,63 @@ const Manifest = () => {
       { firstName: '', lastName: '', phone: '', email: '', weight: '' }
     ]);
 
+    // Booking modal: Live Availability-like filters and calendar state
+    const [bookingSelectedFlightTypes, setBookingSelectedFlightTypes] = useState(['private', 'shared']);
+    const [bookingSelectedVoucherTypes, setBookingSelectedVoucherTypes] = useState(['weekday morning', 'flexible weekday', 'any day flight']);
+    const [bookingFilteredAvailabilities, setBookingFilteredAvailabilities] = useState([]);
+    const [calendarMonth, setCalendarMonth] = useState(dayjs().startOf('month'));
+
+    // Helper to get times for selected date from filtered list
+    const getBookingTimesForDate = (dateStr) => {
+      return bookingFilteredAvailabilities.filter(a => a.date === dateStr);
+    };
+
+    // Build day cells for calendar
+    const buildBookingDayCells = () => {
+      const cells = [];
+      const startOfMonth = calendarMonth.startOf('month');
+      const firstCellDate = startOfMonth.startOf('week');
+      for (let i = 0; i < 42; i++) {
+        const d = firstCellDate.add(i, 'day');
+        const inCurrentMonth = d.isSame(calendarMonth, 'month');
+        const isPast = d.isBefore(dayjs(), 'day');
+        const isSelected = bookingModalDate && dayjs(bookingModalDate).isSame(d, 'day');
+        const dateStr = d.format('YYYY-MM-DD');
+        const slots = getBookingTimesForDate(dateStr);
+        const totalAvailable = slots.reduce((acc, s) => acc + (Number(s.available) || 0), 0);
+        const soldOut = slots.length > 0 && totalAvailable <= 0;
+        const isSelectable = inCurrentMonth && !isPast && slots.length > 0 && !soldOut;
+        cells.push(
+          <div
+            key={dateStr}
+            onClick={() => isSelectable && (setBookingModalDate(dateStr), setBookingModalTimes(getBookingTimesForDate(dateStr)), setBookingModalSelectedTime(null), setBookingModalContactInfos([{ firstName: '', lastName: '', phone: '', email: '', weight: '' }]))}
+            style={{
+              width: 'calc((100% - 3px * 6) / 7)',
+              aspectRatio: '1 / 1',
+              borderRadius: 8,
+              background: isSelected ? '#56C1FF' : (isSelectable ? '#22c55e' : '#f0f0f0'),
+              color: isSelected ? '#fff' : (isSelectable ? '#fff' : '#999'),
+              display: inCurrentMonth ? 'flex' : 'none',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+              cursor: isSelectable ? 'pointer' : 'default',
+              userSelect: 'none',
+              fontSize: 12,
+              marginBottom: 3
+            }}
+          >
+            <div>{d.date()}</div>
+            <div style={{ fontSize: 9, fontWeight: 600 }}>
+              {slots.length === 0 ? '' : (soldOut ? 'Sold Out' : `${totalAvailable} Spaces`)}
+            </div>
+          </div>
+        );
+      }
+      return cells;
+    };
+
     // Reset contact info and selected time when modal opens or date changes
     useEffect(() => {
       if (!bookingModalOpen) {
@@ -999,7 +1056,14 @@ const Manifest = () => {
         const activity = res.data.activity;
         // Fetch only open availabilities for this activity
         const availRes = await axios.get(`/api/activity/${activity.id}/rebook-availabilities`);
-        setBookingAvailabilities(availRes.data.data || []);
+        const list = (availRes.data.data || []).map(a => ({
+          ...a,
+          date: dayjs(a.date).format('YYYY-MM-DD')
+        }));
+        setBookingAvailabilities(list);
+        if (list.length > 0) {
+          setCalendarMonth(dayjs(list[0].date).startOf('month'));
+        }
       } catch (err) {
         setBookingModalError("Failed to fetch availabilities");
       } finally {
@@ -1067,6 +1131,25 @@ const Manifest = () => {
             });
         }
     }, [availabilities, flights]);
+
+    useEffect(() => {
+      const normalizeType = (t) => t.replace(' Flight', '').trim().toLowerCase();
+      const selectedTypes = bookingSelectedFlightTypes.map(normalizeType);
+      const filtered = (bookingAvailabilities || []).filter((a) => {
+        if (a.status && a.status.toLowerCase() !== 'open') return false;
+        if (a.available !== undefined && a.available <= 0) return false;
+        const slotDateTime = dayjs(`${a.date} ${a.time}`);
+        if (slotDateTime.isBefore(dayjs())) return false;
+        if (!a.flight_types || a.flight_types.toLowerCase() === 'all') return true;
+        const typesArr = a.flight_types.split(',').map(normalizeType);
+        return selectedTypes.some((t) => typesArr.includes(t));
+      });
+      setBookingFilteredAvailabilities(filtered);
+      // Reset selections when data changes
+      setBookingModalDate(null);
+      setBookingModalTimes([]);
+      setBookingModalSelectedTime(null);
+    }, [bookingAvailabilities, bookingSelectedFlightTypes, bookingSelectedVoucherTypes]);
 
     return (
         <div className="final-menifest-wrap">
@@ -1890,7 +1973,7 @@ const Manifest = () => {
                 flightType={bookingDetail?.booking?.flight_type || ''}
             />
             {/* Booking Modal */}
-            <Dialog open={bookingModalOpen} onClose={() => setBookingModalOpen(false)} maxWidth="md" fullWidth>
+            <Dialog open={bookingModalOpen} onClose={() => setBookingModalOpen(false)} maxWidth="sm" fullWidth>
               <DialogTitle style={{ fontWeight: 700, fontSize: 22 }}>
                 Create Booking<br/>{bookingModalGroup ? `${bookingModalGroup.location} - ${bookingModalGroup.flight_type}` : ''}
               </DialogTitle>
@@ -1917,37 +2000,52 @@ const Manifest = () => {
                             <Button variant="contained" color="primary" onClick={() => setBookingModalPax(p => p + 1)} sx={{ minWidth: 40, fontSize: 22, fontWeight: 700 }}>+</Button>
                           </Box>
                         </Box>
-                        {/* Calendar grid by date */}
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-                          {[...new Set(bookingAvailabilities.map(a => a.date))].map(date => (
-                            <Button
-                              key={date}
-                              variant={bookingModalDate === date ? 'contained' : 'outlined'}
-                              onClick={() => {
-                                setBookingModalDate(date);
-                                setBookingModalTimes(bookingAvailabilities.filter(a => a.date === date));
-                                setBookingModalSelectedTime(null); // reset time selection on date change
-                                setBookingModalContactInfos([{ firstName: '', lastName: '', phone: '', email: '', weight: '' }]);
-                              }}
-                              sx={{ minWidth: 90, mb: 1 }}
-                            >
-                              {dayjs(date).isValid() ? dayjs(date).format('DD/MM/YYYY') : date}
-                            </Button>
-                          ))}
+
+                        {/* Flight Type and Voucher Type filters */}
+                        <Box sx={{ mb: 2 }}>
+                          <Typography sx={{ fontWeight: 700, mb: 1 }}>Flight Type:</Typography>
+                          <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                            <Button variant={bookingSelectedFlightTypes.includes('private') ? 'contained' : 'outlined'} onClick={() => setBookingSelectedFlightTypes(prev => prev.includes('private') ? prev.filter(t => t !== 'private') : [...prev, 'private'])}>Private</Button>
+                            <Button variant={bookingSelectedFlightTypes.includes('shared') ? 'contained' : 'outlined'} onClick={() => setBookingSelectedFlightTypes(prev => prev.includes('shared') ? prev.filter(t => t !== 'shared') : [...prev, 'shared'])}>Shared</Button>
+                          </Box>
+                          <Typography sx={{ fontWeight: 700, mb: 1 }}>Voucher Type:</Typography>
+                          <Box sx={{ display: 'flex', gap: 2 }}>
+                            <Button variant={bookingSelectedVoucherTypes.includes('weekday morning') ? 'contained' : 'outlined'} onClick={() => setBookingSelectedVoucherTypes(prev => prev.includes('weekday morning') ? prev.filter(t => t !== 'weekday morning') : [...prev, 'weekday morning'])}>Weekday Morning</Button>
+                            <Button variant={bookingSelectedVoucherTypes.includes('flexible weekday') ? 'contained' : 'outlined'} onClick={() => setBookingSelectedVoucherTypes(prev => prev.includes('flexible weekday') ? prev.filter(t => t !== 'flexible weekday') : [...prev, 'flexible weekday'])}>Flexible Weekday</Button>
+                            <Button variant={bookingSelectedVoucherTypes.includes('any day flight') ? 'contained' : 'outlined'} onClick={() => setBookingSelectedVoucherTypes(prev => prev.includes('any day flight') ? prev.filter(t => t !== 'any day flight') : [...prev, 'any day flight'])}>Any Day Flight</Button>
+                          </Box>
                         </Box>
+
+                        {/* Live Availability style calendar grid */}
+                        <Box sx={{ mb: 2 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                            <Button size="small" onClick={() => setCalendarMonth(prev => prev.subtract(1, 'month'))}>{'<'}</Button>
+                            <Typography variant="h6" sx={{ fontWeight: 700 }}>{calendarMonth.format('MMMM YYYY')}</Typography>
+                            <Button size="small" onClick={() => setCalendarMonth(prev => prev.add(1, 'month'))}>{'>'}</Button>
+                          </Box>
+                          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '3px', mb: 1 }}>
+                            {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(w => (
+                              <div key={w} style={{ textAlign: 'center', fontWeight: 700, color: '#64748b', fontSize: 11 }}>{w}</div>
+                            ))}
+                          </Box>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                            {buildBookingDayCells()}
+                          </div>
+                        </Box>
+
                         {/* Time slots for selected date */}
                         {bookingModalDate && (
                           <Box>
-                            <Typography variant="h6">Times for {dayjs(bookingModalDate).isValid() ? dayjs(bookingModalDate).format('DD/MM/YYYY') : bookingModalDate}</Typography>
+                            <Typography variant="h6">Times for {dayjs(bookingModalDate).format('DD/MM/YYYY')}</Typography>
                             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-                              {bookingModalTimes.map(slot => (
+                              {getBookingTimesForDate(bookingModalDate).map(slot => (
                                 <Button
                                   key={slot.id}
                                   variant={bookingModalSelectedTime && bookingModalSelectedTime.id === slot.id ? 'contained' : 'outlined'}
                                   sx={{ minWidth: 120, mb: 1 }}
                                   onClick={() => setBookingModalSelectedTime(slot)}
                                 >
-                                  {slot.time} {slot.status === 'Open' ? '' : '(Full)'}
+                                  {slot.time} ({slot.available}/{slot.capacity})
                                 </Button>
                               ))}
                             </Box>

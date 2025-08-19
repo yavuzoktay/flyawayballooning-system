@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, CircularProgress, FormControl, InputLabel, Select, MenuItem, Box, Checkbox, FormControlLabel, FormGroup } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, CircularProgress, FormControl, InputLabel, Select, MenuItem, Box, Checkbox, FormControlLabel, FormGroup, IconButton } from '@mui/material';
 import dayjs from 'dayjs';
 import axios from 'axios';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
 const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flightType, onFlightTypesChange, onVoucherTypesChange }) => {
     const [availabilities, setAvailabilities] = useState([]);
@@ -26,6 +28,9 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
     const [availableDates, setAvailableDates] = useState([]);
     const [filteredAvailabilities, setFilteredAvailabilities] = useState([]);
 
+    // Calendar state (Live Availability style)
+    const [currentMonth, setCurrentMonth] = useState(dayjs().startOf('month'));
+
     // Load activities and locations on modal open
     useEffect(() => {
         if (open) {
@@ -36,11 +41,9 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                         setActivities(res.data.data);
                         const uniqueLocations = [...new Set(res.data.data.map(a => a.location))];
                         setLocations(uniqueLocations.map(loc => ({ location: loc })));
-                        // Varsayılan olarak prop ile gelen activity/location seçili olsun
                         if (location) {
                             setSelectedLocation(location);
                         }
-                        // Eğer activityId prop ile gelirse, activity_name'i bulup seç
                         if (location && res.data.data.length > 0) {
                             const found = res.data.data.find(a => a.location === location);
                             if (found) {
@@ -64,6 +67,13 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
     // Fetch availabilities (sadece activity/location değişince)
     useEffect(() => {
         if (selectedActivity && selectedLocation) {
+            // Reset previous state to avoid stale calendar when changing activity/location
+            setAvailabilities([]);
+            setFilteredAvailabilities([]);
+            setAvailableDates([]);
+            setSelectedDate(null);
+            setSelectedTime(null);
+
             setLoading(true);
             setError(null);
             const activity = activities.find(a => a.activity_name === selectedActivity && a.location === selectedLocation);
@@ -72,13 +82,16 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                 axios.get(`/api/activity/${activity.id}/availabilities`)
                     .then(res => {
                         if (res.data.success) {
-                            setAvailabilities(res.data.data);
-                            // Initialize flight types based on activity data
+                            const data = Array.isArray(res.data.data) ? res.data.data : [];
+                            setAvailabilities(data);
                             const flightTypes = ['private', 'shared'];
                             setSelectedFlightTypes(flightTypes);
-                            // Initialize voucher types
                             const voucherTypes = ['weekday morning', 'flexible weekday', 'any day flight'];
                             setSelectedVoucherTypes(voucherTypes);
+                            const firstDate = data?.[0]?.date;
+                            if (firstDate) setCurrentMonth(dayjs(firstDate).startOf('month'));
+                        } else {
+                            setAvailabilities([]);
                         }
                     })
                     .catch(() => setError('Could not fetch availabilities'))
@@ -89,7 +102,14 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
 
     // Flight type değişince sadece filtrele
     useEffect(() => {
-        if (selectedFlightTypes.length === 0 || availabilities.length === 0) return;
+        // If no flight types selected, clear
+        if (selectedFlightTypes.length === 0) {
+            setFilteredAvailabilities([]);
+            setAvailableDates([]);
+            setSelectedDate(null);
+            setSelectedTime(null);
+            return;
+        }
 
         const normalizeType = t => t.replace(' Flight', '').trim().toLowerCase();
         const selectedTypes = selectedFlightTypes.map(t => normalizeType(t));
@@ -97,16 +117,12 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         const filtered = availabilities.filter(a => {
             if (a.status && a.status.toLowerCase() !== 'open') return false;
             if (a.available !== undefined && a.available <= 0) return false;
-            // Filter out past dates and times
             const slotDateTime = dayjs(`${a.date} ${a.time}`);
             if (slotDateTime.isBefore(dayjs())) return false;
             if (!a.flight_types || a.flight_types.toLowerCase() === 'all') return true;
-            // Her bir flight_types'ı normalize et ve includes ile kontrol et
             const typesArr = a.flight_types.split(',').map(t => normalizeType(t));
             return selectedTypes.some(selectedType => typesArr.includes(selectedType));
         });
- 
-        console.log('DEBUG: selectedFlightTypes:', selectedFlightTypes, 'availabilities:', availabilities, 'filtered:', filtered);
  
         setFilteredAvailabilities(filtered);
         setSelectedDate(null);
@@ -136,15 +152,63 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
 
     const getTimesForDate = (date) => {
         const dateStr = dayjs(date).format('YYYY-MM-DD');
-        console.log('Looking for times for date:', dateStr);
-        
         const times = filteredAvailabilities.filter(a => a.date === dateStr);
-        console.log('Found times for date', dateStr, ':', times);
         return times;
     };
 
+    // Live Availability helpers
+    const monthLabel = currentMonth.format('MMMM YYYY');
+    const startOfMonth = currentMonth.startOf('month');
+    const endOfMonth = currentMonth.endOf('month');
+    const startDay = startOfMonth.day(); // 0-6 (Sun-Sat)
+
+    const buildDayCells = () => {
+        const cells = [];
+        // Create a 6-week grid (42 cells)
+        const firstCellDate = startOfMonth.startOf('week');
+        for (let i = 0; i < 42; i++) {
+            const d = firstCellDate.add(i, 'day');
+            const inCurrentMonth = d.isSame(currentMonth, 'month');
+            const isPast = d.isBefore(dayjs(), 'day');
+            const isSelected = selectedDate && dayjs(selectedDate).isSame(d, 'day');
+            // Aggregate availability for this date
+            const slots = filteredAvailabilities.filter(a => a.date === d.format('YYYY-MM-DD'));
+            const totalAvailable = slots.reduce((acc, s) => acc + (Number(s.available) || 0), 0);
+            const soldOut = slots.length > 0 && totalAvailable <= 0;
+            const isSelectable = inCurrentMonth && !isPast && slots.length > 0 && !soldOut;
+
+            cells.push(
+                <div
+                    key={d.format('YYYY-MM-DD')}
+                    onClick={() => isSelectable && (setSelectedDate(d.toDate()), setSelectedTime(null))}
+                    style={{
+                        width: 'calc((100% - 4px * 6) / 7)',
+                        aspectRatio: '1 / 1',
+                        borderRadius: 10,
+                        background: isSelected ? '#56C1FF' : (isSelectable ? '#22c55e' : '#f0f0f0'),
+                        color: isSelected ? '#fff' : (isSelectable ? '#fff' : '#999'),
+                        display: inCurrentMonth ? 'flex' : 'none',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 700,
+                        cursor: isSelectable ? 'pointer' : 'default',
+                        userSelect: 'none',
+                        fontSize: 14
+                    }}
+                >
+                    <div>{d.date()}</div>
+                    <div style={{ fontSize: 10, fontWeight: 600 }}>
+                        {slots.length === 0 ? '' : (soldOut ? 'Sold Out' : `${totalAvailable} Spaces`)}
+                    </div>
+                </div>
+            );
+        }
+        return cells;
+    };
+
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
             <DialogTitle>Rebook - Select New Activity, Location, Date & Time</DialogTitle>
             <DialogContent>
                 {loadingActivities ? (
@@ -164,10 +228,10 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                         onChange={(e) => {
                                             const activityName = e.target.value;
                                             setSelectedActivity(activityName);
-                                            // Find the activity and auto-select its location
                                             const activity = activities.find(a => a.activity_name === activityName);
                                             if (activity) {
                                                 setSelectedLocation(activity.location);
+                                                setCurrentMonth(dayjs().startOf('month'));
                                             }
                                         }}
                                         label="Activity"
@@ -188,7 +252,6 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                         disabled={selectedActivity === ''}
                                     >
                                         {selectedActivity ? 
-                                            // Show only locations for selected activity
                                             activities
                                                 .filter(a => a.activity_name === selectedActivity)
                                                 .map((activity) => (
@@ -197,7 +260,6 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                     </MenuItem>
                                                 ))
                                             : 
-                                            // Show all locations when no activity selected
                                             locations.map((loc) => (
                                                 <MenuItem key={loc.location} value={loc.location}>
                                                     {loc.location}
@@ -308,39 +370,23 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                     <Typography color="error">{error}</Typography>
                                 ) : (
                                     <>
-                                        <Typography variant="subtitle1" sx={{ mb: 2 }}>Select a date:</Typography>
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-                                            {availableDates.length === 0 ? (
-                                                <Typography color="text.secondary">No available dates. Lütfen seçtiğiniz aktivite, lokasyon ve uçuş tipi için uygun uçuş ekleyin veya filtreleri kontrol edin.</Typography>
-                                            ) : (
-                                                availableDates.map(dateStr => {
-                                                    const d = dayjs(dateStr, 'YYYY-MM-DD');
-                                                    const isSelected = selectedDate && dayjs(selectedDate).isSame(d, 'day');
-                                                    const isPastDate = d.isBefore(dayjs(), 'day');
-                                                    const hasAvailableTimes = getTimesForDate(d.toDate()).some(slot => {
-                                                        const slotDateTime = dayjs(`${dateStr} ${slot.time}`);
-                                                        return slotDateTime.isAfter(dayjs()) && slot.available > 0;
-                                                    });
-                                                    const isDisabled = isPastDate || !hasAvailableTimes;
-                                                    return (
-                                                        <Button
-                                                            key={dateStr}
-                                                            variant={isSelected ? 'contained' : 'outlined'}
-                                                            onClick={() => !isDisabled && setSelectedDate(d.toDate())}
-                                                            disabled={isDisabled}
-                                                            sx={{
-                                                                opacity: isDisabled ? 0.5 : 1,
-                                                                backgroundColor: isDisabled ? '#f5f5f5' : 'inherit',
-                                                                color: isDisabled ? '#999' : 'inherit',
-                                                                cursor: isDisabled ? 'not-allowed' : 'pointer'
-                                                            }}
-                                                        >
-                                                            {d.format('DD/MM/YYYY')}
-                                                        </Button>
-                                                    );
-                                                })
-                                            )}
-                                        </div>
+                                        {/* Live Availability style calendar */}
+                                        <Box sx={{ mb: 2 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                                                <IconButton onClick={() => setCurrentMonth(prev => prev.subtract(1, 'month'))} size="small"><ChevronLeftIcon fontSize="small" /></IconButton>
+                                                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 18 }}>{monthLabel}</Typography>
+                                                <IconButton onClick={() => setCurrentMonth(prev => prev.add(1, 'month'))} size="small"><ChevronRightIcon fontSize="small" /></IconButton>
+                                            </Box>
+                                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', mb: 1 }}>
+                                                {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(w => (
+                                                    <div key={w} style={{ textAlign: 'center', fontWeight: 700, color: '#64748b', fontSize: 12 }}>{w}</div>
+                                                ))}
+                                            </Box>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                                {buildDayCells()}
+                                            </div>
+                                        </Box>
+
                                         {selectedDate && (
                                             <>
                                                 <Typography variant="subtitle1" sx={{ mb: 1 }}>Available Times for {dayjs(selectedDate).format('DD/MM/YYYY')}:</Typography>
@@ -348,12 +394,6 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                     {getTimesForDate(selectedDate).length === 0 && (
                                                         <Box>
                                                             <Typography color="text.secondary">No available times</Typography>
-                                                            <Typography variant="caption" color="text.secondary">
-                                                                Debug: Selected date: {dayjs(selectedDate).format('YYYY-MM-DD')}
-                                                            </Typography>
-                                                            <Typography variant="caption" color="text.secondary">
-                                                                Total availabilities: {availabilities.length}
-                                                            </Typography>
                                                         </Box>
                                                     )}
                                                     {getTimesForDate(selectedDate).map(slot => {
@@ -394,12 +434,10 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                 <Button onClick={onClose}>Cancel</Button>
                 <Button
                     onClick={() => {
-                        console.log('Confirming slot with activityId:', activityId);
                         onSlotSelect(selectedDate, selectedTime, activityId, selectedActivity, selectedLocation, selectedFlightTypes, selectedVoucherTypes);
                     }}
                     disabled={!selectedDate || !selectedTime || !selectedActivity || !selectedLocation}
                     variant="contained"
-                    color="primary"
                 >
                     Confirm
                 </Button>
