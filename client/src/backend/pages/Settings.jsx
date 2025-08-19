@@ -38,8 +38,6 @@ const Settings = () => {
         description: '',
         image_url: '',
         image_file: null,
-        price_from: '',
-        price_unit: 'pp',
         max_passengers: 8,
         sort_order: 0,
         is_active: true
@@ -55,8 +53,6 @@ const Settings = () => {
         description: '',
         image_url: '',
         image_file: null,
-        price_per_person: '',
-        price_unit: 'pp',
         max_passengers: 8,
         validity_months: 18,
         flight_days: 'Monday - Friday',
@@ -252,8 +248,8 @@ const Settings = () => {
         e.preventDefault();
         
         // Form validation
-        if (!experienceFormData.title || !experienceFormData.description || !experienceFormData.price_from) {
-            alert('Please fill in all required fields: Title, Description, and Price From');
+        if (!experienceFormData.title || !experienceFormData.description) {
+            alert('Please fill in all required fields: Title and Description');
             return;
         }
         
@@ -262,8 +258,6 @@ const Settings = () => {
             const formData = new FormData();
             formData.append('title', experienceFormData.title);
             formData.append('description', experienceFormData.description);
-            formData.append('price_from', experienceFormData.price_from);
-            formData.append('price_unit', experienceFormData.price_unit);
             formData.append('max_passengers', experienceFormData.max_passengers);
             formData.append('sort_order', experienceFormData.sort_order);
             formData.append('is_active', experienceFormData.is_active);
@@ -303,8 +297,6 @@ const Settings = () => {
             description: experience.description,
             image_url: experience.image_url || '',
             image_file: null,
-            price_from: experience.price_from,
-            price_unit: experience.price_unit || 'pp',
             max_passengers: experience.max_passengers || 8,
             sort_order: experience.sort_order || 0,
             is_active: experience.is_active
@@ -330,8 +322,6 @@ const Settings = () => {
             description: '',
             image_url: '',
             image_file: null,
-            price_from: '',
-            price_unit: 'pp',
             max_passengers: 8,
             sort_order: 0,
             is_active: true
@@ -385,8 +375,8 @@ const Settings = () => {
         e.preventDefault();
         
         // Form validation
-        if (!voucherTypeFormData.title || !voucherTypeFormData.description || !voucherTypeFormData.price_per_person) {
-            alert('Please fill in all required fields: Title, Description, and Price Per Person');
+        if (!voucherTypeFormData.title || !voucherTypeFormData.description) {
+            alert('Please fill in all required fields: Title and Description');
             return;
         }
         
@@ -395,8 +385,6 @@ const Settings = () => {
             const formData = new FormData();
             formData.append('title', voucherTypeFormData.title);
             formData.append('description', voucherTypeFormData.description);
-            formData.append('price_per_person', voucherTypeFormData.price_per_person);
-            formData.append('price_unit', voucherTypeFormData.price_unit);
             formData.append('max_passengers', voucherTypeFormData.max_passengers);
             formData.append('validity_months', voucherTypeFormData.validity_months);
             formData.append('flight_days', voucherTypeFormData.flight_days);
@@ -441,8 +429,6 @@ const Settings = () => {
             description: voucherType.description,
             image_url: voucherType.image_url || '',
             image_file: null,
-            price_per_person: voucherType.price_per_person,
-            price_unit: voucherType.price_unit || 'pp',
             max_passengers: voucherType.max_passengers || 8,
             validity_months: voucherType.validity_months || 18,
             flight_days: voucherType.flight_days || 'Monday - Friday',
@@ -473,8 +459,6 @@ const Settings = () => {
             description: '',
             image_url: '',
             image_file: null,
-            price_per_person: '',
-            price_unit: 'pp',
             max_passengers: 8,
             validity_months: 18,
             flight_days: 'Monday - Friday',
@@ -1202,7 +1186,6 @@ const Settings = () => {
                                             <tr>
                                                 <th>TITLE</th>
                                                 <th>DESCRIPTION</th>
-                                                <th>PRICE</th>
                                                 <th>MAX PASSENGERS</th>
                                                 <th>STATUS</th>
                                                 <th>ACTIONS</th>
@@ -1238,14 +1221,6 @@ const Settings = () => {
                                                     <td>
                                                         <div style={{ maxWidth: '300px', fontSize: '14px' }}>
                                                             {experience.description}
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        <div style={{ fontWeight: '600' }}>
-                                                            £{experience.price_from}
-                                                            <span style={{ fontSize: '12px', color: '#6b7280', marginLeft: '4px' }}>
-                                                                {experience.price_unit}
-                                                            </span>
                                                         </div>
                                                     </td>
                                                     <td>{experience.max_passengers}</td>
@@ -1584,7 +1559,6 @@ const Settings = () => {
                                         <tr>
                                             <th>TITLE</th>
                                             <th>DESCRIPTION</th>
-                                            <th>PRICE</th>
                                             <th>FLIGHT DAYS</th>
                                             <th>FLIGHT TIME</th>
                                             <th>VALIDITY</th>
@@ -1622,14 +1596,6 @@ const Settings = () => {
                                                 <td>
                                                     <div style={{ maxWidth: '300px', fontSize: '14px' }}>
                                                         {voucherType.description}
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div style={{ fontWeight: '600' }}>
-                                                        £{voucherType.price_per_person}
-                                                        <span style={{ fontSize: '12px', color: '#6b7280', marginLeft: '4px' }}>
-                                                            {voucherType.price_unit}
-                                                        </span>
                                                     </div>
                                                 </td>
                                                 <td>{voucherType.flight_days}</td>
@@ -2235,31 +2201,6 @@ const Settings = () => {
                                 </div>
                                 
                                 <div className="form-group">
-                                    <label>Price From (£) *</label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        value={experienceFormData.price_from}
-                                        onChange={(e) => setExperienceFormData({...experienceFormData, price_from: e.target.value})}
-                                        placeholder="180.00"
-                                        required
-                                    />
-                                </div>
-                            </div>
-                            
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Price Unit</label>
-                                    <select
-                                        value={experienceFormData.price_unit}
-                                        onChange={(e) => setExperienceFormData({...experienceFormData, price_unit: e.target.value})}
-                                    >
-                                        <option value="pp">Per Person (pp)</option>
-                                        <option value="total">Total</option>
-                                    </select>
-                                </div>
-                                
-                                <div className="form-group">
                                     <label>Max Passengers</label>
                                     <input
                                         type="number"
@@ -2377,13 +2318,12 @@ const Settings = () => {
                                 </div>
                                 
                                 <div className="form-group">
-                                    <label>Price Per Person *</label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        value={voucherTypeFormData.price_per_person}
-                                        onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, price_per_person: e.target.value})}
-                                        placeholder="e.g., 180.00"
+                                    <label>Description *</label>
+                                    <textarea
+                                        value={voucherTypeFormData.description}
+                                        onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, description: e.target.value})}
+                                        placeholder="Detailed description of the voucher type..."
+                                        rows="3"
                                         required
                                     />
                                 </div>
@@ -2391,23 +2331,23 @@ const Settings = () => {
                             
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label>Price Unit</label>
-                                    <select
-                                        value={voucherTypeFormData.price_unit}
-                                        onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, price_unit: e.target.value})}
-                                    >
-                                        <option value="pp">Per Person (pp)</option>
-                                        <option value="total">Total</option>
-                                    </select>
-                                </div>
-                                
-                                <div className="form-group">
                                     <label>Max Passengers</label>
                                     <input
                                         type="number"
                                         value={voucherTypeFormData.max_passengers}
                                         onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, max_passengers: e.target.value})}
                                         placeholder="8"
+                                        min="1"
+                                    />
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label>Validity (Months)</label>
+                                    <input
+                                        type="number"
+                                        value={voucherTypeFormData.validity_months}
+                                        onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, validity_months: e.target.value})}
+                                        placeholder="18"
                                         min="1"
                                     />
                                 </div>
@@ -2439,17 +2379,6 @@ const Settings = () => {
                             
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label>Validity (Months)</label>
-                                    <input
-                                        type="number"
-                                        value={voucherTypeFormData.validity_months}
-                                        onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, validity_months: e.target.value})}
-                                        placeholder="18"
-                                        min="1"
-                                    />
-                                </div>
-                                
-                                <div className="form-group">
                                     <label>Sort Order</label>
                                     <input
                                         type="number"
@@ -2459,17 +2388,17 @@ const Settings = () => {
                                         min="0"
                                     />
                                 </div>
-                            </div>
-                            
-                            <div className="form-group">
-                                <label>Description *</label>
-                                <textarea
-                                    value={voucherTypeFormData.description}
-                                    onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, description: e.target.value})}
-                                    placeholder="Detailed description of the voucher type..."
-                                    rows="3"
-                                    required
-                                />
+                                
+                                <div className="form-group">
+                                    <label>Status</label>
+                                    <select
+                                        value={voucherTypeFormData.is_active}
+                                        onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, is_active: e.target.value === 'true'})}
+                                    >
+                                        <option value={true}>Active</option>
+                                        <option value={false}>Inactive</option>
+                                    </select>
+                                </div>
                             </div>
                             
                             <div className="form-group">
@@ -2504,17 +2433,6 @@ const Settings = () => {
                                         Current image: {voucherTypeFormData.image_url}
                                     </div>
                                 )}
-                            </div>
-                            
-                            <div className="form-group">
-                                <label>Status</label>
-                                <select
-                                    value={voucherTypeFormData.is_active}
-                                    onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, is_active: e.target.value === 'true'})}
-                                >
-                                    <option value={true}>Active</option>
-                                    <option value={false}>Inactive</option>
-                                </select>
                             </div>
                             
                             <div className="form-actions">

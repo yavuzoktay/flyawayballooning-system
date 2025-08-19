@@ -632,15 +632,14 @@ app.post('/api/experiences', experiencesUpload.single('experience_image'), (req,
     const {
         title,
         description,
-        price_from,
-        price_unit,
         max_passengers,
-        sort_order
+        sort_order,
+        is_active
     } = req.body;
     
     // Validation
-    if (!title || !description || !price_from) {
-        return res.status(400).json({ success: false, message: 'Missing required fields: title, description, and price_from' });
+    if (!title || !description) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: title and description' });
     }
     
     // Handle image upload
@@ -651,19 +650,17 @@ app.post('/api/experiences', experiencesUpload.single('experience_image'), (req,
     
     const sql = `
         INSERT INTO experiences (
-            title, description, image_url, price_from, price_unit, 
-            max_passengers, sort_order
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            title, description, image_url, max_passengers, sort_order, is_active
+        ) VALUES (?, ?, ?, ?, ?, ?)
     `;
     
     const values = [
         title,
         description,
         image_url,
-        price_from,
-        price_unit || 'pp',
         max_passengers || 8,
-        sort_order || 0
+        sort_order || 0,
+        is_active !== undefined ? is_active : true
     ];
     
     con.query(sql, values, (err, result) => {
@@ -687,16 +684,14 @@ app.put('/api/experiences/:id', experiencesUpload.single('experience_image'), (r
     const {
         title,
         description,
-        price_from,
-        price_unit,
         max_passengers,
         sort_order,
         is_active
     } = req.body;
     
     // Validation
-    if (!title || !description || !price_from) {
-        return res.status(400).json({ success: false, message: 'Missing required fields: title, description, and price_from' });
+    if (!title || !description) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: title and description' });
     }
     
     // Handle image upload
@@ -707,8 +702,7 @@ app.put('/api/experiences/:id', experiencesUpload.single('experience_image'), (r
     
     const sql = `
         UPDATE experiences SET 
-            title = ?, description = ?, image_url = ?, price_from = ?, 
-            price_unit = ?, max_passengers = ?, sort_order = ?, is_active = ?
+            title = ?, description = ?, image_url = ?, max_passengers = ?, sort_order = ?, is_active = ?
         WHERE id = ?
     `;
     
@@ -716,8 +710,6 @@ app.put('/api/experiences/:id', experiencesUpload.single('experience_image'), (r
         title,
         description,
         image_url,
-        price_from,
-        price_unit || 'pp',
         max_passengers || 8,
         sort_order || 0,
         is_active !== undefined ? is_active : true,
@@ -5060,6 +5052,50 @@ const runDatabaseMigrations = () => {
             });
         } else {
             console.log('✅ Unique constraint already exists on activity_availability');
+        }
+    });
+
+    // Ensure experiences table has applicable_locations column
+    const checkExpApplicableLocations = "SHOW COLUMNS FROM experiences LIKE 'applicable_locations'";
+    con.query(checkExpApplicableLocations, (err, result) => {
+        if (err) {
+            console.error('Error checking experiences.applicable_locations column:', err);
+            return;
+        }
+        if (result.length === 0) {
+            console.log('Adding applicable_locations column to experiences...');
+            const addExpApplicableLocations = "ALTER TABLE experiences ADD COLUMN applicable_locations TEXT NULL COMMENT 'Comma-separated list of allowed locations for this experience'";
+            con.query(addExpApplicableLocations, (err) => {
+                if (err) {
+                    console.error('Error adding applicable_locations column:', err);
+                } else {
+                    console.log('✅ applicable_locations column added to experiences');
+                }
+            });
+        } else {
+            console.log('✅ experiences.applicable_locations column already exists');
+        }
+    });
+
+    // Remove price columns from experiences table since pricing now comes from activities
+    const checkExpPriceColumns = "SHOW COLUMNS FROM experiences LIKE 'price_from'";
+    con.query(checkExpPriceColumns, (err, result) => {
+        if (err) {
+            console.error('Error checking experiences.price_from column:', err);
+            return;
+        }
+        if (result.length > 0) {
+            console.log('Removing price columns from experiences table...');
+            const removePriceColumns = "ALTER TABLE experiences DROP COLUMN price_from, DROP COLUMN price_unit";
+            con.query(removePriceColumns, (err) => {
+                if (err) {
+                    console.error('Error removing price columns:', err);
+                } else {
+                    console.log('✅ price_from and price_unit columns removed from experiences');
+                }
+            });
+        } else {
+            console.log('✅ experiences price columns already removed');
         }
     });
 };
