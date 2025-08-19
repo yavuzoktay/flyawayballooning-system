@@ -230,6 +230,7 @@ CREATE TABLE IF NOT EXISTS add_to_booking_items (
     stock_quantity INT DEFAULT 0 COMMENT 'Available stock quantity (0 = unlimited)',
     is_physical_item BOOLEAN DEFAULT TRUE COMMENT 'Whether this is a physical item that needs shipping',
     weight_grams INT DEFAULT 0 COMMENT 'Item weight in grams (for shipping calculations)',
+    journey_types JSON DEFAULT '["Book Flight", "Flight Voucher", "Redeem Voucher", "Buy Gift"]' COMMENT 'JSON array of applicable journey types',
     sort_order INT DEFAULT 0 COMMENT 'Sort order for display',
     is_active BOOLEAN DEFAULT TRUE COMMENT 'Whether this item is active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -240,6 +241,12 @@ CREATE TABLE IF NOT EXISTS add_to_booking_items (
     INDEX idx_is_active (is_active),
     INDEX idx_sort_order (sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Additional items that can be added to bookings';
+
+-- Add journey_types column to existing add_to_booking_items table if it doesn't exist
+ALTER TABLE add_to_booking_items ADD COLUMN IF NOT EXISTS journey_types JSON DEFAULT '["Book Flight", "Flight Voucher", "Redeem Voucher", "Buy Gift"]' COMMENT 'JSON array of applicable journey types';
+
+-- Update existing records to have default journey types
+UPDATE add_to_booking_items SET journey_types = '["Book Flight", "Flight Voucher", "Redeem Voucher", "Buy Gift"]' WHERE journey_types IS NULL;
 
 -- Örnek add to booking items ekleme
 INSERT INTO add_to_booking_items (title, description, price, price_unit, category, stock_quantity, is_physical_item, weight_grams, sort_order, is_active) VALUES
@@ -258,6 +265,7 @@ CREATE TABLE IF NOT EXISTS additional_information_questions (
     placeholder_text VARCHAR(255) DEFAULT NULL COMMENT 'Placeholder text for text inputs',
     help_text VARCHAR(500) DEFAULT NULL COMMENT 'Additional help text below the question',
     category VARCHAR(100) DEFAULT 'General' COMMENT 'Question category for grouping',
+    journey_types JSON DEFAULT '["Book Flight", "Flight Voucher", "Redeem Voucher", "Buy Gift"]' COMMENT 'JSON array of applicable journey types',
     sort_order INT DEFAULT 0 COMMENT 'Sort order for display',
     is_active BOOLEAN DEFAULT TRUE COMMENT 'Whether this question is active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -268,6 +276,12 @@ CREATE TABLE IF NOT EXISTS additional_information_questions (
     INDEX idx_is_active (is_active),
     INDEX idx_sort_order (sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Additional information questions for booking forms';
+
+-- Add journey_types column to existing additional_information_questions table if it doesn't exist
+ALTER TABLE additional_information_questions ADD COLUMN IF NOT EXISTS journey_types JSON DEFAULT '["Book Flight", "Flight Voucher", "Redeem Voucher", "Buy Gift"]' COMMENT 'JSON array of applicable journey types';
+
+-- Update existing records to have default journey types
+UPDATE additional_information_questions SET journey_types = '["Book Flight", "Flight Voucher", "Redeem Voucher", "Buy Gift"]' WHERE journey_types IS NULL;
 
 -- Örnek additional information questions ekleme
 INSERT INTO additional_information_questions (question_text, question_type, is_required, options, placeholder_text, help_text, category, sort_order, is_active) VALUES

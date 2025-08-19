@@ -966,6 +966,7 @@ app.post('/api/add-to-booking-items', experiencesUpload.single('add_to_booking_i
         stock_quantity,
         is_physical_item,
         weight_grams,
+        journey_types,
         sort_order,
         is_active
     } = req.body;
@@ -984,8 +985,8 @@ app.post('/api/add-to-booking-items', experiencesUpload.single('add_to_booking_i
     const sql = `
         INSERT INTO add_to_booking_items (
             title, description, image_url, price, price_unit, category,
-            stock_quantity, is_physical_item, weight_grams, sort_order, is_active
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            stock_quantity, is_physical_item, weight_grams, journey_types, sort_order, is_active
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     
     const values = [
@@ -996,10 +997,11 @@ app.post('/api/add-to-booking-items', experiencesUpload.single('add_to_booking_i
         price_unit || 'fixed',
         category || 'Merchandise',
         stock_quantity || 0,
-        is_physical_item !== undefined ? is_physical_item : true,
+        is_physical_item !== undefined ? (is_physical_item === 'true' || is_physical_item === true) : true,
         weight_grams || 0,
+        journey_types || JSON.stringify(['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift']),
         sort_order || 0,
-        is_active !== undefined ? is_active : true
+        is_active !== undefined ? (is_active === 'true' || is_active === true) : true
     ];
     
     con.query(sql, values, (err, result) => {
@@ -1028,9 +1030,28 @@ app.put('/api/add-to-booking-items/:id', experiencesUpload.single('add_to_bookin
         stock_quantity,
         is_physical_item,
         weight_grams,
+        journey_types,
         sort_order,
         is_active
     } = req.body;
+    
+    // Debug: Log received values
+    console.log('PUT /api/add-to-booking-items/:id - Received data:', {
+        id,
+        title,
+        description,
+        price,
+        price_unit,
+        category,
+        stock_quantity,
+        is_physical_item,
+        weight_grams,
+        journey_types,
+        sort_order,
+        is_active,
+        is_active_type: typeof is_active,
+        is_active_value: is_active
+    });
     
     // Validation
     if (!title || !description || !price) {
@@ -1047,7 +1068,7 @@ app.put('/api/add-to-booking-items/:id', experiencesUpload.single('add_to_bookin
         UPDATE add_to_booking_items SET 
             title = ?, description = ?, image_url = ?, price = ?, 
             price_unit = ?, category = ?, stock_quantity = ?, is_physical_item = ?,
-            weight_grams = ?, sort_order = ?, is_active = ?
+            weight_grams = ?, journey_types = ?, sort_order = ?, is_active = ?
         WHERE id = ?
     `;
     
@@ -1059,12 +1080,17 @@ app.put('/api/add-to-booking-items/:id', experiencesUpload.single('add_to_bookin
         price_unit || 'fixed',
         category || 'Merchandise',
         stock_quantity || 0,
-        is_physical_item !== undefined ? is_physical_item : true,
+        is_physical_item !== undefined ? (is_physical_item === 'true' || is_physical_item === true) : true,
         weight_grams || 0,
+        journey_types || JSON.stringify(['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift']),
         sort_order || 0,
-        is_active !== undefined ? is_active : true,
+        is_active !== undefined ? (is_active === 'true' || is_active === true) : true,
         id
     ];
+    
+    // Debug: Log SQL values
+    console.log('SQL values being sent:', values);
+    console.log('is_active value in SQL:', is_active !== undefined ? (is_active === 'true' || is_active === true) : true);
     
     con.query(sql, values, (err, result) => {
         if (err) {
@@ -1136,6 +1162,7 @@ app.post('/api/additional-information-questions', (req, res) => {
         placeholder_text,
         help_text,
         category,
+        journey_types,
         sort_order,
         is_active
     } = req.body;
@@ -1148,8 +1175,8 @@ app.post('/api/additional-information-questions', (req, res) => {
     const sql = `
         INSERT INTO additional_information_questions (
             question_text, question_type, is_required, options,
-            placeholder_text, help_text, category, sort_order, is_active
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            placeholder_text, help_text, category, journey_types, sort_order, is_active
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     
     const values = [
@@ -1160,9 +1187,14 @@ app.post('/api/additional-information-questions', (req, res) => {
         placeholder_text || null,
         help_text || null,
         category || 'General',
+        Array.isArray(journey_types) ? JSON.stringify(journey_types) : (journey_types || JSON.stringify(['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'])),
         sort_order || 0,
         is_active !== undefined ? is_active : true
     ];
+    
+    // Debug: Log SQL values
+    console.log('SQL values being sent:', values);
+    console.log('journey_types value in SQL:', Array.isArray(journey_types) ? JSON.stringify(journey_types) : (journey_types || JSON.stringify(['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'])));
     
     con.query(sql, values, (err, result) => {
         if (err) {
@@ -1189,9 +1221,27 @@ app.put('/api/additional-information-questions/:id', (req, res) => {
         placeholder_text,
         help_text,
         category,
+        journey_types,
         sort_order,
         is_active
     } = req.body;
+    
+    // Debug: Log received values
+    console.log('PUT /api/additional-information-questions/:id - Received data:', {
+        id,
+        question_text,
+        question_type,
+        is_required,
+        options,
+        placeholder_text,
+        help_text,
+        category,
+        journey_types,
+        journey_types_type: typeof journey_types,
+        journey_types_isArray: Array.isArray(journey_types),
+        sort_order,
+        is_active
+    });
     
     // Validation
     if (!question_text || !question_type) {
@@ -1201,7 +1251,7 @@ app.put('/api/additional-information-questions/:id', (req, res) => {
     const sql = `
         UPDATE additional_information_questions SET 
             question_text = ?, question_type = ?, is_required = ?, options = ?,
-            placeholder_text = ?, help_text = ?, category = ?, sort_order = ?, is_active = ?
+            placeholder_text = ?, help_text = ?, category = ?, journey_types = ?, sort_order = ?, is_active = ?
         WHERE id = ?
     `;
     
@@ -1213,10 +1263,15 @@ app.put('/api/additional-information-questions/:id', (req, res) => {
         placeholder_text || null,
         help_text || null,
         category || 'General',
+        Array.isArray(journey_types) ? JSON.stringify(journey_types) : (journey_types || JSON.stringify(['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'])),
         sort_order || 0,
         is_active !== undefined ? is_active : true,
         id
     ];
+    
+    // Debug: Log SQL values
+    console.log('SQL values being sent:', values);
+    console.log('journey_types value in SQL:', Array.isArray(journey_types) ? JSON.stringify(journey_types) : (journey_types || JSON.stringify(['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'])));
     
     con.query(sql, values, (err, result) => {
         if (err) {

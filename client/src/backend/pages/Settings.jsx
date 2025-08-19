@@ -79,6 +79,7 @@ const Settings = () => {
         stock_quantity: 0,
         is_physical_item: true,
         weight_grams: 0,
+        journey_types: ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'],
         sort_order: 0,
         is_active: true
     });
@@ -96,6 +97,7 @@ const Settings = () => {
         placeholder_text: '',
         help_text: '',
         category: 'General',
+        journey_types: ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'],
         sort_order: 0,
         is_active: true
     });
@@ -136,6 +138,7 @@ const Settings = () => {
     const locations = ['Somerset', 'United Kingdom'];
     const experienceTypes = ['Shared Flight', 'Private Charter'];
     const voucherTypeOptions = ['Weekday Morning', 'Flexible Weekday', 'Any Day Flight'];
+    const journeyTypes = ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'];
 
     useEffect(() => {
         fetchVoucherCodes();
@@ -188,6 +191,7 @@ const Settings = () => {
         try {
             const response = await axios.get('/api/add-to-booking-items');
             if (response.data.success) {
+                console.log('Fetched add to booking items:', response.data.data);
                 setAddToBookingItems(response.data.data);
             }
         } catch (error) {
@@ -481,6 +485,11 @@ const Settings = () => {
             return;
         }
         
+        if (addToBookingFormData.journey_types.length === 0) {
+            alert('Please select at least one journey type');
+            return;
+        }
+        
         try {
             // Create FormData for file upload
             const formData = new FormData();
@@ -492,8 +501,30 @@ const Settings = () => {
             formData.append('stock_quantity', addToBookingFormData.stock_quantity);
             formData.append('is_physical_item', addToBookingFormData.is_physical_item);
             formData.append('weight_grams', addToBookingFormData.weight_grams);
+            formData.append('journey_types', JSON.stringify(addToBookingFormData.journey_types));
             formData.append('sort_order', addToBookingFormData.sort_order);
             formData.append('is_active', addToBookingFormData.is_active);
+            
+            // Debug: Log the form data being sent
+            console.log('Form data being sent:', {
+                title: addToBookingFormData.title,
+                description: addToBookingFormData.description,
+                price: addToBookingFormData.price,
+                price_unit: addToBookingFormData.price_unit,
+                category: addToBookingFormData.category,
+                stock_quantity: addToBookingFormData.stock_quantity,
+                is_physical_item: addToBookingFormData.is_physical_item,
+                weight_grams: addToBookingFormData.weight_grams,
+                journey_types: addToBookingFormData.journey_types,
+                sort_order: addToBookingFormData.sort_order,
+                is_active: addToBookingFormData.is_active
+            });
+            
+            // Debug: Log FormData entries
+            console.log('FormData entries:');
+            for (let [key, value] of formData.entries()) {
+                console.log(`${key}: ${value} (type: ${typeof value})`);
+            }
             
             // Add image file if selected
             if (addToBookingFormData.image_file) {
@@ -525,6 +556,35 @@ const Settings = () => {
 
     const handleEditAddToBookingItem = (item) => {
         setSelectedAddToBookingItem(item);
+        
+        // Safely parse journey_types - handle both JSON and string formats
+        let parsedJourneyTypes = ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'];
+        if (item.journey_types) {
+            try {
+                // If it's already an array, use it directly
+                if (Array.isArray(item.journey_types)) {
+                    parsedJourneyTypes = item.journey_types;
+                } else if (typeof item.journey_types === 'string') {
+                    // Try to parse as JSON first
+                    try {
+                        parsedJourneyTypes = JSON.parse(item.journey_types);
+                    } catch (parseError) {
+                        // If JSON parsing fails, try to split by comma
+                        if (item.journey_types.includes(',')) {
+                            parsedJourneyTypes = item.journey_types.split(',').map(type => type.trim());
+                        } else {
+                            // Single value, wrap in array
+                            parsedJourneyTypes = [item.journey_types.trim()];
+                        }
+                    }
+                }
+            } catch (error) {
+                console.warn('Error parsing journey_types:', error);
+                // Fallback to default
+                parsedJourneyTypes = ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'];
+            }
+        }
+        
         setAddToBookingFormData({
             title: item.title,
             description: item.description,
@@ -534,10 +594,11 @@ const Settings = () => {
             price_unit: item.price_unit || 'fixed',
             category: item.category || 'Merchandise',
             stock_quantity: item.stock_quantity || 0,
-            is_physical_item: item.is_physical_item,
+            is_physical_item: Boolean(item.is_physical_item),
             weight_grams: item.weight_grams || 0,
+            journey_types: parsedJourneyTypes,
             sort_order: item.sort_order || 0,
-            is_active: item.is_active
+            is_active: Boolean(item.is_active)
         });
         setShowEditAddToBookingForm(true);
     };
@@ -566,6 +627,7 @@ const Settings = () => {
             stock_quantity: 0,
             is_physical_item: true,
             weight_grams: 0,
+            journey_types: ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'],
             sort_order: 0,
             is_active: true
         });
@@ -582,7 +644,18 @@ const Settings = () => {
             return;
         }
         
+        if (additionalInfoFormData.journey_types.length === 0) {
+            alert('Please select at least one journey type');
+            return;
+        }
+        
         try {
+            // Debug: Log the form data being sent
+            console.log('Additional info form data being sent:', additionalInfoFormData);
+            console.log('journey_types being sent:', additionalInfoFormData.journey_types);
+            console.log('journey_types type:', typeof additionalInfoFormData.journey_types);
+            console.log('journey_types isArray:', Array.isArray(additionalInfoFormData.journey_types));
+            
             if (showEditAdditionalInfoForm) {
                 await axios.put(`/api/additional-information-questions/${selectedAdditionalInfoQuestion.id}`, additionalInfoFormData);
             } else {
@@ -601,6 +674,35 @@ const Settings = () => {
 
     const handleEditAdditionalInfoQuestion = (question) => {
         setSelectedAdditionalInfoQuestion(question);
+        
+        // Safely parse journey_types - handle both JSON and string formats
+        let parsedJourneyTypes = ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'];
+        if (question.journey_types) {
+            try {
+                // If it's already an array, use it directly
+                if (Array.isArray(question.journey_types)) {
+                    parsedJourneyTypes = question.journey_types;
+                } else if (typeof question.journey_types === 'string') {
+                    // Try to parse as JSON first
+                    try {
+                        parsedJourneyTypes = JSON.parse(question.journey_types);
+                    } catch (parseError) {
+                        // If JSON parsing fails, try to split by comma
+                        if (question.journey_types.includes(',')) {
+                            parsedJourneyTypes = question.journey_types.split(',').map(type => type.trim());
+                        } else {
+                            // Single value, wrap in array
+                            parsedJourneyTypes = [question.journey_types.trim()];
+                        }
+                    }
+                }
+            } catch (error) {
+                console.warn('Error parsing journey_types:', error);
+                // Fallback to default
+                parsedJourneyTypes = ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'];
+            }
+        }
+        
         setAdditionalInfoFormData({
             question_text: question.question_text,
             question_type: question.question_type,
@@ -609,6 +711,7 @@ const Settings = () => {
             placeholder_text: question.placeholder_text || '',
             help_text: question.help_text || '',
             category: question.category || 'General',
+            journey_types: parsedJourneyTypes,
             sort_order: question.sort_order || 0,
             is_active: question.is_active
         });
@@ -636,6 +739,7 @@ const Settings = () => {
             placeholder_text: '',
             help_text: '',
             category: 'General',
+            journey_types: ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'],
             sort_order: 0,
             is_active: true
         });
@@ -1361,6 +1465,7 @@ const Settings = () => {
                                             <th>DESCRIPTION</th>
                                             <th>PRICE</th>
                                             <th>CATEGORY</th>
+                                            <th>JOURNEY TYPES</th>
                                             <th>STOCK</th>
                                             <th>WEIGHT</th>
                                             <th>STATUS</th>
@@ -1420,6 +1525,50 @@ const Settings = () => {
                                                     </span>
                                                 </td>
                                                 <td>
+                                                    {item.journey_types ? (
+                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                                            {(() => {
+                                                                let journeyTypes = [];
+                                                                try {
+                                                                    if (Array.isArray(item.journey_types)) {
+                                                                        journeyTypes = item.journey_types;
+                                                                    } else if (typeof item.journey_types === 'string') {
+                                                                        try {
+                                                                            journeyTypes = JSON.parse(item.journey_types);
+                                                                        } catch (parseError) {
+                                                                            if (item.journey_types.includes(',')) {
+                                                                                journeyTypes = item.journey_types.split(',').map(type => type.trim());
+                                                                            } else {
+                                                                                journeyTypes = [item.journey_types.trim()];
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                } catch (error) {
+                                                                    console.warn('Error parsing journey_types for display:', error);
+                                                                    journeyTypes = ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'];
+                                                                }
+                                                                
+                                                                return journeyTypes.map((journeyType) => (
+                                                                    <span key={journeyType} style={{
+                                                                        padding: '2px 8px',
+                                                                        borderRadius: '12px',
+                                                                        fontSize: '11px',
+                                                                        backgroundColor: '#dbeafe',
+                                                                        color: '#1e40af'
+                                                                    }}>
+                                                                        {journeyType}
+                                                                    </span>
+                                                                ));
+                                                            })()}
+                                                        </div>
+                                                    ) : (
+                                                        <span style={{ color: '#9ca3af', fontSize: '12px' }}>
+                                                            {item.journey_types === undefined || item.journey_types === null ? 
+                                                                'Not set' : 'No journey types'}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td>
                                                     {item.stock_quantity === 0 ? (
                                                         <span style={{ color: '#10b981', fontSize: '12px' }}>Unlimited</span>
                                                     ) : (
@@ -1437,6 +1586,10 @@ const Settings = () => {
                                                     ) : (
                                                         <span className="status-badge inactive">Inactive</span>
                                                     )}
+                                                    {/* Debug: Show raw value */}
+                                                    <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '2px' }}>
+                                                        Raw: {item.is_active} (type: {typeof item.is_active})
+                                                    </div>
                                                 </td>
                                                 <td>
                                                     <div className="action-buttons">
@@ -1453,6 +1606,49 @@ const Settings = () => {
                                                             title="Delete"
                                                         >
                                                             <Trash2 size={16} />
+                                                        </button>
+                                                        {/* Test button to toggle status */}
+                                                        <button
+                                                            className="btn btn-sm"
+                                                            onClick={async () => {
+                                                                try {
+                                                                    const newStatus = !item.is_active;
+                                                                    console.log(`Toggling status for item ${item.id} from ${item.is_active} to ${newStatus}`);
+                                                                    
+                                                                    const formData = new FormData();
+                                                                    formData.append('title', item.title);
+                                                                    formData.append('description', item.description);
+                                                                    formData.append('price', item.price);
+                                                                    formData.append('price_unit', item.price_unit || 'fixed');
+                                                                    formData.append('category', item.category || 'Merchandise');
+                                                                    formData.append('stock_quantity', item.stock_quantity || 0);
+                                                                    formData.append('is_physical_item', item.is_physical_item);
+                                                                    formData.append('weight_grams', item.weight_grams || 0);
+                                                                    formData.append('journey_types', item.journey_types ? JSON.stringify(item.journey_types) : JSON.stringify(['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift']));
+                                                                    formData.append('sort_order', item.sort_order || 0);
+                                                                    formData.append('is_active', newStatus);
+                                                                    
+                                                                    await axios.put(`/api/add-to-booking-items/${item.id}`, formData, {
+                                                                        headers: { 'Content-Type': 'multipart/form-data' }
+                                                                    });
+                                                                    
+                                                                    fetchAddToBookingItems();
+                                                                } catch (error) {
+                                                                    console.error('Error toggling status:', error);
+                                                                    alert('Error toggling status');
+                                                                }
+                                                            }}
+                                                            style={{ 
+                                                                fontSize: '10px', 
+                                                                padding: '2px 6px',
+                                                                backgroundColor: item.is_active ? '#ef4444' : '#10b981',
+                                                                color: 'white',
+                                                                border: 'none',
+                                                                borderRadius: '4px',
+                                                                cursor: 'pointer'
+                                                            }}
+                                                        >
+                                                            {item.is_active ? 'Deactivate' : 'Activate'}
                                                         </button>
                                                     </div>
                                                 </td>
@@ -1743,6 +1939,7 @@ const Settings = () => {
                                             <th>TYPE</th>
                                             <th>OPTIONS</th>
                                             <th>CATEGORY</th>
+                                            <th>JOURNEY TYPES</th>
                                             <th>REQUIRED</th>
                                             <th>HELP TEXT</th>
                                             <th>STATUS</th>
@@ -1803,6 +2000,50 @@ const Settings = () => {
                                                     }}>
                                                         {question.category}
                                                     </span>
+                                                </td>
+                                                <td>
+                                                    {question.journey_types ? (
+                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                                            {(() => {
+                                                                let journeyTypes = [];
+                                                                try {
+                                                                    if (Array.isArray(question.journey_types)) {
+                                                                        journeyTypes = question.journey_types;
+                                                                    } else if (typeof question.journey_types === 'string') {
+                                                                        try {
+                                                                            journeyTypes = JSON.parse(question.journey_types);
+                                                                        } catch (parseError) {
+                                                                            if (question.journey_types.includes(',')) {
+                                                                                journeyTypes = question.journey_types.split(',').map(type => type.trim());
+                                                                            } else {
+                                                                                journeyTypes = [question.journey_types.trim()];
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                } catch (error) {
+                                                                    console.warn('Error parsing journey_types for display:', error);
+                                                                    journeyTypes = ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'];
+                                                                }
+                                                                
+                                                                return journeyTypes.map((journeyType) => (
+                                                                    <span key={journeyType} style={{
+                                                                        padding: '2px 8px',
+                                                                        borderRadius: '12px',
+                                                                        fontSize: '11px',
+                                                                        backgroundColor: '#dbeafe',
+                                                                        color: '#1e40af'
+                                                                    }}>
+                                                                        {journeyType}
+                                                                    </span>
+                                                                ));
+                                                            })()}
+                                                        </div>
+                                                    ) : (
+                                                        <span style={{ color: '#9ca3af', fontSize: '12px' }}>
+                                                            {question.journey_types === undefined || question.journey_types === null ? 
+                                                                'Not set' : 'No journey types'}
+                                                        </span>
+                                                    )}
                                                 </td>
                                                 <td>
                                                     {question.is_required ? (
@@ -2549,6 +2790,53 @@ const Settings = () => {
                                 </div>
                             </div>
                             
+                            <div className="form-group">
+                                <label>Journey Types *</label>
+                                <div style={{ 
+                                    border: '1px solid #d1d5db', 
+                                    borderRadius: '8px', 
+                                    padding: '16px',
+                                    background: '#f9fafb'
+                                }}>
+                                    <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
+                                        Select which journey types this question applies to:
+                                    </div>
+                                    {journeyTypes.map((journeyType) => (
+                                        <label key={journeyType} style={{ 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            marginBottom: '8px',
+                                            cursor: 'pointer'
+                                        }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={additionalInfoFormData.journey_types.includes(journeyType)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setAdditionalInfoFormData({
+                                                            ...additionalInfoFormData,
+                                                            journey_types: [...additionalInfoFormData.journey_types, journeyType]
+                                                        });
+                                                    } else {
+                                                        setAdditionalInfoFormData({
+                                                            ...additionalInfoFormData,
+                                                            journey_types: additionalInfoFormData.journey_types.filter(type => type !== journeyType)
+                                                        });
+                                                    }
+                                                }}
+                                                style={{ marginRight: '8px' }}
+                                            />
+                                            <span style={{ fontSize: '14px', color: '#374151' }}>{journeyType}</span>
+                                        </label>
+                                    ))}
+                                    {additionalInfoFormData.journey_types.length === 0 && (
+                                        <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '8px' }}>
+                                            Please select at least one journey type.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            
                             {(additionalInfoFormData.question_type === 'dropdown' || additionalInfoFormData.question_type === 'radio' || additionalInfoFormData.question_type === 'checkbox') && (
                                 <div className="form-group">
                                     <label>Options (JSON array)</label>
@@ -2756,6 +3044,53 @@ const Settings = () => {
                                     <option value={true}>Active</option>
                                     <option value={false}>Inactive</option>
                                 </select>
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Journey Types *</label>
+                                <div style={{ 
+                                    border: '1px solid #d1d5db', 
+                                    borderRadius: '8px', 
+                                    padding: '16px',
+                                    background: '#f9fafb'
+                                }}>
+                                    <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
+                                        Select which journey types this item applies to:
+                                    </div>
+                                    {journeyTypes.map((journeyType) => (
+                                        <label key={journeyType} style={{ 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            marginBottom: '8px',
+                                            cursor: 'pointer'
+                                        }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={addToBookingFormData.journey_types.includes(journeyType)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setAddToBookingFormData({
+                                                            ...addToBookingFormData,
+                                                            journey_types: [...addToBookingFormData.journey_types, journeyType]
+                                                        });
+                                                    } else {
+                                                        setAddToBookingFormData({
+                                                            ...addToBookingFormData,
+                                                            journey_types: addToBookingFormData.journey_types.filter(type => type !== journeyType)
+                                                        });
+                                                    }
+                                                }}
+                                                style={{ marginRight: '8px' }}
+                                            />
+                                            <span style={{ fontSize: '14px', color: '#374151' }}>{journeyType}</span>
+                                        </label>
+                                    ))}
+                                    {addToBookingFormData.journey_types.length === 0 && (
+                                        <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '8px' }}>
+                                            Please select at least one journey type.
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                             
                             <div className="form-actions">
