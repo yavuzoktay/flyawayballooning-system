@@ -1210,6 +1210,36 @@ app.post('/api/additional-information-questions', (req, res) => {
     });
 });
 
+// Crew Management API Endpoints
+
+// Get all crew members
+app.get('/api/crew', (req, res) => {
+    const sql = 'SELECT * FROM crew ORDER BY last_name ASC, first_name ASC';
+    con.query(sql, (err, result) => {
+        if (err) {
+            console.error('Error fetching crew members:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        res.json({ success: true, data: result });
+    });
+});
+
+// Get crew member by ID
+app.get('/api/crew/:id', (req, res) => {
+    const { id } = req.params;
+    const sql = 'SELECT * FROM crew WHERE id = ?';
+    con.query(sql, [id], (err, result) => {
+        if (err) {
+            console.error('Error fetching crew member:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        if (result.length === 0) {
+            return res.status(404).json({ success: false, message: 'Crew member not found' });
+        }
+        res.json({ success: true, data: result[0] });
+    });
+});
+
 // Update additional information question
 app.put('/api/additional-information-questions/:id', (req, res) => {
     const { id } = req.params;
@@ -1309,6 +1339,102 @@ app.delete('/api/additional-information-questions/:id', (req, res) => {
         res.json({
             success: true,
             message: 'Additional information question deleted successfully'
+        });
+    });
+});
+
+// ==================== CREW MANAGEMENT API ENDPOINTS ====================
+
+// Create new crew member
+app.post('/api/crew', (req, res) => {
+    const { first_name, last_name, is_active } = req.body;
+    
+    // Validation
+    if (!first_name || !last_name) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: first_name and last_name' });
+    }
+    
+    const sql = 'INSERT INTO crew (first_name, last_name, is_active) VALUES (?, ?, ?)';
+    const values = [
+        first_name.trim(),
+        last_name.trim(),
+        is_active !== undefined ? is_active : true
+    ];
+    
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error creating crew member:', err);
+            if (err.code === 'ER_DUP_ENTRY') {
+                return res.status(400).json({ success: false, message: 'A crew member with this name already exists' });
+            }
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Crew member created successfully',
+            id: result.insertId
+        });
+    });
+});
+
+// Update crew member
+app.put('/api/crew/:id', (req, res) => {
+    const { id } = req.params;
+    const { first_name, last_name, is_active } = req.body;
+    
+    // Validation
+    if (!first_name || !last_name) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: first_name and last_name' });
+    }
+    
+    const sql = 'UPDATE crew SET first_name = ?, last_name = ?, is_active = ? WHERE id = ?';
+    const values = [
+        first_name.trim(),
+        last_name.trim(),
+        is_active !== undefined ? is_active : true,
+        id
+    ];
+    
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error updating crew member:', err);
+            if (err.code === 'ER_DUP_ENTRY') {
+                return res.status(400).json({ success: false, message: 'A crew member with this name already exists' });
+            }
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Crew member not found' });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Crew member updated successfully'
+        });
+    });
+});
+
+// Delete crew member
+app.delete('/api/crew/:id', (req, res) => {
+    const { id } = req.params;
+    
+    const sql = 'DELETE FROM crew WHERE id = ?';
+    
+    con.query(sql, [id], (err, result) => {
+        if (err) {
+            console.error('Error deleting crew member:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Crew member not found' });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Crew member deleted successfully'
         });
     });
 });
@@ -5393,6 +5519,126 @@ app.get('/api/debug/table-structure', (req, res) => {
     });
 });
 
+// Session status endpoint to avoid duplicate creation from client
+app.get('/api/session-status', (req, res) => {
+    const { session_id } = req.query;
+    if (!session_id) return res.status(400).json({ processed: false, message: 'session_id is required' });
+    const data = stripeSessionStore[session_id];
+    return res.json({ processed: !!(data && (data.processed || data.processing)), type: data?.type || null });
+});
+
+// Crew Assignment Migrations
+function runCrewAssignmentMigrations() {
+    const createAssignments = `
+        CREATE TABLE IF NOT EXISTS flight_crew_assignments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            activity_id INT NOT NULL,
+            date DATE NOT NULL,
+            time TIME NOT NULL,
+            crew_id INT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_slot (activity_id, date, time)
+        ) COMMENT 'Assigned crew per activity/date/time slot';
+    `;
+    con.query(createAssignments, (err) => {
+        if (err) {
+            console.error('Error creating flight_crew_assignments table:', err);
+        } else {
+            console.log('✅ flight_crew_assignments table ready');
+        }
+    });
+}
+runCrewAssignmentMigrations();
+
+// Get all crew assignments for a date
+app.get('/api/crew-assignments', (req, res) => {
+    const { date } = req.query;
+    if (!date) return res.status(400).json({ success: false, message: 'date is required (YYYY-MM-DD)' });
+    
+    console.log('Fetching crew assignments for date:', date);
+    
+    const sql = `
+        SELECT fca.*, c.first_name, c.last_name 
+        FROM flight_crew_assignments fca
+        JOIN crew c ON fca.crew_id = c.id
+        WHERE fca.date = ?
+        ORDER BY fca.time ASC
+    `;
+    
+    con.query(sql, [date], (err, result) => {
+        if (err) {
+            console.error('Error fetching crew assignments:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        console.log('Crew assignments found for date', date, ':', result);
+        res.json({ success: true, data: result });
+    });
+});
+
+// Upsert crew assignment for a slot
+app.post('/api/crew-assignment', (req, res) => {
+    const { activity_id, date, time, crew_id } = req.body;
+    if (!activity_id || !date || !time) {
+        return res.status(400).json({ success: false, message: 'activity_id, date, time are required' });
+    }
+    
+    console.log('Saving crew assignment:', { activity_id, date, time, crew_id });
+    
+    // If crew_id is null, delete the assignment
+    if (crew_id === null || crew_id === undefined) {
+        const deleteSql = 'DELETE FROM flight_crew_assignments WHERE activity_id = ? AND date = ? AND time = ?';
+        con.query(deleteSql, [activity_id, date, time], (err, result) => {
+            if (err) {
+                console.error('Error deleting crew assignment:', err);
+                return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+            }
+            console.log('Crew assignment deleted successfully:', result);
+            res.json({ 
+                success: true, 
+                message: 'Crew assignment cleared',
+                data: { activity_id, date, time, crew_id: null }
+            });
+        });
+        return;
+    }
+    
+    // Validate that the crew member exists
+    const validateCrewSql = 'SELECT id FROM crew WHERE id = ? AND is_active = 1';
+    con.query(validateCrewSql, [crew_id], (validateErr, validateResult) => {
+        if (validateErr) {
+            console.error('Error validating crew member:', validateErr);
+            return res.status(500).json({ success: false, message: 'Database error', error: validateErr.message });
+        }
+        
+        if (validateResult.length === 0) {
+            return res.status(400).json({ success: false, message: 'Invalid crew member ID' });
+        }
+        
+        const sql = `
+            INSERT INTO flight_crew_assignments (activity_id, date, time, crew_id)
+            VALUES (?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE crew_id = VALUES(crew_id), updated_at = CURRENT_TIMESTAMP
+        `;
+        
+        con.query(sql, [activity_id, date, time, crew_id], (err, result) => {
+            if (err) {
+                console.error('Error upserting crew assignment:', err);
+                return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+            }
+            console.log('Crew assignment saved successfully:', result);
+            
+            // Return the saved assignment data
+            res.json({ 
+                success: true, 
+                message: 'Crew assignment saved',
+                data: { activity_id, date, time, crew_id }
+            });
+        });
+    });
+});
+
 // Place this at the very end, after all API endpoints:
 app.use(express.static(path.join(__dirname, '../client/build')));
 
@@ -5401,10 +5647,63 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/build/index.html'));
 });
 
-// Session status endpoint to avoid duplicate creation from client
-app.get('/api/session-status', (req, res) => {
-    const { session_id } = req.query;
-    if (!session_id) return res.status(400).json({ processed: false, message: 'session_id is required' });
-    const data = stripeSessionStore[session_id];
-    return res.json({ processed: !!(data && (data.processed || data.processing)), type: data?.type || null });
+// Debug endpoint to check crew assignments table
+app.get('/api/debug/crew-assignments', (req, res) => {
+    const sql = "SHOW TABLES LIKE 'flight_crew_assignments'";
+    con.query(sql, (err, tables) => {
+        if (err) {
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        if (tables.length === 0) {
+            return res.json({ success: false, message: 'Table does not exist', tables: [] });
+        }
+        
+        // Check table structure
+        con.query("DESCRIBE flight_crew_assignments", (err, structure) => {
+            if (err) {
+                return res.status(500).json({ success: false, message: 'Error describing table', error: err.message });
+            }
+            
+            // Check if table has data
+            con.query("SELECT COUNT(*) as count FROM flight_crew_assignments", (err, countResult) => {
+                if (err) {
+                    return res.status(500).json({ success: false, message: 'Error counting records', error: err.message });
+                }
+                
+                res.json({ 
+                    success: true, 
+                    tableExists: true, 
+                    structure: structure,
+                    recordCount: countResult[0].count
+                });
+            });
+        });
+    });
+});
+
+// Test endpoint to insert a sample crew assignment
+app.post('/api/debug/crew-assignments/test', (req, res) => {
+    const testData = {
+        activity_id: 24, // Use a valid activity ID from your system
+        date: '2025-08-28',
+        time: '17:00:00',
+        crew_id: 1 // Use a valid crew ID from your system
+    };
+    
+    const sql = `
+        INSERT INTO flight_crew_assignments (activity_id, date, time, crew_id)
+        VALUES (?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE crew_id = VALUES(crew_id), updated_at = CURRENT_TIMESTAMP
+    `;
+    
+    con.query(sql, [testData.activity_id, testData.date, testData.time, testData.crew_id], (err, result) => {
+        if (err) {
+            console.error('Error inserting test crew assignment:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        console.log('Test crew assignment inserted:', result);
+        res.json({ success: true, message: 'Test crew assignment inserted', result });
+    });
 });

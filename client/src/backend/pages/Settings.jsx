@@ -101,6 +101,17 @@ const Settings = () => {
         sort_order: 0,
         is_active: true
     });
+
+    // Crew Management state
+    const [crewMembers, setCrewMembers] = useState([]);
+    const [showCrewForm, setShowCrewForm] = useState(false);
+    const [showEditCrewForm, setShowEditCrewForm] = useState(false);
+    const [selectedCrewMember, setSelectedCrewMember] = useState(null);
+    const [crewFormData, setCrewFormData] = useState({
+        first_name: '',
+        last_name: '',
+        is_active: true
+    });
     
     // Terms & Conditions state
     const [termsAndConditions, setTermsAndConditions] = useState([]);
@@ -120,6 +131,7 @@ const Settings = () => {
     const [experiencesExpanded, setExperiencesExpanded] = useState(false);
     const [voucherTypesExpanded, setVoucherTypesExpanded] = useState(false);
     const [addToBookingExpanded, setAddToBookingExpanded] = useState(false);
+    const [crewExpanded, setCrewExpanded] = useState(false);
     const [additionalInfoExpanded, setAdditionalInfoExpanded] = useState(false);
     const [termsExpanded, setTermsExpanded] = useState(false);
     
@@ -147,6 +159,7 @@ const Settings = () => {
         fetchAddToBookingItems();
         fetchAdditionalInfoQuestions();
         fetchTermsAndConditions();
+        fetchCrewMembers();
     }, []);
 
     const fetchVoucherCodes = async () => {
@@ -218,6 +231,17 @@ const Settings = () => {
             }
         } catch (error) {
             console.error('Error fetching terms and conditions:', error);
+        }
+    };
+
+    const fetchCrewMembers = async () => {
+        try {
+            const response = await axios.get('/api/crew');
+            if (response.data.success) {
+                setCrewMembers(response.data.data);
+            }
+        } catch (error) {
+            console.error('Error fetching crew members:', error);
         }
     };
 
@@ -473,6 +497,64 @@ const Settings = () => {
             is_active: true
         });
         setSelectedVoucherType(null);
+    };
+
+    // Crew Management form handling
+    const handleCrewSubmit = async (e) => {
+        e.preventDefault();
+        
+        // Form validation
+        if (!crewFormData.first_name || !crewFormData.last_name) {
+            alert('Please fill in all required fields: First Name and Last Name');
+            return;
+        }
+        
+        try {
+            if (showEditCrewForm) {
+                await axios.put(`/api/crew/${selectedCrewMember.id}`, crewFormData);
+            } else {
+                await axios.post('/api/crew', crewFormData);
+            }
+            
+            fetchCrewMembers();
+            resetCrewForm();
+            setShowCrewForm(false);
+            setShowEditCrewForm(false);
+        } catch (error) {
+            console.error('Error saving crew member:', error);
+            alert(error.response?.data?.message || 'Error saving crew member');
+        }
+    };
+
+    const handleEditCrew = (crewMember) => {
+        setSelectedCrewMember(crewMember);
+        setCrewFormData({
+            first_name: crewMember.first_name,
+            last_name: crewMember.last_name,
+            is_active: crewMember.is_active
+        });
+        setShowEditCrewForm(true);
+    };
+
+    const handleDeleteCrew = async (id) => {
+        if (window.confirm('Are you sure you want to delete this crew member?')) {
+            try {
+                await axios.delete(`/api/crew/${id}`);
+                fetchCrewMembers();
+            } catch (error) {
+                console.error('Error deleting crew member:', error);
+                alert(error.response?.data?.message || 'Error deleting crew member');
+            }
+        }
+    };
+
+    const resetCrewForm = () => {
+        setCrewFormData({
+            first_name: '',
+            last_name: '',
+            is_active: true
+        });
+        setSelectedCrewMember(null);
     };
 
     // Add to Booking Items form handling
@@ -1816,6 +1898,162 @@ const Settings = () => {
                                                         <button
                                                             className="btn btn-icon btn-danger"
                                                             onClick={() => handleDeleteVoucherType(voucherType.id)}
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+
+            {/* Crew Management Section */}
+            <div className="settings-card" style={{ marginBottom: '24px' }}>
+                <div 
+                    className="card-header"
+                    onClick={() => setCrewExpanded(!crewExpanded)}
+                    style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        padding: '20px',
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                    }}
+                >
+                    <div>
+                        <h2 style={{ margin: 0, color: '#1f2937' }}>Crew Management</h2>
+                        <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
+                            Manage balloon crew members for flight operations.
+                        </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button 
+                            className="btn btn-primary"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowCrewForm(true);
+                            }}
+                            style={{ margin: 0 }}
+                        >
+                            <Plus size={20} />
+                            Add Crew Member
+                        </button>
+                        {crewExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+                    </div>
+                </div>
+                
+                {crewExpanded && (
+                    <>
+                        <div className="crew-stats" style={{ 
+                            display: 'flex', 
+                            gap: '20px', 
+                            marginBottom: '20px',
+                            padding: '16px',
+                            background: '#f8fafc',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0'
+                        }}>
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#1f2937' }}>
+                                    {crewMembers.length}
+                                </div>
+                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Total Crew Members</div>
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#10b981' }}>
+                                    {crewMembers.filter(c => c.is_active).length}
+                                </div>
+                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Active</div>
+                            </div>
+                        </div>
+                        
+                        {crewMembers.length === 0 ? (
+                            <div className="no-crew-message">
+                                <div style={{ textAlign: 'center', padding: '40px' }}>
+                                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>👥</div>
+                                    <h3 style={{ color: '#6b7280', marginBottom: '8px' }}>No Crew Members Yet</h3>
+                                    <p style={{ color: '#9ca3af', marginBottom: '20px' }}>
+                                        Add your first crew member to manage balloon flight operations.
+                                    </p>
+                                    <button 
+                                        className="btn btn-primary"
+                                        onClick={() => setShowCrewForm(true)}
+                                    >
+                                        <Plus size={20} />
+                                        Add First Crew Member
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="crew-table-container" style={{ 
+                                width: '100%', 
+                                overflowX: 'auto',
+                                minHeight: '400px'
+                            }}>
+                                <table className="crew-table" style={{ width: '100%', tableLayout: 'fixed' }}>
+                                    <colgroup>
+                                        <col style={{ width: '40%' }} />
+                                        <col style={{ width: '15%' }} />
+                                        <col style={{ width: '20%' }} />
+                                        <col style={{ width: '25%' }} />
+                                    </colgroup>
+                                    <thead>
+                                        <tr>
+                                            <th style={{ textAlign: 'left' }}>NAME</th>
+                                            <th style={{ textAlign: 'left' }}>STATUS</th>
+                                            <th style={{ textAlign: 'left' }}>CREATED</th>
+                                            <th style={{ textAlign: 'left' }}>ACTIONS</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {crewMembers.map((crew) => (
+                                            <tr key={crew.id}>
+                                                <td>
+                                                    <div style={{ fontWeight: '500', color: '#1f2937' }}>
+                                                        {crew.first_name} {crew.last_name}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span style={{
+                                                        padding: '4px 8px',
+                                                        borderRadius: '12px',
+                                                        fontSize: '12px',
+                                                        fontWeight: '500',
+                                                        backgroundColor: crew.is_active ? '#dcfce7' : '#fef2f2',
+                                                        color: crew.is_active ? '#166534' : '#dc2626'
+                                                    }}>
+                                                        {crew.is_active ? 'Active' : 'Inactive'}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span style={{ color: '#6b7280', fontSize: '14px' }}>
+                                                        {new Date(crew.created_at).toLocaleDateString()}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                                        <button
+                                                            className="btn btn-secondary btn-sm"
+                                                            onClick={() => handleEditCrew(crew)}
+                                                            title="Edit"
+                                                        >
+                                                            <Edit size={16} />
+                                                        </button>
+                                                        <button
+                                                            className="btn btn-danger btn-sm"
+                                                            onClick={() => handleDeleteCrew(crew.id)}
                                                             title="Delete"
                                                         >
                                                             <Trash2 size={16} />
@@ -3230,6 +3468,77 @@ const Settings = () => {
                                 </button>
                                 <button type="submit" className="btn btn-primary">
                                     {showEditTermsForm ? 'Update Terms' : 'Create Terms'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Create/Edit Crew Form Modal */}
+            {(showCrewForm || showEditCrewForm) && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h3>{showEditCrewForm ? 'Edit Crew Member' : 'Add New Crew Member'}</h3>
+                            <button 
+                                className="close-btn"
+                                onClick={() => {
+                                    setShowCrewForm(false);
+                                    setShowEditCrewForm(false);
+                                    resetCrewForm();
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        
+                        <form onSubmit={handleCrewSubmit} className="crew-form">
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>First Name *</label>
+                                    <input
+                                        type="text"
+                                        value={crewFormData.first_name}
+                                        onChange={(e) => setCrewFormData({...crewFormData, first_name: e.target.value})}
+                                        placeholder="e.g., John"
+                                        required
+                                    />
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label>Last Name *</label>
+                                    <input
+                                        type="text"
+                                        value={crewFormData.last_name}
+                                        onChange={(e) => setCrewFormData({...crewFormData, last_name: e.target.value})}
+                                        placeholder="e.g., Smith"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Status</label>
+                                <select
+                                    value={crewFormData.is_active}
+                                    onChange={(e) => setCrewFormData({...crewFormData, is_active: e.target.value === 'true'})}
+                                >
+                                    <option value={true}>Active</option>
+                                    <option value={false}>Inactive</option>
+                                </select>
+                            </div>
+                            
+                            <div className="form-actions">
+                                <button type="button" className="btn btn-secondary" onClick={() => {
+                                    setShowCrewForm(false);
+                                    setShowEditCrewForm(false);
+                                    resetCrewForm();
+                                }}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn btn-primary">
+                                    {showEditCrewForm ? 'Update Crew Member' : 'Add Crew Member'}
                                 </button>
                             </div>
                         </form>

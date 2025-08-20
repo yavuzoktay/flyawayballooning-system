@@ -198,7 +198,31 @@ const Manifest = () => {
     }, [booking, passenger, bookingLoading, passengerLoading]);
 
     const handleDateChange = (e) => {
-        setSelectedDate(e.target.value);
+        const newDate = e.target.value;
+        console.log('Date changed to:', newDate);
+        setSelectedDate(newDate);
+        
+        // Clear crew assignments for the old date and fetch for the new date
+        setCrewAssignmentsBySlot({});
+        
+        // Fetch crew assignments for the new date
+        if (newDate) {
+            axios.get('/api/crew-assignments', { params: { date: newDate } })
+                .then(res => {
+                    if (res.data?.success && Array.isArray(res.data.data)) {
+                        const map = {};
+                        for (const row of res.data.data) {
+                            const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
+                            map[key] = row.crew_id;
+                        }
+                        console.log('Crew assignments loaded for new date:', map);
+                        setCrewAssignmentsBySlot(map);
+                    }
+                })
+                .catch((err) => {
+                    console.error('Error fetching crew assignments for new date:', err);
+                });
+        }
     };
 
     const handleMenuOpen = (event, flightId) => {
@@ -1151,6 +1175,233 @@ const Manifest = () => {
       setBookingModalSelectedTime(null);
     }, [bookingAvailabilities, bookingSelectedFlightTypes, bookingSelectedVoucherTypes]);
 
+    const [crewList, setCrewList] = useState([]);
+    const [crewAssignmentsBySlot, setCrewAssignmentsBySlot] = useState({}); // key: `${activityId}_${date}_${time}` => crew_id
+    const [crewNotification, setCrewNotification] = useState({ show: false, message: '', type: 'success' });
+
+    const slotKey = (activityId, date, time) => `${activityId}_${date}_${time}`;
+
+    const refreshCrewAssignments = async (date) => {
+        if (!date) return;
+        try {
+            console.log('Refreshing crew assignments for date:', date);
+            const res = await axios.get('/api/crew-assignments', { params: { date } });
+            console.log('Crew assignments response:', res.data);
+            
+            if (res.data?.success && Array.isArray(res.data.data)) {
+                const map = {};
+                for (const row of res.data.data) {
+                    const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
+                    map[key] = row.crew_id;
+                    console.log('Mapping crew assignment:', key, '->', row.crew_id, 'for', row.first_name, row.last_name);
+                }
+                console.log('Final crew assignments map:', map);
+                setCrewAssignmentsBySlot(map);
+            } else {
+                console.log('No crew assignments found or invalid response format');
+                setCrewAssignmentsBySlot({});
+            }
+        } catch (err) {
+            console.error('Error refreshing crew assignments:', err);
+            setCrewAssignmentsBySlot({});
+        }
+    };
+
+    // Helper function to get crew member name by ID
+    const getCrewMemberName = (crewId) => {
+        if (!crewId || !crewList.length) return 'None';
+        const crewMember = crewList.find(c => c.id == crewId);
+        return crewMember ? `${crewMember.first_name} ${crewMember.last_name}` : `ID: ${crewId}`;
+    };
+
+    // Function to clear crew assignment
+    const clearCrewAssignment = async (activityId, flightDateStr) => {
+        let date = null; let time = null;
+        if (typeof flightDateStr === 'string') {
+            const parts = flightDateStr.split(' ');
+            date = parts[0];
+            time = (parts[1] || '').substring(0,5) + ':00';
+        }
+        if (!date || !time) return;
+        
+        try {
+            // Set crew_id to null or delete the record
+            await axios.post('/api/crew-assignment', { 
+                activity_id: activityId, 
+                date, 
+                time, 
+                crew_id: null 
+            });
+            
+            const slotKeyValue = slotKey(activityId, date, time.substring(0,5));
+            setCrewAssignmentsBySlot(prev => {
+                const updated = { ...prev };
+                delete updated[slotKeyValue];
+                return updated;
+            });
+            
+            setCrewNotification({
+                show: true,
+                message: 'Crew assignment cleared successfully!',
+                type: 'success'
+            });
+            setTimeout(() => setCrewNotification({ show: false, message: '', type: 'success' }), 3000);
+            
+        } catch (e) {
+            console.error('Failed to clear crew assignment:', e);
+            setCrewNotification({
+                show: true,
+                message: 'Failed to clear crew assignment: ' + (e.response?.data?.message || e.message),
+                type: 'error'
+            });
+            setTimeout(() => setCrewNotification({ show: false, message: '', type: 'error' }), 3000);
+        }
+    };
+
+    // Fetch crew list once
+    useEffect(() => {
+        console.log('Fetching crew list...');
+        axios.get('/api/crew').then(res => {
+            if (res.data?.success) {
+                console.log('Crew list loaded:', res.data.data);
+                setCrewList(res.data.data || []);
+            }
+        }).catch((err) => {
+            console.error('Error fetching crew list:', err);
+        });
+    }, []);
+
+    // Initialize crew assignments on mount and when selectedDate changes
+    useEffect(() => {
+        if (selectedDate) {
+            console.log('Initial crew assignments fetch for date:', selectedDate);
+            refreshCrewAssignments(selectedDate);
+        }
+    }, [selectedDate]); // Run when selectedDate changes
+
+    // Ensure crew assignments are loaded on initial mount
+    useEffect(() => {
+        if (selectedDate && crewList.length > 0) {
+            console.log('Component mounted, loading crew assignments for date:', selectedDate);
+            refreshCrewAssignments(selectedDate);
+        }
+    }, [crewList.length]); // Run when crew list is loaded
+
+    // Force refresh crew assignments on mount
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (selectedDate) {
+                console.log('Force refreshing crew assignments on mount for date:', selectedDate);
+                refreshCrewAssignments(selectedDate);
+            }
+        }, 1000); // Wait 1 second for everything to load
+        
+        return () => clearTimeout(timer);
+    }, []); // Run once on mount
+
+    // Additional effect to ensure crew assignments are loaded
+    useEffect(() => {
+        if (selectedDate && crewList.length > 0 && Object.keys(crewAssignmentsBySlot).length === 0) {
+            console.log('No crew assignments loaded, fetching for date:', selectedDate);
+            refreshCrewAssignments(selectedDate);
+        }
+    }, [selectedDate, crewList.length, crewAssignmentsBySlot]);
+
+    // Debug effect to log crew assignments changes
+    useEffect(() => {
+        console.log('Crew assignments changed:', crewAssignmentsBySlot);
+    }, [crewAssignmentsBySlot]);
+
+
+
+    // Also fetch crew assignments when flights change (in case of data refresh)
+    useEffect(() => {
+        if (!selectedDate || flights.length === 0) return;
+        console.log('Flights changed, refreshing crew assignments for date:', selectedDate);
+        axios.get('/api/crew-assignments', { params: { date: selectedDate } })
+            .then(res => {
+                if (res.data?.success && Array.isArray(res.data.data)) {
+                    const map = {};
+                    for (const row of res.data.data) {
+                        const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
+                        map[key] = row.crew_id;
+                    }
+                    setCrewAssignmentsBySlot(map);
+                }
+            })
+            .catch((err) => {
+                console.error('Error refreshing crew assignments:', err);
+            });
+    }, [selectedDate, flights]);
+
+    const handleCrewChange = async (activityId, flightDateStr, crewId) => {
+        // flightDateStr like 'YYYY-MM-DD HH:mm:ss' or 'YYYY-MM-DD 17:00:00'
+        let date = null; let time = null;
+        if (typeof flightDateStr === 'string') {
+            const parts = flightDateStr.split(' ');
+            date = parts[0];
+            time = (parts[1] || '').substring(0,5) + ':00';
+        }
+        if (!date || !time) {
+            console.error('Invalid flight date string:', flightDateStr);
+            return;
+        }
+        
+        console.log('Saving crew assignment:', { activityId, date, time, crewId });
+        
+        try {
+            console.log('Saving crew assignment for:', { activityId, date, time, crewId });
+            
+            const response = await axios.post('/api/crew-assignment', { 
+                activity_id: activityId, 
+                date, 
+                time, 
+                crew_id: crewId 
+            });
+            console.log('Crew assignment saved:', response.data);
+            
+            const slotKeyValue = slotKey(activityId, date, time.substring(0,5));
+            console.log('Updating local state with key:', slotKeyValue, 'value:', crewId);
+            
+            // Update local state immediately for instant feedback
+            setCrewAssignmentsBySlot(prev => {
+                const updated = { ...prev, [slotKeyValue]: crewId };
+                console.log('Updated crew assignments:', updated);
+                return updated;
+            });
+            
+            // Show success message
+            console.log('Crew assignment saved successfully!');
+            
+            // Show success notification
+            const crewName = getCrewMemberName(crewId);
+            setCrewNotification({
+                show: true,
+                message: `Crew member ${crewName} assigned successfully!`,
+                type: 'success'
+            });
+            
+            // Hide notification after 3 seconds
+            setTimeout(() => setCrewNotification({ show: false, message: '', type: 'success' }), 3000);
+            
+            // Also refresh from server to ensure consistency
+            await refreshCrewAssignments(date);
+            
+            // Force a re-render to ensure UI updates
+            setTimeout(() => {
+                setCrewAssignmentsBySlot(prev => ({ ...prev }));
+            }, 100);
+        } catch (e) {
+            console.error('Failed to save crew selection:', e);
+            setCrewNotification({
+                show: true,
+                message: 'Failed to save crew selection: ' + (e.response?.data?.message || e.message),
+                type: 'error'
+            });
+            setTimeout(() => setCrewNotification({ show: false, message: '', type: 'error' }), 5000);
+        }
+    };
+
     return (
         <div className="final-menifest-wrap">
             <Container maxWidth="xl">
@@ -1161,15 +1412,84 @@ const Manifest = () => {
                 <Box sx={{ padding: 2 }}>
                     {/* Header Section */}
                     <Box sx={{ marginBottom: 3 }}>
+                        {/* Crew assignment notification */}
+                        {crewNotification.show && (
+                            <Box sx={{ 
+                                mb: 2, 
+                                p: 2, 
+                                bgcolor: crewNotification.type === 'success' ? '#f0fdf4' : '#fef2f2',
+                                color: crewNotification.type === 'success' ? '#166534' : '#dc2626',
+                                borderRadius: 1, 
+                                border: `1px solid ${crewNotification.type === 'success' ? '#bbf7d0' : '#fecaca'}`,
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                            }}>
+                                <span>{crewNotification.message}</span>
+                                <IconButton 
+                                    size="small" 
+                                    onClick={() => setCrewNotification({ show: false, message: '', type: 'success' })}
+                                >
+                                    ×
+                                </IconButton>
+                            </Box>
+                        )}
+                        
+                        {/* Debug info for crew assignments - removed for production */}
+                        {/* Intentionally hidden */}
                         <Box display="flex" alignItems="center" gap={2}>
-                            <IconButton onClick={() => setSelectedDate(dayjs(selectedDate).subtract(1, 'day').format('YYYY-MM-DD'))}>
+                            <IconButton onClick={() => {
+                                const newDate = dayjs(selectedDate).subtract(1, 'day').format('YYYY-MM-DD');
+                                console.log('Date navigation: going back to', newDate);
+                                setSelectedDate(newDate);
+                                setCrewAssignmentsBySlot({});
+                                
+                                // Fetch crew assignments for the new date
+                                axios.get('/api/crew-assignments', { params: { date: newDate } })
+                                    .then(res => {
+                                        if (res.data?.success && Array.isArray(res.data.data)) {
+                                            const map = {};
+                                            for (const row of res.data.data) {
+                                                const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
+                                                map[key] = row.crew_id;
+                                            }
+                                            setCrewAssignmentsBySlot(map);
+                                        }
+                                    })
+                                    .catch((err) => {
+                                        console.error('Error fetching crew assignments for previous date:', err);
+                                    });
+                            }}>
                                 <ArrowBackIosNewIcon />
                             </IconButton>
                             <LocalizationProvider dateAdapter={AdapterDayjs}>
                                 <DatePicker
                                     label="Select Date"
                                     value={dayjs(selectedDate)}
-                                    onChange={date => setSelectedDate(date ? date.format('YYYY-MM-DD') : selectedDate)}
+                                    onChange={date => {
+                                        const newDate = date ? date.format('YYYY-MM-DD') : selectedDate;
+                                        console.log('Date picker changed to:', newDate);
+                                        setSelectedDate(newDate);
+                                        setCrewAssignmentsBySlot({});
+                                        
+                                        // Fetch crew assignments for the new date
+                                        if (newDate) {
+                                            axios.get('/api/crew-assignments', { params: { date: newDate } })
+                                                .then(res => {
+                                                    if (res.data?.success && Array.isArray(res.data.data)) {
+                                                        const map = {};
+                                                        for (const row of res.data.data) {
+                                                            const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
+                                                            map[key] = row.crew_id;
+                                                        }
+                                                        setCrewAssignmentsBySlot(map);
+                                                    }
+                                                })
+                                                .catch((err) => {
+                                                    console.error('Error fetching crew assignments for picked date:', err);
+                                                });
+                                        }
+                                    }}
                                     format="DD.MM.YYYY"
                                     views={["year", "month", "day"]}
                                     slotProps={{ textField: { size: 'small', sx: { minWidth: 180, background: '#fff', borderRadius: 1 } } }}
@@ -1179,7 +1499,28 @@ const Manifest = () => {
                                     }}
                                 />
                             </LocalizationProvider>
-                            <IconButton onClick={() => setSelectedDate(dayjs(selectedDate).add(1, 'day').format('YYYY-MM-DD'))}>
+                            <IconButton onClick={() => {
+                                const newDate = dayjs(selectedDate).add(1, 'day').format('YYYY-MM-DD');
+                                console.log('Date navigation: going forward to', newDate);
+                                setSelectedDate(newDate);
+                                setCrewAssignmentsBySlot({});
+                                
+                                // Fetch crew assignments for the new date
+                                axios.get('/api/crew-assignments', { params: { date: newDate } })
+                                    .then(res => {
+                                        if (res.data?.success && Array.isArray(res.data.data)) {
+                                            const map = {};
+                                            for (const row of res.data.data) {
+                                                const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
+                                                map[key] = row.crew_id;
+                                            }
+                                            setCrewAssignmentsBySlot(map);
+                                        }
+                                    })
+                                    .catch((err) => {
+                                        console.error('Error fetching crew assignments for next date:', err);
+                                    });
+                            }}>
                                 <ArrowForwardIosIcon />
                             </IconButton>
                         </Box>
@@ -1418,6 +1759,93 @@ const Manifest = () => {
                                                 </Box>
                                             </Box>
                                             <Box display="flex" alignItems="center" gap={1}>
+                                                                        {/* Crew Selection Dropdown */}
+                        {(() => {
+                            const slotKeyValue = slotKey(first.activity_id, (first.flight_date||'').substring(0,10), (first.flight_date||'').substring(11,16));
+                            const currentCrewId = crewAssignmentsBySlot[slotKeyValue];
+                            
+                            // Debug logging
+                            if (process.env.NODE_ENV === 'development') {
+                                console.log('Dropdown for flight:', first.id, 'slotKey:', slotKeyValue, 'currentCrewId:', currentCrewId, 'all assignments:', crewAssignmentsBySlot);
+                                console.log('Flight data:', { 
+                                    id: first.id, 
+                                    activity_id: first.activity_id, 
+                                    flight_date: first.flight_date,
+                                    date_part: (first.flight_date||'').substring(0,10),
+                                    time_part: (first.flight_date||'').substring(11,16)
+                                });
+                            }
+                            
+                            return (
+                                <>
+                                    <Select
+                                        native
+                                        value={currentCrewId || ''}
+                                        onChange={(e) => handleCrewChange(first.activity_id, first.flight_date, e.target.value)}
+                                        sx={{ minWidth: 200, mr: 1, background: '#fff' }}
+                                    >
+                                        <option value="">Crew Selection</option>
+                                        {crewList.map(c => (
+                                            <option key={c.id} value={c.id}>{`${c.first_name} ${c.last_name}`}</option>
+                                        ))}
+                                    </Select>
+                                    
+                                    {/* Crew Assignment Status Display */}
+                                    <Box sx={{ 
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'flex-start',
+                                        ml: 1,
+                                        minWidth: 150
+                                    }}>
+                                        <Box sx={{ 
+                                            fontSize: '12px', 
+                                            fontWeight: '500',
+                                            color: currentCrewId ? '#10b981' : '#6b7280',
+                                            mb: 0.5
+                                        }}>
+                                            {currentCrewId ? '✓ Assigned' : '○ Not Assigned'}
+                                        </Box>
+                                        <Box sx={{ 
+                                            fontSize: '11px', 
+                                            color: '#6b7280',
+                                            fontStyle: currentCrewId ? 'normal' : 'italic'
+                                        }}>
+                                            {currentCrewId ? getCrewMemberName(currentCrewId) : 'No crew selected'}
+                                        </Box>
+                                    </Box>
+                                    
+                                    {/* Show selected crew member name */}
+                                    {currentCrewId && (
+                                        <Box sx={{ 
+                                            fontSize: '12px', 
+                                            color: '#10b981', 
+                                            fontWeight: '500',
+                                            ml: 1,
+                                            p: 0.5,
+                                            bgcolor: '#f0fdf4',
+                                            borderRadius: 1,
+                                            border: '1px solid #bbf7d0',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 1
+                                        }}>
+                                            <span>Crew: {getCrewMemberName(currentCrewId)}</span>
+                                            <IconButton 
+                                                size="small" 
+                                                onClick={() => clearCrewAssignment(first.activity_id, first.flight_date)}
+                                                sx={{ p: 0, minWidth: 'auto', color: '#dc2626' }}
+                                                title="Clear crew assignment"
+                                            >
+                                                ×
+                                            </IconButton>
+                                        </Box>
+                                    )}
+                                    
+                                    {/* Crew info line removed for production */}
+                                </>
+                            );
+                        })()}
                                                 <Button variant="contained" color="primary" sx={{ minWidth: 90, fontWeight: 600, textTransform: 'none' }} onClick={() => handleOpenBookingModal(first)}>Book</Button>
                                                 <IconButton size="large" onClick={e => handleGlobalMenuOpen(e, first, groupFlights)}>
                                                     <MoreVertIcon />
