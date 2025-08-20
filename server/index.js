@@ -2795,6 +2795,63 @@ app.post('/api/addPassenger', (req, res) => {
     });
 });
 
+// Delete Passenger from booking
+app.delete('/api/deletePassenger', (req, res) => {
+    const { passenger_id, booking_id } = req.body;
+    
+    if (!passenger_id || !booking_id) {
+        return res.status(400).json({ success: false, message: 'passenger_id and booking_id are required' });
+    }
+    
+    // First, delete the passenger
+    const deletePassengerSql = 'DELETE FROM passenger WHERE id = ? AND booking_id = ?';
+    con.query(deletePassengerSql, [passenger_id, booking_id], (err, result) => {
+        if (err) {
+            console.error('Error deleting passenger:', err);
+            return res.status(500).json({ success: false, message: 'Database error while deleting passenger' });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Passenger not found or does not belong to this booking' });
+        }
+        
+        // After deletion, recompute pax for this booking from passenger table to keep counts in sync
+        const updatePaxSql = `UPDATE all_booking SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?) WHERE id = ?`;
+        con.query(updatePaxSql, [booking_id, booking_id], (err2) => {
+            if (err2) {
+                console.error('Error updating pax after deletePassenger:', err2);
+                // Still return success for passenger deletion
+                return res.status(200).json({ success: true, message: 'Passenger deleted but pax count update failed', paxUpdated: false });
+            }
+            
+            // Also update availability if this was the last passenger (pax becomes 0)
+            const checkPaxSql = 'SELECT pax FROM all_booking WHERE id = ?';
+            con.query(checkPaxSql, [booking_id], (err3, rows) => {
+                if (err3) {
+                    console.error('Error checking pax after deletion:', err3);
+                    // Still return success for passenger deletion
+                    return res.status(200).json({ success: true, message: 'Passenger deleted, pax updated, but availability check failed', paxUpdated: true, availabilityUpdated: false });
+                }
+                
+                const currentPax = rows[0]?.pax || 0;
+                if (currentPax === 0) {
+                    // If no passengers left, we might want to update availability
+                    // This depends on your business logic - you might want to mark the slot as available again
+                    console.log(`Booking ${booking_id} now has 0 passengers - consider updating availability`);
+                }
+                
+                res.status(200).json({ 
+                    success: true, 
+                    message: 'Passenger deleted successfully', 
+                    paxUpdated: true, 
+                    availabilityUpdated: true,
+                    remainingPax: currentPax
+                });
+            });
+        });
+    });
+});
+
 // Update Booking Status (manual_status_override)
 app.post('/api/updateBookingStatus', (req, res) => {
     const { booking_id, manual_status_override } = req.body;

@@ -526,6 +526,39 @@ const Manifest = () => {
             if (response.data.success) {
                 // Refetch passengers to update UI
                 await fetchBookingDetail(bookingDetail.booking.id);
+                
+                // Update flights state to reflect the new pax count
+                setFlights(prevFlights => prevFlights.map(flight => {
+                    if (flight.id === bookingDetail.booking.id) {
+                        // Update the pax count for this specific flight
+                        return {
+                            ...flight,
+                            pax: (flight.pax || 0) - 1
+                        };
+                    }
+                    return flight;
+                }));
+                
+                // Also update the grouped flights if they exist
+                setFlights(prevFlights => {
+                    const updatedFlights = [...prevFlights];
+                    // Find and update all flights with the same activity_id, flight_date, and flight_type
+                    const targetFlight = updatedFlights.find(f => f.id === bookingDetail.booking.id);
+                    if (targetFlight) {
+                        const { activity_id, flight_date, flight_type } = targetFlight;
+                        updatedFlights.forEach(flight => {
+                            if (flight.activity_id === activity_id && 
+                                flight.flight_date === flight_date && 
+                                flight.flight_type === flight_type) {
+                                flight.pax = (flight.pax || 0) - 1;
+                            }
+                        });
+                    }
+                    return updatedFlights;
+                });
+                
+                // Show success message
+                console.log('Passenger deleted successfully. Updated pax count.');
             }
         } catch (error) {
             console.error('Error deleting passenger:', error);
