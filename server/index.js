@@ -4576,20 +4576,26 @@ app.post('/api/create-checkout-session', async (req, res) => {
         }
         
         const { totalPrice, currency = 'GBP', bookingData, voucherData, type } = req.body;
-        if (!totalPrice || (!bookingData && !voucherData)) {
-            return res.status(400).json({ success: false, message: 'Eksik veri: totalPrice veya bookingData/voucherData yok.' });
+        if (totalPrice === undefined || totalPrice === null || isNaN(Number(totalPrice))) {
+            return res.status(400).json({ success: false, message: 'Invalid totalPrice' });
+        }
+        if (!bookingData && !voucherData) {
+            return res.status(400).json({ success: false, message: 'Eksik veri: bookingData veya voucherData gereklidir.' });
         }
         
         console.log('Processing payment:', { totalPrice, type, hasBookingData: !!bookingData, hasVoucherData: !!voucherData });
         
         // Stripe fiyatı kuruş cinsinden ister
         const amount = Math.round(Number(totalPrice) * 100);
+        if (!Number.isFinite(amount) || amount <= 0) {
+            return res.status(400).json({ success: false, message: 'Invalid amount' });
+        }
         
         // Environment'a göre URL'leri ayarla
-        const isProduction = process.env.NODE_ENV === 'production';
-        const baseUrl = isProduction ? 'https://flyawayballooning-book.com' : 'http://localhost:3000';
+        const isProd = process.env.NODE_ENV === 'production';
+        const baseUrl = isProd ? 'https://flyawayballooning-book.com' : 'http://localhost:3000';
         
-        console.log('Creating Stripe session with:', { amount, baseUrl, isProduction });
+        console.log('Creating Stripe session with:', { amount, baseUrl, isProd });
         
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
@@ -4637,18 +4643,41 @@ app.post('/api/create-checkout-session', async (req, res) => {
         res.json({ success: true, sessionId: session_id });
     } catch (error) {
         console.error('Stripe Checkout Session error:', error);
-        console.error('Error details:', {
-            message: error.message,
-            stack: error.stack,
+        const details = {
+            message: error?.message,
+            type: error?.type,
+            code: error?.code,
+            doc_url: error?.doc_url,
+            param: error?.param,
+            stack: error?.stack,
             stripeKey: stripeSecretKey ? 'SET' : 'NOT SET',
-            environment: isProduction ? 'PRODUCTION' : 'DEVELOPMENT'
-        });
+            nodeEnv: process.env.NODE_ENV
+        };
+        console.error('Error details:', details);
         res.status(500).json({ 
             success: false, 
             message: 'Stripe Checkout Session oluşturulamadı', 
-            error: error.message,
-            details: error.stack
+            error: details
         });
+    }
+});
+
+// Diagnostics endpoint to verify Stripe config in production (returns only non-sensitive info)
+app.get('/api/stripe/diagnostics', async (req, res) => {
+    try {
+        const keySet = !!stripeSecretKey;
+        let accountEmail = null;
+        if (keySet) {
+            try {
+                const acct = await stripe.accounts.retrieve();
+                accountEmail = acct.email || null;
+            } catch (e) {
+                // ignore
+            }
+        }
+        res.json({ success: true, keySet, nodeEnv: process.env.NODE_ENV, accountEmail });
+    } catch (e) {
+        res.status(500).json({ success: false, message: e.message });
     }
 });
 
