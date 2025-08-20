@@ -1759,7 +1759,26 @@ const Manifest = () => {
                                                 </Box>
                                             </Box>
                                             <Box display="flex" alignItems="center" gap={1}>
-                                                                        {/* Crew Selection Dropdown */}
+                                                {/* Sold Out Badge - Show when flight is fully booked */}
+                                                {paxBookedDisplay === paxTotalDisplay && (
+                                                    <Box sx={{
+                                                        backgroundColor: '#dc2626',
+                                                        color: 'white',
+                                                        px: 2,
+                                                        py: 1,
+                                                        borderRadius: 2,
+                                                        fontSize: '12px',
+                                                        fontWeight: '600',
+                                                        textTransform: 'uppercase',
+                                                        letterSpacing: '0.5px',
+                                                        boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
+                                                        border: '1px solid #b91c1c'
+                                                    }}>
+                                                        Sold Out
+                                                    </Box>
+                                                )}
+                                                
+                                                {/* Crew Selection Dropdown */}
                         {(() => {
                             const slotKeyValue = slotKey(first.activity_id, (first.flight_date||'').substring(0,10), (first.flight_date||'').substring(11,16));
                             const currentCrewId = crewAssignmentsBySlot[slotKeyValue];
