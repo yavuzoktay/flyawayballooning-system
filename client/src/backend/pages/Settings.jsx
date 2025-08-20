@@ -2216,8 +2216,24 @@ const Settings = () => {
                                                 <td>
                                                     {question.options && question.options !== '[]' ? (
                                                         <div style={{ maxWidth: '200px', fontSize: '12px' }}>
-                                                            {JSON.parse(question.options).slice(0, 3).join(', ')}
-                                                            {JSON.parse(question.options).length > 3 && '...'}
+                                                            {(() => {
+                                                                try {
+                                                                    const parsedOptions = JSON.parse(question.options);
+                                                                    if (Array.isArray(parsedOptions)) {
+                                                                        return (
+                                                                            <>
+                                                                                {parsedOptions.slice(0, 3).join(', ')}
+                                                                                {parsedOptions.length > 3 && '...'}
+                                                                            </>
+                                                                        );
+                                                                    } else {
+                                                                        return 'Invalid options format';
+                                                                    }
+                                                                } catch (parseError) {
+                                                                    console.warn('Error parsing question options:', parseError, 'Raw value:', question.options);
+                                                                    return 'Invalid options format';
+                                                                }
+                                                            })()}
                                                         </div>
                                                     ) : (
                                                         <span style={{ color: '#9ca3af', fontSize: '12px' }}>No options</span>
