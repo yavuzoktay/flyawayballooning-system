@@ -838,11 +838,15 @@ const Settings = () => {
         console.log('voucher_type_ids value:', termsFormData.voucher_type_ids);
         console.log('voucher_type_ids isArray:', Array.isArray(termsFormData.voucher_type_ids));
         
-        // Ensure voucher_type_ids is an array
-        const formDataToSend = {
-            ...termsFormData,
-            voucher_type_ids: Array.isArray(termsFormData.voucher_type_ids) ? termsFormData.voucher_type_ids : []
-        };
+        // Ensure voucher_type_ids is an array and also send voucher_type_id for clarity
+            const normalizedIds = Array.isArray(termsFormData.voucher_type_ids)
+                ? termsFormData.voucher_type_ids.map(Number)
+                : [];
+            const formDataToSend = {
+                ...termsFormData,
+                voucher_type_id: normalizedIds[0] || null,
+                voucher_type_ids: normalizedIds
+            };
         
         console.log('Form data to send:', formDataToSend);
         
@@ -876,9 +880,15 @@ const Settings = () => {
             content: terms.content,
             voucher_type_ids: (() => {
                 try {
+                    if (terms.voucher_type_id) {
+                        return [Number(terms.voucher_type_id)];
+                    }
                     if (terms.voucher_type_ids) {
                         const parsed = JSON.parse(terms.voucher_type_ids);
-                        return Array.isArray(parsed) ? parsed : [];
+                        if (Array.isArray(parsed)) {
+                            return parsed.map(id => Number(id));
+                        }
+                        return [];
                     }
                     return [];
                 } catch (error) {
@@ -920,20 +930,13 @@ const Settings = () => {
         console.log('Current voucher_type_ids:', termsFormData.voucher_type_ids);
         
         setTermsFormData(prev => {
-            const currentIds = Array.isArray(prev.voucher_type_ids) ? prev.voucher_type_ids : [];
-            console.log('Current IDs array:', currentIds);
-            
+            const currentIds = Array.isArray(prev.voucher_type_ids) ? prev.voucher_type_ids.map(Number) : [];
             let newIds;
-            if (currentIds.includes(voucherTypeId)) {
-                newIds = currentIds.filter(id => id !== voucherTypeId);
-                console.log('Removing ID:', voucherTypeId);
+            if (currentIds.includes(Number(voucherTypeId))) {
+                newIds = currentIds.filter(id => id !== Number(voucherTypeId));
             } else {
-                newIds = [...currentIds, voucherTypeId];
-                console.log('Adding ID:', voucherTypeId);
+                newIds = [...currentIds, Number(voucherTypeId)];
             }
-            
-            console.log('New IDs array:', newIds);
-            
             return {
                 ...prev,
                 voucher_type_ids: newIds
@@ -2487,37 +2490,43 @@ const Settings = () => {
                                                     </div>
                                                 </td>
                                                 <td>
-                                                    {terms.voucher_type_ids ? (
-                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                                            {(() => {
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                                        {(() => {
+                                                            // Prefer voucher_type_id; fallback to voucher_type_ids JSON
+                                                            const idCandidates = [];
+                                                            if (terms.voucher_type_id) {
+                                                                idCandidates.push(Number(terms.voucher_type_id));
+                                                            }
+                                                            if (terms.voucher_type_ids) {
                                                                 try {
-                                                                    const voucherTypeIds = JSON.parse(terms.voucher_type_ids);
-                                                                    if (Array.isArray(voucherTypeIds)) {
-                                                                        return voucherTypeIds.map((voucherTypeId) => {
-                                                                            const voucherType = voucherTypes.find(vt => vt.id === voucherTypeId);
-                                                                            return voucherType ? (
-                                                                                <span key={voucherTypeId} style={{
-                                                                                    padding: '2px 8px',
-                                                                                    borderRadius: '12px',
-                                                                                    fontSize: '11px',
-                                                                                    backgroundColor: '#dbeafe',
-                                                                                    color: '#1e40af'
-                                                                                }}>
-                                                                                    {voucherType.title}
-                                                                                </span>
-                                                                            ) : null;
-                                                                        });
+                                                                    const parsed = JSON.parse(terms.voucher_type_ids);
+                                                                    if (Array.isArray(parsed)) {
+                                                                        parsed.forEach((v) => idCandidates.push(Number(v)));
                                                                     }
-                                                                    return <span style={{ color: '#9ca3af', fontSize: '12px' }}>Invalid format</span>;
-                                                                } catch (error) {
-                                                                    console.error('Error parsing voucher_type_ids:', error);
-                                                                    return <span style={{ color: '#ef4444', fontSize: '12px' }}>Parse error</span>;
+                                                                } catch (e) {
+                                                                    // ignore parse error here; we'll show a badge if nothing resolves
                                                                 }
-                                                            })()}
-                                                        </div>
-                                                    ) : (
-                                                        <span style={{ color: '#9ca3af', fontSize: '12px' }}>No voucher types</span>
-                                                    )}
+                                                            }
+                                                            const uniqueIds = Array.from(new Set(idCandidates.filter((v) => !Number.isNaN(v))));
+                                                            if (uniqueIds.length === 0) {
+                                                                return <span style={{ color: '#9ca3af', fontSize: '12px' }}>No voucher type</span>;
+                                                            }
+                                                            return uniqueIds.map((voucherTypeId) => {
+                                                                const voucherType = voucherTypes.find((vt) => Number(vt.id) === Number(voucherTypeId));
+                                                                return (
+                                                                    <span key={voucherTypeId} style={{
+                                                                        padding: '2px 8px',
+                                                                        borderRadius: '12px',
+                                                                        fontSize: '11px',
+                                                                        backgroundColor: '#dbeafe',
+                                                                        color: '#1e40af'
+                                                                    }}>
+                                                                        {voucherType ? voucherType.title : `#${voucherTypeId}`}
+                                                                    </span>
+                                                                );
+                                                            });
+                                                        })()}
+                                                    </div>
                                                 </td>
                                                 <td>
                                                     <span style={{ color: '#6b7280', fontSize: '12px' }}>
@@ -3431,32 +3440,28 @@ const Settings = () => {
                                     background: '#f9fafb'
                                 }}>
                                     <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
-                                        Select which voucher types these terms apply to:
+                                        Select which voucher type these terms apply to:
                                     </div>
-                                    {voucherTypes.map((voucherType) => (
-                                        <label key={voucherType.id} style={{ 
-                                            display: 'flex', 
-                                            alignItems: 'center', 
-                                            marginBottom: '8px',
-                                            cursor: 'pointer'
-                                        }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={Array.isArray(termsFormData.voucher_type_ids) && termsFormData.voucher_type_ids.includes(voucherType.id)}
-                                                onChange={() => {
-                                                    console.log('Checkbox clicked for voucher type:', voucherType.id);
-                                                    console.log('Current checked state:', Array.isArray(termsFormData.voucher_type_ids) && termsFormData.voucher_type_ids.includes(voucherType.id));
-                                                    handleVoucherTypeToggle(voucherType.id);
-                                                }}
-                                                style={{ marginRight: '8px' }}
-                                            />
-                                            <span style={{ fontSize: '14px' }}>
-                                                {voucherType.title} - {voucherType.description}
-                                            </span>
-                                        </label>
-                                    ))}
+                                    <select
+                                        value={Array.isArray(termsFormData.voucher_type_ids) && termsFormData.voucher_type_ids.length > 0 ? String(termsFormData.voucher_type_ids[0]) : ''}
+                                        onChange={(e) => {
+                                            const selectedId = e.target.value ? Number(e.target.value) : null;
+                                            setTermsFormData({
+                                                ...termsFormData,
+                                                voucher_type_ids: selectedId ? [selectedId] : []
+                                            });
+                                        }}
+                                        style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #d1d5db', background: '#fff' }}
+                                    >
+                                        <option value="">Select a voucher type</option>
+                                        {voucherTypes.map((voucherType) => (
+                                            <option key={voucherType.id} value={String(voucherType.id)}>
+                                                {voucherType.title}
+                                            </option>
+                                        ))}
+                                    </select>
                                     {voucherTypes.length === 0 && (
-                                        <div style={{ color: '#9ca3af', fontSize: '14px', fontStyle: 'italic' }}>
+                                        <div style={{ color: '#9ca3af', fontSize: '14px', fontStyle: 'italic', marginTop: '8px' }}>
                                             No voucher types available. Please create voucher types first.
                                         </div>
                                     )}

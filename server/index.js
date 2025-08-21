@@ -1463,10 +1463,10 @@ app.get('/api/terms-and-conditions/voucher-type/:voucherTypeId', (req, res) => {
     const { voucherTypeId } = req.params;
     console.log('GET /api/terms-and-conditions/voucher-type/' + voucherTypeId + ' called');
     
-    const sql = `SELECT * FROM terms_and_conditions WHERE JSON_CONTAINS(voucher_type_ids, ?) AND is_active = 1 ORDER BY sort_order ASC`;
+    const sql = `SELECT * FROM terms_and_conditions WHERE (voucher_type_id = ? OR JSON_CONTAINS(voucher_type_ids, ?)) AND is_active = 1 ORDER BY sort_order ASC`;
     console.log('SQL Query:', sql);
     
-    con.query(sql, [JSON.stringify(parseInt(voucherTypeId))], (err, result) => {
+    con.query(sql, [parseInt(voucherTypeId), JSON.stringify(parseInt(voucherTypeId))], (err, result) => {
         if (err) {
             console.error('Error fetching terms and conditions for voucher type:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
@@ -1481,26 +1481,33 @@ app.post('/api/terms-and-conditions', (req, res) => {
     const {
         title,
         content,
+        voucher_type_id,
         voucher_type_ids,
         is_active,
         sort_order
     } = req.body;
     
+    // Normalize voucher type input
+    const normalizedVoucherTypeIds = Array.isArray(voucher_type_ids) && voucher_type_ids.length > 0
+        ? voucher_type_ids.map((v) => Number(v))
+        : (voucher_type_id ? [Number(voucher_type_id)] : []);
+
     // Validation
-    if (!title || !content || !voucher_type_ids) {
-        return res.status(400).json({ success: false, message: 'Missing required fields: title, content, and voucher_type_ids' });
+    if (!title || !content || normalizedVoucherTypeIds.length === 0) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: title, content, and voucher_type (voucher_type_id or voucher_type_ids)' });
     }
     
     const sql = `
         INSERT INTO terms_and_conditions (
-            title, content, voucher_type_ids, is_active, sort_order
-        ) VALUES (?, ?, ?, ?, ?)
+            title, content, voucher_type_id, voucher_type_ids, is_active, sort_order
+        ) VALUES (?, ?, ?, ?, ?, ?)
     `;
     
     const values = [
         title,
         content,
-        JSON.stringify(voucher_type_ids),
+        normalizedVoucherTypeIds[0] || null,
+        JSON.stringify(normalizedVoucherTypeIds),
         is_active !== undefined ? is_active : true,
         sort_order || 0
     ];
@@ -1525,6 +1532,7 @@ app.put('/api/terms-and-conditions/:id', (req, res) => {
     const {
         title,
         content,
+        voucher_type_id,
         voucher_type_ids,
         is_active,
         sort_order
@@ -1535,21 +1543,27 @@ app.put('/api/terms-and-conditions/:id', (req, res) => {
     console.log('voucher_type_ids type:', typeof voucher_type_ids);
     console.log('voucher_type_ids value:', voucher_type_ids);
     
+    // Normalize voucher type input
+    const normalizedVoucherTypeIds = Array.isArray(voucher_type_ids) && voucher_type_ids.length > 0
+        ? voucher_type_ids.map((v) => Number(v))
+        : (voucher_type_id ? [Number(voucher_type_id)] : []);
+
     // Validation
-    if (!title || !content || !voucher_type_ids) {
-        return res.status(400).json({ success: false, message: 'Missing required fields: title, content, and voucher_type_ids' });
+    if (!title || !content || normalizedVoucherTypeIds.length === 0) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: title, content, and voucher_type (voucher_type_id or voucher_type_ids)' });
     }
     
     const sql = `
         UPDATE terms_and_conditions SET 
-            title = ?, content = ?, voucher_type_ids = ?, is_active = ?, sort_order = ?
+            title = ?, content = ?, voucher_type_id = ?, voucher_type_ids = ?, is_active = ?, sort_order = ?
         WHERE id = ?
     `;
     
     const values = [
         title,
         content,
-        JSON.stringify(voucher_type_ids),
+        normalizedVoucherTypeIds[0] || null,
+        JSON.stringify(normalizedVoucherTypeIds),
         is_active !== undefined ? is_active : true,
         sort_order || 0,
         id
@@ -5462,6 +5476,37 @@ const runDatabaseMigrations = () => {
             });
         } else {
             console.log('✅ experiences price columns already removed');
+        }
+    });
+
+    // Add voucher_type_id to terms_and_conditions for clearer linkage and backfill from voucher_type_ids
+    const checkTcVoucherTypeIdCol = "SHOW COLUMNS FROM terms_and_conditions LIKE 'voucher_type_id'";
+    con.query(checkTcVoucherTypeIdCol, (err, result) => {
+        if (err) {
+            console.error('Error checking terms_and_conditions.voucher_type_id column:', err);
+            return;
+        }
+        if (result.length === 0) {
+            console.log('Adding voucher_type_id column to terms_and_conditions...');
+            const addCol = "ALTER TABLE terms_and_conditions ADD COLUMN voucher_type_id INT NULL COMMENT 'Primary voucher type this terms applies to' AFTER content";
+            con.query(addCol, (err) => {
+                if (err) {
+                    console.error('Error adding voucher_type_id column:', err);
+                } else {
+                    console.log('✅ voucher_type_id column added to terms_and_conditions');
+                    // Backfill: set voucher_type_id to first id from voucher_type_ids array when available
+                    const backfill = "UPDATE terms_and_conditions SET voucher_type_id = JSON_EXTRACT(voucher_type_ids, '$[0]') WHERE voucher_type_id IS NULL AND voucher_type_ids IS NOT NULL";
+                    con.query(backfill, (err) => {
+                        if (err) {
+                            console.error('Error backfilling voucher_type_id:', err);
+                        } else {
+                            console.log('✅ voucher_type_id backfilled from voucher_type_ids');
+                        }
+                    });
+                }
+            });
+        } else {
+            console.log('✅ terms_and_conditions.voucher_type_id already exists');
         }
     });
 };
