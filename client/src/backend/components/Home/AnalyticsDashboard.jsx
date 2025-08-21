@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Grid, Card, CardContent, Typography } from '@mui/material';
 import axios from 'axios';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL;
+import config from '../../../config';
 
 
 const AnalyticsDashboard = ({ dateRange }) => {
@@ -11,7 +10,7 @@ const AnalyticsDashboard = ({ dateRange }) => {
 
     useEffect(() => {
         setLoading(true);
-        axios.get(`http://34.205.25.8:3002/api/analytics`, {
+        axios.get(`${config.API_BASE_URL}/api/analytics`, {
             params: {
                 start_date: dateRange.start,
                 end_date: dateRange.end
