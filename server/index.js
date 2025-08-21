@@ -2852,6 +2852,35 @@ app.delete('/api/deletePassenger', (req, res) => {
     });
 });
 
+// POST alias for environments/proxies that block DELETE bodies
+app.post('/api/deletePassenger', (req, res) => {
+    const { passenger_id, booking_id } = req.body;
+    if (!passenger_id || !booking_id) {
+        return res.status(400).json({ success: false, message: 'passenger_id and booking_id are required' });
+    }
+    const deletePassengerSql = 'DELETE FROM passenger WHERE id = ? AND booking_id = ?';
+    con.query(deletePassengerSql, [passenger_id, booking_id], (err, result) => {
+        if (err) {
+            console.error('Error deleting passenger (POST):', err);
+            return res.status(500).json({ success: false, message: 'Database error while deleting passenger' });
+        }
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Passenger not found or does not belong to this booking' });
+        }
+        const updatePaxSql = `UPDATE all_booking SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?) WHERE id = ?`;
+        con.query(updatePaxSql, [booking_id, booking_id], (err2) => {
+            if (err2) {
+                console.error('Error updating pax after deletePassenger (POST):', err2);
+                return res.status(200).json({ success: true, message: 'Passenger deleted but pax update failed', paxUpdated: false });
+            }
+            con.query('SELECT pax FROM all_booking WHERE id = ?', [booking_id], (err3, rows) => {
+                const currentPax = rows?.[0]?.pax ?? null;
+                return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, remainingPax: currentPax });
+            });
+        });
+    });
+});
+
 // Update Booking Status (manual_status_override)
 app.post('/api/updateBookingStatus', (req, res) => {
     const { booking_id, manual_status_override } = req.body;

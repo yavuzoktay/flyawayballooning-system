@@ -199,7 +199,7 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 180, marginLeft: 32, marginTop: 38 }}>
                             <a
-                                href="http://54.174.214.16/"
+                                href="https://flyawayballooning-book.com"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 style={{
