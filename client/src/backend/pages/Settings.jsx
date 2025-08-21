@@ -92,7 +92,7 @@ const Settings = () => {
     const [additionalInfoFormData, setAdditionalInfoFormData] = useState({
         question_text: '',
         question_type: 'dropdown',
-        is_required: false,
+        is_required: true,
         options: '[]',
         placeholder_text: '',
         help_text: '',
@@ -788,7 +788,7 @@ const Settings = () => {
         setAdditionalInfoFormData({
             question_text: question.question_text,
             question_type: question.question_type,
-            is_required: question.is_required,
+            is_required: true, // All questions are now required
             options: question.options || '[]',
             placeholder_text: question.placeholder_text || '',
             help_text: question.help_text || '',
@@ -816,7 +816,7 @@ const Settings = () => {
         setAdditionalInfoFormData({
             question_text: '',
             question_type: 'dropdown',
-            is_required: false,
+            is_required: true,
             options: '[]',
             placeholder_text: '',
             help_text: '',
@@ -3036,7 +3036,6 @@ const Settings = () => {
                                         value={additionalInfoFormData.is_required}
                                         onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, is_required: e.target.value === 'true'})}
                                     >
-                                        <option value={false}>Optional</option>
                                         <option value={true}>Required</option>
                                     </select>
                                 </div>
