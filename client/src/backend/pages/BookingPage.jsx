@@ -89,9 +89,8 @@ const BookingPage = () => {
     const [editingNoteText, setEditingNoteText] = useState("");
 
     // Add to component state:
-    const [editPrefField, setEditPrefField] = useState(null);
-    const [editPrefValue, setEditPrefValue] = useState("");
-    const [savingPref, setSavingPref] = useState(false);
+
+
 
     // Add state for passenger price editing
     const [editPassengerPrice, setEditPassengerPrice] = useState("");
@@ -939,38 +938,7 @@ const BookingPage = () => {
       setBookingDetail(prev => ({ ...prev, notes: res.data.notes }));
     };
 
-    // Add handlers for preferences:
-    const handleEditPref = (field, value) => {
-        setEditPrefField(field);
-        setEditPrefValue(value || "");
-    };
-    const handleCancelPref = () => {
-        setEditPrefField(null);
-        setEditPrefValue("");
-    };
-    const handleSavePref = async (field) => {
-        setSavingPref(true);
-        try {
-            await axios.patch('/api/updateBookingField', {
-                booking_id: bookingDetail.booking.id,
-                field,
-                value: editPrefValue
-            });
-            setBookingDetail(prev => ({
-                ...prev,
-                booking: {
-                    ...prev.booking,
-                    [field]: editPrefValue
-                }
-            }));
-            setEditPrefField(null);
-            setEditPrefValue("");
-        } catch (err) {
-            alert('Failed to update preference.');
-        } finally {
-            setSavingPref(false);
-        }
-    };
+
 
     // When opening dialog, initialize editPassengerPrices
     useEffect(() => {
@@ -1715,73 +1683,7 @@ const BookingPage = () => {
                                                 <Typography><b>Reason for Ballooning:</b> {bookingDetail.booking?.ballooning_reason || 'N/A'}</Typography>
                                         </Box>
                                         )}
-                                        {/* Preferences Section - Only for bookings, not vouchers */}
-                                        {activeTab !== 'vouchers' && (
-                                        <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
-                                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Preferences</Typography>
-                                            {/* Preferred Day */}
-                                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                                <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Day:</b></Typography>
-                                                {editPrefField === 'preferred_day' ? (
-                                                    <>
-                                                        <select value={editPrefValue} onChange={e => setEditPrefValue(e.target.value)} style={{ marginRight: 8, width: 220 }} disabled={savingPref}>
-                                                            <option value="">Select...</option>
-                                                            <option value="Weekend Only">Weekend Only</option>
-                                                            <option value="Weekday & Weekend">Weekday & Weekend</option>
-                                                        </select>
-                                                        <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_day')} disabled={savingPref}>Save</Button>
-                                                        <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                            <Typography sx={{ mr: 1 }}>{bookingDetail.booking?.preferred_day || '-'}</Typography>
-                                                            <Button size="small" onClick={() => handleEditPref('preferred_day', bookingDetail.booking?.preferred_day)}>Edit</Button>
-                                                    </>
-                                                )}
-                                            </Box>
-                                            {/* Preferred Location */}
-                                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                                <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Location:</b></Typography>
-                                                {editPrefField === 'preferred_location' ? (
-                                                    <>
-                                                        <select value={editPrefValue} onChange={e => setEditPrefValue(e.target.value)} style={{ marginRight: 8, width: 220 }} disabled={savingPref}>
-                                                            <option value="">Select...</option>
-                                                            <option value="Bath">Bath</option>
-                                                            <option value="Taunton & South Somerset">Taunton & South Somerset</option>
-                                                            <option value="Exeter & Tiverton">Exeter & Tiverton</option>
-                                                        </select>
-                                                        <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_location')} disabled={savingPref}>Save</Button>
-                                                        <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                            <Typography sx={{ mr: 1 }}>{bookingDetail.booking?.preferred_location || '-'}</Typography>
-                                                            <Button size="small" onClick={() => handleEditPref('preferred_location', bookingDetail.booking?.preferred_location)}>Edit</Button>
-                                                    </>
-                                                )}
-                                            </Box>
-                                            {/* Preferred Time */}
-                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Time:</b></Typography>
-                                                {editPrefField === 'preferred_time' ? (
-                                                    <>
-                                                        <select value={editPrefValue} onChange={e => setEditPrefValue(e.target.value)} style={{ marginRight: 8, width: 220 }} disabled={savingPref}>
-                                                            <option value="">Select...</option>
-                                                            <option value="Morning">Morning</option>
-                                                            <option value="Afternoon & Evening">Afternoon & Evening</option>
-                                                        </select>
-                                                        <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_time')} disabled={savingPref}>Save</Button>
-                                                        <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                            <Typography sx={{ mr: 1 }}>{bookingDetail.booking?.preferred_time || '-'}</Typography>
-                                                            <Button size="small" onClick={() => handleEditPref('preferred_time', bookingDetail.booking?.preferred_time)}>Edit</Button>
-                                                    </>
-                                                )}
-                                            </Box>
-                                        </Box>
-                                        )}
+
                                     </Grid>
                                     {/* Main Details */}
                                     <Grid item xs={12} md={8}>
@@ -2033,33 +1935,38 @@ const BookingPage = () => {
                                             )}
                                         </Box>
                                     </Grid>
-                                    <Grid item xs={12} md={4}>
-                                        <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
-                                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Recipient Details</Typography>
-                                            {(() => {
-                                                const v = bookingDetail.voucher || {};
-                                                return <>
+                                    {/* Recipient Details - Only show if there's meaningful data */}
+                                    {(() => {
+                                        const v = bookingDetail.voucher || {};
+                                        const hasRecipientData = v.recipient_name || v.recipient_email || v.recipient_phone || v.recipient_gift_date;
+                                        return hasRecipientData ? (
+                                            <Grid item xs={12} md={4}>
+                                                <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
+                                                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Recipient Details</Typography>
                                                     <Typography><b>Name:</b> {v.recipient_name || '-'}</Typography>
                                                     <Typography><b>Email:</b> {v.recipient_email || '-'}</Typography>
                                                     <Typography><b>Phone:</b> {v.recipient_phone || '-'}</Typography>
                                                     <Typography><b>Gift Date:</b> {v.recipient_gift_date ? dayjs(v.recipient_gift_date).format('DD/MM/YYYY') : '-'}</Typography>
-                                                </>;
-                                            })()}
-                                        </Box>
-                                </Grid>
-                                    <Grid item xs={12} md={4}>
-                                        <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
-                                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Preferences</Typography>
-                                            {(() => {
-                                                const v = bookingDetail.voucher || {};
-                                                return <>
+                                                </Box>
+                                            </Grid>
+                                        ) : null;
+                                    })()}
+                                    
+                                    {/* Preferences - Only show if there's meaningful data */}
+                                    {(() => {
+                                        const v = bookingDetail.voucher || {};
+                                        const hasPreferencesData = v.preferred_location || v.preferred_time || v.preferred_day;
+                                        return hasPreferencesData ? (
+                                            <Grid item xs={12} md={4}>
+                                                <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
+                                                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Preferences</Typography>
                                                     <Typography><b>Preferred Location:</b> {v.preferred_location || '-'}</Typography>
                                                     <Typography><b>Preferred Time:</b> {v.preferred_time || '-'}</Typography>
                                                     <Typography><b>Preferred Day:</b> {v.preferred_day || '-'}</Typography>
-                                                </>;
-                                            })()}
-                                        </Box>
-                                    </Grid>
+                                                </Box>
+                                            </Grid>
+                                        ) : null;
+                                    })()}
                                 </Grid>
                             </Box>
                             </>
