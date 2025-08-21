@@ -496,19 +496,28 @@ const BookingPage = () => {
             });
             
             if (response.data.success) {
-                // Update the booking table with new pax count
-                const updatedPax = response.data.updatedPax;
-                if (updatedPax !== null) {
-                    setBooking(prev => prev.map(b => 
-                        b.id === selectedBookingId ? { ...b, pax: updatedPax } : b
-                    ));
-                    setFilteredData(prev => prev.map(b => 
-                        b.id === selectedBookingId ? { ...b, pax: updatedPax } : b
-                    ));
-                }
+                // First, refetch the updated passenger list to get the correct count
+                const res = await axios.get(`/api/getBookingDetail?booking_id=${selectedBookingId}`);
+                const updatedPassengers = res.data.passengers || [];
+                const updatedPax = updatedPassengers.length;
                 
-                // Refetch passengers to update UI
-                await fetchPassengers(selectedBookingId);
+                // Update the main booking table with the new pax count
+                setBooking(prev => prev.map(b => 
+                    b.id === selectedBookingId ? { ...b, pax: updatedPax } : b
+                ));
+                setFilteredData(prev => prev.map(b => 
+                    b.id === selectedBookingId ? { ...b, pax: updatedPax } : b
+                ));
+                
+                // Update bookingDetail state to reflect the new pax count immediately
+                setBookingDetail(prev => ({
+                    ...prev,
+                    booking: {
+                        ...prev.booking,
+                        pax: updatedPax
+                    },
+                    passengers: updatedPassengers
+                }));
             }
         } catch (error) {
             console.error('Error deleting passenger:', error);
