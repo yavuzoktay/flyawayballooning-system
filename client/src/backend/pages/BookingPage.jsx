@@ -1207,7 +1207,7 @@ const BookingPage = () => {
                                         flight_type: item.flight_type || '',
                                         voucher_type: item.voucher_type || '',
                                         location: item.location || '',
-                                        flight_date: item.flight_date_display || item.flight_date || '',
+                                        flight_date: (item.status === 'Cancelled') ? '-' : (item.flight_date_display || item.flight_date || ''),
                                         pax: item.pax || '',
                                         status: item.status || '',
                                         paid: item.paid || '',
