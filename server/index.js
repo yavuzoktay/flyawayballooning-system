@@ -860,8 +860,8 @@ app.put('/api/voucher-types/:id', experiencesUpload.single('voucher_type_image')
     } = req.body;
     
     // Validation
-    if (!title || !description || !price_per_person) {
-        return res.status(400).json({ success: false, message: 'Missing required fields: title, description, and price_per_person' });
+    if (!title || !description) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: title and description' });
     }
     
     // Handle image upload
@@ -872,9 +872,9 @@ app.put('/api/voucher-types/:id', experiencesUpload.single('voucher_type_image')
     
     const sql = `
         UPDATE voucher_types SET 
-            title = ?, description = ?, image_url = ?, price_per_person = ?, 
-            price_unit = ?, max_passengers = ?, validity_months = ?, flight_days = ?,
-            flight_time = ?, features = ?, terms = ?, sort_order = ?, is_active = ?
+            title = ?, description = ?, image_url = ?, max_passengers = ?, 
+            validity_months = ?, flight_days = ?, flight_time = ?, features = ?, 
+            terms = ?, sort_order = ?, is_active = ?
         WHERE id = ?
     `;
     
@@ -882,8 +882,6 @@ app.put('/api/voucher-types/:id', experiencesUpload.single('voucher_type_image')
         title,
         description,
         image_url,
-        price_per_person,
-        price_unit || 'pp',
         max_passengers || 8,
         validity_months || 18,
         flight_days || 'Monday - Friday',
