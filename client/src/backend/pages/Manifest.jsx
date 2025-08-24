@@ -275,6 +275,22 @@ const Manifest = () => {
         return "Open";
     };
 
+    // Helper function to display passenger status with emojis
+    const getStatusWithEmoji = (status) => {
+        switch (status) {
+            case 'Scheduled':
+                return '🕓 Scheduled';
+            case 'Checked In':
+                return '✅ Checked In';
+            case 'Flown':
+                return '🎈 Flown';
+            case 'No Show':
+                return '❌ No Show';
+            default:
+                return status;
+        }
+    };
+
     // Function to automatically update flight status based on passenger count
     const autoUpdateFlightStatus = async (flight) => {
         try {
@@ -2002,10 +2018,10 @@ const Manifest = () => {
                                                                         variant="standard"
                                                                         sx={{ minWidth: 120 }}
                                                                     >
-                                                                        <MenuItem value="Scheduled">Scheduled</MenuItem>
-                                                                        <MenuItem value="Checked In">Checked In</MenuItem>
-                                                                        <MenuItem value="Flown">Flown</MenuItem>
-                                                                        <MenuItem value="No Show">No Show</MenuItem>
+                                                                        <MenuItem value="Scheduled">🕓 Scheduled</MenuItem>
+                                                                        <MenuItem value="Checked In">✅ Checked In</MenuItem>
+                                                                        <MenuItem value="Flown">🎈 Flown</MenuItem>
+                                                                        <MenuItem value="No Show">❌ No Show</MenuItem>
                                                                     </Select>
                                                                 </TableCell>
                                                             </TableRow>
@@ -2398,14 +2414,14 @@ const Manifest = () => {
                                                         <TableCell>{bookingDetail.booking.created_at ? dayjs(bookingDetail.booking.created_at).format('DD/MM/YYYY') : '-'}</TableCell>
                                                         <TableCell>{bookingDetail.booking.flight_type || '-'}</TableCell>
                                                         <TableCell>{bookingDetail.booking.location || '-'}</TableCell>
-                                                        <TableCell>Scheduled</TableCell>
+                                                        <TableCell>🕓 Scheduled</TableCell>
                                                     </TableRow>
                                                     {bookingHistory.map((h, i) => (
                                                         <TableRow key={i}>
                                                             <TableCell>{h.changed_at ? dayjs(h.changed_at).format('DD/MM/YYYY HH:mm') : '-'}</TableCell>
                                                             <TableCell>{bookingDetail.booking.flight_type || '-'}</TableCell>
                                                             <TableCell>{bookingDetail.booking.location || '-'}</TableCell>
-                                                            <TableCell>{h.status}</TableCell>
+                                                            <TableCell>{getStatusWithEmoji(h.status)}</TableCell>
                                                         </TableRow>
                                                     ))}
                                                 </TableBody>
