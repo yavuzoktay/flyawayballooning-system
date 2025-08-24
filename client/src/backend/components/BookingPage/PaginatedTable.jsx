@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selectable = false, onSelectionChange }) => {
+const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selectable = false, onSelectionChange, context = 'bookings' }) => {
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedRows, setSelectedRows] = useState([]);
 
@@ -11,6 +11,9 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
             if (col === 'created_at' || col === 'created') return 'Created';
             if (col === 'voucher_booking_id') return 'Voucher/Booking ID';
             if (col === 'date_requested') return 'Date requested';
+            if (col === 'flight_type') return 'Experience';
+            if (col === 'voucher_type') return context === 'vouchers' ? 'Book Flight' : 'Voucher Type';
+            if (col === 'actual_voucher_type') return 'Voucher Type';
             const label = col.replace(/_/g, ' ');
             return label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
         }
@@ -20,6 +23,9 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
         if (id === 'created_at' || id === 'created') return 'Created';
         if (id === 'voucher_booking_id') return 'Voucher/Booking ID';
         if (id === 'date_requested') return 'Date requested';
+        if (id === 'flight_type') return 'Experience';
+        if (id === 'voucher_type') return context === 'vouchers' ? 'Book Flight' : 'Voucher Type';
+        if (id === 'actual_voucher_type') return 'Voucher Type';
         const label = id.replace(/_/g, ' ');
         return label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
     };

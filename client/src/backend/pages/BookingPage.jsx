@@ -23,6 +23,7 @@ const BookingPage = () => {
         status: "",
         location: "",
         voucherType: "",
+        actualVoucherType: "",
         redeemedStatus: "",
     });
 
@@ -280,8 +281,9 @@ const BookingPage = () => {
                 return {
                     created: formattedDate,
                     name: item.name || '',
-                    flight_type: item.flight_type || '',
-                    voucher_type: item.voucher_type || '',
+                    flight_type: item.experience_type || '', // Updated field name
+                    voucher_type: item.book_flight || '', // Updated field name
+                    actual_voucher_type: item.voucher_type || '', // New field for actual voucher type
                     email: item.email || '',
                     phone: item.phone || '',
                     expires: item.expires || '',
@@ -978,7 +980,7 @@ const BookingPage = () => {
     const columns = [
         { key: 'created_at_display', label: 'Created' },
         { key: 'passenger_name', label: 'Name' },
-        { key: 'flight_type', label: 'Flight Type' },
+        { key: 'flight_type', label: 'Experience' },
         { key: 'voucher_type', label: 'Voucher Type' },
         { key: 'status', label: 'Status' },
         { key: 'location', label: 'Location' },
@@ -1056,11 +1058,11 @@ const BookingPage = () => {
                                     <div className="booking-filter-wrap">
                                         <div className="booking-filter-field">
                                             <FormControl sx={{ m: 1, minWidth: 120 }} size="small" className="booking-filter-field">
-                                                <InputLabel id="book-flight-type-label">Flight Type</InputLabel>
+                                                <InputLabel id="book-flight-type-label">Experience</InputLabel>
                                                 <Select
                                                     labelId="book-flight-type-label"
                                                     value={filters.flightType}
-                                                    label="Flight Type"
+                                                    label="Experience"
                                                     onChange={(e) => handleFilterChange("flightType", e.target.value)}
                                                 >
                                                     <MenuItem value="">
@@ -1209,6 +1211,7 @@ const BookingPage = () => {
                                         "expires"
                                     ]}
                                     onNameClick={handleNameClick}
+                                    context="bookings"
                                 />
                             </>
                         )}
@@ -1228,12 +1231,12 @@ const BookingPage = () => {
                                     <div className="booking-filter-wrap">
                                         <div className="booking-filter-field">
                                             <FormControl sx={{ m: 1, minWidth: 120 }} size="small">
-                                                <InputLabel id="book-voucher-type-label">Voucher Type</InputLabel>
+                                                <InputLabel id="book-voucher-type-label">Book Flight</InputLabel>
                                                 <Select
                                                     labelId="book-voucher-type-label"
                                                     value={filters.voucherType}
                                                     onChange={(e) => handleFilterChange("voucherType", e.target.value)}
-                                                    label="Voucher Type"
+                                                    label="Book Flight"
                                                 >
                                                     <MenuItem value="">
                                                         <em>Select</em>
@@ -1245,11 +1248,11 @@ const BookingPage = () => {
                                         </div>
                                         <div className="booking-filter-field">
                                             <FormControl sx={{ m: 1, minWidth: 120 }} size="small">
-                                                <InputLabel id="book-flight-type-label">Flight Type</InputLabel>
+                                                <InputLabel id="book-flight-type-label">Experience</InputLabel>
                                                 <Select
                                                     labelId="book-flight-type-label"
                                                     value={filters.flightType}
-                                                    label="Flight Type"
+                                                    label="Experience"
                                                     onChange={(e) => handleFilterChange("flightType", e.target.value)}
                                                 >
                                                     <MenuItem value="">
@@ -1257,6 +1260,24 @@ const BookingPage = () => {
                                                     </MenuItem>
                                                     <MenuItem value="Private Flight">Private</MenuItem>
                                                     <MenuItem value="Shared Flight">Shared</MenuItem>
+                                                </Select>
+                                            </FormControl>
+                                        </div>
+                                        <div className="booking-filter-field">
+                                            <FormControl sx={{ m: 1, minWidth: 120 }} size="small">
+                                                <InputLabel id="book-actual-voucher-type-label">Voucher Type</InputLabel>
+                                                <Select
+                                                    labelId="book-actual-voucher-type-label"
+                                                    value={filters.actualVoucherType}
+                                                    label="Voucher Type"
+                                                    onChange={(e) => handleFilterChange("actualVoucherType", e.target.value)}
+                                                >
+                                                    <MenuItem value="">
+                                                        <em>Select</em>
+                                                    </MenuItem>
+                                                    <MenuItem value="Weekday Morning">Weekday Morning</MenuItem>
+                                                    <MenuItem value="Flexible Weekday">Flexible Weekday</MenuItem>
+                                                    <MenuItem value="Any Day Flight">Any Day Flight</MenuItem>
                                                 </Select>
                                             </FormControl>
                                         </div>
@@ -1290,9 +1311,10 @@ const BookingPage = () => {
                                                 const phone = (item.phone || "").toLowerCase();
                                                 const voucherRef = (item.voucher_ref || "").toLowerCase();
                                                 const offerCode = (item.offer_code || "").toLowerCase();
-                                                const flightType = (item.flight_type || "").toLowerCase();
-                                                const voucherType = (item.voucher_type || "").toLowerCase();
-                                                return name.includes(search) || email.includes(search) || phone.includes(search) || voucherRef.includes(search) || offerCode.includes(search) || flightType.includes(search) || voucherType.includes(search);
+                                                                                            const flightType = (item.flight_type || "").toLowerCase();
+                                            const voucherType = (item.voucher_type || "").toLowerCase();
+                                            const actualVoucherType = (item.actual_voucher_type || "").toLowerCase();
+                                            return name.includes(search) || email.includes(search) || phone.includes(search) || voucherRef.includes(search) || offerCode.includes(search) || flightType.includes(search) || voucherType.includes(search) || actualVoucherType.includes(search);
                                             }).length} vouchers found
                                         </Typography>
                                     </div>
@@ -1302,6 +1324,8 @@ const BookingPage = () => {
                                     data={filteredData.filter(item => {
                                         // Voucher Type filter
                                         if (filters.voucherType && item.voucher_type !== filters.voucherType) return false;
+                                        // Actual Voucher Type filter
+                                        if (filters.actualVoucherType && item.actual_voucher_type !== filters.actualVoucherType) return false;
                                         // Flight Type filter
                                         if (filters.flightType && item.flight_type !== filters.flightType) return false;
                                         // Redeemed Status filter
@@ -1328,8 +1352,9 @@ const BookingPage = () => {
                                         }
                                         return true;
                                     })}
-                                    columns={["created", "name", "flight_type", "voucher_type", "email", "phone", "expires", "redeemed", "paid", "offer_code", "voucher_ref"]}
+                                    columns={["created", "name", "flight_type", "voucher_type", "actual_voucher_type", "email", "phone", "expires", "redeemed", "paid", "offer_code", "voucher_ref"]}
                                     onNameClick={handleNameClick}
+                                    context="vouchers"
                                 />
                             </>
                         )}
@@ -1395,7 +1420,7 @@ const BookingPage = () => {
                                             <Grid item xs={12} md={6}>
                                                 <Box sx={{ background: '#fff', borderRadius: 2, p: 3, boxShadow: 1 }}>
                                                     <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>Flight Information</Typography>
-                                                    <Typography><b>Flight Type:</b> {bookingDetail.voucher.flight_type}</Typography>
+                                                    <Typography><b>Experience:</b> {bookingDetail.voucher.flight_type}</Typography>
                                                     <Typography><b>Voucher Type:</b> {bookingDetail.voucher.voucher_type}</Typography>
                                                     <Typography><b>Status:</b> {bookingDetail.voucher.status}</Typography>
                                                     <Typography><b>Redeemed:</b> {bookingDetail.voucher.redeemed}</Typography>
@@ -1611,8 +1636,8 @@ const BookingPage = () => {
                                                 {(() => {
                                                     const v = bookingDetail.voucher || {};
                                                     return <>
-                                                        <Typography><b>Voucher Type:</b> {v.voucher_type || '-'}</Typography>
-                                                        <Typography><b>Flight Type:</b> {v.flight_type || '-'}</Typography>
+                                                        <Typography><b>Book Flight:</b> {v.voucher_type || '-'}</Typography>
+                                                        <Typography><b>Experience:</b> {v.flight_type || '-'}</Typography>
                                                         <Typography><b>Redeemed:</b> {v.redeemed || 'No'}</Typography>
                                                         <Typography><b>Offer Code:</b> {v.offer_code || '-'}</Typography>
                                                         <Typography><b>Voucher Ref:</b> {v.voucher_ref || '-'}</Typography>
@@ -1696,8 +1721,8 @@ const BookingPage = () => {
                                                         (() => {
                                                             const v = bookingDetail.voucher || {};
                                                             return <>
-                                                                <Typography><b>Flight Type:</b> {v.flight_type || '-'}</Typography>
-                                                                <Typography><b>Voucher Type:</b> {v.voucher_type || '-'}</Typography>
+                                                                <Typography><b>Experience:</b> {v.flight_type || '-'}</Typography>
+                                                                <Typography><b>Book Flight:</b> {v.voucher_type || '-'}</Typography>
                                                                 <Typography><b>Paid:</b> £{v.paid || '0.00'}</Typography>
                                                                 <Typography><b>Redeemed:</b> {v.redeemed || '-'}</Typography>
                                                                 <Typography><b>Offer Code:</b> {v.offer_code || '-'}</Typography>
@@ -1994,7 +2019,7 @@ const BookingPage = () => {
                 <Dialog open={addGuestDialogOpen} onClose={() => setAddGuestDialogOpen(false)} maxWidth="sm" fullWidth>
                     <DialogTitle>Add Guest</DialogTitle>
                     <DialogContent>
-                        <Typography sx={{ mb: 2 }}>Flight Type: <b>{guestType}</b></Typography>
+                        <Typography sx={{ mb: 2 }}>Experience: <b>{guestType}</b></Typography>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                             <Typography>How many guests to add?</Typography>
                             <Button variant="outlined" onClick={() => setGuestCount(Math.max(guestCount - 1, 0))}>-</Button>

@@ -1982,7 +1982,8 @@ app.get('/api/getAllBookingData', (req, res) => {
 app.get('/api/getAllVoucherData', (req, res) => {
     // Join all_vouchers with all_booking and passenger (if available)
     const voucher = `
-        SELECT v.*, b.email as booking_email, b.phone as booking_phone, b.id as booking_id, p.weight as passenger_weight,
+        SELECT v.*, v.experience_type, v.book_flight, v.voucher_type as actual_voucher_type,
+               b.email as booking_email, b.phone as booking_phone, b.id as booking_id, p.weight as passenger_weight,
                vc.code as vc_code
         FROM all_vouchers v
         LEFT JOIN all_booking b ON v.voucher_ref = b.voucher_code
@@ -2008,8 +2009,9 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     ...row,
                     voucher_ref,
                     name: row.name ?? '',
-                    flight_type: row.flight_type ?? '',
-                    voucher_type: row.voucher_type ?? '',
+                    flight_type: row.experience_type ?? '', // Changed from flight_type to experience_type
+                    voucher_type: row.actual_voucher_type ?? '', // Changed to use actual_voucher_type for voucher_type column
+                    actual_voucher_type: row.actual_voucher_type ?? '', // New field for actual voucher type
                     email: row.email ?? '',
                     phone: row.phone ?? '',
                     expires: expiresVal ? moment(expiresVal).format('DD/MM/YYYY') : '',
@@ -2537,9 +2539,18 @@ app.get('/api/setup-database', (req, res) => {
 
 // Create Voucher (Flight Voucher veya Redeem Voucher)
 app.post('/api/createVoucher', (req, res) => {
+    console.log('=== CREATE VOUCHER ENDPOINT CALLED ===');
+    console.log('Request body:', req.body);
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('voucher_type_detail from request:', req.body.voucher_type_detail);
+    console.log('voucher_type from request:', req.body.voucher_type);
+    
+    // Helper function
     function emptyToNull(val) {
         return (val === '' || val === undefined) ? null : val;
     }
+    
+    // Extract request data
     const {
         name = '',
         weight = '',
@@ -2564,10 +2575,109 @@ app.post('/api/createVoucher', (req, res) => {
 
     const now = moment().format('YYYY-MM-DD HH:mm:ss');
     let expiresFinal = expires && expires !== '' ? expires : moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+    
+    // Determine the actual voucher type based on the input
+    let actualVoucherType = '';
+    
+                    // Check if there's a specific voucher type detail in the request
+        if (req.body.voucher_type_detail && req.body.voucher_type_detail.trim() !== '') {
+            actualVoucherType = req.body.voucher_type_detail.trim();
+            console.log('Using voucher_type_detail from request:', actualVoucherType);
+        } else if (voucher_type === 'Weekday Morning' || voucher_type === 'Flexible Weekday' || voucher_type === 'Any Day Flight') {
+            // If the frontend sends the specific voucher type directly
+            actualVoucherType = voucher_type;
+            console.log('Using voucher_type directly:', actualVoucherType);
+        } else {
+            // For Flight Voucher, Gift Voucher, etc., we need to get the actual type from the frontend
+            // This should be sent as voucher_type_detail
+            console.error('ERROR: No voucher_type_detail provided for voucher type:', voucher_type);
+            console.error('This indicates a frontend issue - selectedVoucherType was not set');
+            return res.status(400).json({ success: false, error: 'Missing voucher type detail. Please select a specific voucher type before proceeding.' });
+        }
+        
+        // Validate that the voucher type detail is one of the valid types
+        const validVoucherTypes = ['Weekday Morning', 'Flexible Weekday', 'Any Day Flight'];
+        if (!validVoucherTypes.includes(actualVoucherType)) {
+            console.error('ERROR: Invalid voucher type detail:', actualVoucherType);
+            console.error('Valid types are:', validVoucherTypes);
+            return res.status(400).json({ success: false, error: `Invalid voucher type detail: ${actualVoucherType}. Valid types are: ${validVoucherTypes.join(', ')}` });
+        }
+        
+        console.log('Final actualVoucherType:', actualVoucherType);
 
-    // Eğer Redeem Voucher ise, voucher code usage'ını güncelle
-    if (voucher_type === 'Redeem Voucher' && voucher_ref) {
-        // Önce voucher code'un mevcut olup olmadığını ve kullanılabilir olup olmadığını kontrol et
+    // First, check for duplicates to prevent multiple vouchers
+    const duplicateCheckSql = `SELECT id FROM all_vouchers WHERE name = ? AND email = ? AND phone = ? AND voucher_type = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 MINUTE) LIMIT 1`;
+    
+    con.query(duplicateCheckSql, [name, email, phone, voucher_type], (err, duplicateResult) => {
+        if (err) {
+            console.error('Error checking for duplicates:', err);
+            return res.status(500).json({ success: false, error: 'Database query failed to check for duplicates' });
+        }
+        
+        if (duplicateResult && duplicateResult.length > 0) {
+            console.log('=== DUPLICATE VOUCHER DETECTED ===');
+            console.log('Duplicate voucher ID:', duplicateResult[0].id);
+            console.log('Name:', name, 'Email:', email, 'Phone:', phone);
+            return res.status(400).json({ success: false, error: 'A voucher with these details was already created recently. Please wait a moment before trying again.' });
+        }
+        
+        // Also check if this is a Stripe session that was already processed
+        // Look for a voucher with the same payment details (name, email, paid amount) created very recently
+        const stripeDuplicateCheckSql = `SELECT id FROM all_vouchers WHERE name = ? AND email = ? AND paid = ? AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE) LIMIT 1`;
+        
+        con.query(stripeDuplicateCheckSql, [name, email, paid], (err, stripeDuplicateResult) => {
+            if (err) {
+                console.error('Error checking for Stripe duplicates:', err);
+                return res.status(500).json({ success: false, error: 'Database query failed to check for Stripe duplicates' });
+            }
+            
+            if (stripeDuplicateResult && stripeDuplicateResult.length > 0) {
+                console.log('=== STRIPE DUPLICATE VOUCHER DETECTED ===');
+                console.log('Stripe duplicate voucher ID:', stripeDuplicateResult[0].id);
+                console.log('Name:', name, 'Email:', email, 'Paid:', paid);
+                return res.status(400).json({ success: false, error: 'A voucher with these payment details was already created recently. This may be a duplicate Stripe webhook call.' });
+            }
+            
+            // Additional check: if this looks like a Stripe payment (paid > 0), check if there's already a voucher
+            // with the same name, email, and similar payment amount created very recently
+            if (paid > 0) {
+                const recentVoucherCheckSql = `SELECT id FROM all_vouchers WHERE name = ? AND email = ? AND created_at > DATE_SUB(NOW(), INTERVAL 2 MINUTE) LIMIT 1`;
+                
+                con.query(recentVoucherCheckSql, [name, email], (err, recentResult) => {
+                    if (err) {
+                        console.error('Error checking for recent vouchers:', err);
+                        return res.status(500).json({ success: false, error: 'Database query failed to check for recent vouchers' });
+                    }
+                    
+                    if (recentResult && recentResult.length > 0) {
+                        console.log('=== RECENT VOUCHER DETECTED (Possible Stripe Duplicate) ===');
+                        console.log('Recent voucher ID:', recentResult[0].id);
+                        console.log('Name:', name, 'Email:', email);
+                        return res.status(400).json({ success: false, error: 'A voucher with these details was already created recently. Please wait a moment before trying again.' });
+                    }
+                    
+                    // No recent vouchers found, proceed with voucher creation
+                    createVoucher();
+                });
+            } else {
+                // No payment amount, proceed with voucher creation
+                createVoucher();
+            }
+        });
+    });
+    
+    function createVoucher() {
+        // If this is a Redeem Voucher, handle voucher code usage first
+        if (voucher_type === 'Redeem Voucher' && voucher_ref) {
+            handleRedeemVoucher();
+        } else {
+            // For Flight Voucher or Gift Voucher, create directly
+            insertVoucherRecord();
+        }
+    }
+    
+    function handleRedeemVoucher() {
+        // Check if voucher code exists and is valid
         const checkVoucherSql = `
             SELECT id, current_uses, max_uses, is_active, valid_from, valid_until 
             FROM voucher_codes 
@@ -2589,12 +2699,8 @@ app.post('/api/createVoucher', (req, res) => {
             
             const voucher = voucherResult[0];
             
-            // Voucher code usage'ını güncelle
-            const updateVoucherSql = `
-                UPDATE voucher_codes 
-                SET current_uses = current_uses + 1 
-                WHERE id = ?
-            `;
+            // Update voucher code usage
+            const updateVoucherSql = `UPDATE voucher_codes SET current_uses = current_uses + 1 WHERE id = ?`;
             
             con.query(updateVoucherSql, [voucher.id], (err, updateResult) => {
                 if (err) {
@@ -2602,7 +2708,7 @@ app.post('/api/createVoucher', (req, res) => {
                     return res.status(500).json({ success: false, error: 'Failed to update voucher code usage' });
                 }
                 
-                // Şimdi voucher usage kaydını ekle
+                // Insert voucher usage record
                 const insertUsageSql = `
                     INSERT INTO voucher_code_usage 
                     (voucher_code_id, booking_id, customer_email, discount_applied, original_amount, final_amount) 
@@ -2624,58 +2730,26 @@ app.post('/api/createVoucher', (req, res) => {
                         // Usage kaydı başarısız olsa bile voucher oluşturmaya devam et
                     }
                     
-                    // Ana voucher kaydını oluştur
-                    createVoucherRecord();
+                    // Now create the main voucher record
+                    insertVoucherRecord();
                 });
             });
         });
+    }
+    
+    function insertVoucherRecord() {
+        console.log('=== INSERTING VOUCHER RECORD ===');
         
-        // Ana voucher kaydını oluşturan fonksiyon
-        function createVoucherRecord() {
-            const insertSql = `INSERT INTO all_vouchers 
-                (name, weight, flight_type, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-            const values = [
-                emptyToNull(name),
-                emptyToNull(weight),
-                emptyToNull(flight_type),
-                emptyToNull(voucher_type),
-                emptyToNull(email),
-                emptyToNull(phone),
-                emptyToNull(mobile),
-                emptyToNull(expiresFinal),
-                emptyToNull(redeemed),
-                paid,
-                emptyToNull(offer_code),
-                emptyToNull(voucher_ref),
-                now,
-                emptyToNull(recipient_name),
-                emptyToNull(recipient_email),
-                emptyToNull(recipient_phone),
-                emptyToNull(recipient_gift_date),
-                emptyToNull(preferred_location),
-                emptyToNull(preferred_time),
-                emptyToNull(preferred_day)
-            ];
-            
-            con.query(insertSql, values, (err, result) => {
-                if (err) {
-                    console.error('Error creating voucher:', err);
-                    return res.status(500).json({ success: false, error: 'Database query failed to create voucher' });
-                }
-                res.status(201).json({ success: true, message: 'Voucher created successfully!', voucherId: result.insertId });
-            });
-        }
-    } else {
-        // Flight Voucher veya Gift Voucher için normal işlem
         const insertSql = `INSERT INTO all_vouchers 
-            (name, weight, flight_type, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+            (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+            
         const values = [
             emptyToNull(name),
             emptyToNull(weight),
-            emptyToNull(flight_type),
-            emptyToNull(voucher_type),
+            emptyToNull(flight_type), // This will go to experience_type column
+            emptyToNull(voucher_type), // This will go to book_flight column
+            emptyToNull(actualVoucherType), // This will go to voucher_type column (actual voucher type)
             emptyToNull(email),
             emptyToNull(phone),
             emptyToNull(mobile),
@@ -2699,6 +2773,13 @@ app.post('/api/createVoucher', (req, res) => {
                 console.error('Error creating voucher:', err);
                 return res.status(500).json({ success: false, error: 'Database query failed to create voucher' });
             }
+            
+            console.log('=== VOUCHER CREATED SUCCESSFULLY ===');
+            console.log('Voucher ID:', result.insertId);
+            console.log('Name:', name);
+            console.log('Email:', email);
+            
+            // Send response only once
             res.status(201).json({ success: true, message: 'Voucher created successfully!', voucherId: result.insertId });
         });
     }
@@ -4621,40 +4702,94 @@ async function createVoucherFromWebhook(voucherData) {
 
         const now = moment().format('YYYY-MM-DD HH:mm:ss');
         let expiresFinal = expires && expires !== '' ? expires : moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
-
-        const insertSql = `INSERT INTO all_vouchers 
-            (name, weight, flight_type, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-        const values = [
-            emptyToNull(name),
-            emptyToNull(weight),
-            emptyToNull(flight_type),
-            emptyToNull(voucher_type),
-            emptyToNull(email),
-            emptyToNull(phone),
-            emptyToNull(mobile),
-            emptyToNull(expiresFinal),
-            emptyToNull(redeemed),
-            paid,
-            emptyToNull(offer_code),
-            emptyToNull(voucher_ref),
-            now,
-            emptyToNull(recipient_name),
-            emptyToNull(recipient_email),
-            emptyToNull(recipient_phone),
-            emptyToNull(recipient_gift_date),
-            emptyToNull(preferred_location),
-            emptyToNull(preferred_time),
-            emptyToNull(preferred_day)
-        ];
         
-        con.query(insertSql, values, (err, result) => {
+        // Determine the actual voucher type based on the input
+        let actualVoucherType = '';
+        
+        console.log('Webhook voucher data received:', voucherData);
+        console.log('voucher_type_detail from webhook:', voucherData.voucher_type_detail);
+        console.log('voucher_type from webhook:', voucher_type);
+        
+        // Check if there's a specific voucher type detail in the request
+        if (voucherData.voucher_type_detail && voucherData.voucher_type_detail.trim() !== '') {
+            actualVoucherType = voucherData.voucher_type_detail.trim();
+            console.log('Using voucher_type_detail from webhook data:', actualVoucherType);
+        } else if (voucher_type === 'Weekday Morning' || voucher_type === 'Flexible Weekday' || voucher_type === 'Any Day Flight') {
+            // If the frontend sends the specific voucher type directly
+            actualVoucherType = voucher_type;
+            console.log('Using voucher_type directly from webhook:', actualVoucherType);
+        } else {
+            // For Flight Voucher, Gift Voucher, etc., we need to get the actual type from the frontend
+            // This should be sent as voucher_type_detail
+            console.error('ERROR: No voucher_type_detail provided for voucher type:', voucher_type);
+            console.error('This indicates a frontend issue - selectedVoucherType was not set');
+            return reject(new Error('Missing voucher type detail. Please select a specific voucher type before proceeding.'));
+        }
+        
+        // Validate that the voucher type detail is one of the valid types
+        const validVoucherTypes = ['Weekday Morning', 'Flexible Weekday', 'Any Day Flight'];
+        if (!validVoucherTypes.includes(actualVoucherType)) {
+            console.error('ERROR: Invalid voucher type detail from webhook:', actualVoucherType);
+            console.error('Valid types are:', validVoucherTypes);
+            return reject(new Error(`Invalid voucher type detail: ${actualVoucherType}. Valid types are: ${validVoucherTypes.join(', ')}`));
+        }
+        
+        console.log('Final actualVoucherType from webhook:', actualVoucherType);
+
+        // Check for duplicates before inserting (prevent webhook duplicates)
+        const duplicateCheckSql = `SELECT id FROM all_vouchers WHERE name = ? AND email = ? AND paid = ? AND created_at > DATE_SUB(NOW(), INTERVAL 2 MINUTE) LIMIT 1`;
+        
+        con.query(duplicateCheckSql, [name, email, paid], (err, duplicateResult) => {
             if (err) {
-                console.error('Webhook voucher insertion error:', err);
+                console.error('Error checking for webhook duplicates:', err);
                 return reject(err);
             }
-            console.log('Webhook voucher created successfully, ID:', result.insertId);
-            resolve(result.insertId);
+            
+            if (duplicateResult && duplicateResult.length > 0) {
+                console.log('=== WEBHOOK DUPLICATE VOUCHER DETECTED ===');
+                console.log('Duplicate voucher ID:', duplicateResult[0].id);
+                console.log('Name:', name, 'Email:', email, 'Paid:', paid);
+                // Return the existing voucher ID instead of creating a new one
+                resolve(duplicateResult[0].id);
+                return;
+            }
+            
+            // No duplicates found, proceed with voucher creation
+            const insertSql = `INSERT INTO all_vouchers 
+                (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+            const values = [
+                emptyToNull(name),
+                emptyToNull(weight),
+                emptyToNull(flight_type), // This will go to experience_type column
+                emptyToNull(voucher_type), // This will go to book_flight column
+                emptyToNull(actualVoucherType), // This will go to voucher_type column (actual voucher type)
+                emptyToNull(email),
+                emptyToNull(phone),
+                emptyToNull(mobile),
+                emptyToNull(expiresFinal),
+                emptyToNull(redeemed),
+                paid,
+                emptyToNull(offer_code),
+                emptyToNull(voucher_ref),
+                now,
+                emptyToNull(recipient_name),
+                emptyToNull(recipient_email),
+                emptyToNull(recipient_phone),
+                emptyToNull(recipient_gift_date),
+                emptyToNull(preferred_location),
+                emptyToNull(preferred_time),
+                emptyToNull(preferred_day)
+            ];
+            
+            con.query(insertSql, values, (err, result) => {
+                if (err) {
+                    console.error('Webhook voucher insertion error:', err);
+                    return reject(err);
+                }
+                console.log('Webhook voucher created successfully, ID:', result.insertId);
+                resolve(result.insertId);
+            });
         });
     });
 }
@@ -4989,11 +5124,28 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                 result = storeData.voucherData.voucher_id;
                 voucherCode = storeData.voucherData.generated_voucher_code;
             } else {
-                // Create voucher only if not already created
-                result = await createVoucherFromWebhook(storeData.voucherData);
-                console.log('Voucher created successfully, ID:', result);
+                // Additional check: look for existing voucher in database to prevent duplicates
+                const existingVoucherSql = `SELECT id FROM all_vouchers WHERE name = ? AND email = ? AND paid = ? AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE) LIMIT 1`;
                 
-                                        // Voucher code generation is now handled by frontend only
+                try {
+                    const existingVoucher = await new Promise((resolve, reject) => {
+                        con.query(existingVoucherSql, [storeData.voucherData.name, storeData.voucherData.email, storeData.voucherData.paid], (err, result) => {
+                            if (err) reject(err);
+                            else resolve(result);
+                        });
+                    });
+                    
+                    if (existingVoucher && existingVoucher.length > 0) {
+                        console.log('Voucher already exists in database, using existing ID:', existingVoucher[0].id);
+                        result = existingVoucher[0].id;
+                        storeData.voucherData.voucher_id = result;
+                        storeData.processed = true;
+                    } else {
+                        // Create voucher only if not already created
+                        result = await createVoucherFromWebhook(storeData.voucherData);
+                        console.log('Voucher created successfully, ID:', result);
+                        
+                        // Voucher code generation is now handled by frontend only
                         // Webhook only creates the voucher entry
                         console.log('Voucher code generation skipped - will be handled by frontend');
                         
@@ -5034,9 +5186,17 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                                 // Continue even if code generation fails
                             }
                         }
-                
-                // Mark session as processed to prevent duplicate creation
-                storeData.processed = true;
+                        
+                        // Mark session as processed to prevent duplicate creation
+                        storeData.processed = true;
+                    }
+                } catch (dbError) {
+                    console.error('Error checking for existing voucher:', dbError);
+                    // Fallback to creating voucher
+                    result = await createVoucherFromWebhook(storeData.voucherData);
+                    console.log('Voucher created successfully (fallback), ID:', result);
+                    storeData.processed = true;
+                }
             }
         } else {
             return res.status(400).json({ success: false, message: 'Invalid type or missing data' });
@@ -5052,7 +5212,9 @@ app.post('/api/createBookingFromSession', async (req, res) => {
             voucher_code: voucherCode || storeData.voucherData?.generated_voucher_code || null,
             customer_name: storeData.voucherData?.name || storeData.bookingData?.name || null,
             customer_email: storeData.voucherData?.email || storeData.bookingData?.email || null,
-            paid_amount: storeData.voucherData?.paid || storeData.bookingData?.totalPrice || null
+            paid_amount: storeData.voucherData?.paid || storeData.bookingData?.totalPrice || null,
+            voucher_type: storeData.voucherData?.voucher_type || null,
+            voucher_type_detail: storeData.voucherData?.voucher_type_detail || null
         });
     } catch (error) {
         console.error('Error creating from session:', error);
