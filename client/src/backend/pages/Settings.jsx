@@ -63,6 +63,26 @@ const Settings = () => {
         is_active: true
     });
     
+    // Private Charter Voucher Types state
+    const [privateCharterVoucherTypes, setPrivateCharterVoucherTypes] = useState([]);
+    const [showPrivateCharterVoucherTypesForm, setShowPrivateCharterVoucherTypesForm] = useState(false);
+    const [showEditPrivateCharterVoucherTypeForm, setShowEditPrivateCharterVoucherTypeForm] = useState(false);
+    const [selectedPrivateCharterVoucherType, setSelectedPrivateCharterVoucherType] = useState(null);
+    const [privateCharterVoucherTypeFormData, setPrivateCharterVoucherTypeFormData] = useState({
+        title: '',
+        description: '',
+        image_url: '',
+        image_file: null,
+        max_passengers: 8,
+        validity_months: 18,
+        flight_days: 'Any Day',
+        flight_time: 'AM & PM',
+        features: '[]',
+        terms: '',
+        sort_order: 0,
+        is_active: true
+    });
+    
     // Add to Booking Items state
     const [addToBookingItems, setAddToBookingItems] = useState([]);
     const [showAddToBookingForm, setShowAddToBookingForm] = useState(false);
@@ -130,6 +150,7 @@ const Settings = () => {
     const [voucherCodesExpanded, setVoucherCodesExpanded] = useState(true);
     const [experiencesExpanded, setExperiencesExpanded] = useState(false);
     const [voucherTypesExpanded, setVoucherTypesExpanded] = useState(false);
+    const [privateCharterVoucherTypesExpanded, setPrivateCharterVoucherTypesExpanded] = useState(false);
     const [addToBookingExpanded, setAddToBookingExpanded] = useState(false);
     const [crewExpanded, setCrewExpanded] = useState(false);
     const [additionalInfoExpanded, setAdditionalInfoExpanded] = useState(false);
@@ -156,6 +177,7 @@ const Settings = () => {
         fetchVoucherCodes();
         fetchExperiences();
         fetchVoucherTypes();
+        fetchPrivateCharterVoucherTypes();
         fetchAddToBookingItems();
         fetchAdditionalInfoQuestions();
         fetchTermsAndConditions();
@@ -197,6 +219,17 @@ const Settings = () => {
             }
         } catch (error) {
             console.error('Error fetching voucher types:', error);
+        }
+    };
+
+    const fetchPrivateCharterVoucherTypes = async () => {
+        try {
+            const response = await axios.get('/api/private-charter-voucher-types');
+            if (response.data.success) {
+                setPrivateCharterVoucherTypes(response.data.data);
+            }
+        } catch (error) {
+            console.error('Error fetching private charter voucher types:', error);
         }
     };
 
@@ -497,6 +530,95 @@ const Settings = () => {
             is_active: true
         });
         setSelectedVoucherType(null);
+    };
+
+    // Private Charter Voucher Types form handling
+    const handlePrivateCharterVoucherTypeSubmit = async (e) => {
+        e.preventDefault();
+        
+        // Form validation
+        if (!privateCharterVoucherTypeFormData.title || !privateCharterVoucherTypeFormData.description) {
+            alert('Please fill in all required fields: Title and Description');
+            return;
+        }
+        
+        try {
+            const formData = new FormData();
+            Object.keys(privateCharterVoucherTypeFormData).forEach(key => {
+                if (key === 'image_file' && privateCharterVoucherTypeFormData[key]) {
+                    formData.append('private_charter_voucher_type_image', privateCharterVoucherTypeFormData[key]);
+                } else if (key !== 'image_file') {
+                    formData.append(key, privateCharterVoucherTypeFormData[key]);
+                }
+            });
+            
+            if (showEditPrivateCharterVoucherTypeForm) {
+                await axios.put(`/api/private-charter-voucher-types/${selectedPrivateCharterVoucherType.id}`, formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+            } else {
+                await axios.post('/api/private-charter-voucher-types', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+            }
+            
+            fetchPrivateCharterVoucherTypes();
+            resetPrivateCharterVoucherTypeForm();
+            setShowPrivateCharterVoucherTypesForm(false);
+            setShowEditPrivateCharterVoucherTypeForm(false);
+        } catch (error) {
+            console.error('Error saving private charter voucher type:', error);
+            alert(error.response?.data?.message || 'Error saving private charter voucher type');
+        }
+    };
+
+    const handleEditPrivateCharterVoucherType = (privateCharterVoucherType) => {
+        setSelectedPrivateCharterVoucherType(privateCharterVoucherType);
+        setPrivateCharterVoucherTypeFormData({
+            title: privateCharterVoucherType.title,
+            description: privateCharterVoucherType.description,
+            image_url: privateCharterVoucherType.image_url || '',
+            image_file: null,
+            max_passengers: privateCharterVoucherType.max_passengers || 8,
+            validity_months: privateCharterVoucherType.validity_months || 18,
+            flight_days: privateCharterVoucherType.flight_days || 'Any Day',
+            flight_time: privateCharterVoucherType.flight_time || 'AM & PM',
+            features: privateCharterVoucherType.features || '[]',
+            terms: privateCharterVoucherType.terms || '',
+            sort_order: privateCharterVoucherType.sort_order || 0,
+            is_active: privateCharterVoucherType.is_active
+        });
+        setShowEditPrivateCharterVoucherTypeForm(true);
+    };
+
+    const handleDeletePrivateCharterVoucherType = async (id) => {
+        if (window.confirm('Are you sure you want to delete this private charter voucher type?')) {
+            try {
+                await axios.delete(`/api/private-charter-voucher-types/${id}`);
+                fetchPrivateCharterVoucherTypes();
+            } catch (error) {
+                console.error('Error deleting private charter voucher type:', error);
+                alert(error.response?.data?.message || 'Error deleting private charter voucher type');
+            }
+        }
+    };
+
+    const resetPrivateCharterVoucherTypeForm = () => {
+        setPrivateCharterVoucherTypeFormData({
+            title: '',
+            description: '',
+            image_url: '',
+            image_file: null,
+            max_passengers: 8,
+            validity_months: 18,
+            flight_days: 'Any Day',
+            flight_time: 'AM & PM',
+            features: '[]',
+            terms: '',
+            sort_order: 0,
+            is_active: true
+        });
+        setSelectedPrivateCharterVoucherType(null);
     };
 
     // Crew Management form handling
@@ -1917,6 +2039,176 @@ const Settings = () => {
                 )}
             </div>
 
+            {/* Private Charter Voucher Types Section */}
+            <div className="settings-card" style={{ marginBottom: '24px' }}>
+                <div 
+                    className="card-header"
+                    onClick={() => setPrivateCharterVoucherTypesExpanded(!privateCharterVoucherTypesExpanded)}
+                    style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        padding: '20px',
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                    }}
+                >
+                    <div>
+                        <h2 style={{ margin: 0, color: '#1f2937' }}>Private Charter Voucher Types</h2>
+                        <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
+                            Manage private charter voucher types for exclusive ballooning experiences.
+                        </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button 
+                            className="btn btn-primary"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowPrivateCharterVoucherTypesForm(true);
+                            }}
+                            style={{ margin: 0 }}
+                        >
+                            <Plus size={20} />
+                            Create Private Charter Voucher Type
+                        </button>
+                        {privateCharterVoucherTypesExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+                    </div>
+                </div>
+                
+                {privateCharterVoucherTypesExpanded && (
+                    <>
+                        <div className="private-charter-voucher-types-stats" style={{ 
+                            display: 'flex', 
+                            gap: '20px', 
+                            marginBottom: '20px',
+                            padding: '16px',
+                            background: '#f8fafc',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0'
+                        }}>
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#1f2937' }}>
+                                    {privateCharterVoucherTypes.length}
+                                </div>
+                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Total Private Charter Voucher Types</div>
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#10b981' }}>
+                                    {privateCharterVoucherTypes.filter(vt => vt.is_active).length}
+                                </div>
+                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Active</div>
+                            </div>
+                        </div>
+                        
+                        {privateCharterVoucherTypes.length === 0 ? (
+                            <div className="no-private-charter-voucher-types-message">
+                                <div style={{ textAlign: 'center', padding: '40px' }}>
+                                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎈</div>
+                                    <h3 style={{ color: '#6b7280', marginBottom: '8px' }}>No Private Charter Voucher Types Yet</h3>
+                                    <p style={{ color: '#9ca3af', marginBottom: '20px' }}>
+                                        Create your first private charter voucher type for exclusive ballooning experiences.
+                                    </p>
+                                    <button 
+                                        className="btn btn-primary"
+                                        onClick={() => setShowPrivateCharterVoucherTypesForm(true)}
+                                    >
+                                        <Plus size={20} />
+                                        Create First Private Charter Voucher Type
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="private-charter-voucher-types-table-container" style={{ 
+                                width: '100%', 
+                                overflowX: 'auto',
+                                minHeight: '400px'
+                            }}>
+                                <table className="private-charter-voucher-types-table">
+                                    <thead>
+                                        <tr>
+                                            <th>TITLE</th>
+                                            <th>DESCRIPTION</th>
+                                            <th>FLIGHT DAYS</th>
+                                            <th>FLIGHT TIME</th>
+                                            <th>VALIDITY</th>
+                                            <th>STATUS</th>
+                                            <th>ACTIONS</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {privateCharterVoucherTypes.map((privateCharterVoucherType) => (
+                                            <tr key={privateCharterVoucherType.id}>
+                                                <td>
+                                                    <div>
+                                                        <div style={{ fontWeight: '600' }}>{privateCharterVoucherType.title}</div>
+                                                        {privateCharterVoucherType.image_url && (
+                                                            <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                                                                {privateCharterVoucherType.image_url.startsWith('/uploads/') ? (
+                                                                    <img 
+                                                                        src={privateCharterVoucherType.image_url} 
+                                                                        alt={privateCharterVoucherType.title}
+                                                                        style={{ 
+                                                                            width: '60px', 
+                                                                            height: '40px', 
+                                                                            objectFit: 'cover',
+                                                                            borderRadius: '4px',
+                                                                            marginTop: '4px'
+                                                                        }}
+                                                                    />
+                                                                ) : (
+                                                                    `Image: ${privateCharterVoucherType.image_url}`
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div style={{ maxWidth: '300px', fontSize: '14px' }}>
+                                                        {privateCharterVoucherType.description}
+                                                    </div>
+                                                </td>
+                                                <td>{privateCharterVoucherType.flight_days}</td>
+                                                <td>{privateCharterVoucherType.flight_time}</td>
+                                                <td>{privateCharterVoucherType.validity_months} months</td>
+                                                <td>
+                                                    {privateCharterVoucherType.is_active ? (
+                                                        <span className="status-badge active">Active</span>
+                                                    ) : (
+                                                        <span className="status-badge inactive">Inactive</span>
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    <div className="action-buttons">
+                                                        <button
+                                                            className="btn btn-icon"
+                                                            onClick={() => handleEditPrivateCharterVoucherType(privateCharterVoucherType)}
+                                                            title="Edit"
+                                                        >
+                                                            <Edit size={16} />
+                                                        </button>
+                                                        <button
+                                                            className="btn btn-icon btn-danger"
+                                                            onClick={() => handleDeletePrivateCharterVoucherType(privateCharterVoucherType.id)}
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+
             {/* Crew Management Section */}
             <div className="settings-card" style={{ marginBottom: '24px' }}>
                 <div 
@@ -2949,6 +3241,189 @@ const Settings = () => {
                                 </button>
                                 <button type="submit" className="btn btn-primary">
                                     {showEditVoucherTypeForm ? 'Update Voucher Type' : 'Create Voucher Type'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Create/Edit Private Charter Voucher Type Form Modal */}
+            {(showPrivateCharterVoucherTypesForm || showEditPrivateCharterVoucherTypeForm) && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h3>{showEditPrivateCharterVoucherTypeForm ? 'Edit Private Charter Voucher Type' : 'Create New Private Charter Voucher Type'}</h3>
+                            <button 
+                                className="close-btn"
+                                onClick={() => {
+                                    setShowPrivateCharterVoucherTypesForm(false);
+                                    setShowEditPrivateCharterVoucherTypeForm(false);
+                                    resetPrivateCharterVoucherTypeForm();
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        
+                        <form onSubmit={handlePrivateCharterVoucherTypeSubmit} className="private-charter-voucher-type-form">
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Title *</label>
+                                    <input
+                                        type="text"
+                                        value={privateCharterVoucherTypeFormData.title}
+                                        onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, title: e.target.value})}
+                                        placeholder="e.g., Private Morning Charter"
+                                        required
+                                    />
+                                </div>
+                                
+                            </div>
+                            
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Max Passengers</label>
+                                    <input
+                                        type="number"
+                                        value={privateCharterVoucherTypeFormData.max_passengers}
+                                        onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, max_passengers: parseInt(e.target.value)})}
+                                        placeholder="8"
+                                        min="1"
+                                    />
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label>Max Passengers</label>
+                                    <input
+                                        type="number"
+                                        value={privateCharterVoucherTypeFormData.max_passengers}
+                                        onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, max_passengers: parseInt(e.target.value)})}
+                                        placeholder="8"
+                                        min="1"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Validity (Months)</label>
+                                    <input
+                                        type="number"
+                                        value={privateCharterVoucherTypeFormData.validity_months}
+                                        onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, validity_months: parseInt(e.target.value)})}
+                                        placeholder="18"
+                                        min="1"
+                                    />
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label>Flight Days</label>
+                                    <select
+                                        value={privateCharterVoucherTypeFormData.flight_days}
+                                        onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, flight_days: e.target.value})}
+                                    >
+                                        <option value="Any Day">Any Day</option>
+                                        <option value="Monday - Friday">Monday - Friday</option>
+                                        <option value="Weekends">Weekends</option>
+                                        <option value="Monday - Sunday">Monday - Sunday</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Flight Time</label>
+                                    <select
+                                        value={privateCharterVoucherTypeFormData.flight_time}
+                                        onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, flight_time: e.target.value})}
+                                    >
+                                        <option value="AM">AM (Morning)</option>
+                                        <option value="PM">PM (Afternoon/Evening)</option>
+                                        <option value="AM & PM">AM & PM (Flexible)</option>
+                                    </select>
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label>Sort Order</label>
+                                    <input
+                                        type="number"
+                                        value={privateCharterVoucherTypeFormData.sort_order}
+                                        onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, sort_order: parseInt(e.target.value)})}
+                                        placeholder="0"
+                                        min="0"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Description *</label>
+                                <textarea
+                                    value={privateCharterVoucherTypeFormData.description}
+                                    onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, description: e.target.value})}
+                                    placeholder="Describe the private charter experience..."
+                                    rows="4"
+                                    required
+                                />
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Features (JSON Array)</label>
+                                <textarea
+                                    value={privateCharterVoucherTypeFormData.features}
+                                    onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, features: e.target.value})}
+                                    placeholder='["Private Balloon", "Flexible Timing", "Personalized Experience"]'
+                                    rows="2"
+                                />
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Terms & Conditions</label>
+                                <textarea
+                                    value={privateCharterVoucherTypeFormData.terms}
+                                    onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, terms: e.target.value})}
+                                    placeholder="Terms and conditions for this private charter voucher type..."
+                                    rows="3"
+                                />
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Image</label>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, image_file: e.target.files[0]})}
+                                />
+                                {privateCharterVoucherTypeFormData.image_url && !privateCharterVoucherTypeFormData.image_file && (
+                                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                                        Current image: {privateCharterVoucherTypeFormData.image_url}
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Status</label>
+                                    <select
+                                        value={privateCharterVoucherTypeFormData.is_active}
+                                        onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, is_active: e.target.value === 'true'})}
+                                    >
+                                        <option value={true}>Active</option>
+                                        <option value={false}>Inactive</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div className="form-actions">
+                                <button type="button" className="btn btn-secondary" onClick={() => {
+                                    setShowPrivateCharterVoucherTypesForm(false);
+                                    setShowEditPrivateCharterVoucherTypeForm(false);
+                                    resetPrivateCharterVoucherTypeForm();
+                                }}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn btn-primary">
+                                    {showEditPrivateCharterVoucherTypeForm ? 'Update Private Charter Voucher Type' : 'Create Private Charter Voucher Type'}
                                 </button>
                             </div>
                         </form>

@@ -1,5 +1,5 @@
 import { Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from "@mui/material";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import {Link, useNavigate} from 'react-router-dom';
 import Button from '@mui/material/Button';
@@ -24,6 +24,8 @@ const ActivityList = ({ activity }) => {
         location: '',
         flight_type: [], // now array
         voucher_type: [], // voucher types array
+        private_charter_voucher_types: [], // private charter voucher types array
+        private_charter_pricing: {}, // individual pricing for each voucher type
         weekday_morning_price: '',
         flexible_weekday_price: '',
         any_day_flight_price: '',
@@ -35,7 +37,9 @@ const ActivityList = ({ activity }) => {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
-    const [editForm, setEditForm] = useState({});
+    const [editForm, setEditForm] = useState({
+        private_charter_pricing: {}
+    });
     const [editId, setEditId] = useState(null);
     const [editSaving, setEditSaving] = useState(false);
     const [editError, setEditError] = useState('');
@@ -45,13 +49,37 @@ const ActivityList = ({ activity }) => {
     const [editImagePreview, setEditImagePreview] = useState(null);
     const [availModalOpen, setAvailModalOpen] = useState(false);
     const [availActivity, setAvailActivity] = useState(null);
+    const [privateCharterVoucherTypes, setPrivateCharterVoucherTypes] = useState([]);
+    const [privateCharterVoucherTypesLoading, setPrivateCharterVoucherTypesLoading] = useState(false);
     const navigate = useNavigate();
+
+    // Fetch private charter voucher types on component mount
+    useEffect(() => {
+        const fetchPrivateCharterVoucherTypes = async () => {
+            setPrivateCharterVoucherTypesLoading(true);
+            try {
+                const response = await fetch('/api/private-charter-voucher-types');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        setPrivateCharterVoucherTypes(data.data);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching private charter voucher types:', error);
+            } finally {
+                setPrivateCharterVoucherTypesLoading(false);
+            }
+        };
+
+        fetchPrivateCharterVoucherTypes();
+    }, []);
 
     const handleOpen = () => setOpen(true);
     const handleClose = () => {
         setOpen(false);
         setForm({
-            activity_name: '', capacity: '', location: '', flight_type: [], voucher_type: [], weekday_morning_price: '', flexible_weekday_price: '', any_day_flight_price: '', shared_flight_from_price: '', private_charter_from_price: '', status: 'Live'
+            activity_name: '', capacity: '', location: '', flight_type: [], voucher_type: [], private_charter_voucher_types: [], private_charter_pricing: {}, weekday_morning_price: '', flexible_weekday_price: '', any_day_flight_price: '', shared_flight_from_price: '', private_charter_from_price: '', status: 'Live'
         });
         setError('');
         setSuccess(false);
@@ -75,6 +103,23 @@ const ActivityList = ({ activity }) => {
                 newTypes = newTypes.filter(t => t !== value);
             }
             setForm({ ...form, voucher_type: newTypes });
+        } else if (name === 'private_charter_voucher_types') {
+            let newTypes = [...form.private_charter_voucher_types];
+            if (checked) {
+                newTypes.push(value);
+            } else {
+                newTypes = newTypes.filter(t => t !== value);
+            }
+            setForm({ ...form, private_charter_voucher_types: newTypes });
+        } else if (name.startsWith('private_charter_price_')) {
+            const voucherTypeId = name.replace('private_charter_price_', '');
+            setForm({
+                ...form,
+                private_charter_pricing: {
+                    ...form.private_charter_pricing,
+                    [voucherTypeId]: value
+                }
+            });
         } else {
             setForm({ ...form, [name]: value });
         }
@@ -95,8 +140,10 @@ const ActivityList = ({ activity }) => {
         try {
             const formData = new FormData();
             Object.entries(form).forEach(([key, value]) => {
-                if (key === 'flight_type' || key === 'voucher_type') {
+                if (key === 'flight_type' || key === 'voucher_type' || key === 'private_charter_voucher_types') {
                     formData.append(key, value.join(','));
+                } else if (key === 'private_charter_pricing') {
+                    formData.append(key, JSON.stringify(value));
                 } else {
                     formData.append(key, value);
                 }
@@ -129,8 +176,17 @@ const ActivityList = ({ activity }) => {
             const res = await fetch(`/api/activity/${id}`);
             const data = await res.json();
             if (data.success) {
-                setEditForm(data.data);
-                setEditImagePreview(data.data.image ? data.data.image : null);
+                // Parse private_charter_pricing if it's a string
+                let parsedData = data.data;
+                if (parsedData.private_charter_pricing && typeof parsedData.private_charter_pricing === 'string') {
+                    try {
+                        parsedData.private_charter_pricing = JSON.parse(parsedData.private_charter_pricing);
+                    } catch (e) {
+                        parsedData.private_charter_pricing = {};
+                    }
+                }
+                setEditForm(parsedData);
+                setEditImagePreview(parsedData.image ? parsedData.image : null);
             } else {
                 setEditForm({});
                 setEditError('Not found');
@@ -159,6 +215,23 @@ const ActivityList = ({ activity }) => {
                 newTypes = newTypes.filter(t => t !== value);
             }
             setEditForm({ ...editForm, voucher_type: newTypes });
+        } else if (name === 'private_charter_voucher_types') {
+            let newTypes = Array.isArray(editForm.private_charter_voucher_types) ? [...editForm.private_charter_voucher_types] : (typeof editForm.private_charter_voucher_types === 'string' ? editForm.private_charter_voucher_types.split(',') : []);
+            if (checked) {
+                newTypes.push(value);
+            } else {
+                newTypes = newTypes.filter(t => t !== value);
+            }
+            setEditForm({ ...editForm, private_charter_voucher_types: newTypes });
+        } else if (name.startsWith('private_charter_price_')) {
+            const voucherTypeId = name.replace('private_charter_price_', '');
+            setEditForm({
+                ...editForm,
+                private_charter_pricing: {
+                    ...editForm.private_charter_pricing,
+                    [voucherTypeId]: value
+                }
+            });
         } else {
             setEditForm({ ...editForm, [name]: value });
         }
@@ -178,8 +251,10 @@ const ActivityList = ({ activity }) => {
         try {
             const formData = new FormData();
             Object.entries(editForm).forEach(([key, value]) => {
-                if (key === 'flight_type' || key === 'voucher_type') {
+                if (key === 'flight_type' || key === 'voucher_type' || key === 'private_charter_voucher_types') {
                     formData.append(key, Array.isArray(value) ? value.join(',') : value);
+                } else if (key === 'private_charter_pricing') {
+                    formData.append(key, JSON.stringify(value));
                 } else {
                     formData.append(key, value);
                 }
@@ -239,48 +314,320 @@ const ActivityList = ({ activity }) => {
             <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
                 <DialogTitle>Create Activity</DialogTitle>
                 <DialogContent>
-                    <TextField margin="dense" label="Activity Name" name="activity_name" value={form.activity_name} onChange={handleChange} fullWidth required />
-                    <TextField margin="dense" label="Capacity" name="capacity" value={form.capacity} onChange={handleChange} type="number" fullWidth required />
-                    <TextField margin="dense" label="Location" name="location" value={form.location} onChange={handleChange} fullWidth required />
-                    <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Flight Type</div>
-                    <FormGroup row sx={{ mb: 2, mt: 1 }}>
-                        <FormControlLabel
-                            control={<Checkbox checked={form.flight_type.includes('Private')} onChange={handleChange} name="flight_type" value="Private" />}
-                            label="Private"
+                    <div style={{ 
+                        marginBottom: 20, 
+                        padding: '16px', 
+                        backgroundColor: '#f8f9fa', 
+                        borderRadius: '8px', 
+                        border: '1px solid #dee2e6' 
+                    }}>
+                        <div style={{ 
+                            marginBottom: 12, 
+                            fontWeight: 600, 
+                            fontSize: '16px', 
+                            color: '#495057',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                        }}>
+                            <span style={{ fontSize: '18px' }}>📋</span>
+                            Basic Information
+                        </div>
+                        <div style={{ 
+                            fontSize: '13px', 
+                            color: '#6c757d', 
+                            marginBottom: '12px', 
+                            fontStyle: 'italic' 
+                        }}>
+                            General activity details and configuration
+                        </div>
+                        <TextField margin="dense" label="Activity Name" name="activity_name" value={form.activity_name} onChange={handleChange} fullWidth required />
+                        <TextField margin="dense" label="Capacity" name="capacity" value={form.capacity} onChange={handleChange} type="number" fullWidth required />
+                        <TextField margin="dense" label="Location" name="location" value={form.location} onChange={handleChange} fullWidth required />
+                    </div>
+                    
+                    <div style={{ 
+                        marginTop: 20, 
+                        marginBottom: 16, 
+                        padding: '16px', 
+                        backgroundColor: '#e3f2fd', 
+                        borderRadius: '8px', 
+                        border: '1px solid #bbdefb' 
+                    }}>
+                        <div style={{ 
+                            marginBottom: 12, 
+                            fontWeight: 600, 
+                            fontSize: '16px', 
+                            color: '#1565c0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                        }}>
+                            <span style={{ fontSize: '18px' }}>🛩️</span>
+                            Flight Type
+                        </div>
+                        <div style={{ 
+                            fontSize: '13px', 
+                            color: '#1565c0', 
+                            marginBottom: '12px', 
+                            fontStyle: 'italic' 
+                        }}>
+                            Select which types of flights this activity supports
+                        </div>
+                        <FormGroup row sx={{ mb: 0, mt: 1 }}>
+                            <FormControlLabel
+                                control={<Checkbox checked={form.flight_type.includes('Private')} onChange={handleChange} name="flight_type" value="Private" />}
+                                label="Private"
+                            />
+                            <FormControlLabel
+                                control={<Checkbox checked={form.flight_type.includes('Shared')} onChange={handleChange} name="flight_type" value="Shared" />}
+                                label="Shared"
+                            />
+                        </FormGroup>
+                    </div>
+                    
+                    {/* Experience: Shared Flight Section */}
+                    <div style={{ 
+                        marginTop: 24, 
+                        marginBottom: 16, 
+                        padding: '20px', 
+                        backgroundColor: '#f8f9fa', 
+                        borderRadius: '12px', 
+                        border: '2px solid #e9ecef',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                    }}>
+                        <div style={{ 
+                            marginBottom: 20, 
+                            fontWeight: 700, 
+                            fontSize: '18px', 
+                            color: '#1976d2',
+                            borderBottom: '3px solid #1976d2',
+                            paddingBottom: '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                        }}>
+                            <span style={{ fontSize: '20px' }}>✈️</span>
+                            Experience: Shared Flight
+                        </div>
+                        <div style={{ 
+                            fontSize: '14px', 
+                            color: '#666', 
+                            marginBottom: '20px', 
+                            fontStyle: 'italic',
+                            padding: '12px',
+                            backgroundColor: '#fff',
+                            borderRadius: '8px',
+                            border: '1px solid #dee2e6'
+                        }}>
+                            ℹ️ These fields are specifically for Shared Flight experiences only. They control pricing and voucher options for shared balloon flights.
+                        </div>
+                        
+                        <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>From Price</div>
+                        <TextField margin="dense" label="Shared Flight From Price" name="shared_flight_from_price" value={form.shared_flight_from_price} onChange={handleChange} type="number" fullWidth required />
+                        
+                        <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Voucher Type</div>
+                        <FormGroup row sx={{ mb: 2, mt: 1 }}>
+                            <FormControlLabel
+                                control={<Checkbox checked={form.voucher_type.includes('Weekday Morning')} onChange={handleChange} name="voucher_type" value="Weekday Morning" />}
+                                label="Weekday Morning"
+                            />
+                            <FormControlLabel
+                                control={<Checkbox checked={form.voucher_type.includes('Flexible Weekday')} onChange={handleChange} name="voucher_type" value="Flexible Weekday" />}
+                                label="Flexible Weekday"
+                            />
+                            <FormControlLabel
+                                control={<Checkbox checked={form.voucher_type.includes('Any Day Flight')} onChange={handleChange} name="voucher_type" value="Any Day Flight" />}
+                                label="Any Day Flight"
+                            />
+                        </FormGroup> 
+                        
+                        <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Per Person Pricing</div>
+                        <TextField margin="dense" label="Weekday Morning Price" name="weekday_morning_price" value={form.weekday_morning_price} onChange={handleChange} type="number" fullWidth required />
+                        <TextField margin="dense" label="Flexible Weekday Price" name="flexible_weekday_price" value={form.flexible_weekday_price} onChange={handleChange} type="number" fullWidth required />
+                        <TextField margin="dense" label="Any Day Flight Price" name="any_day_flight_price" value={form.any_day_flight_price} onChange={handleChange} type="number" fullWidth required />
+                    </div>
+                    
+                    {/* Private Charter From Price - Separate section */}
+                    <div style={{ 
+                        marginTop: 24, 
+                        marginBottom: 16, 
+                        padding: '16px', 
+                        backgroundColor: '#fff3cd', 
+                        borderRadius: '8px', 
+                        border: '1px solid #ffeaa7' 
+                    }}>
+                        <div style={{ 
+                            marginBottom: 12, 
+                            fontWeight: 600, 
+                            fontSize: '16px', 
+                            color: '#856404',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                        }}>
+                            <span style={{ fontSize: '18px' }}>🎈</span>
+                            Private Charter From Price
+                        </div>
+                        <div style={{ 
+                            fontSize: '13px', 
+                            color: '#856404', 
+                            marginBottom: '12px', 
+                            fontStyle: 'italic' 
+                        }}>
+                            This field is for Private Charter experiences only
+                        </div>
+                        <TextField margin="dense" label="Private Charter From Price" name="private_charter_from_price" value={form.private_charter_from_price} onChange={handleChange} type="number" fullWidth required />
+                    </div>
+
+                    {/* Private Charter Voucher Types Section */}
+                    <div style={{ 
+                        marginTop: 24, 
+                        marginBottom: 16, 
+                        padding: '20px', 
+                        backgroundColor: '#fff3cd', 
+                        borderRadius: '12px', 
+                        border: '2px solid #ffeaa7',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                    }}>
+                        <div style={{ 
+                            marginBottom: 20, 
+                            fontWeight: 700, 
+                            fontSize: '18px', 
+                            color: '#856404',
+                            borderBottom: '3px solid #f39c12',
+                            paddingBottom: '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                        }}>
+                            <span style={{ fontSize: '20px' }}>🎫</span>
+                            Private Charter Voucher Types
+                        </div>
+                        <div style={{ 
+                            fontSize: '14px', 
+                            color: '#856404', 
+                            marginBottom: '20px', 
+                            fontStyle: 'italic',
+                            padding: '12px',
+                            backgroundColor: '#fff',
+                            borderRadius: '8px',
+                            border: '1px solid #ffeaa7'
+                        }}>
+                            ℹ️ Select which private charter voucher types this activity supports. These options come from the Private Charter Voucher Types settings.
+                        </div>
+                        
+                        {privateCharterVoucherTypesLoading ? (
+                            <div style={{ textAlign: 'center', padding: '20px', color: '#856404' }}>
+                                Loading voucher types...
+                            </div>
+                        ) : privateCharterVoucherTypes.length > 0 ? (
+                            <>
+                                <FormGroup row sx={{ mb: 2, mt: 1 }}>
+                                    {privateCharterVoucherTypes.map((voucherType) => (
+                                        <FormControlLabel
+                                            key={voucherType.id}
+                                            control={
+                                                <Checkbox 
+                                                    checked={form.private_charter_voucher_types.includes(voucherType.id.toString())} 
+                                                    onChange={handleChange} 
+                                                    name="private_charter_voucher_types" 
+                                                    value={voucherType.id.toString()} 
+                                                />
+                                            }
+                                            label={voucherType.title}
+                                        />
+                                    ))}
+                                </FormGroup>
+                                
+                                {/* Individual Pricing Fields */}
+                                <div style={{ marginTop: '20px', padding: '16px', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #ffeaa7' }}>
+                                    <div style={{ marginBottom: '16px', fontWeight: '600', color: '#856404' }}>
+                                        Group Pricing for Selected Voucher Types
+                                    </div>
+                                    {privateCharterVoucherTypes.map((voucherType) => (
+                                        <div key={voucherType.id} style={{ marginBottom: '12px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                <Checkbox 
+                                                    checked={form.private_charter_voucher_types.includes(voucherType.id.toString())} 
+                                                    disabled
+                                                    style={{ color: '#856404' }}
+                                                />
+                                                <label style={{ fontWeight: '500', color: '#856404', minWidth: '200px' }}>
+                                                    Group Pricing: {voucherType.title}
+                                                </label>
+                                                <TextField
+                                                    size="small"
+                                                    type="number"
+                                                    name={`private_charter_price_${voucherType.id}`}
+                                                    value={form.private_charter_pricing[voucherType.id] || ''}
+                                                    onChange={handleChange}
+                                                    placeholder="0.00"
+                                                    min="0"
+                                                    step="0.01"
+                                                    style={{ width: '120px' }}
+                                                    disabled={!form.private_charter_voucher_types.includes(voucherType.id.toString())}
+                                                />
+                                                <span style={{ color: '#856404', fontSize: '14px' }}>£</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
+                        ) : (
+                            <div style={{ textAlign: 'center', padding: '20px', color: '#856404', fontStyle: 'italic' }}>
+                                No private charter voucher types available. Please create some in the settings first.
+                            </div>
+                        )}
+                    </div>
+                    
+                    <div style={{ 
+                        marginTop: 20, 
+                        marginBottom: 16, 
+                        padding: '16px', 
+                        backgroundColor: '#e8f5e8', 
+                        borderRadius: '8px', 
+                        border: '1px solid #c8e6c9' 
+                    }}>
+                        <div style={{ 
+                            marginBottom: 12, 
+                            fontWeight: 600, 
+                            fontSize: '16px', 
+                            color: '#2e7d32',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                        }}>
+                            <span style={{ fontSize: '18px' }}>✅</span>
+                            Status & Configuration
+                        </div>
+                        <div style={{ 
+                            fontSize: '13px', 
+                            color: '#2e7d32', 
+                            marginBottom: '12px', 
+                            fontStyle: 'italic' 
+                        }}>
+                            Set the activity status and upload any images
+                        </div>
+                        <TextField margin="dense" label="Status" name="status" value={form.status} onChange={handleChange} select fullWidth required>
+                            <MenuItem value="Live">Live</MenuItem>
+                            <MenuItem value="Draft">Draft</MenuItem>
+                            <MenuItem value="Closed">Closed</MenuItem>
+                        </TextField>
+                        <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageChange}
+                            style={{ marginTop: '16px' }}
                         />
-                        <FormControlLabel
-                            control={<Checkbox checked={form.flight_type.includes('Shared')} onChange={handleChange} name="flight_type" value="Shared" />}
-                            label="Shared"
-                        />
-                    </FormGroup>
-                    <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>From Price</div>
-                    <TextField margin="dense" label="Shared Flight From Price" name="shared_flight_from_price" value={form.shared_flight_from_price} onChange={handleChange} type="number" fullWidth required />
-                    <TextField margin="dense" label="Private Charter From Price" name="private_charter_from_price" value={form.private_charter_from_price} onChange={handleChange} type="number" fullWidth required />
-                    <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Voucher Type</div>
-                    <FormGroup row sx={{ mb: 2, mt: 1 }}>
-                        <FormControlLabel
-                            control={<Checkbox checked={form.voucher_type.includes('Weekday Morning')} onChange={handleChange} name="voucher_type" value="Weekday Morning" />}
-                            label="Weekday Morning"
-                        />
-                        <FormControlLabel
-                            control={<Checkbox checked={form.voucher_type.includes('Flexible Weekday')} onChange={handleChange} name="voucher_type" value="Flexible Weekday" />}
-                            label="Flexible Weekday"
-                        />
-                        <FormControlLabel
-                            control={<Checkbox checked={form.voucher_type.includes('Any Day Flight')} onChange={handleChange} name="voucher_type" value="Any Day Flight" />}
-                            label="Any Day Flight"
-                        />
-                    </FormGroup> 
-                    <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Per Person Pricing</div>
-                    <TextField margin="dense" label="Weekday Morning Price" name="weekday_morning_price" value={form.weekday_morning_price} onChange={handleChange} type="number" fullWidth required />
-                    <TextField margin="dense" label="Flexible Weekday Price" name="flexible_weekday_price" value={form.flexible_weekday_price} onChange={handleChange} type="number" fullWidth required />
-                    <TextField margin="dense" label="Any Day Flight Price" name="any_day_flight_price" value={form.any_day_flight_price} onChange={handleChange} type="number" fullWidth required />
-                    <TextField margin="dense" label="Status" name="status" value={form.status} onChange={handleChange} select fullWidth required>
-                        <MenuItem value="Live">Live</MenuItem>
-                        <MenuItem value="Inactive">Inactive</MenuItem>
-                    </TextField>
-                    <input type="file" accept="image/*" onChange={handleImageChange} style={{ marginTop: 16 }} />
-                    {imagePreview && <img src={imagePreview} alt="Preview" style={{ maxWidth: 120, marginTop: 8 }} />}
+                        {imagePreview && (
+                            <img
+                                src={imagePreview}
+                                alt="Preview"
+                                style={{ width: '100px', height: '100px', objectFit: 'cover', marginTop: '8px', borderRadius: '4px' }}
+                            />
+                        )}
+                    </div>
                     {error && <div style={{ color: 'red', marginTop: 8 }}>{error}</div>}
                 </DialogContent>
                 <DialogActions>
@@ -333,48 +680,320 @@ const ActivityList = ({ activity }) => {
             <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="sm" fullWidth>
                 <DialogTitle>Edit Activity</DialogTitle>
                 <DialogContent>
-                    <TextField margin="dense" label="Activity Name" name="activity_name" value={editForm.activity_name || ''} onChange={handleEditChange} fullWidth required />
-                    <TextField margin="dense" label="Capacity" name="capacity" value={editForm.capacity || ''} onChange={handleEditChange} type="number" fullWidth required />
-                    <TextField margin="dense" label="Location" name="location" value={editForm.location || ''} onChange={handleEditChange} fullWidth required />
-                    <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Flight Type</div>
-                    <FormGroup row sx={{ mb: 2, mt: 1 }}>
-                        <FormControlLabel
-                            control={<Checkbox checked={Array.isArray(editForm.flight_type) ? editForm.flight_type.includes('Private') : (typeof editForm.flight_type === 'string' ? editForm.flight_type.split(',').includes('Private') : false)} onChange={handleEditChange} name="flight_type" value="Private" />}
-                            label="Private"
+                    <div style={{ 
+                        marginBottom: 20, 
+                        padding: '16px', 
+                        backgroundColor: '#f8f9fa', 
+                        borderRadius: '8px', 
+                        border: '1px solid #dee2e6' 
+                    }}>
+                        <div style={{ 
+                            marginBottom: 12, 
+                            fontWeight: 600, 
+                            fontSize: '16px', 
+                            color: '#495057',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                        }}>
+                            <span style={{ fontSize: '18px' }}>📋</span>
+                            Basic Information
+                        </div>
+                        <div style={{ 
+                            fontSize: '13px', 
+                            color: '#6c757d', 
+                            marginBottom: '12px', 
+                            fontStyle: 'italic' 
+                        }}>
+                            General activity details and configuration
+                        </div>
+                        <TextField margin="dense" label="Activity Name" name="activity_name" value={editForm.activity_name || ''} onChange={handleEditChange} fullWidth required />
+                        <TextField margin="dense" label="Capacity" name="capacity" value={editForm.capacity || ''} onChange={handleEditChange} type="number" fullWidth required />
+                        <TextField margin="dense" label="Location" name="location" value={editForm.location || ''} onChange={handleEditChange} fullWidth required />
+                    </div>
+                    
+                    <div style={{ 
+                        marginTop: 20, 
+                        marginBottom: 16, 
+                        padding: '16px', 
+                        backgroundColor: '#e3f2fd', 
+                        borderRadius: '8px', 
+                        border: '1px solid #bbdefb' 
+                    }}>
+                        <div style={{ 
+                            marginBottom: 12, 
+                            fontWeight: 600, 
+                            fontSize: '16px', 
+                            color: '#1565c0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                        }}>
+                            <span style={{ fontSize: '18px' }}>🛩️</span>
+                            Flight Type
+                        </div>
+                        <div style={{ 
+                            fontSize: '13px', 
+                            color: '#1565c0', 
+                            marginBottom: '12px', 
+                            fontStyle: 'italic' 
+                        }}>
+                            Select which types of flights this activity supports
+                        </div>
+                        <FormGroup row sx={{ mb: 0, mt: 1 }}>
+                            <FormControlLabel
+                                control={<Checkbox checked={Array.isArray(editForm.flight_type) ? editForm.flight_type.includes('Private') : (typeof editForm.flight_type === 'string' ? editForm.flight_type.split(',').includes('Private') : false)} onChange={handleEditChange} name="flight_type" value="Private" />}
+                                label="Private"
+                            />
+                            <FormControlLabel
+                                control={<Checkbox checked={Array.isArray(editForm.flight_type) ? editForm.flight_type.includes('Shared') : (typeof editForm.flight_type === 'string' ? editForm.flight_type.split(',').includes('Shared') : false)} onChange={handleEditChange} name="flight_type" value="Shared" />}
+                                label="Shared"
+                            />
+                        </FormGroup>
+                    </div>
+                    
+                    {/* Experience: Shared Flight Section */}
+                    <div style={{ 
+                        marginTop: 24, 
+                        marginBottom: 16, 
+                        padding: '20px', 
+                        backgroundColor: '#f8f9fa', 
+                        borderRadius: '12px', 
+                        border: '2px solid #e9ecef',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                    }}>
+                        <div style={{ 
+                            marginBottom: 20, 
+                            fontWeight: 700, 
+                            fontSize: '18px', 
+                            color: '#1976d2',
+                            borderBottom: '3px solid #1976d2',
+                            paddingBottom: '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                        }}>
+                            <span style={{ fontSize: '20px' }}>✈️</span>
+                            Experience: Shared Flight
+                        </div>
+                        <div style={{ 
+                            fontSize: '14px', 
+                            color: '#666', 
+                            marginBottom: '20px', 
+                            fontStyle: 'italic',
+                            padding: '12px',
+                            backgroundColor: '#fff',
+                            borderRadius: '8px',
+                            border: '1px solid #dee2e6'
+                        }}>
+                            ℹ️ These fields are specifically for Shared Flight experiences only. They control pricing and voucher options for shared balloon flights.
+                        </div>
+                        
+                        <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>From Price</div>
+                        <TextField margin="dense" label="Shared Flight From Price" name="shared_flight_from_price" value={editForm.shared_flight_from_price || ''} onChange={handleEditChange} type="number" fullWidth required />
+                        
+                        <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Voucher Type</div>
+                        <FormGroup row sx={{ mb: 2, mt: 1 }}>
+                            <FormControlLabel
+                                control={<Checkbox checked={Array.isArray(editForm.voucher_type) ? editForm.voucher_type.includes('Weekday Morning') : (typeof editForm.voucher_type === 'string' ? editForm.voucher_type.split(',').includes('Weekday Morning') : false)} onChange={handleEditChange} name="voucher_type" value="Weekday Morning" />}
+                                label="Weekday Morning"
+                            />
+                            <FormControlLabel
+                                control={<Checkbox checked={Array.isArray(editForm.voucher_type) ? editForm.voucher_type.includes('Flexible Weekday') : (typeof editForm.voucher_type === 'string' ? editForm.voucher_type.split(',').includes('Flexible Weekday') : false)} onChange={handleEditChange} name="voucher_type" value="Flexible Weekday" />}
+                                label="Flexible Weekday"
+                            />
+                            <FormControlLabel
+                                control={<Checkbox checked={Array.isArray(editForm.voucher_type) ? editForm.voucher_type.includes('Any Day Flight') : (typeof editForm.voucher_type === 'string' ? editForm.voucher_type.split(',').includes('Any Day Flight') : false)} onChange={handleEditChange} name="voucher_type" value="Any Day Flight" />}
+                                label="Any Day Flight"
+                            />
+                        </FormGroup>
+                        
+                        <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Per Person Pricing</div>
+                        <TextField margin="dense" label="Weekday Morning Price" name="weekday_morning_price" value={editForm.weekday_morning_price || ''} onChange={handleEditChange} type="number" fullWidth required />
+                        <TextField margin="dense" label="Flexible Weekday Price" name="flexible_weekday_price" value={editForm.flexible_weekday_price || ''} onChange={handleEditChange} type="number" fullWidth required />
+                        <TextField margin="dense" label="Any Day Flight Price" name="any_day_flight_price" value={editForm.any_day_flight_price || ''} onChange={handleEditChange} type="number" fullWidth required />
+                    </div>
+                    
+                    {/* Private Charter From Price - Separate section */}
+                    <div style={{ 
+                        marginTop: 24, 
+                        marginBottom: 16, 
+                        padding: '16px', 
+                        backgroundColor: '#fff3cd', 
+                        borderRadius: '8px', 
+                        border: '1px solid #ffeaa7' 
+                    }}>
+                        <div style={{ 
+                            marginBottom: 12, 
+                            fontWeight: 600, 
+                            fontSize: '16px', 
+                            color: '#856404',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                        }}>
+                            <span style={{ fontSize: '18px' }}>🎈</span>
+                            Private Charter From Price
+                        </div>
+                        <div style={{ 
+                            fontSize: '13px', 
+                            color: '#856404', 
+                            marginBottom: '12px', 
+                            fontStyle: 'italic' 
+                        }}>
+                            This field is for Private Charter experiences only
+                        </div>
+                        <TextField margin="dense" label="Private Charter From Price" name="private_charter_from_price" value={editForm.private_charter_from_price || ''} onChange={handleEditChange} type="number" fullWidth required />
+                    </div>
+
+                    {/* Private Charter Voucher Types Section */}
+                    <div style={{ 
+                        marginTop: 24, 
+                        marginBottom: 16, 
+                        padding: '20px', 
+                        backgroundColor: '#fff3cd', 
+                        borderRadius: '12px', 
+                        border: '2px solid #ffeaa7',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                    }}>
+                        <div style={{ 
+                            marginBottom: 20, 
+                            fontWeight: 700, 
+                            fontSize: '18px', 
+                            color: '#856404',
+                            borderBottom: '3px solid #f39c12',
+                            paddingBottom: '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                        }}>
+                            <span style={{ fontSize: '20px' }}>🎫</span>
+                            Private Charter Voucher Types
+                        </div>
+                        <div style={{ 
+                            fontSize: '14px', 
+                            color: '#856404', 
+                            marginBottom: '20px', 
+                            fontStyle: 'italic',
+                            padding: '12px',
+                            backgroundColor: '#fff',
+                            borderRadius: '8px',
+                            border: '1px solid #ffeaa7'
+                        }}>
+                            ℹ️ Select which private charter voucher types this activity supports. These options come from the Private Charter Voucher Types settings.
+                        </div>
+                        
+                        {privateCharterVoucherTypesLoading ? (
+                            <div style={{ textAlign: 'center', padding: '20px', color: '#856404' }}>
+                                Loading voucher types...
+                            </div>
+                        ) : privateCharterVoucherTypes.length > 0 ? (
+                            <>
+                                <FormGroup row sx={{ mb: 2, mt: 1 }}>
+                                    {privateCharterVoucherTypes.map((voucherType) => (
+                                        <FormControlLabel
+                                            key={voucherType.id}
+                                            control={
+                                                <Checkbox 
+                                                    checked={Array.isArray(editForm.private_charter_voucher_types) ? editForm.private_charter_voucher_types.includes(voucherType.id.toString()) : (typeof editForm.private_charter_voucher_types === 'string' ? editForm.private_charter_voucher_types.split(',') : [])} 
+                                                    onChange={handleEditChange} 
+                                                    name="private_charter_voucher_types" 
+                                                    value={voucherType.id.toString()} 
+                                                />
+                                            }
+                                            label={voucherType.title}
+                                        />
+                                    ))}
+                                </FormGroup>
+                                
+                                {/* Individual Pricing Fields */}
+                                <div style={{ marginTop: '20px', padding: '16px', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #ffeaa7' }}>
+                                    <div style={{ marginBottom: '16px', fontWeight: '600', color: '#856404' }}>
+                                        Group Pricing for Selected Voucher Types
+                                    </div>
+                                    {privateCharterVoucherTypes.map((voucherType) => (
+                                        <div key={voucherType.id} style={{ marginBottom: '12px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                <Checkbox 
+                                                    checked={Array.isArray(editForm.private_charter_voucher_types) ? editForm.private_charter_voucher_types.includes(voucherType.id.toString()) : (typeof editForm.private_charter_voucher_types === 'string' ? editForm.private_charter_voucher_types.split(',') : [])} 
+                                                    disabled
+                                                    style={{ color: '#856404' }}
+                                                />
+                                                <label style={{ fontWeight: '500', color: '#856404', minWidth: '200px' }}>
+                                                    Group Pricing: {voucherType.title}
+                                                </label>
+                                                <TextField
+                                                    size="small"
+                                                    type="number"
+                                                    name={`private_charter_price_${voucherType.id}`}
+                                                    value={editForm.private_charter_pricing && editForm.private_charter_pricing[voucherType.id] ? editForm.private_charter_pricing[voucherType.id] : ''}
+                                                    onChange={handleEditChange}
+                                                    placeholder="0.00"
+                                                    min="0"
+                                                    step="0.01"
+                                                    style={{ width: '120px' }}
+                                                    disabled={!Array.isArray(editForm.private_charter_voucher_types) ? (typeof editForm.private_charter_voucher_types === 'string' ? editForm.private_charter_voucher_types.split(',').includes(voucherType.id.toString()) : false) : editForm.private_charter_voucher_types.includes(voucherType.id.toString())}
+                                                />
+                                                <span style={{ color: '#856404', fontSize: '14px' }}>£</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
+                        ) : (
+                            <div style={{ textAlign: 'center', padding: '20px', color: '#856404', fontStyle: 'italic' }}>
+                                No private charter voucher types available. Please create some in the settings first.
+                            </div>
+                        )}
+                    </div>
+                    
+                    <div style={{ 
+                        marginTop: 20, 
+                        marginBottom: 16, 
+                        padding: '16px', 
+                        backgroundColor: '#e8f5e8', 
+                        borderRadius: '8px', 
+                        border: '1px solid #c8e6c9' 
+                    }}>
+                        <div style={{ 
+                            marginBottom: 12, 
+                            fontWeight: 600, 
+                            fontSize: '16px', 
+                            color: '#2e7d32',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                        }}>
+                            <span style={{ fontSize: '18px' }}>✅</span>
+                            Status & Configuration
+                        </div>
+                        <div style={{ 
+                            fontSize: '13px', 
+                            color: '#2e7d32', 
+                            marginBottom: '12px', 
+                            fontStyle: 'italic' 
+                        }}>
+                            Set the activity status and upload any images
+                        </div>
+                        <TextField margin="dense" label="Status" name="status" value={editForm.status || ''} onChange={handleEditChange} select fullWidth required>
+                            <MenuItem value="Live">Live</MenuItem>
+                            <MenuItem value="Draft">Draft</MenuItem>
+                            <MenuItem value="Closed">Closed</MenuItem>
+                        </TextField>
+                        <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleEditImageChange}
+                            style={{ marginTop: '16px' }}
                         />
-                        <FormControlLabel
-                            control={<Checkbox checked={Array.isArray(editForm.flight_type) ? editForm.flight_type.includes('Shared') : (typeof editForm.flight_type === 'string' ? editForm.flight_type.split(',').includes('Shared') : false)} onChange={handleEditChange} name="flight_type" value="Shared" />}
-                            label="Shared"
-                        />
-                    </FormGroup>
-                    <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>From Price</div>
-                    <TextField margin="dense" label="Shared Flight From Price" name="shared_flight_from_price" value={editForm.shared_flight_from_price || ''} onChange={handleEditChange} type="number" fullWidth required />
-                    <TextField margin="dense" label="Private Charter From Price" name="private_charter_from_price" value={editForm.private_charter_from_price || ''} onChange={handleEditChange} type="number" fullWidth required />
-                    <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Voucher Type</div>
-                    <FormGroup row sx={{ mb: 2, mt: 1 }}>
-                        <FormControlLabel
-                            control={<Checkbox checked={Array.isArray(editForm.voucher_type) ? editForm.voucher_type.includes('Weekday Morning') : (typeof editForm.voucher_type === 'string' ? editForm.voucher_type.split(',').includes('Weekday Morning') : false)} onChange={handleEditChange} name="voucher_type" value="Weekday Morning" />}
-                            label="Weekday Morning"
-                        />
-                        <FormControlLabel
-                            control={<Checkbox checked={Array.isArray(editForm.voucher_type) ? editForm.voucher_type.includes('Flexible Weekday') : (typeof editForm.voucher_type === 'string' ? editForm.voucher_type.split(',').includes('Flexible Weekday') : false)} onChange={handleEditChange} name="voucher_type" value="Flexible Weekday" />}
-                            label="Flexible Weekday"
-                        />
-                        <FormControlLabel
-                            control={<Checkbox checked={Array.isArray(editForm.voucher_type) ? editForm.voucher_type.includes('Any Day Flight') : (typeof editForm.voucher_type === 'string' ? editForm.voucher_type.split(',').includes('Any Day Flight') : false)} onChange={handleEditChange} name="voucher_type" value="Any Day Flight" />}
-                            label="Any Day Flight"
-                        />
-                    </FormGroup>
-                    <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Per Person Pricing</div>
-                    <TextField margin="dense" label="Weekday Morning Price" name="weekday_morning_price" value={editForm.weekday_morning_price || ''} onChange={handleEditChange} type="number" fullWidth required />
-                    <TextField margin="dense" label="Flexible Weekday Price" name="flexible_weekday_price" value={editForm.flexible_weekday_price || ''} onChange={handleEditChange} type="number" fullWidth required />
-                    <TextField margin="dense" label="Any Day Flight Price" name="any_day_flight_price" value={editForm.any_day_flight_price || ''} onChange={handleEditChange} type="number" fullWidth required />
-                    <TextField margin="dense" label="Status" name="status" value={editForm.status || ''} onChange={handleEditChange} select fullWidth required>
-                        <MenuItem value="Live">Live</MenuItem>
-                        <MenuItem value="Inactive">Inactive</MenuItem>
-                    </TextField>
-                    <input type="file" accept="image/*" onChange={handleEditImageChange} style={{ marginTop: 16 }} />
-                    {editImagePreview && <img src={editImagePreview} alt="Preview" style={{ maxWidth: 120, marginTop: 8 }} />}
+                        {editImagePreview && (
+                            <img
+                                src={editImagePreview}
+                                alt="Preview"
+                                style={{ width: '100px', height: '100px', objectFit: 'cover', marginTop: '8px', borderRadius: '4px' }}
+                            />
+                        )}
+                    </div>
                     {editError && <div style={{ color: 'red', marginTop: 8 }}>{editError}</div>}
                 </DialogContent>
                 <DialogActions>

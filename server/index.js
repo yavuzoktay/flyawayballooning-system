@@ -934,6 +934,177 @@ app.delete('/api/voucher-types/:id', (req, res) => {
     });
 });
 
+// ==================== PRIVATE CHARTER VOUCHER TYPES API ENDPOINTS ====================
+
+// Get all private charter voucher types
+app.get('/api/private-charter-voucher-types', (req, res) => {
+    console.log('GET /api/private-charter-voucher-types called');
+    const sql = `SELECT * FROM private_charter_voucher_types ORDER BY sort_order ASC, created_at DESC`;
+    console.log('SQL Query:', sql);
+    
+    con.query(sql, (err, result) => {
+        if (err) {
+            console.error('Error fetching private charter voucher types:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        console.log('Query result:', result);
+        console.log('Result length:', result ? result.length : 'undefined');
+        res.json({ success: true, data: result });
+    });
+});
+
+// Create new private charter voucher type
+app.post('/api/private-charter-voucher-types', experiencesUpload.single('private_charter_voucher_type_image'), (req, res) => {
+    const {
+        title,
+        description,
+        max_passengers,
+        validity_months,
+        flight_days,
+        flight_time,
+        features,
+        terms,
+        sort_order,
+        is_active
+    } = req.body;
+    
+    // Validation
+    if (!title || !description) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: title and description' });
+    }
+    
+    // Handle image upload
+    let image_url = req.body.image_url; // Keep existing image if no new file uploaded
+    if (req.file) {
+        image_url = `/uploads/experiences/${req.file.filename}`;
+    }
+    
+    const sql = `
+        INSERT INTO private_charter_voucher_types (
+            title, description, image_url, max_passengers,
+            validity_months, flight_days, flight_time, features, terms, sort_order, is_active
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    
+    const values = [
+        title,
+        description,
+        image_url,
+        max_passengers || 8,
+        validity_months || 18,
+        flight_days || 'Any Day',
+        flight_time || 'AM & PM',
+        features || '[]',
+        terms || '',
+        sort_order || 0,
+        is_active !== undefined ? is_active : true
+    ];
+    
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error creating private charter voucher type:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Private charter voucher type created successfully',
+            id: result.insertId
+        });
+    });
+});
+
+// Update private charter voucher type
+app.put('/api/private-charter-voucher-types/:id', experiencesUpload.single('private_charter_voucher_type_image'), (req, res) => {
+    const { id } = req.params;
+    const {
+        title,
+        description,
+        max_passengers,
+        validity_months,
+        flight_days,
+        flight_time,
+        features,
+        terms,
+        sort_order,
+        is_active
+    } = req.body;
+    
+    // Validation
+    if (!title || !description) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: title and description' });
+    }
+    
+    // Handle image upload
+    let image_url = req.body.image_url; // Keep existing image if no new file uploaded
+    if (req.file) {
+        image_url = `/uploads/experiences/${req.file.filename}`;
+    }
+    
+    const sql = `
+        UPDATE private_charter_voucher_types SET 
+            title = ?, description = ?, image_url = ?, max_passengers = ?, 
+            validity_months = ?, flight_days = ?, flight_time = ?, features = ?, 
+            terms = ?, sort_order = ?, is_active = ?
+        WHERE id = ?
+    `;
+    
+    const values = [
+        title,
+        description,
+        image_url,
+        max_passengers || 8,
+        validity_months || 18,
+        flight_days || 'Any Day',
+        flight_time || 'AM & PM',
+        features || '[]',
+        terms || '',
+        sort_order || 0,
+        is_active !== undefined ? is_active : true,
+        id
+    ];
+    
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error updating private charter voucher type:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Private charter voucher type not found' });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Private charter voucher type updated successfully',
+            image_url: image_url
+        });
+    });
+});
+
+// Delete private charter voucher type
+app.delete('/api/private-charter-voucher-types/:id', (req, res) => {
+    const { id } = req.params;
+    
+    const sql = 'DELETE FROM private_charter_voucher_types WHERE id = ?';
+    
+    con.query(sql, [id], (err, result) => {
+        if (err) {
+            console.error('Error deleting private charter voucher type:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Private charter voucher type not found' });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Private charter voucher type deleted successfully'
+        });
+    });
+});
+
 // ==================== ADD TO BOOKING ITEMS API ENDPOINTS ====================
 
 // Get all add to booking items
@@ -3283,7 +3454,7 @@ app.get('/api/analytics', async (req, res) => {
 
 // Create Activity endpoint (with image upload)
 app.post("/api/createActivity", upload.single('image'), (req, res) => {
-    const { activity_name, capacity, event_time, location, flight_type, voucher_type, status, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price } = req.body;
+    const { activity_name, capacity, event_time, location, flight_type, voucher_type, private_charter_voucher_types, private_charter_pricing, status, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price } = req.body;
     let image = null;
     if (req.file) {
         // Sunucuya göre path'i düzelt
@@ -3292,11 +3463,30 @@ app.post("/api/createActivity", upload.single('image'), (req, res) => {
     if (!activity_name || !capacity || !location || !flight_type || !status || !weekday_morning_price || !flexible_weekday_price || !any_day_flight_price || !shared_flight_from_price || !private_charter_from_price) {
         return res.status(400).json({ success: false, message: "Eksik bilgi!" });
     }
+    
+    // Validate and format flight_type
+    let formattedFlightType = flight_type;
+    if (Array.isArray(flight_type)) {
+        formattedFlightType = flight_type.join(',');
+    } else if (typeof flight_type === 'string') {
+        // Ensure it's properly formatted
+        formattedFlightType = flight_type.split(',').map(type => type.trim()).join(',');
+    }
+    
+    // Validate and format private_charter_voucher_types
+    let formattedPrivateCharterVoucherTypes = private_charter_voucher_types;
+    if (Array.isArray(private_charter_voucher_types)) {
+        formattedPrivateCharterVoucherTypes = private_charter_voucher_types.join(',');
+    } else if (typeof private_charter_voucher_types === 'string') {
+        // Ensure it's properly formatted
+        formattedPrivateCharterVoucherTypes = private_charter_voucher_types.split(',').map(type => type.trim()).join(',');
+    }
+    
     const sql = `
-        INSERT INTO activity (activity_name, capacity, start_date, end_date, event_time, location, flight_type, voucher_type, status, image, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price)
-        VALUES (?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO activity (activity_name, capacity, start_date, end_date, event_time, location, flight_type, voucher_type, private_charter_voucher_types, private_charter_pricing, status, image, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price)
+        VALUES (?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    con.query(sql, [activity_name, capacity, location, flight_type, voucher_type || 'All', status, image, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price], (err, result) => {
+    con.query(sql, [activity_name, capacity, location, formattedFlightType, voucher_type || 'All', formattedPrivateCharterVoucherTypes || null, JSON.stringify(private_charter_pricing || {}), status, image, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price], (err, result) => {
         if (err) {
             return res.status(500).json({ success: false, message: "Database error" });
         }
@@ -3346,22 +3536,41 @@ app.get('/api/locationVoucherTypes/:location', (req, res) => {
 // Update activity by id (with image upload)
 app.put("/api/activity/:id", upload.single('image'), (req, res) => {
     const { id } = req.params;
-    const { activity_name, capacity, event_time, location, flight_type, voucher_type, status, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price } = req.body;
+    const { activity_name, capacity, event_time, location, flight_type, voucher_type, private_charter_voucher_types, private_charter_pricing, status, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price } = req.body;
     let image = null;
     if (req.file) {
         image = `/uploads/activities/${req.file.filename}`;
     }
+    
+    // Validate and format flight_type
+    let formattedFlightType = flight_type;
+    if (Array.isArray(flight_type)) {
+        formattedFlightType = flight_type.join(',');
+    } else if (typeof flight_type === 'string') {
+        // Ensure it's properly formatted
+        formattedFlightType = flight_type.split(',').map(type => type.trim()).join(',');
+    }
+    
     // Eğer yeni fotoğraf yoksa, mevcut image değerini koru
     const getImageSql = "SELECT image FROM activity WHERE id = ?";
     con.query(getImageSql, [id], (err, result) => {
         if (err) return res.status(500).json({ success: false, message: "Database error" });
         const currentImage = result && result[0] ? result[0].image : null;
         const finalImage = image || currentImage;
+        // Validate and format private_charter_voucher_types
+        let formattedPrivateCharterVoucherTypes = private_charter_voucher_types;
+        if (Array.isArray(private_charter_voucher_types)) {
+            formattedPrivateCharterVoucherTypes = private_charter_voucher_types.join(',');
+        } else if (typeof private_charter_voucher_types === 'string') {
+            // Ensure it's properly formatted
+            formattedPrivateCharterVoucherTypes = private_charter_voucher_types.split(',').map(type => type.trim()).join(',');
+        }
+
         const sql = `
-            UPDATE activity SET activity_name=?, capacity=?, start_date=NULL, end_date=NULL, event_time=NULL, location=?, flight_type=?, voucher_type=?, status=?, image=?, weekday_morning_price=?, flexible_weekday_price=?, any_day_flight_price=?, shared_flight_from_price=?, private_charter_from_price=?
+            UPDATE activity SET activity_name=?, capacity=?, start_date=NULL, end_date=NULL, event_time=NULL, location=?, flight_type=?, voucher_type=?, private_charter_voucher_types=?, private_charter_pricing=?, status=?, image=?, weekday_morning_price=?, flexible_weekday_price=?, any_day_flight_price=?, shared_flight_from_price=?, private_charter_from_price=?
             WHERE id=?
         `;
-        con.query(sql, [activity_name, capacity, location, flight_type, voucher_type || 'All', status, finalImage, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price, id], (err, result) => {
+        con.query(sql, [activity_name, capacity, location, formattedFlightType, voucher_type || 'All', formattedPrivateCharterVoucherTypes || null, JSON.stringify(private_charter_pricing || {}), status, finalImage, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price, id], (err, result) => {
             if (err) return res.status(500).json({ success: false, message: "Database error" });
             res.json({ success: true, data: result });
         });
@@ -3395,8 +3604,11 @@ app.get('/api/locationPricing/:location', (req, res) => {
     const { location } = req.params;
     if (!location) return res.status(400).json({ success: false, message: 'Location is required' });
     
+    console.log('=== /api/locationPricing called ===');
+    console.log('Location:', location);
+    
     const sql = `
-        SELECT weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price
+        SELECT weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price, flight_type
         FROM activity 
         WHERE location = ? AND status = 'Live'
         ORDER BY id ASC
@@ -3405,10 +3617,35 @@ app.get('/api/locationPricing/:location', (req, res) => {
     con.query(sql, [location], (err, result) => {
         if (err) return res.status(500).json({ success: false, message: "Database error" });
         if (!result || result.length === 0) {
+            console.log('No pricing found for location:', location);
             return res.status(404).json({ success: false, message: "No pricing found for this location" });
         }
         
         const pricing = result[0];
+        console.log('Raw pricing data:', pricing);
+        
+        // Process flight_type to map to experience names
+        let flightTypes = [];
+        let experiences = [];
+        if (pricing.flight_type) {
+            if (typeof pricing.flight_type === 'string') {
+                flightTypes = pricing.flight_type.split(',').map(type => type.trim());
+            } else if (Array.isArray(pricing.flight_type)) {
+                flightTypes = pricing.flight_type;
+            }
+            
+            // Map flight types to experience names
+            experiences = flightTypes.map(type => {
+                if (type === 'Private') return 'Private Charter';
+                if (type === 'Shared') return 'Shared Flight';
+                return type; // Keep original if not mapped
+            });
+        }
+        
+        console.log('Processed flight types:', flightTypes);
+        console.log('Processed experiences:', experiences);
+        console.log('=== /api/locationPricing response ===');
+        
         res.json({ 
             success: true, 
             data: {
@@ -3416,7 +3653,9 @@ app.get('/api/locationPricing/:location', (req, res) => {
                 flexible_weekday_price: pricing.flexible_weekday_price,
                 any_day_flight_price: pricing.any_day_flight_price,
                 shared_flight_from_price: pricing.shared_flight_from_price,
-                private_charter_from_price: pricing.private_charter_from_price
+                private_charter_from_price: pricing.private_charter_from_price,
+                flight_type: flightTypes,
+                experiences: experiences
             }
         });
     });
@@ -4950,7 +5189,7 @@ app.get('/api/locationPricing/:location', (req, res) => {
     if (!location) return res.status(400).json({ success: false, message: 'Location is required' });
     
     const sql = `
-        SELECT weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price
+        SELECT weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price, flight_type
         FROM activity 
         WHERE location = ? AND status = 'Live'
         ORDER BY id ASC
@@ -4963,6 +5202,25 @@ app.get('/api/locationPricing/:location', (req, res) => {
         }
         
         const pricing = result[0];
+        
+        // Process flight_type to map to experience names
+        let flightTypes = [];
+        let experiences = [];
+        if (pricing.flight_type) {
+            if (typeof pricing.flight_type === 'string') {
+                flightTypes = pricing.flight_type.split(',').map(type => type.trim());
+            } else if (Array.isArray(pricing.flight_type)) {
+                flightTypes = pricing.flight_type;
+            }
+            
+            // Map flight types to experience names
+            experiences = flightTypes.map(type => {
+                if (type === 'Private') return 'Private Charter';
+                if (type === 'Shared') return 'Shared Flight';
+                return type; // Keep original if not mapped
+            });
+        }
+        
         res.json({ 
             success: true, 
             data: {
@@ -4970,7 +5228,9 @@ app.get('/api/locationPricing/:location', (req, res) => {
                 flexible_weekday_price: pricing.flexible_weekday_price,
                 any_day_flight_price: pricing.any_day_flight_price,
                 shared_flight_from_price: pricing.shared_flight_from_price,
-                private_charter_from_price: pricing.private_charter_from_price
+                private_charter_from_price: pricing.private_charter_from_price,
+                flight_type: flightTypes,
+                experiences: experiences
             }
         });
     });
@@ -6055,5 +6315,80 @@ app.post('/api/debug/crew-assignments/test', (req, res) => {
         
         console.log('Test crew assignment inserted:', result);
         res.json({ success: true, message: 'Test crew assignment inserted', result });
+    });
+});
+
+// Get activities with flight types for ballooning-book
+app.get('/api/activities/flight-types', (req, res) => {
+    const { location } = req.query;
+    
+    console.log('=== /api/activities/flight-types called ===');
+    console.log('Location filter:', location);
+    
+    let sql = 'SELECT id, activity_name, location, flight_type, status, private_charter_pricing, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price FROM activity WHERE status = "Live"';
+    const params = [];
+    
+    if (location) {
+        sql += ' AND location = ?';
+        params.push(location);
+    }
+    
+    sql += ' ORDER BY location, activity_name';
+    
+    console.log('SQL query:', sql);
+    console.log('SQL params:', params);
+    
+    con.query(sql, params, (err, result) => {
+        if (err) {
+            console.error('Error fetching activities with flight types:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        console.log('Raw database result:', result);
+        console.log('Raw database result - private_charter_pricing fields:', result.map(r => ({ id: r.id, name: r.activity_name, pricing: r.private_charter_pricing })));
+        console.log('Raw database result - shared flight pricing fields:', result.map(r => ({ 
+            id: r.id, 
+            name: r.activity_name, 
+            weekday_morning_price: r.weekday_morning_price,
+            flexible_weekday_price: r.flexible_weekday_price,
+            any_day_flight_price: r.any_day_flight_price,
+            shared_flight_from_price: r.shared_flight_from_price
+        })));
+        
+        // Process flight types to map them to experience names
+        const processedActivities = result.map(activity => {
+            let flightTypes = [];
+            if (activity.flight_type) {
+                // Parse flight_type which can be comma-separated string or array
+                if (typeof activity.flight_type === 'string') {
+                    flightTypes = activity.flight_type.split(',').map(type => type.trim());
+                } else if (Array.isArray(activity.flight_type)) {
+                    flightTypes = activity.flight_type;
+                }
+            }
+            
+            // Map flight types to experience names
+            const experiences = flightTypes.map(type => {
+                if (type === 'Private') return 'Private Charter';
+                if (type === 'Shared') return 'Shared Flight';
+                return type; // Keep original if not mapped
+            });
+            
+            console.log(`Activity ${activity.activity_name}: flight_type="${activity.flight_type}" -> flightTypes=${JSON.stringify(flightTypes)} -> experiences=${JSON.stringify(experiences)}`);
+            
+            return {
+                ...activity,
+                flight_type: flightTypes,
+                experiences: experiences
+            };
+        });
+        
+        console.log('Processed activities:', processedActivities);
+        console.log('=== /api/activities/flight-types response ===');
+        
+        res.json({ 
+            success: true, 
+            data: processedActivities 
+        });
     });
 });
