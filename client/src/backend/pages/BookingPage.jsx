@@ -291,6 +291,7 @@ const BookingPage = () => {
                     paid: item.paid || '',
                     offer_code: item.offer_code || '',
                     voucher_ref: item.voucher_ref || '',
+                    flight_attempts: item.flight_attempts ?? 0,
                     _original: item // _original her zaman eklensin
                 };
             }));
@@ -327,7 +328,7 @@ const BookingPage = () => {
                 // Ensure voucher data is properly structured
                 const finalVoucherDetail = voucherDetail || { 
                     success: true, 
-                    voucher: voucherItem, 
+                    voucher: { ...voucherItem, flight_attempts: voucherItem.flight_attempts ?? (voucherItem._original?.flight_attempts ?? 0) }, 
                     passengers: [], 
                     notes: [] 
                 };
@@ -337,7 +338,15 @@ const BookingPage = () => {
                     finalVoucherDetail.voucher = voucherItem;
                 }
                 
-                setBookingDetail(finalVoucherDetail);
+                // Ensure flight_attempts carried from list row if API omitted
+finalVoucherDetail.voucher = finalVoucherDetail.voucher || {};
+if (finalVoucherDetail && finalVoucherDetail.voucher) {
+    const listAttempts = voucherItem.flight_attempts ?? voucherItem._original?.flight_attempts;
+    if (finalVoucherDetail.voucher.flight_attempts == null && listAttempts != null) {
+        finalVoucherDetail.voucher.flight_attempts = listAttempts;
+    }
+}
+setBookingDetail(finalVoucherDetail);
                 setDetailDialogOpen(true);
             } catch (err) {
                 console.error('Error fetching voucher detail:', err);
@@ -1552,7 +1561,7 @@ const BookingPage = () => {
                                                         )}</Typography>
                                                         <Typography><b>Voucher ID:</b> {v.id || '-'}</Typography>
                                                         <Typography><b>Voucher Code:</b> {v.voucher_code || '-'}</Typography>
-                                                        <Typography><b>Flight Attempts:</b> {v.flight_attempts || '-'}</Typography>
+                                                        <Typography><b>Flight Attempts:</b> {v.flight_attempts ?? '-'}</Typography>
                                                     </>;
                                                 })()
                                             ) : (
@@ -1703,7 +1712,17 @@ const BookingPage = () => {
                                                     }));
                                                 }}>FAB Add On</Button>
                                             </Box>
-                                            <Typography><b>WX Refundable:</b> {bookingDetail.passengers && bookingDetail.passengers.some(p => p.weather_refund === 1) ? 'Yes' : 'No'}</Typography>
+                                            <Typography>
+    <b>WX Refundable:</b>{' '}
+    {(() => {
+        const wxPassengers = Array.isArray(bookingDetail.passengers)
+            ? bookingDetail.passengers.filter(p => Number(p.weather_refund) === 1)
+            : [];
+        if (wxPassengers.length === 0) return 'No';
+        const names = wxPassengers.map(p => `${p.first_name || ''} ${p.last_name || ''}`.trim()).filter(Boolean);
+        return `Yes${names.length ? ` — ${names.join(', ')}` : ''}`;
+    })()}
+</Typography>
                                                 <Typography><b>Marketing:</b> {bookingDetail.booking?.hear_about_us || 'N/A'}</Typography>
                                                 <Typography><b>Reason for Ballooning:</b> {bookingDetail.booking?.ballooning_reason || 'N/A'}</Typography>
                                         </Box>

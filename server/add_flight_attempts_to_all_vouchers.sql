@@ -1,0 +1,2 @@
+ALTER TABLE all_vouchers
+  ADD COLUMN IF NOT EXISTS flight_attempts INT NOT NULL DEFAULT 0; 

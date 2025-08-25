@@ -2023,7 +2023,8 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     booking_email: row.booking_email ?? '',
                     booking_phone: row.booking_phone ?? '',
                     booking_id: row.booking_id ?? '',
-                    passenger_weight: row.passenger_weight ?? ''
+                    passenger_weight: row.passenger_weight ?? '',
+                    flight_attempts: row.flight_attempts ?? 0
                 };
             });
             res.json({ success: true, data: formatted });
@@ -2295,7 +2296,7 @@ app.post('/api/createBooking', (req, res) => {
                 voucher_type,
                 voucher_discount,
                 original_amount
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         // Debug log for choose_add_on and bookingValues
@@ -2741,8 +2742,8 @@ app.post('/api/createVoucher', (req, res) => {
         console.log('=== INSERTING VOUCHER RECORD ===');
         
         const insertSql = `INSERT INTO all_vouchers 
-            (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+            (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
             
         const values = [
             emptyToNull(name),
@@ -2765,7 +2766,8 @@ app.post('/api/createVoucher', (req, res) => {
             emptyToNull(recipient_gift_date),
             emptyToNull(preferred_location),
             emptyToNull(preferred_time),
-            emptyToNull(preferred_day)
+            emptyToNull(preferred_day),
+            1 // flight_attempts starts at 1 for each created voucher
         ];
         
         con.query(insertSql, values, (err, result) => {
@@ -4053,12 +4055,39 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
     try {
         // 1. Update booking status
         const updateBookingSql = "UPDATE all_booking SET status = ? WHERE id = ?";
+        // If status change indicates a cancellation or retry, also increment related voucher's flight_attempts
+        const incrementAttemptsForVoucher = async () => {
+            try {
+                // Find voucher_ref from booking
+                const [rows] = await new Promise((resolve, reject) => {
+                    con.query("SELECT voucher_code FROM all_booking WHERE id = ?", [booking_id], (err, rows) => {
+                        if (err) reject(err); else resolve([rows]);
+                    });
+                });
+                const voucherCode = rows && rows[0] ? rows[0].voucher_code : null;
+                if (!voucherCode) return;
+                // Increment attempts if status is Cancelled or Pending or Rescheduled etc.
+                const shouldIncrement = ['Cancelled', 'Pending', 'Rescheduled'].includes(new_status);
+                if (!shouldIncrement) return;
+                await new Promise((resolve, reject) => {
+                    con.query("UPDATE all_vouchers SET flight_attempts = COALESCE(flight_attempts,0) + 1 WHERE voucher_ref = ?", [voucherCode], (err, result) => {
+                        if (err) reject(err); else resolve(result);
+                    });
+                });
+            } catch (e) {
+                console.error('Failed to increment flight_attempts for voucher:', e);
+            }
+        };
+
         await new Promise((resolve, reject) => {
             con.query(updateBookingSql, [new_status, booking_id], (err, result) => {
                 if (err) reject(err);
                 else resolve(result);
             });
         });
+
+        // Also increment attempts if necessary (fire-and-forget)
+        incrementAttemptsForVoucher();
 
         // 2. Get activity_id for the location
         const getActivitySql = "SELECT id FROM activity WHERE location = ? AND status = 'Live'";
@@ -4756,8 +4785,8 @@ async function createVoucherFromWebhook(voucherData) {
             
             // No duplicates found, proceed with voucher creation
             const insertSql = `INSERT INTO all_vouchers 
-                (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
             const values = [
                 emptyToNull(name),
                 emptyToNull(weight),
@@ -4779,7 +4808,8 @@ async function createVoucherFromWebhook(voucherData) {
                 emptyToNull(recipient_gift_date),
                 emptyToNull(preferred_location),
                 emptyToNull(preferred_time),
-                emptyToNull(preferred_day)
+                emptyToNull(preferred_day),
+                1 // flight_attempts starts at 1 for each created voucher
             ];
             
             con.query(insertSql, values, (err, result) => {
