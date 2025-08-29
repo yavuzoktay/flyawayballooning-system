@@ -1948,20 +1948,35 @@ const Manifest = () => {
                                                                     </span>
                                                                 </TableCell>
                                                                 <TableCell>
-                                                                    <span style={{ color: '#3274b4', cursor: 'pointer', textDecoration: 'underline' }}
-                                                                        onClick={() => handleNameClick(flight.id)}>
-                                                                        {firstPassenger ? `${firstPassenger.first_name || ''} ${firstPassenger.last_name || ''}`.trim() : (flight.name || '')}
-                                                                    </span>
-                                                                    {/* Render additional guests under the main name */}
-                                                                    {Array.isArray(flight.passengers) && flight.passengers.length > 1 && (
-                                                                        <div style={{ marginTop: 4, fontSize: 12, color: '#555' }}>
-                                                                            {flight.passengers.slice(1).map((p, i) => (
-                                                                                <div key={`${flight.id}-p-${i+1}`}>
-                                                                                    {`${p.first_name || ''} ${p.last_name || ''}`.trim()} {p.weight ? `(${p.weight}kg)` : ''}
-                                                                                </div>
-                                                                            ))}
-                                                                        </div>
-                                                                    )}
+                                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                                                                        {/* İlk passenger'ı ana isim olarak göster */}
+                                                                        <span style={{ 
+                                                                            color: '#3274b4', 
+                                                                            cursor: 'pointer', 
+                                                                            textDecoration: 'underline',
+                                                                            fontSize: '14px'
+                                                                        }}
+                                                                            onClick={() => handleNameClick(flight.id)}>
+                                                                            {firstPassenger ? `${firstPassenger.first_name || ''} ${firstPassenger.last_name || ''}`.trim() : (flight.name || '')}
+                                                                        </span>
+                                                                        
+                                                                        {/* Ek passenger'ları yan yana göster */}
+                                                                        {Array.isArray(flight.passengers) && flight.passengers.length > 1 && 
+                                                                            flight.passengers.slice(1).map((p, i) => (
+                                                                                <span 
+                                                                                    key={`${flight.id}-p-${i+1}`}
+                                                                                    style={{ 
+                                                                                        color: 'rgb(50, 116, 180)', 
+                                                                                        fontSize: '14px',
+                                                                                        fontWeight: '500'
+                                                                                    }}
+                                                                                >
+                                                                                    {`${p.first_name || ''} ${p.last_name || ''}`.trim()}
+                                                                                    {p.weight ? ` (${p.weight}kg)` : ''}
+                                                                                </span>
+                                                                            ))
+                                                                        }
+                                                                    </div>
                                                                 </TableCell>
                                                                 <TableCell>{firstPassenger ? firstPassenger.weight : ''}</TableCell>
                                                                 <TableCell>{flight.phone || ''}</TableCell>
