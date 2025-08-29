@@ -100,6 +100,7 @@ const Settings = () => {
         is_physical_item: true,
         weight_grams: 0,
         journey_types: ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'],
+        locations: ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'],
         sort_order: 0,
         is_active: true
     });
@@ -169,6 +170,7 @@ const Settings = () => {
     });
 
     const locations = ['Somerset', 'United Kingdom'];
+    const activityLocations = ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'];
     const experienceTypes = ['Shared Flight', 'Private Charter'];
     const voucherTypeOptions = ['Weekday Morning', 'Flexible Weekday', 'Any Day Flight'];
     const journeyTypes = ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'];
@@ -706,6 +708,7 @@ const Settings = () => {
             formData.append('is_physical_item', addToBookingFormData.is_physical_item);
             formData.append('weight_grams', addToBookingFormData.weight_grams);
             formData.append('journey_types', JSON.stringify(addToBookingFormData.journey_types));
+            formData.append('locations', JSON.stringify(addToBookingFormData.locations));
             formData.append('sort_order', addToBookingFormData.sort_order);
             formData.append('is_active', addToBookingFormData.is_active);
             
@@ -789,6 +792,34 @@ const Settings = () => {
             }
         }
         
+        // Safely parse locations - handle both JSON and string formats
+        let parsedLocations = ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'];
+        if (item.locations) {
+            try {
+                // If it's already an array, use it directly
+                if (Array.isArray(item.locations)) {
+                    parsedLocations = item.locations;
+                } else if (typeof item.locations === 'string') {
+                    // Try to parse as JSON first
+                    try {
+                        parsedLocations = JSON.parse(item.locations);
+                    } catch (parseError) {
+                        // If JSON parsing fails, try to split by comma
+                        if (item.locations.includes(',')) {
+                            parsedLocations = item.locations.split(',').map(loc => loc.trim());
+                        } else {
+                            // Single value, wrap in array
+                            parsedLocations = [item.locations.trim()];
+                        }
+                    }
+                }
+            } catch (error) {
+                console.warn('Error parsing locations:', error);
+                // Fallback to default
+                parsedLocations = ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'];
+            }
+        }
+        
         setAddToBookingFormData({
             title: item.title,
             description: item.description,
@@ -801,6 +832,7 @@ const Settings = () => {
             is_physical_item: Boolean(item.is_physical_item),
             weight_grams: item.weight_grams || 0,
             journey_types: parsedJourneyTypes,
+            locations: parsedLocations,
             sort_order: item.sort_order || 0,
             is_active: Boolean(item.is_active)
         });
@@ -832,6 +864,7 @@ const Settings = () => {
             is_physical_item: true,
             weight_grams: 0,
             journey_types: ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'],
+            locations: ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'],
             sort_order: 0,
             is_active: true
         });
@@ -1673,6 +1706,7 @@ const Settings = () => {
                                             <th>PRICE</th>
                                             <th>CATEGORY</th>
                                             <th>JOURNEY TYPES</th>
+                                            <th>LOCATIONS</th>
                                             <th>STOCK</th>
                                             <th>WEIGHT</th>
                                             <th>STATUS</th>
@@ -1776,6 +1810,55 @@ const Settings = () => {
                                                     )}
                                                 </td>
                                                 <td>
+                                                    {item.locations ? (
+                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                                            {(() => {
+                                                                let locations = [];
+                                                                try {
+                                                                    if (Array.isArray(item.locations)) {
+                                                                        locations = item.locations;
+                                                                    } else if (typeof item.locations === 'string') {
+                                                                        try {
+                                                                            locations = JSON.parse(item.locations);
+                                                                        } catch (parseError) {
+                                                                            if (item.locations.includes(',')) {
+                                                                                locations = item.locations.split(',').map(loc => loc.trim());
+                                                                            } else {
+                                                                                locations = [item.locations.trim()];
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                } catch (error) {
+                                                                    console.warn('Error parsing locations for display:', error);
+                                                                    locations = ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'];
+                                                                }
+                                                                
+                                                                return locations.map((location) => (
+                                                                    <span key={location} style={{
+                                                                        padding: '2px 8px',
+                                                                        borderRadius: '12px',
+                                                                        fontSize: '11px',
+                                                                        backgroundColor: '#fef3c7',
+                                                                        color: '#92400e'
+                                                                    }}>
+                                                                        {location}
+                                                                    </span>
+                                                                ));
+                                                            })()}
+                                                        </div>
+                                                    ) : (
+                                                        <span style={{
+                                                            padding: '2px 8px',
+                                                            borderRadius: '12px',
+                                                            fontSize: '11px',
+                                                            backgroundColor: '#f3f4f6',
+                                                            color: '#6b7280'
+                                                        }}>
+                                                            All Locations
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td>
                                                     {item.stock_quantity === 0 ? (
                                                         <span style={{ color: '#10b981', fontSize: '12px' }}>Unlimited</span>
                                                     ) : (
@@ -1832,6 +1915,7 @@ const Settings = () => {
                                                                     formData.append('is_physical_item', item.is_physical_item);
                                                                     formData.append('weight_grams', item.weight_grams || 0);
                                                                     formData.append('journey_types', item.journey_types ? JSON.stringify(item.journey_types) : JSON.stringify(['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift']));
+                                                                    formData.append('locations', item.locations ? JSON.stringify(item.locations) : JSON.stringify(['Bath', 'Devon', 'Somerset', 'Bristol Fiesta']));
                                                                     formData.append('sort_order', item.sort_order || 0);
                                                                     formData.append('is_active', newStatus);
                                                                     
@@ -3825,6 +3909,53 @@ const Settings = () => {
                                     {addToBookingFormData.journey_types.length === 0 && (
                                         <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '8px' }}>
                                             Please select at least one journey type.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Locations *</label>
+                                <div style={{ 
+                                    border: '1px solid #d1d5db', 
+                                    borderRadius: '8px', 
+                                    padding: '16px',
+                                    background: '#f9fafb'
+                                }}>
+                                    <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
+                                        Select which locations this item applies to:
+                                    </div>
+                                    {activityLocations.map((location) => (
+                                        <label key={location} style={{ 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            marginBottom: '8px',
+                                            cursor: 'pointer'
+                                        }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={addToBookingFormData.locations.includes(location)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setAddToBookingFormData({
+                                                            ...addToBookingFormData,
+                                                            locations: [...addToBookingFormData.locations, location]
+                                                        });
+                                                    } else {
+                                                        setAddToBookingFormData({
+                                                            ...addToBookingFormData,
+                                                            locations: addToBookingFormData.locations.filter(loc => loc !== location)
+                                                        });
+                                                    }
+                                                }}
+                                                style={{ marginRight: '8px' }}
+                                            />
+                                            <span style={{ fontSize: '14px', color: '#374151' }}>{location}</span>
+                                        </label>
+                                    ))}
+                                    {addToBookingFormData.locations.length === 0 && (
+                                        <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '8px' }}>
+                                            Please select at least one location.
                                         </div>
                                     )}
                                 </div>

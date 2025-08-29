@@ -1154,8 +1154,8 @@ app.post('/api/add-to-booking-items', experiencesUpload.single('add_to_booking_i
     const sql = `
         INSERT INTO add_to_booking_items (
             title, description, image_url, price, price_unit, category,
-            stock_quantity, is_physical_item, weight_grams, journey_types, sort_order, is_active
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            stock_quantity, is_physical_item, weight_grams, journey_types, locations, sort_order, is_active
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     
     const values = [
@@ -1169,6 +1169,7 @@ app.post('/api/add-to-booking-items', experiencesUpload.single('add_to_booking_i
         is_physical_item !== undefined ? (is_physical_item === 'true' || is_physical_item === true) : true,
         weight_grams || 0,
         journey_types || JSON.stringify(['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift']),
+        locations || JSON.stringify(['Bath', 'Devon', 'Somerset', 'Bristol Fiesta']),
         sort_order || 0,
         is_active !== undefined ? (is_active === 'true' || is_active === true) : true
     ];
@@ -1200,6 +1201,7 @@ app.put('/api/add-to-booking-items/:id', experiencesUpload.single('add_to_bookin
         is_physical_item,
         weight_grams,
         journey_types,
+        locations,
         sort_order,
         is_active
     } = req.body;
@@ -1237,7 +1239,7 @@ app.put('/api/add-to-booking-items/:id', experiencesUpload.single('add_to_bookin
         UPDATE add_to_booking_items SET 
             title = ?, description = ?, image_url = ?, price = ?, 
             price_unit = ?, category = ?, stock_quantity = ?, is_physical_item = ?,
-            weight_grams = ?, journey_types = ?, sort_order = ?, is_active = ?
+            weight_grams = ?, journey_types = ?, locations = ?, sort_order = ?, is_active = ?
         WHERE id = ?
     `;
     
@@ -1252,6 +1254,7 @@ app.put('/api/add-to-booking-items/:id', experiencesUpload.single('add_to_bookin
         is_physical_item !== undefined ? (is_physical_item === 'true' || is_physical_item === true) : true,
         weight_grams || 0,
         journey_types || JSON.stringify(['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift']),
+        locations || JSON.stringify(['Bath', 'Devon', 'Somerset', 'Bristol Fiesta']),
         sort_order || 0,
         is_active !== undefined ? (is_active === 'true' || is_active === true) : true,
         id
@@ -2130,7 +2133,7 @@ app.get('/api/getAllBookingData', (req, res) => {
         ORDER BY ab.created_at DESC
     `;
     
-    con.query(sql, (err, result) => {
+    con.query(sql, async (err, result) => {
         if (err) {
             console.error('Error fetching all booking data:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err });
@@ -2144,7 +2147,166 @@ app.get('/api/getAllBookingData', (req, res) => {
             return r;
         });
         
-        console.log(`Fetched ${result.length} bookings`);
+        // Fetch additional information for each booking
+        try {
+            for (let i = 0; i < enriched.length; i++) {
+                const booking = enriched[i];
+                
+                // Get additional information answers
+                const [answersRows] = await new Promise((resolve, reject) => {
+                    const answersSql = `
+                        SELECT 
+                            aia.id,
+                            aia.question_id,
+                            aia.answer,
+                            aia.created_at,
+                            aiq.question_text,
+                            aiq.question_type,
+                            aiq.options,
+                            aiq.help_text,
+                            aiq.category
+                        FROM additional_information_answers aia
+                        JOIN additional_information_questions aiq ON aia.question_id = aiq.id
+                        WHERE aia.booking_id = ?
+                        ORDER BY aiq.sort_order, aiq.id
+                    `;
+                    con.query(answersSql, [booking.id], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
+                });
+                
+                // Also get all available questions for this journey type to show what questions exist
+                const [questionsRows] = await new Promise((resolve, reject) => {
+                    const questionsSql = `
+                        SELECT 
+                            id,
+                            question_text,
+                            question_type,
+                            options,
+                            help_text,
+                            category,
+                            journey_types,
+                            sort_order
+                        FROM additional_information_questions 
+                        WHERE is_active = 1 
+                        ORDER BY sort_order, id
+                    `;
+                    console.log('Fetching questions with SQL:', questionsSql);
+                    con.query(questionsSql, (err, rows) => {
+                        if (err) {
+                            console.error('Error fetching questions:', err);
+                            reject(err);
+                        } else {
+                            console.log('Questions fetched successfully:', rows);
+                            console.log('Questions count:', rows ? rows.length : 0);
+                            resolve([rows]);
+                        }
+                    });
+                });
+                
+                // Format additional information
+                const additionalInfo = {
+                                    questions: questionsRows.map(question => {
+                    try {
+                        let parsedOptions = [];
+                        let parsedJourneyTypes = [];
+                        
+                        // Safely parse options
+                        if (question.options) {
+                            try {
+                                parsedOptions = JSON.parse(question.options);
+                            } catch (e) {
+                                console.warn('Failed to parse options for question', question.id, e);
+                                parsedOptions = [];
+                            }
+                        }
+                        
+                        // Safely parse journey_types
+                        if (question.journey_types) {
+                            try {
+                                parsedJourneyTypes = JSON.parse(question.journey_types);
+                            } catch (e) {
+                                console.warn('Failed to parse journey_types for question', question.id, e);
+                                parsedJourneyTypes = [];
+                            }
+                        }
+                        
+                        return {
+                            id: question.id,
+                            question_text: question.question_text,
+                            question_type: question.question_type,
+                            options: parsedOptions,
+                            help_text: question.help_text,
+                            category: question.category,
+                            journey_types: parsedJourneyTypes,
+                            sort_order: question.sort_order
+                        };
+                    } catch (error) {
+                        console.warn('Error processing question:', question.id, error);
+                        return {
+                            id: question.id,
+                            question_text: question.question_text,
+                            question_type: question.question_type,
+                            options: [],
+                            help_text: question.help_text,
+                            category: question.category,
+                            journey_types: [],
+                            sort_order: question.sort_order
+                        };
+                    }
+                }),
+                    answers: answersRows.map(answer => ({
+                        question_id: answer.question_id,
+                        question_text: answer.question_text,
+                        question_type: answer.question_type,
+                        answer: answer.answer,
+                        options: answer.options ? JSON.parse(answer.options) : [],
+                        help_text: answer.help_text,
+                        category: answer.category,
+                        created_at: answer.created_at
+                    })),
+                    legacy: {
+                        additional_notes: booking.additional_notes,
+                        hear_about_us: booking.hear_about_us,
+                        ballooning_reason: booking.ballooning_reason,
+                        prefer: booking.prefer
+                    },
+                    additional_information_json: (() => {
+                        if (!booking.additional_information_json) return null;
+                        if (typeof booking.additional_information_json === 'string') {
+                            try {
+                                return JSON.parse(booking.additional_information_json);
+                            } catch (e) {
+                                console.warn('Failed to parse additional_information_json:', e);
+                                return null;
+                            }
+                        }
+                        return booking.additional_information_json;
+                    })()
+                };
+                
+                // Add additional information to the booking object
+                enriched[i].additional_information = additionalInfo;
+            }
+        } catch (error) {
+            console.error('Error fetching additional information:', error);
+            // Continue without additional information if there's an error
+        }
+        
+        console.log(`Fetched ${result.length} bookings with additional information`);
+        
+        // Debug: Log what we're returning
+        console.log('getAllBookingData - Returning bookings with additional info:', {
+            totalBookings: enriched.length,
+            sampleBooking: enriched[0] ? {
+                id: enriched[0].id,
+                hasAdditionalInfo: !!enriched[0].additional_information,
+                questionsCount: enriched[0].additional_information?.questions?.length || 0,
+                answersCount: enriched[0].additional_information?.answers?.length || 0
+            } : null
+        });
+        
         res.json({ success: true, data: enriched });
     });
 });
@@ -3022,11 +3184,268 @@ app.get('/api/getBookingDetail', async (req, res) => {
                 else resolve([rows]);
             });
         });
+        
+        // 4. Additional Information
+        let additionalInformation = null;
+        try {
+            // Get additional information answers
+            const [answersRows] = await new Promise((resolve, reject) => {
+                const answersSql = `
+                    SELECT 
+                        aia.id,
+                        aia.question_id,
+                        aia.answer,
+                        aia.created_at,
+                        aiq.question_text,
+                        aiq.question_type,
+                        aiq.options,
+                        aiq.help_text,
+                        aiq.category
+                    FROM additional_information_answers aia
+                    JOIN additional_information_questions aiq ON aia.question_id = aiq.id
+                    WHERE aia.booking_id = ?
+                    ORDER BY aiq.sort_order, aiq.id
+                `;
+                con.query(answersSql, [booking_id], (err, rows) => {
+                    if (err) reject(err);
+                    else resolve([rows]);
+                });
+            });
+            
+            // Also get all available questions for this journey type to show what questions exist
+            const [questionsRows] = await new Promise((resolve, reject) => {
+                const questionsSql = `
+                    SELECT 
+                        id,
+                        question_text,
+                        question_type,
+                        options,
+                        help_text,
+                        category,
+                        journey_types,
+                        sort_order
+                    FROM additional_information_questions 
+                    WHERE is_active = 1 
+                    ORDER BY sort_order, id
+                `;
+                console.log('Fetching questions with SQL:', questionsSql);
+                con.query(questionsSql, (err, rows) => {
+                    if (err) {
+                        console.error('Error fetching questions:', err);
+                        reject(err);
+                    } else {
+                        console.log('Questions fetched successfully:', rows);
+                        console.log('Questions count:', rows ? rows.length : 0);
+                        resolve([rows]);
+                    }
+                });
+            });
+            
+            // Format additional information
+            const jsonData = (() => {
+                if (!booking.additional_information_json) return null;
+                if (typeof booking.additional_information_json === 'string') {
+                    try {
+                        return JSON.parse(booking.additional_information_json);
+                    } catch (e) {
+                        console.warn('Failed to parse additional_information_json:', e);
+                        return null;
+                    }
+                }
+                return booking.additional_information_json;
+            })();
+
+            // Create a map of question_id to question details for easy lookup
+            const questionMap = new Map();
+            questionsRows.forEach(question => {
+                try {
+                    let parsedOptions = [];
+                    let parsedJourneyTypes = [];
+                    
+                    // Safely parse options
+                    if (question.options) {
+                        try {
+                            parsedOptions = JSON.parse(question.options);
+                        } catch (e) {
+                            console.warn('Failed to parse options for question', question.id, e);
+                            parsedOptions = [];
+                        }
+                    }
+                    
+                    // Safely parse journey_types
+                    if (question.journey_types) {
+                        try {
+                            parsedJourneyTypes = JSON.parse(question.journey_types);
+                        } catch (e) {
+                            console.warn('Failed to parse journey_types for question', question.id, e);
+                            parsedJourneyTypes = [];
+                        }
+                    }
+                    
+                    questionMap.set(question.id.toString(), {
+                        id: question.id,
+                        question_text: question.question_text,
+                        question_type: question.question_type,
+                        options: parsedOptions,
+                        help_text: question.help_text,
+                        category: question.category,
+                        journey_types: parsedJourneyTypes,
+                        sort_order: question.sort_order
+                    });
+                } catch (error) {
+                    console.warn('Error processing question:', question.id, error);
+                }
+            });
+
+            // Process JSON answers and map them to questions
+            const jsonAnswers = [];
+            if (jsonData) {
+                console.log('Processing JSON data:', jsonData);
+                console.log('Question map keys:', Array.from(questionMap.keys()));
+                
+                Object.entries(jsonData).forEach(([key, value]) => {
+                    if (key.startsWith('question_')) {
+                        const questionId = key.replace('question_', '');
+                        console.log('Processing question key:', key, 'questionId:', questionId);
+                        
+                        const question = questionMap.get(questionId);
+                        console.log('Found question for ID', questionId, ':', question);
+                        
+                        if (question) {
+                            jsonAnswers.push({
+                                question_id: parseInt(questionId),
+                                question_text: question.question_text,
+                                question_type: question.question_type,
+                                answer: value,
+                                options: question.options,
+                                help_text: question.help_text,
+                                category: question.category,
+                                created_at: null // JSON data doesn't have creation time
+                            });
+                        } else {
+                            console.warn('No question found for ID:', questionId);
+                        }
+                    }
+                });
+                
+                console.log('JSON answers created:', jsonAnswers);
+            }
+
+            // Combine answers from both sources (database and JSON)
+            const allAnswers = [...answersRows, ...jsonAnswers];
+
+            additionalInformation = {
+                questions: questionsRows.map(question => {
+                    try {
+                        let parsedOptions = [];
+                        let parsedJourneyTypes = [];
+                        
+                        // Safely parse options
+                        if (question.options) {
+                            try {
+                                parsedOptions = JSON.parse(question.options);
+                            } catch (e) {
+                                console.warn('Failed to parse options for question', question.id, e);
+                                parsedOptions = [];
+                            }
+                        }
+                        
+                        // Safely parse journey_types
+                        if (question.journey_types) {
+                            try {
+                                parsedJourneyTypes = JSON.parse(question.journey_types);
+                            } catch (e) {
+                                console.warn('Failed to parse journey_types for question', question.id, e);
+                                parsedJourneyTypes = [];
+                            }
+                        }
+                        
+                        return {
+                            id: question.id,
+                            question_text: question.question_text,
+                            question_type: question.question_type,
+                            options: parsedOptions,
+                            help_text: question.help_text,
+                            category: question.category,
+                            journey_types: parsedJourneyTypes,
+                            sort_order: question.sort_order
+                        };
+                    } catch (error) {
+                        console.warn('Error processing question:', question.id, error);
+                        return {
+                            id: question.id,
+                            question_text: question.question_text,
+                            question_type: question.question_type,
+                            options: [],
+                            help_text: question.help_text,
+                            category: question.category,
+                            journey_types: [],
+                            sort_order: question.sort_order
+                        };
+                    }
+                }),
+                answers: allAnswers.map(answer => ({
+                    question_id: answer.question_id,
+                    question_text: answer.question_text,
+                    question_type: answer.question_type,
+                    answer: answer.answer,
+                    options: answer.options || [],
+                    help_text: answer.help_text,
+                    category: answer.category,
+                    created_at: answer.created_at
+                })),
+                legacy: {
+                    additional_notes: booking.additional_notes,
+                    hear_about_us: booking.hear_about_us,
+                    ballooning_reason: booking.ballooning_reason,
+                    prefer: booking.prefer
+                },
+                additional_information_json: jsonData
+            };
+        } catch (error) {
+            console.error('Error fetching additional information:', error);
+            // Set default additional information structure
+            const jsonData = (() => {
+                if (!booking.additional_information_json) return null;
+                if (typeof booking.additional_information_json === 'string') {
+                    try {
+                        return JSON.parse(booking.additional_information_json);
+                    } catch (e) {
+                        console.warn('Failed to parse additional_information_json:', e);
+                        return null;
+                    }
+                }
+                return booking.additional_information_json;
+            })();
+
+            additionalInformation = {
+                questions: [],
+                answers: [],
+                legacy: {
+                    additional_notes: booking.additional_notes,
+                    hear_about_us: booking.hear_about_us,
+                    ballooning_reason: booking.ballooning_reason,
+                    prefer: booking.prefer
+                },
+                additional_information_json: jsonData
+            };
+        }
+        
+        // Debug: Log what we're returning
+        console.log('Returning additional information:', {
+            questionsCount: additionalInformation.questions ? additionalInformation.questions.length : 0,
+            answersCount: additionalInformation.answers ? additionalInformation.answers.length : 0,
+            questions: additionalInformation.questions,
+            answers: additionalInformation.answers,
+            jsonData: additionalInformation.additional_information_json
+        });
+        
         res.json({
             success: true,
             booking,
             passengers,
             notes: notesRows,
+            additional_information: additionalInformation
         });
     } catch (err) {
         console.error('Error fetching booking detail:', err);
@@ -4866,9 +5285,85 @@ async function createBookingFromWebhook(bookingData) {
                         } else {
                             console.log('Webhook passengers created successfully, count:', passengerResult.affectedRows);
                         }
+                        
+                        // Store additional information answers if available
+                        if (additionalInfo && typeof additionalInfo === 'object') {
+                            const additionalInfoAnswers = [];
+                            
+                            // Process additionalInfo object to extract question answers
+                            Object.keys(additionalInfo).forEach(key => {
+                                if (key.startsWith('question_') && additionalInfo[key]) {
+                                    const questionId = key.replace('question_', '');
+                                    additionalInfoAnswers.push([bookingId, questionId, additionalInfo[key]]);
+                                }
+                            });
+                            
+                            if (additionalInfoAnswers.length > 0) {
+                                const additionalInfoSql = 'INSERT INTO additional_information_answers (booking_id, question_id, answer) VALUES ?';
+                                con.query(additionalInfoSql, [additionalInfoAnswers], (additionalInfoErr) => {
+                                    if (additionalInfoErr) {
+                                        console.error('Error storing additional information answers:', additionalInfoErr);
+                                    } else {
+                                        console.log('Additional information answers stored successfully');
+                                    }
+                                });
+                            }
+                            
+                            // Also update the JSON field in all_booking for backward compatibility
+                            const jsonData = { ...additionalInfo };
+                            con.query(
+                                'UPDATE all_booking SET additional_information_json = ? WHERE id = ?',
+                                [JSON.stringify(jsonData), bookingId],
+                                (err) => {
+                                    if (err) {
+                                        console.error('Error updating additional_information_json:', err);
+                                    } else {
+                                        console.log('Additional information JSON updated successfully');
+                                    }
+                                }
+                            );
+                        }
+                        
                         resolve(bookingId);
                     });
                 } else {
+                    // Store additional information answers even if no passengers
+                    if (additionalInfo && typeof additionalInfo === 'object') {
+                        const additionalInfoAnswers = [];
+                        
+                        Object.keys(additionalInfo).forEach(key => {
+                            if (key.startsWith('question_') && additionalInfo[key]) {
+                                const questionId = key.replace('question_', '');
+                                additionalInfoAnswers.push([bookingId, questionId, additionalInfo[key]]);
+                            }
+                        });
+                        
+                        if (additionalInfoAnswers.length > 0) {
+                            const additionalInfoSql = 'INSERT INTO additional_information_answers (booking_id, question_id, answer) VALUES ?';
+                            con.query(additionalInfoSql, [additionalInfoAnswers], (additionalInfoErr) => {
+                                if (additionalInfoErr) {
+                                    console.error('Error storing additional information answers:', additionalInfoErr);
+                                } else {
+                                    console.log('Additional information answers stored successfully');
+                                }
+                            });
+                        }
+                        
+                        // Also update the JSON field in all_booking for backward compatibility
+                        const jsonData = { ...additionalInfo };
+                        con.query(
+                            'UPDATE all_booking SET additional_information_json = ? WHERE id = ?',
+                            [JSON.stringify(jsonData), bookingId],
+                            (err) => {
+                                if (err) {
+                                    console.error('Error updating additional_information_json:', err);
+                                } else {
+                                    console.log('Additional information JSON updated successfully');
+                                }
+                            }
+                        );
+                    }
+                    
                     resolve(bookingId);
                 }
             });
@@ -6389,6 +6884,206 @@ app.get('/api/activities/flight-types', (req, res) => {
         res.json({ 
             success: true, 
             data: processedActivities 
+        });
+    });
+});
+
+// Get additional information answers for a specific booking
+app.get('/api/booking/:bookingId/additional-information', async (req, res) => {
+    const { bookingId } = req.params;
+    
+    try {
+        // Get the additional information answers for this booking
+        const answersSql = `
+            SELECT 
+                aia.id,
+                aia.question_id,
+                aia.answer,
+                aia.created_at,
+                aiq.question_text,
+                aiq.question_type,
+                aiq.options,
+                aiq.help_text,
+                aiq.category
+            FROM additional_information_answers aia
+            JOIN additional_information_questions aiq ON aia.question_id = aiq.id
+            WHERE aia.booking_id = ?
+            ORDER BY aiq.sort_order, aiq.id
+        `;
+        
+        const answers = await new Promise((resolve, reject) => {
+            con.query(answersSql, [bookingId], (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        });
+        
+        // Also get the legacy additional information fields from the booking
+        const bookingSql = `
+            SELECT 
+                additional_notes,
+                hear_about_us,
+                ballooning_reason,
+                prefer,
+                additional_information_json
+            FROM all_booking 
+            WHERE id = ?
+        `;
+        
+        const booking = await new Promise((resolve, reject) => {
+            con.query(bookingSql, [bookingId], (err, result) => {
+                if (err) reject(err);
+                else resolve(result[0] || {});
+            });
+        });
+        
+        // Format the response
+        const formattedAnswers = answers.map(answer => ({
+            question_id: answer.question_id,
+            question_text: answer.question_text,
+            question_type: answer.question_type,
+            answer: answer.answer,
+            options: answer.options ? JSON.parse(answer.options) : [],
+            help_text: answer.help_text,
+            category: answer.category,
+            created_at: answer.created_at
+        }));
+        
+        res.json({
+            success: true,
+            data: {
+                answers: formattedAnswers,
+                legacy: {
+                    additional_notes: booking.additional_notes,
+                    hear_about_us: booking.hear_about_us,
+                    ballooning_reason: booking.ballooning_reason,
+                    prefer: booking.prefer
+                },
+                additional_information_json: booking.additional_information_json ? JSON.parse(booking.additional_information_json) : null
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error fetching additional information:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error fetching additional information',
+            error: error.message 
+        });
+    }
+});
+
+// Store additional information answers for a booking
+app.post('/api/booking/:bookingId/additional-information', async (req, res) => {
+    const { bookingId } = req.params;
+    const { answers } = req.body;
+    
+    try {
+        // Validate booking exists
+        const bookingExists = await new Promise((resolve, reject) => {
+            con.query('SELECT id FROM all_booking WHERE id = ?', [bookingId], (err, result) => {
+                if (err) reject(err);
+                else resolve(result.length > 0);
+            });
+        });
+        
+        if (!bookingExists) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Booking not found' 
+            });
+        }
+        
+        // Delete existing answers for this booking
+        await new Promise((resolve, reject) => {
+            con.query('DELETE FROM additional_information_answers WHERE booking_id = ?', [bookingId], (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        
+        // Insert new answers
+        if (answers && Array.isArray(answers) && answers.length > 0) {
+            const insertSql = 'INSERT INTO additional_information_answers (booking_id, question_id, answer) VALUES ?';
+            const insertValues = answers
+                .filter(answer => answer.question_id && answer.answer)
+                .map(answer => [bookingId, answer.question_id, answer.answer]);
+            
+            if (insertValues.length > 0) {
+                await new Promise((resolve, reject) => {
+                    con.query(insertSql, [insertValues], (err) => {
+                        if (err) reject(err);
+                        else resolve();
+                    });
+                });
+            }
+        }
+        
+        // Also update the JSON field in all_booking for backward compatibility
+        const jsonData = answers ? answers.reduce((acc, answer) => {
+            acc[`question_${answer.question_id}`] = answer.answer;
+            return acc;
+        }, {}) : {};
+        
+        await new Promise((resolve, reject) => {
+            con.query(
+                'UPDATE all_booking SET additional_information_json = ? WHERE id = ?',
+                [JSON.stringify(jsonData), bookingId],
+                (err) => {
+                    if (err) reject(err);
+                    else resolve();
+                }
+            );
+        });
+        
+        res.json({
+            success: true,
+            message: 'Additional information saved successfully'
+        });
+        
+    } catch (error) {
+        console.error('Error saving additional information:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error saving additional information',
+            error: error.message 
+        });
+    }
+});
+
+// Get additional information questions (existing endpoint, but let's make sure it's working)
+app.get('/api/additional-information-questions', (req, res) => {
+    const sql = `
+        SELECT 
+            id, 
+            question_text, 
+            question_type, 
+            is_required, 
+            options, 
+            placeholder_text, 
+            help_text, 
+            category, 
+            journey_types,
+            sort_order, 
+            is_active 
+        FROM additional_information_questions 
+        WHERE is_active = 1 
+        ORDER BY sort_order, id
+    `;
+    
+    con.query(sql, (err, result) => {
+        if (err) {
+            console.error('Error fetching additional information questions:', err);
+            return res.status(500).json({ 
+                success: false, 
+                message: 'Database error', 
+                error: err.message 
+            });
+        }
+        
+        res.json({ 
+            success: true, 
+            data: result 
         });
     });
 });

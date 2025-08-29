@@ -73,10 +73,7 @@ const BookingPage = () => {
     const [rebookModalOpen, setRebookModalOpen] = useState(false);
     const [rebookLoading, setRebookLoading] = useState(false);
 
-    // 1. Add state for editing booking notes
-    const [editingNotes, setEditingNotes] = useState(false);
-    const [notesValue, setNotesValue] = useState("");
-    const [savingNotes, setSavingNotes] = useState(false);
+    // Booking notes state removed - now handled in Additional Information section
 
     // Add state and handlers for passenger edit at the top of the component
     const [editingPassenger, setEditingPassenger] = useState(null);
@@ -101,6 +98,10 @@ const BookingPage = () => {
 
     // Add to component state:
     const [selectedDateRequestIds, setSelectedDateRequestIds] = useState([]);
+    
+    // Additional information state
+    const [additionalInformation, setAdditionalInformation] = useState(null);
+    const [additionalInfoLoading, setAdditionalInfoLoading] = useState(false);
 
     // Fetch data
     const voucherData = async () => {
@@ -373,13 +374,18 @@ setBookingDetail(finalVoucherDetail);
             setLoadingDetail(true);
             setDetailError(null);
             axios.get(`/api/getBookingDetail?booking_id=${selectedBookingId}`)
-                .then(res => {
+                .then(async res => {
                     setBookingDetail(res.data);
                     // Ayrıca booking history'yi çek
-                    return axios.get(`/api/getBookingHistory?booking_id=${selectedBookingId}`);
-                })
-                .then(res => {
-                    setBookingHistory(res.data.history || []);
+                    const historyRes = await axios.get(`/api/getBookingHistory?booking_id=${selectedBookingId}`);
+                    setBookingHistory(historyRes.data.history || []);
+                    
+                    // Set additional information from the booking detail response
+                    if (res.data.additional_information) {
+                        setAdditionalInformation(res.data.additional_information);
+                    } else {
+                        setAdditionalInformation(null);
+                    }
                 })
                 .catch(err => {
                     setDetailError('Detaylar alınamadı');
@@ -392,16 +398,11 @@ setBookingDetail(finalVoucherDetail);
             // Dialog kapandığında sıfırla
             setBookingDetail(null);
             setBookingHistory([]);
+            setAdditionalInformation(null);
         }
     }, [detailDialogOpen, selectedBookingId, activeTab]);
 
-    // 2. When opening the dialog, set notesValue to the current notes
-    useEffect(() => {
-        if (detailDialogOpen && bookingDetail?.booking) {
-            setNotesValue(bookingDetail.booking.additional_notes || "");
-            setEditingNotes(false);
-        }
-    }, [detailDialogOpen, bookingDetail]);
+    // Notes handling removed - now handled in Additional Information section
 
 
 
@@ -839,35 +840,8 @@ setBookingDetail(finalVoucherDetail);
         }
     };
 
-    // 3. Add save/cancel logic for notes
-    const handleEditNotes = () => setEditingNotes(true);
-    const handleCancelNotes = () => {
-        setNotesValue(bookingDetail.booking.additional_notes || "");
-        setEditingNotes(false);
-    };
-    const handleSaveNotes = async () => {
-        if (!bookingDetail?.booking?.id) return;
-        setSavingNotes(true);
-        try {
-            await axios.patch('/api/updateBookingField', {
-                booking_id: bookingDetail.booking.id,
-                field: 'additional_notes',
-                value: notesValue
-            });
-            setBookingDetail(prev => ({
-                ...prev,
-                booking: {
-                    ...prev.booking,
-                    additional_notes: notesValue
-                }
-            }));
-            setEditingNotes(false);
-        } catch (err) {
-            alert('Failed to update booking notes');
-        } finally {
-            setSavingNotes(false);
-        }
-    };
+    // Notes handling functions removed - now handled in Additional Information section
+    // Notes handling functions removed - now handled in Additional Information section
 
     // Add state and handlers for passenger edit at the top of the component
     const handleEditPassengerClick = (p) => {
@@ -1638,52 +1612,7 @@ setBookingDetail(finalVoucherDetail);
                                                 </>
                                             )}
                                         </Box>
-                                        {/* Additional */}
-                                        {activeTab === 'vouchers' ? (
-                                            <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
-                                                <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Additional</Typography>
-                                                {(() => {
-                                                    const v = bookingDetail.voucher || {};
-                                                    return <>
-                                                        <Typography><b>Book Flight:</b> {v.voucher_type || '-'}</Typography>
-                                                        <Typography><b>Experience:</b> {v.flight_type || '-'}</Typography>
-                                                        <Typography><b>Redeemed:</b> {v.redeemed || 'No'}</Typography>
-                                                        <Typography><b>Offer Code:</b> {v.offer_code || '-'}</Typography>
-                                                        <Typography><b>Voucher Ref:</b> {v.voucher_ref || '-'}</Typography>
-                                                        <Typography><b>Status:</b> {v.status || '-'}</Typography>
-                                                        <Typography><b>Voucher Code:</b> {v.voucher_code || '-'}</Typography>
-                                                        <Typography><b>Flight Attempts:</b> {v.flight_attempts || '-'}</Typography>
-                                                        <Typography><b>Created At:</b> {v.created_at ? dayjs(v.created_at).format('DD/MM/YYYY') : '-'}</Typography>
-                                                        <Typography><b>Updated At:</b> {v.updated_at ? dayjs(v.updated_at).format('DD/MM/YYYY HH:mm') : '-'}</Typography>
-                                                    </>;
-                                                })()}
-                                            </Box>
-                                        ) : (
-                                        <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
-                                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Additional</Typography>
-                                            {editingNotes ? (
-                                                <>
-                                                    <TextField
-                                                        multiline
-                                                        minRows={2}
-                                                        maxRows={6}
-                                                        fullWidth
-                                                        value={notesValue}
-                                                        onChange={e => setNotesValue(e.target.value)}
-                                                        disabled={savingNotes}
-                                                        sx={{ mb: 1 }}
-                                                    />
-                                                        <Button variant="contained" color="primary" onClick={handleSaveNotes} disabled={savingNotes || notesValue === (bookingDetail.booking?.additional_notes || "")}>Save</Button>
-                                                    <Button variant="outlined" onClick={handleCancelNotes} sx={{ ml: 1 }} disabled={savingNotes}>Cancel</Button>
-                                                </>
-                                            ) : (
-                                                <>
-                                                        <Typography><b>Booking Notes:</b> {bookingDetail.booking?.additional_notes || '-'}</Typography>
-                                                    <Button variant="text" size="small" onClick={handleEditNotes} sx={{ mt: 1 }}>Edit</Button>
-                                                </>
-                                            )}
-                                        </Box>
-                                        )}
+                                        {/* Additional section removed - information is now displayed in Additional Information section */}
                                         {/* Add On - Only for bookings, not vouchers */}
                                         {activeTab !== 'vouchers' && (
                                         <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
@@ -1945,6 +1874,81 @@ setBookingDetail(finalVoucherDetail);
                                                 )) : <Typography>No notes</Typography>}
                                             </Box>
                                             <Divider sx={{ my: 2 }} />
+                                            {/* Additional Information Section */}
+                                            {additionalInformation && (
+                                                <Box>
+                                                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Additional Information & Notes</Typography>
+                                                    {additionalInfoLoading ? (
+                                                        <Typography>Loading additional information...</Typography>
+                                                    ) : (
+                                                        <Box>
+                                                            {/* Booking Notes - Always show if available */}
+                                                            {bookingDetail.booking?.additional_notes && (
+                                                                <Box sx={{ mb: 2, p: 2, background: '#e3f2fd', borderRadius: 1, border: '1px solid #2196f3' }}>
+                                                                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>Booking Notes:</Typography>
+                                                                    <Typography>{bookingDetail.booking.additional_notes}</Typography>
+                                                                </Box>
+                                                            )}
+                                                            
+                                                            {/* Show all available questions with their answers (or "Not answered") - Only this section */}
+                                                            {additionalInformation.questions && additionalInformation.questions.length > 0 && (
+                                                                <>
+                                                                    {additionalInformation.questions.map((question, index) => {
+                                                                        // Find answer from multiple sources to avoid duplication
+                                                                        let answer = null;
+                                                                        
+                                                                        // First try to find in answers array
+                                                                        const answerFromAnswers = additionalInformation.answers?.find(a => a.question_id === question.id);
+                                                                        if (answerFromAnswers) {
+                                                                            answer = answerFromAnswers.answer;
+                                                                        }
+                                                                        
+                                                                        // If not found in answers, try JSON data
+                                                                        if (!answer && additionalInformation.additional_information_json) {
+                                                                            const jsonKey = `question_${question.id}`;
+                                                                            if (additionalInformation.additional_information_json[jsonKey]) {
+                                                                                answer = additionalInformation.additional_information_json[jsonKey];
+                                                                            }
+                                                                        }
+                                                                        
+                                                                        // If still not found, try legacy fields for specific questions
+                                                                        if (!answer && additionalInformation.legacy) {
+                                                                            if (question.question_text.toLowerCase().includes('hear about us') && additionalInformation.legacy.hear_about_us) {
+                                                                                answer = additionalInformation.legacy.hear_about_us;
+                                                                            } else if (question.question_text.toLowerCase().includes('ballooning') && additionalInformation.legacy.ballooning_reason) {
+                                                                                answer = additionalInformation.legacy.ballooning_reason;
+                                                                            }
+                                                                        }
+                                                                        
+                                                                        return (
+                                                                            <Box key={index} sx={{ mb: 2, p: 2, background: '#f0f8ff', borderRadius: 1, border: '1px solid #e0e0e0' }}>
+                                                                                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>
+                                                                                    {question.question_text}:
+                                                                                </Typography>
+                                                                                <Typography sx={{ color: answer ? '#333' : '#999', fontStyle: answer ? 'normal' : 'italic' }}>
+                                                                                    {answer ? answer : 'Not answered'}
+                                                                                </Typography>
+                                                                                {question.help_text && (
+                                                                                    <Typography variant="caption" sx={{ color: '#666', mt: 1, display: 'block' }}>
+                                                                                        {question.help_text}
+                                                                                    </Typography>
+                                                                                )}
+
+                                                                            </Box>
+                                                                        );
+                                                                    })}
+                                                                </>
+                                                            )}
+                                                            
+                                                            {/* Show message if no questions available */}
+                                                            {(!additionalInformation.questions || additionalInformation.questions.length === 0) && (
+                                                                <Typography sx={{ fontStyle: 'italic', color: '#666' }}>No additional information questions available</Typography>
+                                                            )}
+                                                        </Box>
+                                                    )}
+                                                </Box>
+                                            )}
+                                            <Divider sx={{ my: 2 }} />
                                             {/* HISTORY SECTION - Only for bookings, not vouchers */}
                                             {activeTab !== 'vouchers' && (
                                             <Box sx={{ background: '#e0e0e0', borderRadius: 2, p: 2, mt: 2, mb: 2 }}>
@@ -1960,7 +1964,7 @@ setBookingDetail(finalVoucherDetail);
                                                     </TableHead>
                                                     <TableBody>
                                                         <TableRow>
-                                                                <TableCell>{bookingDetail.booking?.created_at ? dayjs(bookingDetail.booking.created_at).format('DD/MM/YYYY') : '-'}</TableCell>
+                                                                <TableCell>{bookingDetail.booking?.flight_date ? dayjs(bookingDetail.booking.flight_date).format('DD/MM/YYYY') : '-'}</TableCell>
                                                                 <TableCell>{bookingDetail.booking?.flight_type || '-'}</TableCell>
                                                                 <TableCell>{bookingDetail.booking?.location || '-'}</TableCell>
                                                             <TableCell>Scheduled</TableCell>
