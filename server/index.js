@@ -955,17 +955,35 @@ app.delete('/api/voucher-types/:id', (req, res) => {
 // Get all private charter voucher types
 app.get('/api/private-charter-voucher-types', (req, res) => {
     console.log('GET /api/private-charter-voucher-types called');
-    const sql = `SELECT * FROM private_charter_voucher_types ORDER BY sort_order ASC, created_at DESC`;
-    console.log('SQL Query:', sql);
     
-    con.query(sql, (err, result) => {
+    // Check if we want only active voucher types (default) or all
+    const showOnlyActive = req.query.active !== 'false';
+    
+    let sql, params = [];
+    if (showOnlyActive) {
+        sql = `SELECT * FROM private_charter_voucher_types WHERE is_active = 1 ORDER BY sort_order ASC, created_at DESC`;
+        console.log('SQL Query (active only):', sql);
+    } else {
+        sql = `SELECT * FROM private_charter_voucher_types ORDER BY sort_order ASC, created_at DESC`;
+        console.log('SQL Query (all):', sql);
+    }
+    
+    con.query(sql, params, (err, result) => {
         if (err) {
             console.error('Error fetching private charter voucher types:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
+        
+        // For admin view (showOnlyActive = false), return all voucher types
+        // For frontend view (showOnlyActive = true), return only active ones
+        let finalResult = result;
+        
         console.log('Query result:', result);
+        console.log('Show only active:', showOnlyActive);
         console.log('Result length:', result ? result.length : 'undefined');
-        res.json({ success: true, data: result });
+        console.log('Final result length:', finalResult ? finalResult.length : 'undefined');
+        
+        res.json({ success: true, data: finalResult });
     });
 });
 
@@ -1022,10 +1040,29 @@ app.post('/api/private-charter-voucher-types', experiencesUpload.single('private
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
         
-        res.json({
-            success: true,
-            message: 'Private charter voucher type created successfully',
-            id: result.insertId
+        console.log('Private charter voucher type created successfully with ID:', result.insertId);
+        console.log('Inserted values:', values);
+        
+        // After successful creation, fetch the newly created voucher type to return complete data
+        const selectSql = `SELECT * FROM private_charter_voucher_types WHERE id = ?`;
+        con.query(selectSql, [result.insertId], (selectErr, selectResult) => {
+            if (selectErr) {
+                console.error('Error fetching newly created voucher type:', selectErr);
+                // Still return success, but without the created data
+                res.json({
+                    success: true,
+                    message: 'Private charter voucher type created successfully',
+                    id: result.insertId
+                });
+            } else {
+                console.log('Newly created voucher type fetched:', selectResult[0]);
+                res.json({
+                    success: true,
+                    message: 'Private charter voucher type created successfully',
+                    id: result.insertId,
+                    data: selectResult[0]
+                });
+            }
         });
     });
 });
@@ -1065,6 +1102,39 @@ app.put('/api/private-charter-voucher-types/:id', experiencesUpload.single('priv
         WHERE id = ?
     `;
     
+    // Convert is_active to proper boolean value
+    let isActiveValue = true; // default value
+    if (is_active !== undefined) {
+        if (typeof is_active === 'string') {
+            isActiveValue = is_active === 'true' || is_active === '1' || is_active === 'Active';
+        } else if (typeof is_active === 'boolean') {
+            isActiveValue = is_active;
+        } else if (typeof is_active === 'number') {
+            isActiveValue = is_active === 1;
+        }
+    }
+    
+    console.log('PUT /api/private-charter-voucher-types/:id - is_active handling:', {
+        originalValue: is_active,
+        type: typeof is_active,
+        convertedValue: isActiveValue,
+        reqBody: req.body
+    });
+    
+    // Additional logging for debugging
+    console.log('PUT /api/private-charter-voucher-types/:id - All form fields:', {
+        title,
+        description,
+        max_passengers,
+        validity_months,
+        flight_days,
+        flight_time,
+        features,
+        terms,
+        sort_order,
+        is_active
+    });
+    
     const values = [
         title,
         description,
@@ -1076,9 +1146,12 @@ app.put('/api/private-charter-voucher-types/:id', experiencesUpload.single('priv
         features || '[]',
         terms || '',
         sort_order || 0,
-        is_active !== undefined ? is_active : true,
+        isActiveValue,
         id
     ];
+    
+    console.log('PUT /api/private-charter-voucher-types/:id - SQL Query:', sql);
+    console.log('PUT /api/private-charter-voucher-types/:id - Values:', values);
     
     con.query(sql, values, (err, result) => {
         if (err) {
@@ -1090,10 +1163,28 @@ app.put('/api/private-charter-voucher-types/:id', experiencesUpload.single('priv
             return res.status(404).json({ success: false, message: 'Private charter voucher type not found' });
         }
         
-        res.json({
-            success: true,
-            message: 'Private charter voucher type updated successfully',
-            image_url: image_url
+        console.log('PUT /api/private-charter-voucher-types/:id - Update successful, affected rows:', result.affectedRows);
+        
+        // Fetch the updated voucher type to return complete data
+        const selectSql = `SELECT * FROM private_charter_voucher_types WHERE id = ?`;
+        con.query(selectSql, [id], (selectErr, selectResult) => {
+            if (selectErr) {
+                console.error('Error fetching updated voucher type:', selectErr);
+                // Still return success, but without the updated data
+                res.json({
+                    success: true,
+                    message: 'Private charter voucher type updated successfully',
+                    image_url: image_url
+                });
+            } else {
+                console.log('Updated voucher type fetched:', selectResult[0]);
+                res.json({
+                    success: true,
+                    message: 'Private charter voucher type updated successfully',
+                    image_url: image_url,
+                    data: selectResult[0]
+                });
+            }
         });
     });
 });

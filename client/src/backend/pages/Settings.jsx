@@ -229,9 +229,20 @@ const Settings = () => {
 
     const fetchPrivateCharterVoucherTypes = async () => {
         try {
-            const response = await axios.get('/api/private-charter-voucher-types');
+            console.log('Fetching private charter voucher types...');
+            // Get all voucher types (active and inactive) for admin view
+            const response = await axios.get('/api/private-charter-voucher-types?active=false');
             if (response.data.success) {
+                console.log('Private charter voucher types fetched:', response.data.data);
+                console.log('Voucher types with is_active values:', response.data.data.map(vt => ({
+                    id: vt.id,
+                    title: vt.title,
+                    is_active: vt.is_active,
+                    is_active_type: typeof vt.is_active
+                })));
                 setPrivateCharterVoucherTypes(response.data.data);
+            } else {
+                console.error('Failed to fetch private charter voucher types:', response.data);
             }
         } catch (error) {
             console.error('Error fetching private charter voucher types:', error);
@@ -549,25 +560,42 @@ const Settings = () => {
         
         try {
             const formData = new FormData();
+            
+            // Debug logging for form data
+            console.log('Private Charter Voucher Type form data before sending:', privateCharterVoucherTypeFormData);
+            
             Object.keys(privateCharterVoucherTypeFormData).forEach(key => {
                 if (key === 'image_file' && privateCharterVoucherTypeFormData[key]) {
                     formData.append('private_charter_voucher_type_image', privateCharterVoucherTypeFormData[key]);
                 } else if (key !== 'image_file') {
                     formData.append(key, privateCharterVoucherTypeFormData[key]);
+                    console.log(`FormData appended - ${key}:`, privateCharterVoucherTypeFormData[key], 'Type:', typeof privateCharterVoucherTypeFormData[key]);
                 }
             });
             
+            // Debug logging for FormData contents
+            for (let [key, value] of formData.entries()) {
+                console.log(`FormData entry - ${key}:`, value, 'Type:', typeof value);
+            }
+            
+            let response;
             if (showEditPrivateCharterVoucherTypeForm) {
-                await axios.put(`/api/private-charter-voucher-types/${selectedPrivateCharterVoucherType.id}`, formData, {
+                console.log('Updating Private Charter Voucher Type with ID:', selectedPrivateCharterVoucherType.id);
+                response = await axios.put(`/api/private-charter-voucher-types/${selectedPrivateCharterVoucherType.id}`, formData, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
             } else {
-                await axios.post('/api/private-charter-voucher-types', formData, {
+                console.log('Creating new Private Charter Voucher Type');
+                response = await axios.post('/api/private-charter-voucher-types', formData, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
             }
             
-            fetchPrivateCharterVoucherTypes();
+            console.log('Private Charter Voucher Type response:', response.data);
+            
+            // Refresh the list to show the new/updated voucher type
+            await fetchPrivateCharterVoucherTypes();
+            
             resetPrivateCharterVoucherTypeForm();
             setShowPrivateCharterVoucherTypesForm(false);
             setShowEditPrivateCharterVoucherTypeForm(false);
@@ -578,7 +606,13 @@ const Settings = () => {
     };
 
     const handleEditPrivateCharterVoucherType = (privateCharterVoucherType) => {
+        console.log('Editing Private Charter Voucher Type:', privateCharterVoucherType);
+        console.log('Original is_active value:', privateCharterVoucherType.is_active, 'Type:', typeof privateCharterVoucherType.is_active);
+        
         setSelectedPrivateCharterVoucherType(privateCharterVoucherType);
+        // Ensure is_active is properly converted to boolean
+        const isActiveValue = privateCharterVoucherType.is_active === 1 || privateCharterVoucherType.is_active === true;
+        
         setPrivateCharterVoucherTypeFormData({
             title: privateCharterVoucherType.title,
             description: privateCharterVoucherType.description,
@@ -591,8 +625,12 @@ const Settings = () => {
             features: privateCharterVoucherType.features || '[]',
             terms: privateCharterVoucherType.terms || '',
             sort_order: privateCharterVoucherType.sort_order || 0,
-            is_active: privateCharterVoucherType.is_active
+            is_active: isActiveValue
         });
+        
+        console.log('Form data set with converted is_active:', isActiveValue, 'Original value:', privateCharterVoucherType.is_active);
+        
+        console.log('Form data set with is_active:', privateCharterVoucherType.is_active);
         setShowEditPrivateCharterVoucherTypeForm(true);
     };
 
@@ -609,6 +647,7 @@ const Settings = () => {
     };
 
     const resetPrivateCharterVoucherTypeForm = () => {
+        console.log('Resetting Private Charter Voucher Type form to default values');
         setPrivateCharterVoucherTypeFormData({
             title: '',
             description: '',
@@ -624,6 +663,7 @@ const Settings = () => {
             is_active: true
         });
         setSelectedPrivateCharterVoucherType(null);
+        console.log('Form reset completed');
     };
 
     // Crew Management form handling
@@ -3731,12 +3771,22 @@ const Settings = () => {
                                 <div className="form-group">
                                     <label>Status</label>
                                     <select
-                                        value={privateCharterVoucherTypeFormData.is_active}
-                                        onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, is_active: e.target.value === 'true'})}
+                                        value={privateCharterVoucherTypeFormData.is_active ? 'true' : 'false'}
+                                        onChange={(e) => {
+                                            const newValue = e.target.value === 'true';
+                                            console.log('Status changed from', privateCharterVoucherTypeFormData.is_active, 'to', newValue);
+                                            setPrivateCharterVoucherTypeFormData({
+                                                ...privateCharterVoucherTypeFormData, 
+                                                is_active: newValue
+                                            });
+                                        }}
                                     >
-                                        <option value={true}>Active</option>
-                                        <option value={false}>Inactive</option>
+                                        <option value="true">Active</option>
+                                        <option value="false">Inactive</option>
                                     </select>
+                                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                                        Current status: {privateCharterVoucherTypeFormData.is_active ? 'Active' : 'Inactive'}
+                                    </div>
                                 </div>
                             </div>
                             
