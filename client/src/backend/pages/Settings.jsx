@@ -148,7 +148,7 @@ const Settings = () => {
     });
     
     // Collapsible sections state
-    const [voucherCodesExpanded, setVoucherCodesExpanded] = useState(true);
+    const [voucherCodesExpanded, setVoucherCodesExpanded] = useState(false);
     const [experiencesExpanded, setExperiencesExpanded] = useState(false);
     const [voucherTypesExpanded, setVoucherTypesExpanded] = useState(false);
     const [privateCharterVoucherTypesExpanded, setPrivateCharterVoucherTypesExpanded] = useState(false);
@@ -3769,42 +3769,7 @@ const Settings = () => {
                                     </select>
                                 </div>
                                 
-                                <div className="form-group">
-                                    <label>Category</label>
-                                    <select
-                                        value={addToBookingFormData.category}
-                                        onChange={(e) => setAddToBookingFormData({...addToBookingFormData, category: e.target.value})}
-                                    >
-                                        <option value="Merchandise">Merchandise</option>
-                                        <option value="Service">Service</option>
-                                        <option value="Food">Food & Beverage</option>
-                                        <option value="Other">Other</option>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Stock Quantity</label>
-                                    <input
-                                        type="number"
-                                        value={addToBookingFormData.stock_quantity}
-                                        onChange={(e) => setAddToBookingFormData({...addToBookingFormData, stock_quantity: e.target.value})}
-                                        placeholder="0 = unlimited"
-                                        min="0"
-                                    />
-                                </div>
-                                
-                                <div className="form-group">
-                                    <label>Weight (grams)</label>
-                                    <input
-                                        type="number"
-                                        value={addToBookingFormData.weight_grams}
-                                        onChange={(e) => setAddToBookingFormData({...addToBookingFormData, weight_grams: e.target.value})}
-                                        placeholder="0"
-                                        min="0"
-                                    />
-                                </div>
+                                {/* Category field removed */}
                             </div>
                             
                             <div className="form-row">
@@ -3819,16 +3784,7 @@ const Settings = () => {
                                     />
                                 </div>
                                 
-                                <div className="form-group">
-                                    <label>Physical Item</label>
-                                    <select
-                                        value={addToBookingFormData.is_physical_item}
-                                        onChange={(e) => setAddToBookingFormData({...addToBookingFormData, is_physical_item: e.target.value === 'true'})}
-                                    >
-                                        <option value={true}>Yes (needs shipping)</option>
-                                        <option value={false}>No (digital/service)</option>
-                                    </select>
-                                </div>
+                                {/* Physical Item field removed */}
                             </div>
                             
                             <div className="form-group">

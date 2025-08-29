@@ -91,6 +91,9 @@ const Manifest = () => {
     const [globalMenuGroup, setGlobalMenuGroup] = useState(null);
     // Add state for the current group's flights
     const [globalMenuGroupFlights, setGlobalMenuGroupFlights] = useState([]);
+    // Confirm cancel-all dialog state
+    const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+    const [confirmCancelLoading, setConfirmCancelLoading] = useState(false);
     const handleGlobalMenuOpen = (event, group, groupFlights) => {
       setGlobalMenuAnchorEl(event.currentTarget);
       setGlobalMenuGroup(group);
@@ -102,28 +105,38 @@ const Manifest = () => {
     };
     const handleGlobalMenuAction = async (action) => {
       if (action === 'cancelAllGuests') {
-        if (!globalMenuGroup?.id) return;
-        try {
-          // Find all booking IDs in the group
-          const groupBookingIds = globalMenuGroupFlights.map(f => f.id);
-          // Cancel all bookings in parallel
-          await Promise.all(groupBookingIds.map(id =>
-            axios.patch('/api/updateBookingField', {
-              booking_id: id,
-              field: 'status',
-              value: 'Cancelled'
-            })
-          ));
-          // Remove all group bookings from UI
-          setFlights(prev => prev.filter(f => !groupBookingIds.includes(f.id)));
-        } catch (err) {
-          alert('Failed to cancel all guests: ' + (err.message || 'Unknown error'));
-        }
-        handleGlobalMenuClose();
+        // Open confirmation dialog instead of immediate action
+        setConfirmCancelOpen(true);
         return;
       }
       console.log('Action:', action);
       handleGlobalMenuClose();
+    };
+
+    // Confirm cancel all - proceed with deletion
+    const handleConfirmCancelAll = async () => {
+      if (!globalMenuGroup?.id) { setConfirmCancelOpen(false); return; }
+      setConfirmCancelLoading(true);
+      try {
+        const groupBookingIds = globalMenuGroupFlights.map(f => f.id);
+        await Promise.all(groupBookingIds.map(id =>
+          axios.patch('/api/updateBookingField', {
+            booking_id: id,
+            field: 'status',
+            value: 'Cancelled'
+          })
+        ));
+        setFlights(prev => prev.filter(f => !groupBookingIds.includes(f.id)));
+        setConfirmCancelOpen(false);
+        handleGlobalMenuClose();
+      } catch (err) {
+        alert('Failed to cancel all guests: ' + (err?.response?.data?.message || err.message || 'Unknown error'));
+      } finally {
+        setConfirmCancelLoading(false);
+      }
+    };
+    const handleConfirmCancelClose = () => {
+      setConfirmCancelOpen(false);
     };
 
     const booking = useMemo(() => Array.isArray(bookingHook.booking) ? bookingHook.booking : [], [bookingHook.booking]);
@@ -1902,9 +1915,7 @@ const Manifest = () => {
                                             >
                                                 <MenuItem onClick={() => handleGlobalMenuAction('cancelAllGuests')}>Cancel All Guests</MenuItem>
                                                 <MenuItem onClick={() => handleGlobalMenuAction('sendMessageAllGuests')}>Send Message to All Guests</MenuItem>
-                                                <MenuItem onClick={() => handleGlobalMenuAction('changeTimeSlotStatus')}>Change Time Slot Status</MenuItem>
-                                                <MenuItem onClick={() => handleGlobalMenuAction('bookCustomerOntoFlight')}>Book Customer onto Flight</MenuItem>
-                                                <MenuItem onClick={() => handleGlobalMenuAction('changeAllPassengerStatuses')}>Change all passenger statuses</MenuItem>
+                                                                  <MenuItem onClick={() => handleGlobalMenuAction('bookCustomerOntoFlight')}>Book Customer onto Flight</MenuItem>
                                             </Menu>
                                         </Box>
                                         <Divider sx={{ marginY: 2 }} />
@@ -1917,7 +1928,6 @@ const Manifest = () => {
                                                         <TableCell>Weight</TableCell>
                                                         <TableCell>Mobile</TableCell>
                                                         <TableCell>Email</TableCell>
-                                                        <TableCell>Flight Time</TableCell>
                                                         <TableCell>WX Ins</TableCell>
                                                         <TableCell>Add On's</TableCell>
                                                         <TableCell>Notes</TableCell>
@@ -1956,7 +1966,6 @@ const Manifest = () => {
                                                                 <TableCell>{firstPassenger ? firstPassenger.weight : ''}</TableCell>
                                                                 <TableCell>{flight.phone || ''}</TableCell>
                                                                 <TableCell>{flight.email || ''}</TableCell>
-                                                                <TableCell>{displayFlightTime}</TableCell>
                                                                 <TableCell>{passenger.weatherRefund || passenger.weather_refund ? 'Yes' : 'No'}</TableCell>
                                                                 <TableCell>{(() => {
                                                                     if (Array.isArray(flight.choose_add_on)) {
@@ -2631,6 +2640,21 @@ const Manifest = () => {
               </DialogContent>
               <DialogActions>
                 <Button onClick={() => setBookingModalOpen(false)}>Close</Button>
+              </DialogActions>
+            </Dialog>
+            {/* Confirm Cancel All Guests Dialog */}
+            <Dialog open={confirmCancelOpen} onClose={handleConfirmCancelClose} maxWidth="xs" fullWidth>
+              <DialogTitle>Confirm Cancellation</DialogTitle>
+              <DialogContent>
+                <Typography sx={{ mt: 1 }}>
+                  Are you sure you want to cancel all guests on this flight?
+                </Typography>
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={handleConfirmCancelClose} disabled={confirmCancelLoading}>No</Button>
+                <Button color="error" variant="contained" onClick={handleConfirmCancelAll} disabled={confirmCancelLoading}>
+                  {confirmCancelLoading ? 'Cancelling...' : 'Yes, Cancel All'}
+                </Button>
               </DialogActions>
             </Dialog>
         </div>
