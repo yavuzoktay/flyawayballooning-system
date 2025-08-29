@@ -5,7 +5,7 @@ import axios from 'axios';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
-const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flightType, onFlightTypesChange, onVoucherTypesChange }) => {
+const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flightType, onFlightTypesChange, onVoucherTypesChange, bookingDetail }) => {
     const [availabilities, setAvailabilities] = useState([]);
     const [loading, setLoading] = useState(false);
     const [selectedDate, setSelectedDate] = useState(null);
@@ -41,14 +41,76 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                         setActivities(res.data.data);
                         const uniqueLocations = [...new Set(res.data.data.map(a => a.location))];
                         setLocations(uniqueLocations.map(loc => ({ location: loc })));
-                        if (location) {
-                            setSelectedLocation(location);
-                        }
-                        if (location && res.data.data.length > 0) {
-                            const found = res.data.data.find(a => a.location === location);
-                            if (found) {
-                                setSelectedActivity(found.activity_name);
+                        
+                        // Set default values based on existing booking
+                        if (bookingDetail?.booking) {
+                            const existingLocation = bookingDetail.booking.location;
+                            const existingActivity = activities.find(a => a.location === existingLocation);
+                            
+                            if (existingLocation) {
+                                setSelectedLocation(existingLocation);
                             }
+                            if (existingActivity) {
+                                setSelectedActivity(existingActivity.activity_name);
+                            }
+                            
+                            // Set default flight types based on existing booking
+                            const existingFlightType = bookingDetail.booking.flight_type || '';
+                            if (existingFlightType.toLowerCase().includes('private')) {
+                                setSelectedFlightTypes(['private']);
+                            } else if (existingFlightType.toLowerCase().includes('shared')) {
+                                setSelectedFlightTypes(['shared']);
+                            } else {
+                                // Default to both if no specific type
+                                setSelectedFlightTypes(['private', 'shared']);
+                            }
+                            
+                            // Set default voucher types based on existing booking
+                            const existingVoucherType = bookingDetail.booking?.voucher_type || '';
+                            if (existingVoucherType) {
+                                // Map existing voucher type to modal options
+                                const voucherTypeMap = {
+                                    'Weekday Morning': 'weekday morning',
+                                    'Flexible Weekday': 'flexible weekday',
+                                    'Any Day Flight': 'any day flight'
+                                };
+                                
+                                const mappedType = voucherTypeMap[existingVoucherType];
+                                if (mappedType) {
+                                    setSelectedVoucherTypes([mappedType]);
+                                } else {
+                                    // If no exact match, try to find partial matches
+                                    const lowerVoucherType = existingVoucherType.toLowerCase();
+                                    if (lowerVoucherType.includes('weekday morning') || lowerVoucherType.includes('morning')) {
+                                        setSelectedVoucherTypes(['weekday morning']);
+                                    } else if (lowerVoucherType.includes('flexible weekday') || lowerVoucherType.includes('flexible')) {
+                                        setSelectedVoucherTypes(['flexible weekday']);
+                                    } else if (lowerVoucherType.includes('any day') || lowerVoucherType.includes('any day flight')) {
+                                        setSelectedVoucherTypes(['any day flight']);
+                                    } else {
+                                        // Fallback to all types if no match found
+                                        setSelectedVoucherTypes(['weekday morning', 'flexible weekday', 'any day flight']);
+                                    }
+                                }
+                            } else {
+                                // Default to all voucher types if no existing voucher type
+                                setSelectedVoucherTypes(['weekday morning', 'flexible weekday', 'any day flight']);
+                            }
+                        } else {
+                            // Fallback to props if no booking detail
+                            if (location) {
+                                setSelectedLocation(location);
+                            }
+                            if (location && res.data.data.length > 0) {
+                                const found = res.data.data.find(a => a.location === location);
+                                if (found) {
+                                    setSelectedActivity(found.activity_name);
+                                }
+                            }
+                            // Default flight types
+                            setSelectedFlightTypes(['private', 'shared']);
+                            // Default voucher types
+                            setSelectedVoucherTypes(['weekday morning', 'flexible weekday', 'any day flight']);
                         }
                     }
                 })
@@ -61,8 +123,10 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
             setActivityId(null);
             setSelectedActivity('');
             setSelectedLocation('');
+            setSelectedFlightTypes([]);
+            setSelectedVoucherTypes([]);
         }
-    }, [open, location]);
+    }, [open, location, bookingDetail]);
 
     // Fetch availabilities (sadece activity/location değişince)
     useEffect(() => {
@@ -84,10 +148,15 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                         if (res.data.success) {
                             const data = Array.isArray(res.data.data) ? res.data.data : [];
                             setAvailabilities(data);
-                            const flightTypes = ['private', 'shared'];
-                            setSelectedFlightTypes(flightTypes);
-                            const voucherTypes = ['weekday morning', 'flexible weekday', 'any day flight'];
-                            setSelectedVoucherTypes(voucherTypes);
+                            // Don't override existing selections
+                            if (selectedFlightTypes.length === 0) {
+                                const flightTypes = ['private', 'shared'];
+                                setSelectedFlightTypes(flightTypes);
+                            }
+                            if (selectedVoucherTypes.length === 0) {
+                                const voucherTypes = ['weekday morning', 'flexible weekday', 'any day flight'];
+                                setSelectedVoucherTypes(voucherTypes);
+                            }
                             const firstDate = data?.[0]?.date;
                             if (firstDate) setCurrentMonth(dayjs(firstDate).startOf('month'));
                         } else {

@@ -2068,6 +2068,7 @@ setBookingDetail(finalVoucherDetail);
                     onClose={() => setRebookModalOpen(false)}
                     location={bookingDetail?.booking?.location}
                     onSlotSelect={handleRebookSlotSelect}
+                    bookingDetail={bookingDetail}
                 />
             </Container>
         </div>
