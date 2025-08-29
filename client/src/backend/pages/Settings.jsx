@@ -119,6 +119,8 @@ const Settings = () => {
         help_text: '',
         category: 'General',
         journey_types: ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'],
+        locations: ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'],
+        experience_types: ['Shared Flight', 'Private Charter'],
         sort_order: 0,
         is_active: true
     });
@@ -886,6 +888,16 @@ const Settings = () => {
             return;
         }
         
+        if (additionalInfoFormData.locations.length === 0) {
+            alert('Please select at least one location');
+            return;
+        }
+        
+        if (additionalInfoFormData.experience_types.length === 0) {
+            alert('Please select at least one experience type');
+            return;
+        }
+        
         try {
             // Debug: Log the form data being sent
             console.log('Additional info form data being sent:', additionalInfoFormData);
@@ -949,6 +961,52 @@ const Settings = () => {
             help_text: question.help_text || '',
             category: question.category || 'General',
             journey_types: parsedJourneyTypes,
+            locations: (() => {
+                try {
+                    if (question.locations) {
+                        if (Array.isArray(question.locations)) {
+                            return question.locations;
+                        } else if (typeof question.locations === 'string') {
+                            try {
+                                return JSON.parse(question.locations);
+                            } catch (parseError) {
+                                if (question.locations.includes(',')) {
+                                    return question.locations.split(',').map(loc => loc.trim());
+                                } else {
+                                    return [question.locations.trim()];
+                                }
+                            }
+                        }
+                    }
+                    return ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'];
+                } catch (error) {
+                    console.warn('Error parsing locations:', error);
+                    return ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'];
+                }
+            })(),
+            experience_types: (() => {
+                try {
+                    if (question.experience_types) {
+                        if (Array.isArray(question.experience_types)) {
+                            return question.experience_types;
+                        } else if (typeof question.experience_types === 'string') {
+                            try {
+                                return JSON.parse(question.experience_types);
+                            } catch (parseError) {
+                                if (question.experience_types.includes(',')) {
+                                    return question.experience_types.split(',').map(exp => exp.trim());
+                                } else {
+                                    return [question.experience_types.trim()];
+                                }
+                            }
+                        }
+                    }
+                    return ['Shared Flight', 'Private Charter'];
+                } catch (error) {
+                    console.warn('Error parsing experience_types:', error);
+                    return ['Shared Flight', 'Private Charter'];
+                }
+            })(),
             sort_order: question.sort_order || 0,
             is_active: question.is_active
         });
@@ -977,6 +1035,8 @@ const Settings = () => {
             help_text: '',
             category: 'General',
             journey_types: ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'],
+            locations: ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'],
+            experience_types: ['Shared Flight', 'Private Charter'],
             sort_order: 0,
             is_active: true
         });
@@ -2557,6 +2617,8 @@ const Settings = () => {
                                             <th>OPTIONS</th>
                                             <th>CATEGORY</th>
                                             <th>JOURNEY TYPES</th>
+                                            <th>LOCATIONS</th>
+                                            <th>EXPERIENCE TYPES</th>
                                             <th>REQUIRED</th>
                                             <th>HELP TEXT</th>
                                             <th>STATUS</th>
@@ -2675,6 +2737,94 @@ const Settings = () => {
                                                         <span style={{ color: '#9ca3af', fontSize: '12px' }}>
                                                             {question.journey_types === undefined || question.journey_types === null ? 
                                                                 'Not set' : 'No journey types'}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    {question.locations ? (
+                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                                            {(() => {
+                                                                let locations = [];
+                                                                try {
+                                                                    if (Array.isArray(question.locations)) {
+                                                                        locations = question.locations;
+                                                                    } else if (typeof question.locations === 'string') {
+                                                                        try {
+                                                                            locations = JSON.parse(question.locations);
+                                                                        } catch (parseError) {
+                                                                            if (question.locations.includes(',')) {
+                                                                                locations = question.locations.split(',').map(loc => loc.trim());
+                                                                            } else {
+                                                                                locations = [question.locations.trim()];
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                } catch (error) {
+                                                                    console.warn('Error parsing locations for display:', error);
+                                                                    locations = ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'];
+                                                                }
+                                                                
+                                                                return locations.map((location) => (
+                                                                    <span key={location} style={{
+                                                                        padding: '2px 8px',
+                                                                        borderRadius: '12px',
+                                                                        fontSize: '11px',
+                                                                        backgroundColor: '#fef3c7',
+                                                                        color: '#92400e'
+                                                                    }}>
+                                                                        {location}
+                                                                    </span>
+                                                                ));
+                                                            })()}
+                                                        </div>
+                                                    ) : (
+                                                        <span style={{ color: '#9ca3af', fontSize: '12px' }}>
+                                                            {question.locations === undefined || question.locations === null ? 
+                                                                'Not set' : 'No locations'}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    {question.experience_types ? (
+                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                                            {(() => {
+                                                                let experienceTypes = [];
+                                                                try {
+                                                                    if (Array.isArray(question.experience_types)) {
+                                                                        experienceTypes = question.experience_types;
+                                                                    } else if (typeof question.experience_types === 'string') {
+                                                                        try {
+                                                                            experienceTypes = JSON.parse(question.experience_types);
+                                                                        } catch (parseError) {
+                                                                            if (question.experience_types.includes(',')) {
+                                                                                experienceTypes = question.experience_types.split(',').map(exp => exp.trim());
+                                                                            } else {
+                                                                                experienceTypes = [question.experience_types.trim()];
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                } catch (error) {
+                                                                    console.warn('Error parsing experience_types for display:', error);
+                                                                    experienceTypes = ['Shared Flight', 'Private Charter'];
+                                                                }
+                                                                
+                                                                return experienceTypes.map((experienceType) => (
+                                                                    <span key={experienceType} style={{
+                                                                        padding: '2px 8px',
+                                                                        borderRadius: '12px',
+                                                                        fontSize: '11px',
+                                                                        backgroundColor: '#dcfce7',
+                                                                        color: '#166534'
+                                                                    }}>
+                                                                        {experienceType}
+                                                                    </span>
+                                                                ));
+                                                            })()}
+                                                        </div>
+                                                    ) : (
+                                                        <span style={{ color: '#9ca3af', fontSize: '12px' }}>
+                                                            {question.experience_types === undefined || question.experience_types === null ? 
+                                                                'Not set' : 'No experience types'}
                                                         </span>
                                                     )}
                                                 </td>
@@ -3653,6 +3803,100 @@ const Settings = () => {
                                     {additionalInfoFormData.journey_types.length === 0 && (
                                         <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '8px' }}>
                                             Please select at least one journey type.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Locations *</label>
+                                <div style={{ 
+                                    border: '1px solid #d1d5db', 
+                                    borderRadius: '8px', 
+                                    padding: '16px',
+                                    background: '#f9fafb'
+                                }}>
+                                    <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
+                                        Select which locations this question applies to:
+                                    </div>
+                                    {activityLocations.map((location) => (
+                                        <label key={location} style={{ 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            marginBottom: '8px',
+                                            cursor: 'pointer'
+                                        }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={additionalInfoFormData.locations.includes(location)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setAdditionalInfoFormData({
+                                                            ...additionalInfoFormData,
+                                                            locations: [...additionalInfoFormData.locations, location]
+                                                        });
+                                                    } else {
+                                                        setAdditionalInfoFormData({
+                                                            ...additionalInfoFormData,
+                                                            locations: additionalInfoFormData.locations.filter(loc => loc !== location)
+                                                        });
+                                                    }
+                                                }}
+                                                style={{ marginRight: '8px' }}
+                                            />
+                                            <span style={{ fontSize: '14px', color: '#374151' }}>{location}</span>
+                                        </label>
+                                    ))}
+                                    {additionalInfoFormData.locations.length === 0 && (
+                                        <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '8px' }}>
+                                            Please select at least one location.
+                                        </div>
+                                            )}
+                                </div>
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Experience Types *</label>
+                                <div style={{ 
+                                    border: '1px solid #d1d5db', 
+                                    borderRadius: '8px', 
+                                    padding: '16px',
+                                    background: '#f9fafb'
+                                }}>
+                                    <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
+                                        Select which experience types this question applies to:
+                                    </div>
+                                    {experienceTypes.map((experienceType) => (
+                                        <label key={experienceType} style={{ 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            marginBottom: '8px',
+                                            cursor: 'pointer'
+                                        }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={additionalInfoFormData.experience_types.includes(experienceType)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setAdditionalInfoFormData({
+                                                            ...additionalInfoFormData,
+                                                            experience_types: [...additionalInfoFormData.experience_types, experienceType]
+                                                        });
+                                                    } else {
+                                                        setAdditionalInfoFormData({
+                                                            ...additionalInfoFormData,
+                                                            experience_types: additionalInfoFormData.experience_types.filter(exp => exp !== experienceType)
+                                                        });
+                                                    }
+                                                }}
+                                                style={{ marginRight: '8px' }}
+                                            />
+                                            <span style={{ fontSize: '14px', color: '#374151' }}>{experienceType}</span>
+                                        </label>
+                                    ))}
+                                    {additionalInfoFormData.experience_types.length === 0 && (
+                                        <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '8px' }}>
+                                            Please select at least one experience type.
                                         </div>
                                     )}
                                 </div>

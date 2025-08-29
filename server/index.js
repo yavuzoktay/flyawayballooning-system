@@ -1335,6 +1335,8 @@ app.post('/api/additional-information-questions', (req, res) => {
         help_text,
         category,
         journey_types,
+        locations,
+        experience_types,
         sort_order,
         is_active
     } = req.body;
@@ -1347,8 +1349,8 @@ app.post('/api/additional-information-questions', (req, res) => {
     const sql = `
         INSERT INTO additional_information_questions (
             question_text, question_type, is_required, options,
-            placeholder_text, help_text, category, journey_types, sort_order, is_active
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            placeholder_text, help_text, category, journey_types, locations, experience_types, sort_order, is_active
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     
     const values = [
@@ -1360,6 +1362,8 @@ app.post('/api/additional-information-questions', (req, res) => {
         help_text || null,
         category || 'General',
         Array.isArray(journey_types) ? JSON.stringify(journey_types) : (journey_types || JSON.stringify(['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'])),
+        Array.isArray(locations) ? JSON.stringify(locations) : (locations || JSON.stringify(['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'])),
+        Array.isArray(experience_types) ? JSON.stringify(experience_types) : (experience_types || JSON.stringify(['Shared Flight', 'Private Charter'])),
         sort_order || 0,
         is_active !== undefined ? is_active : true
     ];
@@ -1424,6 +1428,8 @@ app.put('/api/additional-information-questions/:id', (req, res) => {
         help_text,
         category,
         journey_types,
+        locations,
+        experience_types,
         sort_order,
         is_active
     } = req.body;
@@ -1453,7 +1459,7 @@ app.put('/api/additional-information-questions/:id', (req, res) => {
     const sql = `
         UPDATE additional_information_questions SET 
             question_text = ?, question_type = ?, is_required = ?, options = ?,
-            placeholder_text = ?, help_text = ?, category = ?, journey_types = ?, sort_order = ?, is_active = ?
+            placeholder_text = ?, help_text = ?, category = ?, journey_types = ?, locations = ?, experience_types = ?, sort_order = ?, is_active = ?
         WHERE id = ?
     `;
     
@@ -1466,6 +1472,8 @@ app.put('/api/additional-information-questions/:id', (req, res) => {
         help_text || null,
         category || 'General',
         Array.isArray(journey_types) ? JSON.stringify(journey_types) : (journey_types || JSON.stringify(['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'])),
+        Array.isArray(locations) ? JSON.stringify(locations) : (locations || JSON.stringify(['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'])),
+        Array.isArray(experience_types) ? JSON.stringify(experience_types) : (experience_types || JSON.stringify(['Shared Flight', 'Private Charter'])),
         sort_order || 0,
         is_active !== undefined ? is_active : true,
         id
