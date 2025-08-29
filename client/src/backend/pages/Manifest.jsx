@@ -322,9 +322,9 @@ const Manifest = () => {
             // Get capacity from activity
             const maxCapacity = activity.find((a) => a.id == flight.activity_id)?.capacity || 0;
             
-            console.log(`Checking flight ${flight.id}: passengers ${totalPassengers}/${maxCapacity}, current status: ${getFlightStatus(flight)}`);
+            console.log(`autoUpdateFlightStatus - Flight ${flight.id}: passengers ${totalPassengers}/${maxCapacity}, current status: ${getFlightStatus(flight)}`);
             
-            // Simple logic: if total passengers equals or exceeds capacity, automatically close the flight
+            // Eğer total passengers capacity'yi geçiyorsa, otomatik olarak flight'ı kapat
             if (totalPassengers >= maxCapacity && maxCapacity > 0) {
                 const currentStatus = getFlightStatus(flight);
                 if (currentStatus === "Open") {
@@ -352,6 +352,34 @@ const Manifest = () => {
                     
                     console.log(`Flight ${flight.id} status updated to Closed`);
                 }
+            } else if (totalPassengers < maxCapacity && maxCapacity > 0) {
+                // Eğer total passengers capacity'nin altındaysa ve status "Closed" ise, "Open" yapılabilir
+                const currentStatus = getFlightStatus(flight);
+                if (currentStatus === "Closed" && flight.manual_status_override === 0) {
+                    console.log(`Auto-opening flight: ${flight.id} - passengers: ${totalPassengers}/${maxCapacity}`);
+                    
+                    // Update the flight status to Open
+                    await axios.patch('/api/updateManifestStatus', {
+                        booking_id: flight.id,
+                        old_status: 'Closed',
+                        new_status: 'Open',
+                        flight_date: flight.flight_date,
+                        location: flight.location,
+                        total_pax: totalPassengers
+                    });
+                    
+                    // Update local state
+                    setFlights(prevFlights => prevFlights.map(f =>
+                        f.flight_date === flight.flight_date && 
+                        f.location === flight.location && 
+                        f.flight_type === flight.flight_type &&
+                        f.time_slot === flight.time_slot
+                            ? { ...f, manual_status_override: 1 } // 1 = Open
+                            : f
+                    ));
+                    
+                    console.log(`Flight ${flight.id} status updated to Open`);
+                }
             }
         } catch (error) {
             console.error('Error auto-updating flight status:', error);
@@ -362,7 +390,27 @@ const Manifest = () => {
         const flight = flights.find(f => f.id === flightId);
         if (!flight) return;
         
+        // Calculate total passengers for this flight group
+        const totalPassengers = flights.filter(f => 
+            f.flight_date === flight.flight_date && 
+            f.location === flight.location && 
+            f.flight_type === flight.flight_type &&
+            f.time_slot === flight.time_slot
+        ).reduce((sum, f) => sum + (f.passengers ? f.passengers.length : 0), 0);
+        
+        // Get capacity from activity
+        const maxCapacity = activity.find((a) => a.id == flight.activity_id)?.capacity || 0;
+        
+        console.log(`toggleFlightStatus - Flight ${flightId}: passengers ${totalPassengers}/${maxCapacity}`);
+        
         const oldStatus = flight.manual_status_override === 1 || (flight.manual_status_override === null && getFlightStatus(flight) === "Open") ? "Open" : "Closed";
+        
+        // Eğer pax booked capacity'yi geçiyorsa ve status "Closed" ise, "Open" yapılamaz
+        if (totalPassengers >= maxCapacity && maxCapacity > 0 && oldStatus === "Closed") {
+            alert(`This flight is full with ${totalPassengers}/${maxCapacity} passengers. Status cannot be set to "Open".`);
+            return;
+        }
+        
         const newStatus = oldStatus === "Open" ? "Closed" : "Open";
         
         try {
@@ -530,6 +578,13 @@ const Manifest = () => {
         await fetchBookingDetail(bookingDetail.booking.id);
         // Also refresh overall flights state to recalc Pax Booked
         setFlights(prev => prev.map(f => f.id === bookingDetail.booking.id ? { ...f, passengers: updatedPassengers } : f));
+        
+        // Auto-update flight status based on new passenger count
+        const updatedFlight = flights.find(f => f.id === bookingDetail.booking.id);
+        if (updatedFlight) {
+            await autoUpdateFlightStatus(updatedFlight);
+        }
+        
         setAddGuestDialogOpen(false);
     };
 
@@ -695,20 +750,32 @@ const Manifest = () => {
     const handleCancelFlight = async () => {
         if (!bookingDetail?.booking?.id) return;
         try {
+            // Debug: Mevcut flight_attempts değerini logla
+            console.log('Cancel Flight - Mevcut flight_attempts:', bookingDetail.booking.flight_attempts);
+            console.log('Cancel Flight - Mevcut status:', bookingDetail.booking.status);
+            
             // flight_attempts +1
-            const newAttempts = (parseInt(bookingDetail.booking.flight_attempts || 0, 10) + 1).toString();
+            const currentAttempts = parseInt(bookingDetail.booking.flight_attempts || 0, 10);
+            const newAttempts = (currentAttempts + 1).toString();
+            
+            console.log('Cancel Flight - Yeni flight_attempts:', newAttempts);
+            
             // Status'u Cancelled yap
             await axios.patch('/api/updateBookingField', {
                 booking_id: bookingDetail.booking.id,
                 field: 'status',
                 value: 'Cancelled'
             });
+            
             // flight_attempts güncelle
             await axios.patch('/api/updateBookingField', {
                 booking_id: bookingDetail.booking.id,
                 field: 'flight_attempts',
                 value: newAttempts
             });
+            
+            console.log('Cancel Flight - Database güncellemeleri tamamlandı');
+            
             // Local state güncelle
             setBookingDetail(prev => ({
                 ...prev,
@@ -718,10 +785,23 @@ const Manifest = () => {
                     flight_attempts: newAttempts
                 }
             }));
+            
             // flights state'ini güncelle
             setFlights(prev => prev.map(f => f.id === bookingDetail.booking.id ? { ...f, status: 'Cancelled', flight_attempts: newAttempts } : f));
+            
+            console.log('Cancel Flight - Local state güncellemeleri tamamlandı');
+            
+            // Auto-update flight status based on new passenger count (cancelled passengers don't count)
+            const updatedFlight = flights.find(f => f.id === bookingDetail.booking.id);
+            if (updatedFlight) {
+                await autoUpdateFlightStatus(updatedFlight);
+            }
+            
+            // Success message
+            alert('Flight successfully cancelled! Flight attempts: ' + newAttempts);
         } catch (err) {
-            alert('Cancel işlemi başarısız!');
+            console.error('Cancel Flight Error:', err);
+            alert('Cancel operation failed! Error: ' + err.message);
         }
     };
 

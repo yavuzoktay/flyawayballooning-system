@@ -101,6 +101,7 @@ const Settings = () => {
         weight_grams: 0,
         journey_types: ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'],
         locations: ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'],
+        experience_types: ['Shared Flight', 'Private Charter'],
         sort_order: 0,
         is_active: true
     });
@@ -698,6 +699,16 @@ const Settings = () => {
             return;
         }
         
+        if (addToBookingFormData.locations.length === 0) {
+            alert('Please select at least one location');
+            return;
+        }
+        
+        if (addToBookingFormData.experience_types.length === 0) {
+            alert('Please select at least one experience type');
+            return;
+        }
+        
         try {
             // Create FormData for file upload
             const formData = new FormData();
@@ -711,6 +722,7 @@ const Settings = () => {
             formData.append('weight_grams', addToBookingFormData.weight_grams);
             formData.append('journey_types', JSON.stringify(addToBookingFormData.journey_types));
             formData.append('locations', JSON.stringify(addToBookingFormData.locations));
+            formData.append('experience_types', JSON.stringify(addToBookingFormData.experience_types));
             formData.append('sort_order', addToBookingFormData.sort_order);
             formData.append('is_active', addToBookingFormData.is_active);
             
@@ -822,6 +834,34 @@ const Settings = () => {
             }
         }
         
+        // Safely parse experience_types - handle both JSON and string formats
+        let parsedExperienceTypes = ['Shared Flight', 'Private Charter'];
+        if (item.experience_types) {
+            try {
+                // If it's already an array, use it directly
+                if (Array.isArray(item.experience_types)) {
+                    parsedExperienceTypes = item.experience_types;
+                } else if (typeof item.experience_types === 'string') {
+                    // Try to parse as JSON first
+                    try {
+                        parsedExperienceTypes = JSON.parse(item.experience_types);
+                    } catch (parseError) {
+                        // If JSON parsing fails, try to split by comma
+                        if (item.experience_types.includes(',')) {
+                            parsedExperienceTypes = item.experience_types.split(',').map(exp => exp.trim());
+                        } else {
+                            // Single value, wrap in array
+                            parsedExperienceTypes = [item.experience_types.trim()];
+                        }
+                    }
+                }
+            } catch (error) {
+                console.warn('Error parsing experience_types:', error);
+                // Fallback to default
+                parsedExperienceTypes = ['Shared Flight', 'Private Charter'];
+            }
+        }
+        
         setAddToBookingFormData({
             title: item.title,
             description: item.description,
@@ -835,6 +875,7 @@ const Settings = () => {
             weight_grams: item.weight_grams || 0,
             journey_types: parsedJourneyTypes,
             locations: parsedLocations,
+            experience_types: parsedExperienceTypes,
             sort_order: item.sort_order || 0,
             is_active: Boolean(item.is_active)
         });
@@ -867,6 +908,7 @@ const Settings = () => {
             weight_grams: 0,
             journey_types: ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'],
             locations: ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'],
+            experience_types: ['Shared Flight', 'Private Charter'],
             sort_order: 0,
             is_active: true
         });
@@ -1767,6 +1809,7 @@ const Settings = () => {
                                             <th>CATEGORY</th>
                                             <th>JOURNEY TYPES</th>
                                             <th>LOCATIONS</th>
+                                            <th>EXPERIENCE TYPES</th>
                                             <th>STOCK</th>
                                             <th>WEIGHT</th>
                                             <th>STATUS</th>
@@ -1915,6 +1958,55 @@ const Settings = () => {
                                                             color: '#6b7280'
                                                         }}>
                                                             All Locations
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    {item.experience_types ? (
+                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                                            {(() => {
+                                                                let experienceTypes = [];
+                                                                try {
+                                                                    if (Array.isArray(item.experience_types)) {
+                                                                        experienceTypes = item.experience_types;
+                                                                    } else if (typeof item.experience_types === 'string') {
+                                                                        try {
+                                                                            experienceTypes = JSON.parse(item.experience_types);
+                                                                        } catch (parseError) {
+                                                                            if (item.experience_types.includes(',')) {
+                                                                                experienceTypes = item.experience_types.split(',').map(exp => exp.trim());
+                                                                            } else {
+                                                                                experienceTypes = [item.experience_types.trim()];
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                } catch (error) {
+                                                                    console.warn('Error parsing experience_types for display:', error);
+                                                                    experienceTypes = ['Shared Flight', 'Private Charter'];
+                                                                }
+                                                                
+                                                                return experienceTypes.map((experienceType) => (
+                                                                    <span key={experienceType} style={{
+                                                                        padding: '2px 8px',
+                                                                        borderRadius: '12px',
+                                                                        fontSize: '11px',
+                                                                        backgroundColor: '#fef3c7',
+                                                                        color: '#92400e'
+                                                                    }}>
+                                                                        {experienceType}
+                                                                    </span>
+                                                                ));
+                                                            })()}
+                                                        </div>
+                                                    ) : (
+                                                        <span style={{
+                                                            padding: '2px 8px',
+                                                            borderRadius: '12px',
+                                                            fontSize: '11px',
+                                                            backgroundColor: '#f3f4f6',
+                                                            color: '#6b7280'
+                                                        }}>
+                                                            All Experience Types
                                                         </span>
                                                     )}
                                                 </td>
@@ -4156,6 +4248,54 @@ const Settings = () => {
                                     {addToBookingFormData.locations.length === 0 && (
                                         <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '8px' }}>
                                             Please select at least one location.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            {/* Experience Types Section */}
+                            <div className="form-group">
+                                <label>Experience Types *</label>
+                                <div style={{ 
+                                    border: '1px solid #d1d5db', 
+                                    borderRadius: '6px', 
+                                    padding: '12px',
+                                    backgroundColor: '#f9fafb'
+                                }}>
+                                    <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '12px' }}>
+                                        Select which experience types this item applies to:
+                                    </div>
+                                    {experienceTypes.map((experienceType) => (
+                                        <label key={experienceType} style={{ 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            marginBottom: '8px',
+                                            cursor: 'pointer'
+                                        }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={addToBookingFormData.experience_types.includes(experienceType)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setAddToBookingFormData({
+                                                            ...addToBookingFormData,
+                                                            experience_types: [...addToBookingFormData.experience_types, experienceType]
+                                                        });
+                                                    } else {
+                                                        setAddToBookingFormData({
+                                                            ...addToBookingFormData,
+                                                            experience_types: addToBookingFormData.experience_types.filter(exp => exp !== experienceType)
+                                                        });
+                                                    }
+                                                }}
+                                                style={{ marginRight: '8px' }}
+                                            />
+                                            <span style={{ fontSize: '14px', color: '#374151' }}>{experienceType}</span>
+                                        </label>
+                                    ))}
+                                    {addToBookingFormData.experience_types.length === 0 && (
+                                        <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '8px' }}>
+                                            Please select at least one experience type.
                                         </div>
                                     )}
                                 </div>

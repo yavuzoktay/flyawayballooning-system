@@ -714,20 +714,32 @@ setBookingDetail(finalVoucherDetail);
     const handleCancelFlight = async () => {
         if (!bookingDetail?.booking?.id) return;
         try {
+            // Debug: Mevcut flight_attempts değerini logla
+            console.log('Cancel Flight - Mevcut flight_attempts:', bookingDetail.booking.flight_attempts);
+            console.log('Cancel Flight - Mevcut status:', bookingDetail.booking.status);
+            
             // flight_attempts +1
-            const newAttempts = (parseInt(bookingDetail.booking.flight_attempts || 0, 10) + 1).toString();
+            const currentAttempts = parseInt(bookingDetail.booking.flight_attempts || 0, 10);
+            const newAttempts = (currentAttempts + 1).toString();
+            
+            console.log('Cancel Flight - Yeni flight_attempts:', newAttempts);
+            
             // Status'u Cancelled yap
             await axios.patch('/api/updateBookingField', {
                 booking_id: bookingDetail.booking.id,
                 field: 'status',
                 value: 'Cancelled'
             });
+            
             // flight_attempts güncelle
             await axios.patch('/api/updateBookingField', {
                 booking_id: bookingDetail.booking.id,
                 field: 'flight_attempts',
                 value: newAttempts
             });
+            
+            console.log('Cancel Flight - Database güncellemeleri tamamlandı');
+            
             // Local state güncelle
             setBookingDetail(prev => ({
                 ...prev,
@@ -737,12 +749,19 @@ setBookingDetail(finalVoucherDetail);
                     flight_attempts: newAttempts
                 }
             }));
+            
             // Tabloyu güncellemek için tekrar veri çek
             // (veya setBooking ile localde güncelle)
             setBooking(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, status: 'Cancelled', flight_attempts: newAttempts } : b));
             setFilteredData(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, status: 'Cancelled', flight_attempts: newAttempts } : b));
+            
+            console.log('Cancel Flight - Local state güncellemeleri tamamlandı');
+            
+            // Success message
+            alert('Flight successfully cancelled! Flight attempts: ' + newAttempts);
         } catch (err) {
-            alert('Cancel işlemi başarısız!');
+            console.error('Cancel Flight Error:', err);
+            alert('Cancel operation failed! Error: ' + err.message);
         }
     };
 

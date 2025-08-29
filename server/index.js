@@ -22,6 +22,16 @@ dotenv.config();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Cache control middleware for all routes
+app.use((req, res, next) => {
+    res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+    });
+    next();
+});
+
 // Stripe configuration - environment-based keys
 const isProduction = process.env.NODE_ENV === 'production';
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -53,7 +63,13 @@ app.use(cors({
         'http://34.205.25.8:3002'
     ],
     methods: "GET,POST,PUT,DELETE,PATCH,OPTIONS",
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: [
+        'Content-Type', 
+        'Authorization', 
+        'X-Requested-With',
+        'Cache-Control',
+        'Pragma'
+    ],
     credentials: true
 }));
 
@@ -1105,11 +1121,117 @@ app.delete('/api/private-charter-voucher-types/:id', (req, res) => {
     });
 });
 
+// Test endpoint to check database connection and table contents
+app.get('/api/debug/add-to-booking-items', (req, res) => {
+    console.log('🔧 DEBUG: /api/debug/add-to-booking-items called');
+    
+    // Test database connection
+    con.query('SELECT 1 as test', (err, result) => {
+        if (err) {
+            console.error('❌ Database connection test failed:', err);
+            return res.json({ 
+                success: false, 
+                message: 'Database connection failed',
+                error: err.message 
+            });
+        }
+        console.log('✅ Database connection test passed');
+        
+        // Check if table exists
+        con.query('SHOW TABLES LIKE "add_to_booking_items"', (err, tables) => {
+            if (err) {
+                console.error('❌ Table check failed:', err);
+                return res.json({ 
+                    success: false, 
+                    message: 'Table check failed',
+                    error: err.message 
+                });
+            }
+            
+            if (tables.length === 0) {
+                console.log('❌ Table add_to_booking_items does not exist');
+                return res.json({ 
+                    success: false, 
+                    message: 'Table add_to_booking_items does not exist',
+                    tables: tables
+                });
+            }
+            
+            console.log('✅ Table add_to_booking_items exists');
+            
+            // Check table structure
+            con.query('DESCRIBE add_to_booking_items', (err, structure) => {
+                if (err) {
+                    console.error('❌ Table structure check failed:', err);
+                    return res.json({ 
+                        success: false, 
+                        message: 'Table structure check failed',
+                        error: err.message 
+                    });
+                }
+                
+                console.log('✅ Table structure:', structure);
+                
+                // Check table contents
+                con.query('SELECT COUNT(*) as total_count FROM add_to_booking_items', (err, countResult) => {
+                    if (err) {
+                        console.error('❌ Count query failed:', err);
+                        return res.json({ 
+                            success: false, 
+                            message: 'Count query failed',
+                            error: err.message,
+                            structure: structure
+                        });
+                    }
+                    
+                    const totalCount = countResult[0].total_count;
+                    console.log('✅ Total items in table:', totalCount);
+                    
+                    if (totalCount > 0) {
+                        // Get sample data
+                        con.query('SELECT id, title, is_active, journey_types, locations, experience_types FROM add_to_booking_items LIMIT 3', (err, sampleData) => {
+                            if (err) {
+                                console.error('❌ Sample data query failed:', err);
+                                return res.json({ 
+                                    success: true, 
+                                    message: 'Table exists with data but sample query failed',
+                                    totalCount: totalCount,
+                                    structure: structure,
+                                    error: err.message
+                                });
+                            }
+                            
+                            console.log('✅ Sample data:', sampleData);
+                            res.json({ 
+                                success: true, 
+                                message: 'Table exists with data',
+                                totalCount: totalCount,
+                                structure: structure,
+                                sampleData: sampleData
+                            });
+                        });
+                    } else {
+                        res.json({ 
+                            success: true, 
+                            message: 'Table exists but is empty',
+                            totalCount: totalCount,
+                            structure: structure
+                        });
+                    }
+                });
+            });
+        });
+    });
+});
+
 // ==================== ADD TO BOOKING ITEMS API ENDPOINTS ====================
 
 // Get all add to booking items
 app.get('/api/add-to-booking-items', (req, res) => {
     console.log('GET /api/add-to-booking-items called');
+    console.log('Request headers:', req.headers);
+    console.log('Request query:', req.query);
+    
     const sql = `SELECT * FROM add_to_booking_items ORDER BY sort_order ASC, created_at DESC`;
     console.log('SQL Query:', sql);
     
@@ -1118,8 +1240,54 @@ app.get('/api/add-to-booking-items', (req, res) => {
             console.error('Error fetching add to booking items:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
+        
+        console.log('Database query completed');
         console.log('Query result:', result);
+        console.log('Result type:', typeof result);
+        console.log('Result is array:', Array.isArray(result));
         console.log('Result length:', result ? result.length : 'undefined');
+        
+        if (result && result.length > 0) {
+            console.log('First item sample:', {
+                id: result[0].id,
+                title: result[0].title,
+                is_active: result[0].is_active,
+                journey_types: result[0].journey_types,
+                locations: result[0].locations,
+                experience_types: result[0].experience_types
+            });
+        } else {
+            console.log('⚠️ No items found in database');
+            console.log('This could mean:');
+            console.log('1. Table is empty');
+            console.log('2. All items are inactive');
+            console.log('3. Database connection issue');
+        }
+        
+        // Add cache busting to image URLs and ensure proper image serving
+        if (result && Array.isArray(result)) {
+            result.forEach(item => {
+                if (item.image_url && item.image_url.startsWith('/uploads/')) {
+                    // Add timestamp for cache busting
+                    const timestamp = Date.now();
+                    item.image_url = `${item.image_url}?t=${timestamp}`;
+                    
+                    // Also add full URL for production
+                    if (process.env.NODE_ENV === 'production') {
+                        item.image_url = `https://flyawayballooning-system.com${item.image_url}`;
+                    }
+                }
+            });
+        }
+        
+        // Add cache control headers
+        res.set({
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        });
+        
+        console.log('Sending response with', result ? result.length : 0, 'items');
         res.json({ success: true, data: result });
     });
 });
@@ -1136,6 +1304,8 @@ app.post('/api/add-to-booking-items', experiencesUpload.single('add_to_booking_i
         is_physical_item,
         weight_grams,
         journey_types,
+        locations,
+        experience_types,
         sort_order,
         is_active
     } = req.body;
@@ -1154,8 +1324,8 @@ app.post('/api/add-to-booking-items', experiencesUpload.single('add_to_booking_i
     const sql = `
         INSERT INTO add_to_booking_items (
             title, description, image_url, price, price_unit, category,
-            stock_quantity, is_physical_item, weight_grams, journey_types, locations, sort_order, is_active
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            stock_quantity, is_physical_item, weight_grams, journey_types, locations, experience_types, sort_order, is_active
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     
     const values = [
@@ -1170,6 +1340,7 @@ app.post('/api/add-to-booking-items', experiencesUpload.single('add_to_booking_i
         weight_grams || 0,
         journey_types || JSON.stringify(['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift']),
         locations || JSON.stringify(['Bath', 'Devon', 'Somerset', 'Bristol Fiesta']),
+        experience_types || JSON.stringify(['Shared Flight', 'Private Charter']),
         sort_order || 0,
         is_active !== undefined ? (is_active === 'true' || is_active === true) : true
     ];
@@ -1202,6 +1373,7 @@ app.put('/api/add-to-booking-items/:id', experiencesUpload.single('add_to_bookin
         weight_grams,
         journey_types,
         locations,
+        experience_types,
         sort_order,
         is_active
     } = req.body;
@@ -1233,13 +1405,18 @@ app.put('/api/add-to-booking-items/:id', experiencesUpload.single('add_to_bookin
     let image_url = req.body.image_url; // Keep existing image if no new file uploaded
     if (req.file) {
         image_url = `/uploads/experiences/${req.file.filename}`;
+        console.log('PUT - New image uploaded:', image_url);
+    } else if (req.body.image_url) {
+        console.log('PUT - Keeping existing image:', req.body.image_url);
+    } else {
+        console.log('PUT - No image provided');
     }
     
     const sql = `
         UPDATE add_to_booking_items SET 
             title = ?, description = ?, image_url = ?, price = ?, 
             price_unit = ?, category = ?, stock_quantity = ?, is_physical_item = ?,
-            weight_grams = ?, journey_types = ?, locations = ?, sort_order = ?, is_active = ?
+            weight_grams = ?, journey_types = ?, locations = ?, experience_types = ?, sort_order = ?, is_active = ?
         WHERE id = ?
     `;
     
@@ -1255,6 +1432,7 @@ app.put('/api/add-to-booking-items/:id', experiencesUpload.single('add_to_bookin
         weight_grams || 0,
         journey_types || JSON.stringify(['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift']),
         locations || JSON.stringify(['Bath', 'Devon', 'Somerset', 'Bristol Fiesta']),
+        experience_types || JSON.stringify(['Shared Flight', 'Private Charter']),
         sort_order || 0,
         is_active !== undefined ? (is_active === 'true' || is_active === true) : true,
         id
@@ -1302,6 +1480,27 @@ app.delete('/api/add-to-booking-items/:id', (req, res) => {
             success: true,
             message: 'Add to booking item deleted successfully'
         });
+    });
+});
+
+// ==================== STATIC FILE SERVING ====================
+// Serve uploaded images with cache busting
+app.get('/uploads/experiences/:filename', (req, res) => {
+    const { filename } = req.params;
+    const filePath = path.join(__dirname, 'uploads', 'experiences', filename);
+    
+    // Add cache control headers
+    res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+    });
+    
+    res.sendFile(filePath, (err) => {
+        if (err) {
+            console.error('Error serving image:', err);
+            res.status(404).send('Image not found');
+        }
     });
 });
 
@@ -3592,10 +3791,16 @@ app.post('/api/updateBookingStatus', (req, res) => {
 
 app.patch('/api/updateBookingField', (req, res) => {
     const { booking_id, field, value } = req.body;
-    const allowedFields = ['name', 'phone', 'email', 'expires', 'weight', 'status', 'flight_attempts', 'choose_add_on', 'additional_notes', 'preferred_day', 'preferred_location', 'preferred_time', 'paid', 'activity_id', 'location', 'flight_type', 'flight_date']; // Add new fields
+    
+    // Debug: API çağrısını logla
+    console.log('updateBookingField API çağrısı:', { booking_id, field, value });
+    
+    const allowedFields = ['name', 'phone', 'email', 'expires', 'weight', 'status', 'flight_attempts', 'choose_add_on', 'additional_notes', 'preferred_day', 'preferred_location', 'preferred_time', 'paid', 'activity_id', 'location', 'flight_type', 'flight_date', 'experience_types']; // Add new fields
     if (!booking_id || !field || !allowedFields.includes(field)) {
+        console.log('updateBookingField - Geçersiz istek:', { booking_id, field, value });
         return res.status(400).json({ success: false, message: 'Invalid request' });
     }
+    
     let sql;
     let params;
     if (field === 'weight') {
@@ -3606,16 +3811,25 @@ app.patch('/api/updateBookingField', (req, res) => {
         sql = `UPDATE all_booking SET ${field} = ? WHERE id = ?`;
         params = [value, booking_id];
     }
+    
+    console.log('updateBookingField - SQL:', sql);
+    console.log('updateBookingField - Params:', params);
+    
     con.query(sql, params, (err, result) => {
         if (err) {
             console.error('Error updating booking field:', err);
             return res.status(500).json({ success: false, message: 'Database error' });
         }
+        
+        console.log('updateBookingField - Database güncelleme başarılı:', { field, value, affectedRows: result.affectedRows });
+        
         // If status is updated, also insert into booking_status_history
         if (field === 'status') {
             const historySql = 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
+            console.log('updateBookingField - Status history ekleniyor:', { booking_id, status: value });
             con.query(historySql, [booking_id, value], (err2) => {
                 if (err2) console.error('History insert error:', err2);
+                else console.log('updateBookingField - Status history başarıyla eklendi');
                 // Do not block main response
                 res.json({ success: true });
             });
@@ -4714,7 +4928,11 @@ app.delete("/api/deleteAdminNote", (req, res) => {
 app.patch("/api/updateManifestStatus", async (req, res) => {
     const { booking_id, new_status, old_status, flight_date, location, total_pax } = req.body;
     
+    // Debug: API çağrısını logla
+    console.log('updateManifestStatus API çağrısı:', { booking_id, new_status, old_status, flight_date, location, total_pax });
+    
     if (!booking_id || !new_status || !old_status || !flight_date || !location) {
+        console.log('updateManifestStatus - Eksik alanlar:', { booking_id, new_status, old_status, flight_date, location });
         return res.status(400).json({ success: false, message: "Missing required fields" });
     }
 
