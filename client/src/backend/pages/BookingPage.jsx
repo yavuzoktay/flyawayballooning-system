@@ -399,8 +399,36 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
     finalVoucherDetail.voucher.mobile = voucherItem.mobile || finalVoucherDetail.voucher.mobile;
     finalVoucherDetail.voucher.weight = voucherItem.weight || finalVoucherDetail.voucher.weight;
     finalVoucherDetail.voucher.expires = voucherItem.expires || finalVoucherDetail.voucher.expires;
+    // Use paid information from getAllVoucherData instead of voucher detail API
+    finalVoucherDetail.voucher.paid = voucherItem.paid || finalVoucherDetail.voucher.paid;
 }
-setBookingDetail(finalVoucherDetail);
+
+                // Load voucher notes when opening popup
+                try {
+                    console.log('🔄 Loading voucher notes for popup...');
+                    const voucherRef = voucherItem.voucher_ref;
+                    if (voucherRef) {
+                        const uniqueVoucherId = `voucher_${voucherRef}`;
+                        console.log('📥 Fetching notes for voucher_id:', uniqueVoucherId);
+                        
+                        const notesResponse = await axios.get(`/api/getVoucherNotes?voucher_id=${uniqueVoucherId}`);
+                        if (notesResponse.data.success) {
+                            console.log('✅ Loaded', notesResponse.data.notes.length, 'voucher notes');
+                            finalVoucherDetail.voucherNotes = notesResponse.data.notes || [];
+                        } else {
+                            console.log('❌ Failed to load voucher notes:', notesResponse.data.message);
+                            finalVoucherDetail.voucherNotes = [];
+                        }
+                    } else {
+                        console.log('⚠️ No voucher_ref found, skipping notes load');
+                        finalVoucherDetail.voucherNotes = [];
+                    }
+                } catch (notesError) {
+                    console.error('Error loading voucher notes:', notesError);
+                    finalVoucherDetail.voucherNotes = [];
+                }
+
+                setBookingDetail(finalVoucherDetail);
                 setDetailDialogOpen(true);
             } catch (err) {
                 console.error('Error fetching voucher detail:', err);
@@ -410,8 +438,27 @@ setBookingDetail(finalVoucherDetail);
                     success: true,
                     voucher: voucherItem,
                     passengers: [],
-                    notes: []
+                    notes: [],
+                    voucherNotes: []
                 };
+                
+                // Try to load notes even in error case
+                try {
+                    const voucherRef = voucherItem.voucher_ref;
+                    if (voucherRef) {
+                        const uniqueVoucherId = `voucher_${voucherRef}`;
+                        console.log('📥 Loading notes in error case for voucher_id:', uniqueVoucherId);
+                        
+                        const notesResponse = await axios.get(`/api/getVoucherNotes?voucher_id=${uniqueVoucherId}`);
+                        if (notesResponse.data.success) {
+                            console.log('✅ Loaded notes in error case:', notesResponse.data.notes.length);
+                            errorVoucherDetail.voucherNotes = notesResponse.data.notes || [];
+                        }
+                    }
+                } catch (errorNotesError) {
+                    console.error('Error loading notes in error case:', errorNotesError);
+                }
+                
                 setBookingDetail(errorVoucherDetail);
                 setDetailDialogOpen(true);
             }
@@ -606,12 +653,99 @@ setBookingDetail(finalVoucherDetail);
         try {
             if (activeTab === 'vouchers') {
                 // Voucher güncelleme
-                if (!bookingDetail?.voucher?.id) return;
-                await axios.patch('/api/updateVoucherField', {
-                    voucher_id: bookingDetail.voucher.id,
+                let voucherId = bookingDetail?.voucher?.id;
+                
+                // If no voucher ID but we have voucher_ref, find the ID from all_vouchers table
+                if (!voucherId && bookingDetail?.voucher?.voucher_ref) {
+                    try {
+                        const findVoucherResponse = await axios.get(`/api/findVoucherByRef?voucher_ref=${bookingDetail.voucher.voucher_ref}`);
+                        if (findVoucherResponse.data.success && findVoucherResponse.data.voucher?.id) {
+                            voucherId = findVoucherResponse.data.voucher.id;
+                            const voucherSource = findVoucherResponse.data.source;
+                            console.log('Found voucher ID:', voucherId, 'from source:', voucherSource, 'for voucher_ref:', bookingDetail.voucher.voucher_ref);
+                            
+                            // Store the source information for later use
+                            window.currentVoucherSourceEdit = voucherSource;
+                            window.currentVoucherDataEdit = findVoucherResponse.data.voucher;
+                        } else {
+                            // FALLBACK: Search in getAllVoucherData for the voucher (edit)
+                            console.log('🔍 FALLBACK (edit): Searching getAllVoucherData for voucher_ref:', bookingDetail.voucher.voucher_ref);
+                            try {
+                                const allVouchersResponse = await axios.get('/api/getAllVoucherData');
+                                console.log('getAllVoucherData response received (edit):', allVouchersResponse.data);
+                                
+                                if (allVouchersResponse.data && allVouchersResponse.data.data && Array.isArray(allVouchersResponse.data.data)) {
+                                    console.log('Searching through', allVouchersResponse.data.data.length, 'vouchers (edit)');
+                                    const foundVoucher = allVouchersResponse.data.data.find(v => v.voucher_ref === bookingDetail.voucher.voucher_ref);
+                                    
+                                    if (foundVoucher) {
+                                        console.log('✅ Found voucher in getAllVoucherData (edit):', foundVoucher);
+                                        voucherId = foundVoucher.id;
+                                        window.currentVoucherSourceEdit = 'all_vouchers';
+                                        window.currentVoucherDataEdit = foundVoucher;
+                                    } else {
+                                        console.log('❌ Voucher not found in getAllVoucherData (edit). Available voucher_refs:', 
+                                            allVouchersResponse.data.data.map(v => v.voucher_ref).slice(0, 5));
+                                    }
+                                } else {
+                                    console.log('❌ Invalid response structure from getAllVoucherData (edit)');
+                                }
+                            } catch (fallbackError) {
+                                console.error('Fallback search failed (edit):', fallbackError);
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Error finding voucher by ref:', err);
+                    }
+                }
+                
+                if (!voucherId) {
+                    // Ultimate Fallback: Use voucher_ref as unique ID for any voucher (edit)
+                    if (bookingDetail.voucher.voucher_ref) {
+                        console.log('✅ ULTIMATE FALLBACK (edit): Using voucher_ref as unique ID for', bookingDetail.voucher.voucher_ref);
+                        voucherId = `voucher_${bookingDetail.voucher.voucher_ref}`;
+                        window.currentVoucherSourceEdit = 'all_vouchers';
+                        window.currentVoucherDataEdit = { id: voucherId, voucher_ref: bookingDetail.voucher.voucher_ref };
+                    } else {
+                        console.error('Voucher ID not found:', bookingDetail);
+                        alert('Voucher ID not found. Cannot save changes.');
+                        setSavingEdit(false);
+                        return;
+                    }
+                }
+                
+                console.log('Saving voucher field:', {
+                    voucher_id: voucherId,
                     field: editField,
                     value: editValue
                 });
+                
+                let response;
+                
+                // Use different API endpoints based on voucher source
+                if (window.currentVoucherSourceEdit === 'all_booking') {
+                    // For vouchers from all_booking table, use booking field update
+                    const bookingId = voucherId.replace('booking_', ''); // Remove the 'booking_' prefix
+                    console.log('Using booking field update for booking-based voucher, booking_id:', bookingId);
+                    
+                    response = await axios.patch('/api/updateBookingField', {
+                        booking_id: bookingId,
+                        field: editField,
+                        value: editValue
+                    });
+                } else {
+                    // For vouchers from all_vouchers table, use voucher field update
+                    console.log('Using voucher field update for voucher-based voucher, voucher_id:', voucherId);
+                    
+                    response = await axios.patch('/api/updateVoucherField', {
+                        voucher_id: voucherId,
+                        field: editField,
+                        value: editValue
+                    });
+                }
+                
+                console.log('Save response:', response.data);
+                
                 // Local state güncelle
                 setBookingDetail(prev => ({
                     ...prev,
@@ -621,8 +755,8 @@ setBookingDetail(finalVoucherDetail);
                     }
                 }));
                 // Tabloyu güncelle
-                setVoucher(prev => prev.map(v => v.id === bookingDetail.voucher.id ? { ...v, [editField]: editValue } : v));
-                setFilteredData(prev => prev.map(v => v.id === bookingDetail.voucher.id ? { ...v, [editField]: editValue } : v));
+                setVoucher(prev => prev.map(v => v.id === voucherId ? { ...v, [editField]: editValue } : v));
+                setFilteredData(prev => prev.map(v => v.id === voucherId ? { ...v, [editField]: editValue } : v));
             } else {
                 // Booking güncelleme
                 if (!bookingDetail?.booking?.id) return;
@@ -679,7 +813,12 @@ setBookingDetail(finalVoucherDetail);
             setEditField(null);
             setEditValue('');
         } catch (err) {
-            alert('Update failed');
+            console.error('Save error:', err);
+            if (activeTab === 'vouchers') {
+                alert('Failed to update voucher field. Please try again.');
+            } else {
+                alert('Update failed');
+            }
         } finally {
             setSavingEdit(false);
         }
@@ -687,18 +826,215 @@ setBookingDetail(finalVoucherDetail);
 
     // New note functions
     const handleAddNote = async () => {
-        if (!newNote.trim() || !bookingDetail?.booking?.id) return;
+        if (!newNote.trim()) return;
+        
         setAddingNote(true);
         try {
-            await axios.post('/api/addAdminNotes', {
-                date: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-                note: newNote,
-                booking_id: bookingDetail.booking.id
-            });
-            setNewNote('');
-            await fetchPassengers(bookingDetail.booking.id);
+            if (activeTab === 'vouchers') {
+                // For vouchers, use the new voucher notes system
+                let voucherId = bookingDetail?.voucher?.id;
+                
+                // If no voucher ID but we have voucher_ref, find the ID from all_vouchers table
+                if (!voucherId && bookingDetail?.voucher?.voucher_ref) {
+                    try {
+                        console.log('Searching for voucher with voucher_ref:', bookingDetail.voucher.voucher_ref);
+                        const findVoucherResponse = await axios.get(`/api/findVoucherByRef?voucher_ref=${bookingDetail.voucher.voucher_ref}`);
+                        console.log('findVoucherByRef response:', findVoucherResponse.data);
+                        
+                        if (findVoucherResponse.data.success && findVoucherResponse.data.voucher?.id) {
+                            voucherId = findVoucherResponse.data.voucher.id;
+                            const voucherSource = findVoucherResponse.data.source;
+                            console.log('Found voucher ID for notes:', voucherId, 'from source:', voucherSource, 'for voucher_ref:', bookingDetail.voucher.voucher_ref);
+                            
+                            // Store the source information for later use
+                            window.currentVoucherSource = voucherSource;
+                            window.currentVoucherData = findVoucherResponse.data.voucher;
+                        } else {
+                            console.error('Voucher not found in either table for voucher_ref:', bookingDetail.voucher.voucher_ref);
+                            
+                            // FALLBACK: Search in getAllVoucherData for the voucher
+                            console.log('🔍 FALLBACK: Searching getAllVoucherData for voucher_ref:', bookingDetail.voucher.voucher_ref);
+                            try {
+                                const allVouchersResponse = await axios.get('/api/getAllVoucherData');
+                                console.log('getAllVoucherData response received:', allVouchersResponse.data);
+                                
+                                if (allVouchersResponse.data && allVouchersResponse.data.data && Array.isArray(allVouchersResponse.data.data)) {
+                                    console.log('Searching through', allVouchersResponse.data.data.length, 'vouchers');
+                                    const foundVoucher = allVouchersResponse.data.data.find(v => v.voucher_ref === bookingDetail.voucher.voucher_ref);
+                                    
+                                    if (foundVoucher) {
+                                        console.log('✅ Found voucher in getAllVoucherData:', foundVoucher);
+                                        
+                                        // CRITICAL FIX: Create unique ID for notes based on voucher_ref instead of database ID
+                                        // Since database ID (106) is duplicated for all vouchers, use voucher_ref as unique identifier
+                                        const uniqueVoucherId = `voucher_${foundVoucher.voucher_ref}`;
+                                        voucherId = uniqueVoucherId;
+                                        window.currentVoucherSource = 'all_vouchers';
+                                        window.currentVoucherData = foundVoucher;
+                                        
+                                        console.log('✅ Using unique voucher ID for notes:', uniqueVoucherId, 'instead of database ID:', foundVoucher.id);
+                                    } else {
+                                        console.log('❌ Voucher not found in getAllVoucherData. Available voucher_refs:', 
+                                            allVouchersResponse.data.data.map(v => v.voucher_ref).slice(0, 5));
+                                    }
+                                } else {
+                                    console.log('❌ Invalid response structure from getAllVoucherData');
+                                }
+                            } catch (fallbackError) {
+                                console.error('Fallback search failed:', fallbackError);
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Error finding voucher by ref for notes:', err);
+                        console.error('Error details:', err.response?.data);
+                    }
+                }
+                
+                if (!voucherId) {
+                    console.log('🚨 FINAL ATTEMPT: Trying all available methods to find voucher ID');
+                    
+                    // Ultimate Fallback 1: Try booking ID if available
+                    if (bookingDetail?.booking?.id) {
+                        console.log('✅ ULTIMATE FALLBACK 1: Using booking-based notes');
+                        
+                        const response = await axios.post('/api/addAdminNotes', {
+                            date: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+                            note: newNote,
+                            booking_id: bookingDetail.booking.id
+                        });
+                        
+                        console.log('Add admin note (booking fallback) response:', response.data);
+                        
+                        if (response.data) {
+                            setNewNote('');
+                            
+                            // Preserve voucher data and just refresh notes (booking fallback)
+                            try {
+                                const voucherItem = bookingDetail.voucher;
+                                if (voucherItem.voucher_ref || voucherItem.id) {
+                                    const apiUrl = voucherItem.voucher_ref 
+                                        ? `/api/getVoucherDetail?voucher_ref=${voucherItem.voucher_ref}`
+                                        : `/api/getVoucherDetail?id=${voucherItem.id}`;
+                                    const res = await axios.get(apiUrl);
+                                    const updatedDetail = res?.data || null;
+                                    if (updatedDetail && updatedDetail.success) {
+                                        // Preserve the original voucher data structure
+                                        setBookingDetail(prev => ({
+                                            ...prev,
+                                            notes: updatedDetail.notes || prev.notes || []
+                                        }));
+                                    }
+                                }
+                            } catch (refreshError) {
+                                console.error('Error refreshing notes (booking fallback):', refreshError);
+                            }
+                        }
+                        
+                        setAddingNote(false);
+                        return;
+                    }
+                    
+                    // Ultimate Fallback 2: Use voucher_ref as unique ID for any voucher (notes)
+                    if (bookingDetail.voucher.voucher_ref) {
+                        console.log('✅ ULTIMATE FALLBACK 2: Using voucher_ref as unique ID for', bookingDetail.voucher.voucher_ref);
+                        voucherId = `voucher_${bookingDetail.voucher.voucher_ref}`;
+                        window.currentVoucherSource = 'all_vouchers';
+                        window.currentVoucherData = { id: voucherId, voucher_ref: bookingDetail.voucher.voucher_ref };
+                    } else {
+                        const errorMsg = `Voucher ID not found for voucher_ref: ${bookingDetail.voucher.voucher_ref}. All fallback methods exhausted.`;
+                        console.error(errorMsg);
+                        console.error('Current voucher data:', bookingDetail?.voucher);
+                        alert(errorMsg);
+                        setAddingNote(false);
+                        return;
+                    }
+                }
+                
+                let response;
+                
+                // Use different API endpoints based on voucher source
+                if (window.currentVoucherSource === 'all_booking') {
+                    // For vouchers from all_booking table, use admin notes with booking_id
+                    const bookingId = voucherId.replace('booking_', ''); // Remove the 'booking_' prefix
+                    console.log('Using admin notes for booking-based voucher, booking_id:', bookingId);
+                    
+                    response = await axios.post('/api/addAdminNotes', {
+                        date: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+                        note: newNote,
+                        booking_id: bookingId
+                    });
+                } else {
+                    // For vouchers from all_vouchers table, use voucher notes
+                    console.log('Using voucher notes for voucher-based voucher, voucher_id:', voucherId);
+                    
+                    response = await axios.post('/api/addVoucherNote', {
+                        date: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+                        note: newNote,
+                        voucher_id: voucherId
+                    });
+                }
+                
+                console.log('Add voucher note response:', response.data);
+                
+                if (response.data.success || response.data) {
+                    setNewNote('');
+                    
+                    // Preserve current voucher data and just refresh notes
+                    try {
+                        if (window.currentVoucherSource === 'all_booking') {
+                            // For booking-based vouchers, refresh using the same voucher detail API
+                            const voucherItem = bookingDetail.voucher;
+                            if (voucherItem.voucher_ref || voucherItem.id) {
+                                const apiUrl = voucherItem.voucher_ref 
+                                    ? `/api/getVoucherDetail?voucher_ref=${voucherItem.voucher_ref}`
+                                    : `/api/getVoucherDetail?id=${voucherItem.id}`;
+                                const res = await axios.get(apiUrl);
+                                const updatedDetail = res?.data || null;
+                                if (updatedDetail && updatedDetail.success) {
+                                    // Preserve the original voucher data structure
+                                    setBookingDetail(prev => ({
+                                        ...prev,
+                                        notes: updatedDetail.notes || prev.notes || []
+                                    }));
+                                }
+                            }
+                        } else {
+                            // For voucher-based notes, fetch voucher notes directly
+                            const notesResponse = await axios.get(`/api/getVoucherNotes?voucher_id=${voucherId}`);
+                            if (notesResponse.data.success) {
+                                console.log('✅ Refreshed voucher notes:', notesResponse.data.notes);
+                                // Add voucher notes to the existing structure
+                                setBookingDetail(prev => ({
+                                    ...prev,
+                                    voucherNotes: notesResponse.data.notes || []
+                                }));
+                            }
+                        }
+                    } catch (refreshError) {
+                        console.error('Error refreshing notes:', refreshError);
+                        // Don't fail the whole operation if refresh fails
+                    }
+                }
+            } else {
+                // For regular bookings, use existing admin notes system
+                if (!bookingDetail?.booking?.id) return;
+                
+                const response = await axios.post('/api/addAdminNotes', {
+                    date: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+                    note: newNote,
+                    booking_id: bookingDetail.booking.id
+                });
+                
+                console.log('Add admin note response:', response.data);
+                
+                if (response.data) {
+                    setNewNote('');
+                    await fetchPassengers(bookingDetail.booking.id);
+                }
+            }
         } catch (err) {
-            alert('Note eklenemedi');
+            console.error('Note add error:', err);
+            alert('Note eklenemedi: ' + (err.response?.data?.message || err.message));
         } finally {
             setAddingNote(false);
         }
@@ -978,21 +1314,139 @@ setBookingDetail(finalVoucherDetail);
       setEditingNoteId(null);
       setEditingNoteText("");
     };
-    const handleSaveNoteEdit = async (id) => {
+    const handleSaveNoteEdit = async (id, noteData) => {
       if (!editingNoteText.trim()) return;
-      await axios.patch('/api/updateAdminNote', { id, note: editingNoteText });
-      // Refresh notes (or update local state)
-      const res = await axios.get(`/api/getBookingDetail?booking_id=${bookingDetail.booking.id}`);
-      setBookingDetail(prev => ({ ...prev, notes: res.data.notes }));
-      setEditingNoteId(null);
-      setEditingNoteText("");
+      try {
+        console.log('💾 Saving note edit for id:', id, 'noteData:', noteData);
+        
+        // Determine if this is a voucher note or admin note based on note source
+        const isVoucherNote = noteData?.source === 'voucher' || 
+                             (activeTab === 'vouchers' && !noteData?.booking_id);
+        
+        if (isVoucherNote) {
+          console.log('📝 Updating voucher note via /api/updateVoucherNote');
+          // Check if this is voucher_ref based note
+          if (noteData?.voucher_ref) {
+            // Update voucher_ref_notes table
+            await axios.patch('/api/updateVoucherRefNote', { 
+              id, 
+              note: editingNoteText,
+              voucher_ref: noteData.voucher_ref 
+            });
+          } else {
+            // Update regular voucher_notes table
+            await axios.patch('/api/updateVoucherNote', { id, note: editingNoteText });
+          }
+          
+          // Refresh voucher notes
+          const voucherItem = bookingDetail.voucher;
+          if (voucherItem?.voucher_ref) {
+            const uniqueVoucherId = `voucher_${voucherItem.voucher_ref}`;
+            const notesResponse = await axios.get(`/api/getVoucherNotes?voucher_id=${uniqueVoucherId}`);
+            if (notesResponse.data.success) {
+              setBookingDetail(prev => ({
+                ...prev,
+                voucherNotes: notesResponse.data.notes || []
+              }));
+            }
+          }
+        } else {
+          console.log('📝 Updating admin note via /api/updateAdminNote');
+          await axios.patch('/api/updateAdminNote', { id, note: editingNoteText });
+          
+          // Refresh admin notes
+          if (activeTab === 'vouchers') {
+            const voucherItem = bookingDetail.voucher;
+            if (voucherItem.voucher_ref) {
+              const res = await axios.get(`/api/getVoucherDetail?voucher_ref=${voucherItem.voucher_ref}`);
+              const updatedDetail = res?.data || null;
+              if (updatedDetail) {
+                setBookingDetail(prev => ({
+                  ...prev,
+                  notes: updatedDetail.notes || prev.notes || []
+                }));
+              }
+            }
+          } else {
+            const res = await axios.get(`/api/getBookingDetail?booking_id=${bookingDetail.booking.id}`);
+            setBookingDetail(prev => ({ ...prev, notes: res.data.notes }));
+          }
+        }
+        
+        setEditingNoteId(null);
+        setEditingNoteText("");
+        console.log('✅ Note edit saved successfully');
+      } catch (err) {
+        console.error('Error updating note:', err);
+        alert('Failed to update note');
+      }
     };
-    const handleDeleteNote = async (id) => {
+    
+    const handleDeleteNote = async (id, noteData) => {
       if (!window.confirm('Are you sure you want to delete this note?')) return;
-      await axios.delete('/api/deleteAdminNote', { data: { id } });
-      // Refresh notes (or update local state)
-      const res = await axios.get(`/api/getBookingDetail?booking_id=${bookingDetail.booking.id}`);
-      setBookingDetail(prev => ({ ...prev, notes: res.data.notes }));
+      try {
+        console.log('🗑️ Deleting note with id:', id, 'noteData:', noteData);
+        
+        // Determine if this is a voucher note or admin note based on note source
+        const isVoucherNote = noteData?.source === 'voucher' || 
+                             (activeTab === 'vouchers' && !noteData?.booking_id);
+        
+        if (isVoucherNote) {
+          console.log('🗑️ Deleting voucher note via /api/deleteVoucherNote');
+          // Check if this is voucher_ref based note
+          if (noteData?.voucher_ref) {
+            // Delete from voucher_ref_notes table
+            await axios.delete('/api/deleteVoucherRefNote', { 
+              data: { 
+                id, 
+                voucher_ref: noteData.voucher_ref 
+              } 
+            });
+          } else {
+            // Delete from regular voucher_notes table
+            await axios.delete('/api/deleteVoucherNote', { data: { id } });
+          }
+          
+          // Refresh voucher notes
+          const voucherItem = bookingDetail.voucher;
+          if (voucherItem?.voucher_ref) {
+            const uniqueVoucherId = `voucher_${voucherItem.voucher_ref}`;
+            const notesResponse = await axios.get(`/api/getVoucherNotes?voucher_id=${uniqueVoucherId}`);
+            if (notesResponse.data.success) {
+              setBookingDetail(prev => ({
+                ...prev,
+                voucherNotes: notesResponse.data.notes || []
+              }));
+            }
+          }
+        } else {
+          console.log('🗑️ Deleting admin note via /api/deleteAdminNote');
+          await axios.delete('/api/deleteAdminNote', { data: { id } });
+          
+          // Refresh admin notes
+          if (activeTab === 'vouchers') {
+            const voucherItem = bookingDetail.voucher;
+            if (voucherItem.voucher_ref) {
+              const res = await axios.get(`/api/getVoucherDetail?voucher_ref=${voucherItem.voucher_ref}`);
+              const updatedDetail = res?.data || null;
+              if (updatedDetail) {
+                setBookingDetail(prev => ({
+                  ...prev,
+                  notes: updatedDetail.notes || prev.notes || []
+                }));
+              }
+            }
+          } else {
+            const res = await axios.get(`/api/getBookingDetail?booking_id=${bookingDetail.booking.id}`);
+            setBookingDetail(prev => ({ ...prev, notes: res.data.notes }));
+          }
+        }
+        
+        console.log('✅ Note deleted successfully');
+      } catch (err) {
+        console.error('Error deleting note:', err);
+        alert('Failed to delete note');
+      }
     };
 
 
@@ -1497,22 +1951,49 @@ setBookingDetail(finalVoucherDetail);
                                                         );
                                                     }
                                                     return <>
-                                                        <Typography><b>Name:</b> {bookingDetail.voucher.name || '-'}</Typography>
-                                                        <Typography><b>Phone:</b> {editField === 'phone' ? (
+                                                        <Typography><b>Name:</b> {editField === 'name' ? (
                                                             <>
-                                                                <input value={editValue} onChange={e => setEditValue(e.target.value)} style={{marginRight: 8}} />
+                                                                <input 
+                                                                    value={editValue} 
+                                                                    onChange={e => setEditValue(e.target.value)} 
+                                                                    style={{marginRight: 8}} 
+                                                                    placeholder="Full name"
+                                                                />
                                                                 <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
                                                                 <Button size="small" onClick={handleEditCancel}>Cancel</Button>
                                                             </>
                                                         ) : (
                                                             <>
-                                                                {bookingDetail.voucher.mobile || '-'}
-                                                                <IconButton size="small" onClick={() => handleEditClick('phone', bookingDetail.voucher.mobile)}><EditIcon fontSize="small" /></IconButton>
+                                                                {v.name || '-'}
+                                                                <IconButton size="small" onClick={() => handleEditClick('name', v.name)}><EditIcon fontSize="small" /></IconButton>
+                                                            </>
+                                                        )}</Typography>
+                                                        <Typography><b>Phone:</b> {editField === 'mobile' ? (
+                                                            <>
+                                                                <input 
+                                                                    value={editValue} 
+                                                                    onChange={e => setEditValue(e.target.value.replace(/[^0-9+\-\s()]/g, ''))} 
+                                                                    style={{marginRight: 8}} 
+                                                                    placeholder="Phone number"
+                                                                />
+                                                                <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                                <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                {v.mobile || '-'}
+                                                                <IconButton size="small" onClick={() => handleEditClick('mobile', v.mobile)}><EditIcon fontSize="small" /></IconButton>
                                                             </>
                                                         )}</Typography>
                                                         <Typography><b>Email:</b> {editField === 'email' ? (
                                                             <>
-                                                                <input value={editValue} onChange={e => setEditValue(e.target.value)} style={{marginRight: 8}} />
+                                                                <input 
+                                                                    type="email"
+                                                                    value={editValue} 
+                                                                    onChange={e => setEditValue(e.target.value)} 
+                                                                    style={{marginRight: 8}} 
+                                                                    placeholder="email@example.com"
+                                                                />
                                                                 <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
                                                                 <Button size="small" onClick={handleEditCancel}>Cancel</Button>
                                                             </>
@@ -1529,7 +2010,12 @@ setBookingDetail(finalVoucherDetail);
                                                         ) : '-'}</Typography>
                                                         <Typography><b>Paid:</b> {editField === 'paid' ? (
                                                             <>
-                                                                <input value={editValue} onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} style={{marginRight: 8}} />
+                                                                <input 
+                                                                    value={editValue} 
+                                                                    onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} 
+                                                                    style={{marginRight: 8}} 
+                                                                    placeholder="0.00"
+                                                                />
                                                                 <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
                                                                 <Button size="small" onClick={handleEditCancel}>Cancel</Button>
                                                             </>
@@ -1546,7 +2032,12 @@ setBookingDetail(finalVoucherDetail);
                                                         ) : '-'}</Typography>
                                                         <Typography><b>Weight:</b> {editField === 'weight' ? (
                                                             <>
-                                                                <input value={editValue} onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} style={{marginRight: 8}} />
+                                                                <input 
+                                                                    value={editValue} 
+                                                                    onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} 
+                                                                    style={{marginRight: 8}} 
+                                                                    placeholder="Weight in kg"
+                                                                />
                                                                 <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
                                                                 <Button size="small" onClick={handleEditCancel}>Cancel</Button>
                                                             </>
@@ -1878,7 +2369,31 @@ setBookingDetail(finalVoucherDetail);
                                                         {addingNote ? 'Adding...' : 'Add Note'}
                                                     </Button>
                                                 </Box>
-                                                {bookingDetail.notes && bookingDetail.notes.length > 0 ? bookingDetail.notes.map((n, i) => (
+                                                {(() => {
+                                                    // Combine regular notes and voucher notes
+                                                    const regularNotes = bookingDetail.notes || [];
+                                                    const voucherNotes = bookingDetail.voucherNotes || [];
+                                                    
+                                                    // Format voucher notes to match regular notes structure
+                                                    const formattedVoucherNotes = voucherNotes.map(vn => ({
+                                                        ...vn,
+                                                        notes: vn.note, // Map 'note' field to 'notes' field for consistency
+                                                        source: 'voucher'
+                                                    }));
+                                                    
+                                                    // Combine and sort by date (newest first)
+                                                    const allNotes = [...regularNotes, ...formattedVoucherNotes].sort((a, b) => 
+                                                        new Date(b.date || b.created_at) - new Date(a.date || a.created_at)
+                                                    );
+                                                    
+                                                    console.log('📝 Displaying notes:', {
+                                                        regularNotes: regularNotes.length,
+                                                        voucherNotes: voucherNotes.length,
+                                                        totalNotes: allNotes.length,
+                                                        allNotes
+                                                    });
+                                                    
+                                                    return allNotes.length > 0 ? allNotes.map((n, i) => (
                                                     <Box key={n.id || i} sx={{ mb: 1, p: 1, background: '#fff', borderRadius: 1, boxShadow: 0, position: 'relative' }}>
                                                         <Typography variant="body2" sx={{ color: '#888', fontSize: 12 }}>{n.date ? dayjs(n.date).format('DD/MM/YYYY HH:mm') : ''}</Typography>
                                                         {editingNoteId === n.id ? (
@@ -1892,18 +2407,19 @@ setBookingDetail(finalVoucherDetail);
                                                                     onChange={e => setEditingNoteText(e.target.value)}
                                                                     sx={{ mb: 1 }}
                                                                 />
-                                                                <Button size="small" color="primary" variant="contained" sx={{ mr: 1 }} onClick={() => handleSaveNoteEdit(n.id)}>Save</Button>
+                                                                <Button size="small" color="primary" variant="contained" sx={{ mr: 1 }} onClick={() => handleSaveNoteEdit(n.id, n)}>Save</Button>
                                                                 <Button size="small" variant="outlined" onClick={handleCancelNoteEdit}>Cancel</Button>
                                                             </>
                                                         ) : (
                                                             <>
                                                         <Typography>{n.notes}</Typography>
                                                                 <Button size="small" sx={{ position: 'absolute', right: 60, top: 8 }} onClick={() => handleEditNoteClick(n.id, n.notes)}>Edit</Button>
-                                                                <Button size="small" color="error" sx={{ position: 'absolute', right: 8, top: 8 }} onClick={() => handleDeleteNote(n.id)}>Delete</Button>
+                                                                <Button size="small" color="error" sx={{ position: 'absolute', right: 8, top: 8 }} onClick={() => handleDeleteNote(n.id, n)}>Delete</Button>
                                                             </>
                                                         )}
                                                     </Box>
-                                                )) : <Typography>No notes</Typography>}
+                                                )) : <Typography>No notes</Typography>;
+                                                })()}
                                             </Box>
                                             <Divider sx={{ my: 2 }} />
                                             {/* Additional Information Section */}

@@ -4951,12 +4951,27 @@ app.get('/api/getVoucherDetail', async (req, res) => {
                 notes = notesRows;
             }
         }
+        
+        // Get voucher-specific notes
+        let voucherNotes = [];
+        const [voucherNotesRows] = await new Promise((resolve, reject) => {
+            con.query('SELECT * FROM voucher_notes WHERE voucher_id = ? ORDER BY date DESC', [voucher.id], (err, rows) => {
+                if (err) reject(err);
+                else resolve([rows]);
+            });
+        });
+        voucherNotes = voucherNotesRows;
+        
+        // Combine booking notes and voucher notes
+        const allNotes = [...notes, ...voucherNotes.map(vn => ({ ...vn, source: 'voucher', notes: vn.note }))];
+        
         res.json({
             success: true,
             voucher,
             booking,
             passengers,
-            notes
+            notes: allNotes,
+            voucherNotes
         });
     } catch (err) {
         console.error('Error fetching voucher detail:', err);
@@ -5024,9 +5039,18 @@ app.patch("/api/updateAdminNote", (req, res) => {
 // Update Voucher Field
 app.patch("/api/updateVoucherField", (req, res) => {
     const { voucher_id, field, value } = req.body;
+    
+    // Add field validation for security
+    const allowedFields = ['name', 'email', 'mobile', 'phone', 'paid', 'weight', 'expires', 'flight_type', 'voucher_type', 'status', 'flight_attempts'];
+    
     if (!voucher_id || !field) {
         return res.status(400).json({ success: false, message: "Missing voucher_id or field" });
     }
+    
+    if (!allowedFields.includes(field)) {
+        return res.status(400).json({ success: false, message: "Field not allowed" });
+    }
+    
     const sql = `UPDATE all_vouchers SET ${field} = ? WHERE id = ?`;
     con.query(sql, [value, voucher_id], (err, result) => {
         if (err) {
@@ -5050,6 +5074,268 @@ app.delete("/api/deleteAdminNote", (req, res) => {
             return res.status(500).json({ success: false, message: "Database error" });
         }
         res.json({ success: true });
+    });
+});
+
+// ===== VOUCHER NOTES ENDPOINTS =====
+
+// Add Voucher Note
+app.post("/api/addVoucherNote", (req, res) => {
+    const { date, note, voucher_id } = req.body;
+    
+    if (!date || !note || !voucher_id) {
+        return res.status(400).json({ success: false, message: "Missing date, note, or voucher_id" });
+    }
+    
+    console.log('Adding voucher note for voucher_id:', voucher_id, 'note:', note);
+    
+    // Check if voucher_id is in format "voucher_XXXXXX" (new format) or numeric (old format)
+    if (voucher_id.toString().startsWith('voucher_')) {
+        // Extract voucher_ref from the ID format "voucher_FAT25WOS" -> "FAT25WOS"
+        const voucher_ref = voucher_id.replace('voucher_', '');
+        console.log('Using voucher_ref based storage for voucher_ref:', voucher_ref);
+        
+        // Use a separate table or storage mechanism for voucher_ref based notes
+        const sql = "INSERT INTO voucher_ref_notes (date, note, voucher_ref) VALUES (?, ?, ?)";
+        con.query(sql, [date, note, voucher_ref], (err, result) => {
+            if (err) {
+                // If table doesn't exist, create it
+                if (err.code === 'ER_NO_SUCH_TABLE') {
+                    console.log('Creating voucher_ref_notes table...');
+                    const createTableSql = `
+                        CREATE TABLE IF NOT EXISTS voucher_ref_notes (
+                            id INT AUTO_INCREMENT PRIMARY KEY,
+                            voucher_ref VARCHAR(50) NOT NULL,
+                            note TEXT NOT NULL,
+                            date DATETIME NOT NULL,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                            INDEX idx_voucher_ref (voucher_ref),
+                            INDEX idx_date (date)
+                        )
+                    `;
+                    con.query(createTableSql, (createErr, createResult) => {
+                        if (createErr) {
+                            console.error("Error creating voucher_ref_notes table:", createErr);
+                            return res.status(500).json({ success: false, message: "Database error creating table" });
+                        }
+                        // Retry the insert
+                        con.query(sql, [date, note, voucher_ref], (retryErr, retryResult) => {
+                            if (retryErr) {
+                                console.error("Error adding voucher note after table creation:", retryErr);
+                                return res.status(500).json({ success: false, message: "Database error" });
+                            }
+                            res.json({ success: true, id: retryResult.insertId });
+                        });
+                    });
+                } else {
+                    console.error("Error adding voucher note:", err);
+                    return res.status(500).json({ success: false, message: "Database error" });
+                }
+            } else {
+                res.json({ success: true, id: result.insertId });
+            }
+        });
+    } else {
+        // Original numeric voucher_id format
+        const sql = "INSERT INTO voucher_notes (date, note, voucher_id) VALUES (?, ?, ?)";
+        con.query(sql, [date, note, voucher_id], (err, result) => {
+            if (err) {
+                console.error("Error adding voucher note:", err);
+                return res.status(500).json({ success: false, message: "Database error" });
+            }
+            res.json({ success: true, id: result.insertId });
+        });
+    }
+});
+
+// Update Voucher Note
+app.patch("/api/updateVoucherNote", (req, res) => {
+    const { id, note } = req.body;
+    
+    if (!id || !note) {
+        return res.status(400).json({ success: false, message: "Missing id or note" });
+    }
+    
+    const sql = "UPDATE voucher_notes SET note = ? WHERE id = ?";
+    con.query(sql, [note, id], (err, result) => {
+        if (err) {
+            console.error("Error updating voucher note:", err);
+            return res.status(500).json({ success: false, message: "Database error" });
+        }
+        res.json({ success: true });
+    });
+});
+
+// Update Voucher Ref Note (for voucher_ref_notes table)
+app.patch("/api/updateVoucherRefNote", (req, res) => {
+    const { id, note, voucher_ref } = req.body;
+    
+    if (!id || !note) {
+        return res.status(400).json({ success: false, message: "Missing id or note" });
+    }
+    
+    console.log('Updating voucher ref note:', { id, note, voucher_ref });
+    
+    const sql = "UPDATE voucher_ref_notes SET note = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+    con.query(sql, [note, id], (err, result) => {
+        if (err) {
+            console.error("Error updating voucher ref note:", err);
+            return res.status(500).json({ success: false, message: "Database error" });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: "Note not found" });
+        }
+        
+        console.log('Successfully updated voucher ref note:', result);
+        res.json({ success: true });
+    });
+});
+
+// Delete Voucher Note
+app.delete("/api/deleteVoucherNote", (req, res) => {
+    const { id } = req.body;
+    
+    if (!id) {
+        return res.status(400).json({ success: false, message: "Missing id" });
+    }
+    
+    const sql = "DELETE FROM voucher_notes WHERE id = ?";
+    con.query(sql, [id], (err, result) => {
+        if (err) {
+            console.error("Error deleting voucher note:", err);
+            return res.status(500).json({ success: false, message: "Database error" });
+        }
+        res.json({ success: true });
+    });
+});
+
+// Delete Voucher Ref Note (for voucher_ref_notes table)
+app.delete("/api/deleteVoucherRefNote", (req, res) => {
+    const { id, voucher_ref } = req.body;
+    
+    if (!id) {
+        return res.status(400).json({ success: false, message: "Missing id" });
+    }
+    
+    console.log('Deleting voucher ref note:', { id, voucher_ref });
+    
+    const sql = "DELETE FROM voucher_ref_notes WHERE id = ?";
+    con.query(sql, [id], (err, result) => {
+        if (err) {
+            console.error("Error deleting voucher ref note:", err);
+            return res.status(500).json({ success: false, message: "Database error" });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: "Note not found" });
+        }
+        
+        console.log('Successfully deleted voucher ref note:', result);
+        res.json({ success: true });
+    });
+});
+
+// Get Voucher Notes
+app.get("/api/getVoucherNotes", (req, res) => {
+    const { voucher_id } = req.query;
+    
+    if (!voucher_id) {
+        return res.status(400).json({ success: false, message: "Missing voucher_id" });
+    }
+    
+    console.log('Getting voucher notes for voucher_id:', voucher_id);
+    
+    // Check if voucher_id is in format "voucher_XXXXXX" (new format) or numeric (old format)
+    if (voucher_id.toString().startsWith('voucher_')) {
+        // Extract voucher_ref from the ID format "voucher_FAT25WOS" -> "FAT25WOS"
+        const voucher_ref = voucher_id.replace('voucher_', '');
+        console.log('Getting notes from voucher_ref_notes for voucher_ref:', voucher_ref);
+        
+        const sql = "SELECT * FROM voucher_ref_notes WHERE voucher_ref = ? ORDER BY date DESC";
+        con.query(sql, [voucher_ref], (err, result) => {
+            if (err) {
+                console.error("Error getting voucher ref notes:", err);
+                return res.status(500).json({ success: false, message: "Database error" });
+            }
+            console.log('Found', result.length, 'notes for voucher_ref:', voucher_ref);
+            res.json({ success: true, notes: result });
+        });
+    } else {
+        // Original numeric voucher_id format
+        const sql = "SELECT * FROM voucher_notes WHERE voucher_id = ? ORDER BY date DESC";
+        con.query(sql, [voucher_id], (err, result) => {
+            if (err) {
+                console.error("Error getting voucher notes:", err);
+                return res.status(500).json({ success: false, message: "Database error" });
+            }
+            res.json({ success: true, notes: result });
+        });
+    }
+});
+
+// Debug endpoint to check all vouchers
+app.get("/api/debugVouchers", (req, res) => {
+    const sql = "SELECT id, voucher_ref, name FROM all_vouchers ORDER BY id DESC LIMIT 10";
+    con.query(sql, (err, result) => {
+        if (err) {
+            console.error("Error in debug query:", err);
+            return res.status(500).json({ success: false, error: err.message });
+        }
+        console.log("Debug vouchers query result:", result);
+        res.json({ success: true, vouchers: result });
+    });
+});
+
+// Find Voucher by Voucher Ref
+app.get("/api/findVoucherByRef", (req, res) => {
+    const { voucher_ref } = req.query;
+    
+    if (!voucher_ref) {
+        return res.status(400).json({ success: false, message: "Missing voucher_ref" });
+    }
+    
+    console.log('Searching for voucher with voucher_ref:', voucher_ref);
+    
+    // First try all_vouchers table
+    const voucherSql = "SELECT * FROM all_vouchers WHERE voucher_ref = ? LIMIT 1";
+    con.query(voucherSql, [voucher_ref], (err, voucherResult) => {
+        if (err) {
+            console.error("Error searching all_vouchers table:", err);
+            return res.status(500).json({ success: false, message: "Database error" });
+        }
+        
+        console.log('Query result from all_vouchers:', voucherResult);
+        
+        if (voucherResult && voucherResult.length > 0) {
+            console.log('Found voucher in all_vouchers table:', voucherResult[0]);
+            return res.json({ success: true, voucher: voucherResult[0], source: 'all_vouchers' });
+        }
+        
+        // If not found in all_vouchers, try all_booking table (for Book Flight vouchers)
+        console.log('Voucher not found in all_vouchers, searching all_booking table...');
+        const bookingSql = "SELECT id, voucher_code as voucher_ref, name, email, phone as mobile, paid, created_at FROM all_booking WHERE voucher_code = ?";
+        con.query(bookingSql, [voucher_ref], (err, bookingResult) => {
+            if (err) {
+                console.error("Error searching all_booking table:", err);
+                return res.status(500).json({ success: false, message: "Database error" });
+            }
+            
+            if (bookingResult && bookingResult.length > 0) {
+                console.log('Found voucher in all_booking table:', bookingResult[0]);
+                // For booking-based vouchers, we'll use a special ID format
+                const bookingVoucher = {
+                    ...bookingResult[0],
+                    id: `booking_${bookingResult[0].id}`, // Special ID format to distinguish from voucher IDs
+                    source: 'all_booking'
+                };
+                return res.json({ success: true, voucher: bookingVoucher, source: 'all_booking' });
+            }
+            
+            console.log('Voucher not found in either table');
+            return res.json({ success: false, message: "Voucher not found in all_vouchers or all_booking tables" });
+        });
     });
 });
 
@@ -6861,6 +7147,21 @@ const createVoucherCodeUsageTable = `
     )
 `;
 
+// Create voucher_notes table for notes specific to vouchers
+const createVoucherNotesTable = `
+    CREATE TABLE IF NOT EXISTS voucher_notes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        voucher_id INT NOT NULL,
+        note TEXT NOT NULL,
+        date DATETIME NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (voucher_id) REFERENCES all_vouchers(id) ON DELETE CASCADE,
+        INDEX idx_voucher_id (voucher_id),
+        INDEX idx_date (date)
+    )
+`;
+
 // Add voucher code columns to all_booking table if they don't exist
 const addVoucherColumnsToBooking = `
     ALTER TABLE all_booking 
@@ -6888,6 +7189,15 @@ const runVoucherCodeMigrations = () => {
             console.error('Error creating voucher_code_usage table:', err);
         } else {
             console.log('✅ Voucher code usage table ready');
+        }
+    });
+    
+    // Create voucher_notes table
+    con.query(createVoucherNotesTable, (err) => {
+        if (err) {
+            console.error('Error creating voucher_notes table:', err);
+        } else {
+            console.log('✅ Voucher notes table ready');
         }
     });
     
