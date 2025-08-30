@@ -94,6 +94,40 @@ app.post('/api/generate-voucher-code', async (req, res) => {
     } = req.body;
 
     try {
+        // Check for existing voucher code for same customer to prevent duplicates
+        const duplicateCheckSql = `
+            SELECT code FROM voucher_codes 
+            WHERE customer_email = ? AND customer_name = ? AND paid_amount = ? 
+            AND created_at > DATE_SUB(NOW(), INTERVAL 2 MINUTE) 
+            LIMIT 1
+        `;
+        
+        const duplicateCheck = () => {
+            return new Promise((resolve, reject) => {
+                con.query(duplicateCheckSql, [customer_email, customer_name, paid_amount], (err, result) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(result);
+                    }
+                });
+            });
+        };
+        
+        // Check for recent duplicates first
+        const existingCode = await duplicateCheck();
+        if (existingCode && existingCode.length > 0) {
+            console.log('=== DUPLICATE VOUCHER CODE GENERATION PREVENTED ===');
+            console.log('Existing code found:', existingCode[0].code);
+            console.log('Customer:', customer_name, 'Email:', customer_email, 'Amount:', paid_amount);
+            return res.json({
+                success: true,
+                message: 'Voucher code already exists for this customer',
+                voucher_code: existingCode[0].code,
+                duplicate_prevented: true
+            });
+        }
+        
         // Generate voucher code based on the pattern: F/G + Category + Year + Serial
         const year = new Date().getFullYear().toString().slice(-2); // Get last 2 digits of year (25 for 2025)
         
@@ -5288,6 +5322,59 @@ app.get("/api/debugVouchers", (req, res) => {
     });
 });
 
+// Test endpoint to add Gift Voucher for testing
+app.post("/api/addTestGiftVoucher", (req, res) => {
+    console.log('Adding test Gift Voucher...');
+    
+    const insertSql = `INSERT INTO all_vouchers (
+        name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, 
+        expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, 
+        recipient_email, recipient_phone, recipient_gift_date, preferred_location, 
+        preferred_time, preferred_day, flight_attempts, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    
+    const values = [
+        'Gift Voucher - Book Flight',                    // name
+        '75kg',                                         // weight  
+        'Shared Flight',                                // experience_type
+        'Gift Voucher',                                 // book_flight
+        'Any Day Flight',                              // voucher_type
+        'gift@example.com',                            // email
+        '01234567890',                                 // phone
+        '01234567890',                                 // mobile
+        '31/12/2025',                                  // expires
+        'No',                                          // redeemed
+        '199.99',                                      // paid
+        'GIFT2025',                                    // offer_code
+        'GIFT25001',                                   // voucher_ref
+        new Date().toISOString().slice(0, 19).replace('T', ' '), // created_at
+        'John Doe',                                    // recipient_name
+        'recipient@example.com',                       // recipient_email
+        '09876543210',                                 // recipient_phone
+        '2025-12-25',                                  // recipient_gift_date
+        'Bath',                                        // preferred_location
+        'Morning',                                     // preferred_time
+        'Weekend',                                     // preferred_day
+        0,                                             // flight_attempts
+        'Active'                                       // status
+    ];
+    
+    con.query(insertSql, values, (err, result) => {
+        if (err) {
+            console.error("Error inserting test gift voucher:", err);
+            return res.status(500).json({ success: false, message: "Database error" });
+        }
+        
+        console.log('✅ Test Gift Voucher added with ID:', result.insertId);
+        res.json({ 
+            success: true, 
+            message: "Test Gift Voucher added successfully",
+            id: result.insertId,
+            voucher_ref: 'GIFT25001'
+        });
+    });
+});
+
 // Find Voucher by Voucher Ref
 app.get("/api/findVoucherByRef", (req, res) => {
     const { voucher_ref } = req.query;
@@ -6141,9 +6228,9 @@ async function createVoucherFromWebhook(voucherData) {
         console.log('Final actualVoucherType from webhook:', actualVoucherType);
 
         // Check for duplicates before inserting (prevent webhook duplicates)
-        const duplicateCheckSql = `SELECT id FROM all_vouchers WHERE name = ? AND email = ? AND paid = ? AND created_at > DATE_SUB(NOW(), INTERVAL 2 MINUTE) LIMIT 1`;
+        const duplicateCheckSql = `SELECT id FROM all_vouchers WHERE name = ? AND email = ? AND paid = ? AND voucher_type = ? AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE) LIMIT 1`;
         
-        con.query(duplicateCheckSql, [name, email, paid], (err, duplicateResult) => {
+        con.query(duplicateCheckSql, [name, email, paid, actualVoucherType], (err, duplicateResult) => {
             if (err) {
                 console.error('Error checking for webhook duplicates:', err);
                 return reject(err);
