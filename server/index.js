@@ -2683,14 +2683,14 @@ app.get('/api/getAllBookingData', (req, res) => {
 
 // Get All Voucher Data (with booking and passenger info)
 app.get('/api/getAllVoucherData', (req, res) => {
-    // Join all_vouchers with all_booking and passenger (if available)
+    // Join all_vouchers with all_booking and get DISTINCT vouchers to prevent passenger duplicates
     const voucher = `
-        SELECT v.*, v.experience_type, v.book_flight, v.voucher_type as actual_voucher_type,
-               b.email as booking_email, b.phone as booking_phone, b.id as booking_id, p.weight as passenger_weight,
-               vc.code as vc_code
+        SELECT DISTINCT v.*, v.experience_type, v.book_flight, v.voucher_type as actual_voucher_type,
+               b.email as booking_email, b.phone as booking_phone, b.id as booking_id,
+               vc.code as vc_code,
+               (SELECT p.weight FROM passenger p WHERE p.booking_id = b.id LIMIT 1) as passenger_weight
         FROM all_vouchers v
         LEFT JOIN all_booking b ON v.voucher_ref = b.voucher_code
-        LEFT JOIN passenger p ON b.id = p.booking_id
         LEFT JOIN voucher_codes vc ON vc.code = v.voucher_ref OR (vc.customer_email IS NOT NULL AND vc.customer_email = v.email)
         ORDER BY v.created_at DESC
     `;
@@ -6228,9 +6228,16 @@ async function createVoucherFromWebhook(voucherData) {
         console.log('Final actualVoucherType from webhook:', actualVoucherType);
 
         // Check for duplicates before inserting (prevent webhook duplicates)
-        const duplicateCheckSql = `SELECT id FROM all_vouchers WHERE name = ? AND email = ? AND paid = ? AND voucher_type = ? AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE) LIMIT 1`;
+        // More comprehensive duplicate check - use core voucher details instead of voucher_ref
+        const duplicateCheckSql = `
+            SELECT id FROM all_vouchers 
+            WHERE name = ? AND email = ? AND paid = ? 
+            AND book_flight = ? AND voucher_type = ?
+            AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE) 
+            LIMIT 1
+        `;
         
-        con.query(duplicateCheckSql, [name, email, paid, actualVoucherType], (err, duplicateResult) => {
+        con.query(duplicateCheckSql, [name, email, paid, voucher_type, actualVoucherType], (err, duplicateResult) => {
             if (err) {
                 console.error('Error checking for webhook duplicates:', err);
                 return reject(err);
