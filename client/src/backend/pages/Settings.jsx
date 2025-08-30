@@ -74,6 +74,8 @@ const Settings = () => {
         image_url: '',
         image_file: null,
         max_passengers: 8,
+        price_per_person: 300,
+        price_unit: 'pp',
         validity_months: 18,
         flight_days: 'Any Day',
         flight_time: 'AM & PM',
@@ -619,6 +621,8 @@ const Settings = () => {
             image_url: privateCharterVoucherType.image_url || '',
             image_file: null,
             max_passengers: privateCharterVoucherType.max_passengers || 8,
+            price_per_person: privateCharterVoucherType.price_per_person || 300,
+            price_unit: privateCharterVoucherType.price_unit || 'pp',
             validity_months: privateCharterVoucherType.validity_months || 18,
             flight_days: privateCharterVoucherType.flight_days || 'Any Day',
             flight_time: privateCharterVoucherType.flight_time || 'AM & PM',
@@ -645,7 +649,59 @@ const Settings = () => {
             }
         }
     };
-
+    
+    const handleSyncPricingFromActivities = async () => {
+        try {
+            // Get all activities with private charter pricing
+            const activitiesResponse = await axios.get('/api/activities/flight-types');
+            if (!activitiesResponse.data.success) {
+                alert('Failed to fetch activities');
+                return;
+            }
+            
+            const activities = activitiesResponse.data.data;
+            const activitiesWithPricing = activities.filter(activity => 
+                activity.private_charter_pricing && 
+                typeof activity.private_charter_pricing === 'string' && 
+                activity.private_charter_pricing !== '{}'
+            );
+            
+            if (activitiesWithPricing.length === 0) {
+                alert('No activities found with group pricing configured');
+                return;
+            }
+            
+            // Show activity selection dialog
+            const selectedActivityId = window.prompt(
+                `Select an activity to sync pricing from:\n\n${activitiesWithPricing.map(a => `${a.id}: ${a.activity_name} (${a.location})`).join('\n')}\n\nEnter the activity ID:`
+            );
+            
+            if (!selectedActivityId) return;
+            
+            const selectedActivity = activitiesWithPricing.find(a => a.id.toString() === selectedActivityId);
+            if (!selectedActivity) {
+                alert('Invalid activity ID');
+                return;
+            }
+            
+            // Sync pricing from selected activity
+            const syncResponse = await axios.post('/api/sync-activity-pricing', {
+                activity_id: selectedActivity.id
+            });
+            
+            if (syncResponse.data.success) {
+                alert(`Successfully synced ${syncResponse.data.updatedCount} voucher types with group pricing from ${selectedActivity.activity_name}!`);
+                // Refresh the voucher types to show updated pricing
+                fetchPrivateCharterVoucherTypes();
+            } else {
+                alert('Error syncing pricing: ' + syncResponse.data.message);
+            }
+        } catch (error) {
+            console.error('Error syncing pricing:', error);
+            alert('Error syncing pricing: ' + error.message);
+        }
+    };
+    
     const resetPrivateCharterVoucherTypeForm = () => {
         console.log('Resetting Private Charter Voucher Type form to default values');
         setPrivateCharterVoucherTypeFormData({
@@ -654,6 +710,8 @@ const Settings = () => {
             image_url: '',
             image_file: null,
             max_passengers: 8,
+            price_per_person: 300,
+            price_unit: 'pp',
             validity_months: 18,
             flight_days: 'Any Day',
             flight_time: 'AM & PM',
@@ -2351,6 +2409,17 @@ const Settings = () => {
                             <Plus size={20} />
                             Create Private Charter Voucher Type
                         </button>
+                        <button 
+                            className="btn btn-secondary"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleSyncPricingFromActivities();
+                            }}
+                            style={{ margin: 0 }}
+                            title="Sync group pricing from activities to voucher types"
+                        >
+                            🔄 Sync Pricing
+                        </button>
                         {privateCharterVoucherTypesExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
                     </div>
                 </div>
@@ -2408,6 +2477,7 @@ const Settings = () => {
                                         <tr>
                                             <th>TITLE</th>
                                             <th>DESCRIPTION</th>
+                                            <th>PRICE</th>
                                             <th>FLIGHT DAYS</th>
                                             <th>FLIGHT TIME</th>
                                             <th>VALIDITY</th>
@@ -2445,6 +2515,14 @@ const Settings = () => {
                                                 <td>
                                                     <div style={{ maxWidth: '300px', fontSize: '14px' }}>
                                                         {privateCharterVoucherType.description}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div style={{ fontWeight: '600' }}>
+                                                        £{privateCharterVoucherType.price_per_person || '0.00'}
+                                                        <span style={{ fontSize: '12px', color: '#6b7280', marginLeft: '4px' }}>
+                                                            {privateCharterVoucherType.price_unit === 'pp' ? 'pp' : 'fixed'}
+                                                        </span>
                                                     </div>
                                                 </td>
                                                 <td>{privateCharterVoucherType.flight_days}</td>
@@ -3660,18 +3738,30 @@ const Settings = () => {
                                 </div>
                                 
                                 <div className="form-group">
-                                    <label>Max Passengers</label>
+                                    <label>Price Per Person</label>
                                     <input
                                         type="number"
-                                        value={privateCharterVoucherTypeFormData.max_passengers}
-                                        onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, max_passengers: parseInt(e.target.value)})}
-                                        placeholder="8"
-                                        min="1"
+                                        value={privateCharterVoucherTypeFormData.price_per_person || ''}
+                                        onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, price_per_person: parseFloat(e.target.value)})}
+                                        placeholder="300.00"
+                                        min="0"
+                                        step="0.01"
                                     />
                                 </div>
                             </div>
                             
                             <div className="form-row">
+                                <div className="form-group">
+                                    <label>Price Unit</label>
+                                    <select
+                                        value={privateCharterVoucherTypeFormData.price_unit || 'pp'}
+                                        onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, price_unit: e.target.value})}
+                                    >
+                                        <option value="pp">Per Person (pp)</option>
+                                        <option value="total">Total Price</option>
+                                    </select>
+                                </div>
+                                
                                 <div className="form-group">
                                     <label>Validity (Months)</label>
                                     <input
@@ -3682,7 +3772,9 @@ const Settings = () => {
                                         min="1"
                                     />
                                 </div>
-                                
+                            </div>
+                            
+                            <div className="form-row">
                                 <div className="form-group">
                                     <label>Flight Days</label>
                                     <select
@@ -3695,9 +3787,7 @@ const Settings = () => {
                                         <option value="Monday - Sunday">Monday - Sunday</option>
                                     </select>
                                 </div>
-                            </div>
-                            
-                            <div className="form-row">
+                                
                                 <div className="form-group">
                                     <label>Flight Time</label>
                                     <select
@@ -3709,7 +3799,9 @@ const Settings = () => {
                                         <option value="AM & PM">AM & PM (Flexible)</option>
                                     </select>
                                 </div>
-                                
+                            </div>
+                            
+                            <div className="form-row">
                                 <div className="form-group">
                                     <label>Sort Order</label>
                                     <input

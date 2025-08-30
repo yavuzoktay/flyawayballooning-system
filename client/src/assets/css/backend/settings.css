@@ -865,6 +865,40 @@
     min-height: 400px;
 }
 
+/* Sync Pricing Button */
+.btn-secondary {
+    background-color: #6b7280;
+    color: white;
+    border: 1px solid #6b7280;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-secondary:hover {
+    background-color: #4b5563;
+    border-color: #4b5563;
+}
+
+.btn-secondary:disabled {
+    background-color: #d1d5db;
+    border-color: #d1d5db;
+    cursor: not-allowed;
+}
+
+/* Price column styling */
+.private-charter-voucher-types-table th:nth-child(3),
+.private-charter-voucher-types-table td:nth-child(3) {
+    text-align: center;
+    min-width: 120px;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .settings-container {

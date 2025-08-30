@@ -113,13 +113,17 @@ const ActivityList = ({ activity }) => {
             setForm({ ...form, private_charter_voucher_types: newTypes });
         } else if (name.startsWith('private_charter_price_')) {
             const voucherTypeId = name.replace('private_charter_price_', '');
-            setForm({
-                ...form,
-                private_charter_pricing: {
-                    ...form.private_charter_pricing,
-                    [voucherTypeId]: value
-                }
-            });
+            // Find the voucher type by ID to get the title
+            const voucherType = privateCharterVoucherTypes.find(vt => vt.id.toString() === voucherTypeId);
+            if (voucherType) {
+                setForm({
+                    ...form,
+                    private_charter_pricing: {
+                        ...form.private_charter_pricing,
+                        [voucherType.title]: value // Store by title instead of ID
+                    }
+                });
+            }
         } else {
             setForm({ ...form, [name]: value });
         }
@@ -225,13 +229,17 @@ const ActivityList = ({ activity }) => {
             setEditForm({ ...editForm, private_charter_voucher_types: newTypes });
         } else if (name.startsWith('private_charter_price_')) {
             const voucherTypeId = name.replace('private_charter_price_', '');
-            setEditForm({
-                ...editForm,
-                private_charter_pricing: {
-                    ...editForm.private_charter_pricing,
-                    [voucherTypeId]: value
-                }
-            });
+            // Find the voucher type by ID to get the title
+            const voucherType = privateCharterVoucherTypes.find(vt => vt.id.toString() === voucherTypeId);
+            if (voucherType) {
+                setEditForm({
+                    ...editForm,
+                    private_charter_pricing: {
+                        ...editForm.private_charter_pricing,
+                        [voucherType.title]: value // Store by title instead of ID
+                    }
+                });
+            }
         } else {
             setEditForm({ ...editForm, [name]: value });
         }
@@ -294,6 +302,35 @@ const ActivityList = ({ activity }) => {
         }
         setEditSaving(false);
     };
+    
+    const handleSyncPricing = async () => {
+        if (!editId) return;
+        
+        setEditSaving(true);
+        try {
+            const response = await fetch('/api/sync-activity-pricing', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ activity_id: editId })
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                alert(`Successfully synced ${data.updatedCount} voucher types with group pricing!`);
+                // Refresh the voucher types to show updated pricing
+                window.location.reload();
+            } else {
+                alert('Error syncing pricing: ' + data.message);
+            }
+        } catch (err) {
+            alert('Error syncing pricing: ' + err.message);
+        } finally {
+            setEditSaving(false);
+        }
+    };
+    
     const handleOpenAvailModal = (activity) => {
         setAvailActivity(activity);
         setAvailModalOpen(true);
@@ -560,7 +597,7 @@ const ActivityList = ({ activity }) => {
                                                     size="small"
                                                     type="number"
                                                     name={`private_charter_price_${voucherType.id}`}
-                                                    value={form.private_charter_pricing[voucherType.id] || ''}
+                                                    value={form.private_charter_pricing[voucherType.title] || ''}
                                                     onChange={handleChange}
                                                     placeholder="0.00"
                                                     min="0"
@@ -609,6 +646,16 @@ const ActivityList = ({ activity }) => {
                         }}>
                             Set the activity status and upload any images
                         </div>
+                        
+                        {/* Sync Pricing Button for Create Form */}
+                        {form.private_charter_pricing && Object.keys(form.private_charter_pricing).length > 0 && (
+                            <div style={{ marginBottom: '16px' }}>
+                                <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px', fontStyle: 'italic' }}>
+                                    💡 After saving the activity, you can sync the group pricing to voucher types using the edit form
+                                </div>
+                            </div>
+                        )}
+                        
                         <TextField margin="dense" label="Status" name="status" value={form.status} onChange={handleChange} select fullWidth required>
                             <MenuItem value="Live">Live</MenuItem>
                             <MenuItem value="Draft">Draft</MenuItem>
@@ -926,7 +973,7 @@ const ActivityList = ({ activity }) => {
                                                     size="small"
                                                     type="number"
                                                     name={`private_charter_price_${voucherType.id}`}
-                                                    value={editForm.private_charter_pricing && editForm.private_charter_pricing[voucherType.id] ? editForm.private_charter_pricing[voucherType.id] : ''}
+                                                    value={editForm.private_charter_pricing && editForm.private_charter_pricing[voucherType.title] ? editForm.private_charter_pricing[voucherType.title] : ''}
                                                     onChange={handleEditChange}
                                                     placeholder="0.00"
                                                     min="0"
@@ -975,6 +1022,26 @@ const ActivityList = ({ activity }) => {
                         }}>
                             Set the activity status and upload any images
                         </div>
+                        
+                        {/* Sync Pricing Button */}
+                        {editForm.private_charter_pricing && Object.keys(editForm.private_charter_pricing).length > 0 && (
+                            <div style={{ marginBottom: '16px' }}>
+                                <Button
+                                    variant="outlined"
+                                    color="secondary"
+                                    onClick={handleSyncPricing}
+                                    disabled={editSaving}
+                                    startIcon={<span>🔄</span>}
+                                    fullWidth
+                                >
+                                    Sync Group Pricing to Voucher Types
+                                </Button>
+                                <div style={{ fontSize: '12px', color: '#666', marginTop: '4px', fontStyle: 'italic' }}>
+                                    This will update the private charter voucher types with the group pricing set above
+                                </div>
+                            </div>
+                        )}
+                        
                         <TextField margin="dense" label="Status" name="status" value={editForm.status || ''} onChange={handleEditChange} select fullWidth required>
                             <MenuItem value="Live">Live</MenuItem>
                             <MenuItem value="Draft">Draft</MenuItem>
