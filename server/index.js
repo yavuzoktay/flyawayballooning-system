@@ -1178,6 +1178,13 @@ app.put('/api/private-charter-voucher-types/:id', experiencesUpload.single('priv
         }
         
         console.log('PUT /api/private-charter-voucher-types/:id - Update successful, affected rows:', result.affectedRows);
+        console.log('PUT /api/private-charter-voucher-types/:id - Update result info:', {
+            affectedRows: result.affectedRows,
+            changedRows: result.changedRows,
+            info: result.info,
+            serverStatus: result.serverStatus,
+            warningCount: result.warningCount
+        });
         
         // Fetch the updated voucher type to return complete data
         const selectSql = `SELECT * FROM private_charter_voucher_types WHERE id = ?`;
@@ -1192,6 +1199,12 @@ app.put('/api/private-charter-voucher-types/:id', experiencesUpload.single('priv
                 });
             } else {
                 console.log('Updated voucher type fetched:', selectResult[0]);
+                console.log('CRITICAL DEBUG - Final is_active value in DB:', {
+                    db_is_active: selectResult[0]?.is_active,
+                    db_is_active_type: typeof selectResult[0]?.is_active,
+                    expected_isActiveValue: isActiveValue,
+                    expected_isActiveValue_type: typeof isActiveValue
+                });
                 res.json({
                     success: true,
                     message: 'Private charter voucher type updated successfully',
