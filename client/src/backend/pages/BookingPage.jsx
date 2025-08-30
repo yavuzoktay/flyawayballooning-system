@@ -15,6 +15,11 @@ const BookingPage = () => {
     const [dateRequested, setDateRequested] = useState([]);
     const [filteredData, setFilteredData] = useState([]);
     const [voucher, setVoucher] = useState([]);
+    
+    // Her tab için ayrı filtered data state'leri
+    const [filteredBookingData, setFilteredBookingData] = useState([]);
+    const [filteredVoucherData, setFilteredVoucherData] = useState([]);
+    const [filteredDateRequestData, setFilteredDateRequestData] = useState([]);
 
     // Filters
     const [filters, setFilters] = useState({
@@ -107,7 +112,55 @@ const BookingPage = () => {
     const voucherData = async () => {
         try {
             const resp = await axios.get(`/api/getAllVoucherData`);
-            setVoucher(resp.data.data || []);
+            const voucherData = resp.data.data || [];
+            setVoucher(voucherData);
+            
+            // Her zaman filteredVoucherData'yı güncelle
+            const formattedVouchers = voucherData.map(item => {
+                let formattedDate = '';
+                if (item.created_at) {
+                    try {
+                        let dateString = item.created_at;
+                        
+                        if (dateString.includes(' ') && dateString.includes('/')) {
+                            const datePart = dateString.split(' ')[0];
+                            const [day, month, year] = datePart.split('/');
+                            dateString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                        }
+                        
+                        const date = dayjs(dateString);
+                        if (date.isValid()) {
+                            formattedDate = date.format('DD/MM/YYYY');
+                        } else {
+                            formattedDate = 'N/A';
+                        }
+                    } catch (error) {
+                        formattedDate = 'N/A';
+                    }
+                }
+                
+                return {
+                    ...item,
+                    created: formattedDate,
+                    name: item.name || '',
+                    flight_type: item.flight_type || '',
+                    voucher_type: item.voucher_type || '',
+                    email: item.email || '',
+                    phone: item.phone || '',
+                    expires: item.expires || '',
+                    redeemed: item.redeemed || '',
+                    paid: item.paid || '',
+                    offer_code: item.offer_code || '',
+                    voucher_ref: item.voucher_ref || '',
+                    _original: item
+                };
+            });
+            setFilteredVoucherData(formattedVouchers);
+            
+            // Eğer şu anda vouchers tab'ındaysa, filteredData'yı da güncelle
+            if (activeTab === "vouchers") {
+                setFilteredData(formattedVouchers);
+            }
         } catch (err) {
             console.error("Error fetching vouchers:", err);
         }
@@ -116,7 +169,25 @@ const BookingPage = () => {
     const dateRequestedData = async () => {
         try {
             const response = await axios.get(`/api/getDateRequestData`);
-            setDateRequested(response.data.data || []);
+            const dateRequestData = response.data.data || [];
+            setDateRequested(dateRequestData);
+            
+            // Her zaman filteredDateRequestData'yı güncelle
+            const formattedDateRequests = dateRequestData.map((item) => ({
+                name: item.name || "",
+                number: item.phone || "",
+                email: item.email || "",
+                location: item.location || "",
+                date_requested: item.requested_date ? dayjs(item.requested_date).format('DD/MM/YYYY') : (item.created_at ? dayjs(item.created_at).format('DD/MM/YYYY') : ""),
+                id: item.id || "",
+                _original: item
+            }));
+            setFilteredDateRequestData(formattedDateRequests);
+            
+            // Eğer şu anda dateRequests tab'ındaysa, filteredData'yı da güncelle
+            if (activeTab === "dateRequests") {
+                setFilteredData(formattedDateRequests);
+            }
         } catch (err) {
             console.error("Error fetching date requests:", err);
         }
@@ -142,7 +213,12 @@ const BookingPage = () => {
         try {
             await axios.post('/api/createVoucher', voucherForm);
             setVoucherDialogOpen(false);
-            voucherData(); // Tabloyu güncelle
+            await voucherData(); // Tabloyu güncelle
+            
+            // Vouchers tab'ındaysa filteredData'yı da güncelle
+            if (activeTab === "vouchers") {
+                setFilteredData(filteredVoucherData);
+            }
         } catch (err) {
             alert('Error creating voucher');
         }
@@ -154,100 +230,46 @@ const BookingPage = () => {
         dateRequestedData();
     }, []);
 
-    // Tab değiştiğinde veya filters değiştiğinde ilgili veriyi sunucudan çek
+    // Tab değiştiğinde ilgili filtered data'yı göster
+    useEffect(() => {
+        if (activeTab === "bookings") {
+            // Bookings tab için filteredBookingData'yı kullan
+            setFilteredData(filteredBookingData);
+        } else if (activeTab === "vouchers") {
+            // Vouchers tab için filteredVoucherData'yı kullan
+            setFilteredData(filteredVoucherData);
+        } else if (activeTab === "dateRequests") {
+            // DateRequests tab için filteredDateRequestData'yı kullan
+            setFilteredData(filteredDateRequestData);
+        }
+    }, [activeTab, filteredBookingData, filteredVoucherData, filteredDateRequestData]);
+    
+    // Filters değiştiğinde sadece bookings tab için API çağrısı yap
     useEffect(() => {
         if (activeTab === "bookings") {
             (async () => {
                 try {
                     const response = await axios.get(`/api/getAllBookingData`, { params: filters });
-                    setBooking(response.data.data || []);
-                    setFilteredData(response.data.data || []);
+                    const bookingData = response.data.data || [];
+                    setBooking(bookingData);
+                    
+                    // filteredBookingData'yı güncelle
+                    setFilteredBookingData(bookingData);
+                    
+                    // Eğer şu anda bookings tab'ındaysa, filteredData'yı da güncelle
+                    if (activeTab === "bookings") {
+                        setFilteredData(bookingData);
+                    }
                 } catch (err) {
                     setBooking([]);
-                    setFilteredData([]);
-                }
-            })();
-        } else if (activeTab === "vouchers") {
-            (async () => {
-                try {
-                    const resp = await axios.get(`/api/getAllVoucherData`);
-                    setVoucher(resp.data.data || []);
-                    console.log('Voucher data from API:', resp.data.data);
-                    setFilteredData((resp.data.data || []).map(item => {
-                        console.log('Processing voucher item:', item);
-                        console.log('created_at value:', item.created_at);
-                        console.log('created_at type:', typeof item.created_at);
-                        
-                        let formattedDate = '';
-                        if (item.created_at) {
-                            try {
-                                // Backend'den gelen format: "16/08/2025 18:32" (DD/MM/YYYY HH:mm)
-                                // Bu formatı dayjs ile parse etmek için önce standart formata çevirelim
-                                let dateString = item.created_at;
-                                
-                                // Eğer "DD/MM/YYYY HH:mm" formatındaysa, "DD/MM/YYYY" kısmını alalım
-                                if (dateString.includes(' ') && dateString.includes('/')) {
-                                    const datePart = dateString.split(' ')[0]; // "16/08/2025" kısmını al
-                                    const [day, month, year] = datePart.split('/');
-                                    // YYYY-MM-DD formatına çevir
-                                    dateString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-                                }
-                                
-                                const date = dayjs(dateString);
-                                if (date.isValid()) {
-                                    formattedDate = date.format('DD/MM/YYYY');
-                                } else {
-                                    console.log('Invalid date for item:', item.id, 'created_at:', item.created_at, 'parsed:', dateString);
-                                    formattedDate = 'N/A';
-                                }
-                            } catch (error) {
-                                console.log('Error formatting date for item:', item.id, 'error:', error);
-                                formattedDate = 'N/A';
-                            }
-                        }
-                        
-                        return {
-                            ...item,
-                            created: formattedDate,
-                            name: item.name || '',
-                            flight_type: item.flight_type || '',
-                            voucher_type: item.voucher_type || '',
-                            email: item.email || '',
-                            phone: item.phone || '',
-                            expires: item.expires || '',
-                            redeemed: item.redeemed || '',
-                            paid: item.paid || '',
-                            offer_code: item.offer_code || '',
-                            voucher_ref: item.voucher_ref || '',
-                            _original: item // _original her zaman eklensin
-                        };
-                    }));
-                } catch (err) {
-                    setVoucher([]);
-                    setFilteredData([]);
-                }
-            })();
-        } else if (activeTab === "dateRequests") {
-            (async () => {
-                try {
-                    const response = await axios.get(`/api/date-requests`);
-                    setDateRequested(response.data.data || []);
-                    setFilteredData((response.data.data || []).map((item) => ({
-                        name: item.name || "",
-                        number: item.phone || "",
-                        email: item.email || "",
-                        location: item.location || "",
-                        date_requested: item.requested_date ? dayjs(item.requested_date).format('DD/MM/YYYY') : (item.created_at ? dayjs(item.created_at).format('DD/MM/YYYY') : ""),
-                        id: item.id || "",
-                        _original: item // _original burada da eklensin
-                    })));
-                } catch (err) {
-                    setDateRequested([]);
-                    setFilteredData([]);
+                    setFilteredBookingData([]);
+                    if (activeTab === "bookings") {
+                        setFilteredData([]);
+                    }
                 }
             })();
         }
-    }, [activeTab, filters]);
+    }, [filters]);
 
     // filteredData'yı voucher tablosu için backend key'lerine göre map'le
     useEffect(() => {
