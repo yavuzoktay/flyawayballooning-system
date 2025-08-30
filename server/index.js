@@ -974,6 +974,17 @@ app.get('/api/private-charter-voucher-types', (req, res) => {
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
         
+        console.log('GET /api/private-charter-voucher-types - Raw query result:');
+        result.forEach((item, index) => {
+            console.log(`Item ${index + 1}:`, {
+                id: item.id,
+                title: item.title,
+                is_active: item.is_active,
+                is_active_type: typeof item.is_active,
+                updated_at: item.updated_at
+            });
+        });
+        
         // For admin view (showOnlyActive = false), return all voucher types
         // For frontend view (showOnlyActive = true), return only active ones
         let finalResult = result;
