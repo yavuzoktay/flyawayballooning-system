@@ -1103,15 +1103,29 @@ app.put('/api/private-charter-voucher-types/:id', experiencesUpload.single('priv
     `;
     
     // Convert is_active to proper boolean value
-    let isActiveValue = true; // default value
-    if (is_active !== undefined) {
-        if (typeof is_active === 'string') {
-            isActiveValue = is_active === 'true' || is_active === '1' || is_active === 'Active';
-        } else if (typeof is_active === 'boolean') {
-            isActiveValue = is_active;
-        } else if (typeof is_active === 'number') {
-            isActiveValue = is_active === 1;
-        }
+    let isActiveValue;
+    
+    console.log('DEBUG - is_active received:', {
+        value: is_active,
+        type: typeof is_active,
+        isUndefined: is_active === undefined,
+        isNull: is_active === null,
+        toString: String(is_active)
+    });
+    
+    if (is_active === undefined || is_active === null) {
+        // If is_active is not provided, default to false to avoid unintended activation
+        isActiveValue = false;
+    } else if (typeof is_active === 'string') {
+        isActiveValue = is_active === 'true' || is_active === '1';
+        console.log('String parsing - is_active value:', is_active, 'parsed to:', isActiveValue);
+    } else if (typeof is_active === 'boolean') {
+        isActiveValue = is_active;
+    } else if (typeof is_active === 'number') {
+        isActiveValue = is_active === 1;
+    } else {
+        // Unknown type, default to false
+        isActiveValue = false;
     }
     
     console.log('PUT /api/private-charter-voucher-types/:id - is_active handling:', {

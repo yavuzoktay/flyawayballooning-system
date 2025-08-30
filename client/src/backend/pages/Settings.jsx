@@ -570,8 +570,14 @@ const Settings = () => {
                 if (key === 'image_file' && privateCharterVoucherTypeFormData[key]) {
                     formData.append('private_charter_voucher_type_image', privateCharterVoucherTypeFormData[key]);
                 } else if (key !== 'image_file') {
-                    formData.append(key, privateCharterVoucherTypeFormData[key]);
-                    console.log(`FormData appended - ${key}:`, privateCharterVoucherTypeFormData[key], 'Type:', typeof privateCharterVoucherTypeFormData[key]);
+                    let value = privateCharterVoucherTypeFormData[key];
+                    // Special handling for boolean values to ensure they are sent as proper strings
+                    if (key === 'is_active') {
+                        value = value === true ? 'true' : 'false';
+                        console.log(`Special handling for is_active - original:`, privateCharterVoucherTypeFormData[key], 'converted to:', value);
+                    }
+                    formData.append(key, value);
+                    console.log(`FormData appended - ${key}:`, value, 'Type:', typeof value);
                 }
             });
             
