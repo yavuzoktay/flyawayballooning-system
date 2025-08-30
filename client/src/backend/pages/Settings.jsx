@@ -601,6 +601,10 @@ const Settings = () => {
             
             console.log('Private Charter Voucher Type response:', response.data);
             
+            // Add delay to ensure database transaction is committed before fetching
+            console.log('Waiting 2 seconds for database transaction to commit...');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
             // Refresh the list to show the new/updated voucher type
             await fetchPrivateCharterVoucherTypes();
             
