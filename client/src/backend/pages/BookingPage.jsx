@@ -2064,7 +2064,9 @@ setBookingDetail(finalVoucherDetail);
                                                         <Typography><b>Created:</b> {bookingDetail.voucher.created_at ? (
                                                             dayjs(bookingDetail.voucher.created_at).isValid() ? 
                                                                 dayjs(bookingDetail.voucher.created_at).format('DD/MM/YYYY') : 
-                                                                bookingDetail.voucher.created_at
+                                                                (bookingDetail.voucher.created_at.includes(' ') ? 
+                                                                    bookingDetail.voucher.created_at.split(' ')[0] : 
+                                                                    bookingDetail.voucher.created_at)
                                                         ) : '-'}</Typography>
                                                         <Typography><b>Paid:</b> {editField === 'paid' ? (
                                                             <>
@@ -2224,7 +2226,12 @@ setBookingDetail(finalVoucherDetail);
             : [];
         if (wxPassengers.length === 0) return 'No';
         const names = wxPassengers.map(p => `${p.first_name || ''} ${p.last_name || ''}`.trim()).filter(Boolean);
-        return `Yes${names.length ? ` — ${names.join(', ')}` : ''}`;
+        return (
+            <span>
+                <span style={{ color: '#10b981', fontWeight: 'bold', marginRight: '4px' }}>✔</span>
+                Yes{names.length ? ` — ${names.join(', ')}` : ''}
+            </span>
+        );
     })()}
 </Typography>
                                                 <Typography><b>Marketing:</b> {bookingDetail.booking?.hear_about_us || 'N/A'}</Typography>
@@ -2253,7 +2260,9 @@ setBookingDetail(finalVoucherDetail);
                                                                 <Typography><b>Created:</b> {v.created_at ? (
                                                                     dayjs(v.created_at).isValid() ? 
                                                                         dayjs(v.created_at).format('DD/MM/YYYY') : 
-                                                                        v.created_at
+                                                                        (v.created_at.includes(' ') ? 
+                                                                            v.created_at.split(' ')[0] : 
+                                                                            v.created_at)
                                                                 ) : '-'}</Typography>
                                                                 <Typography><b>Expires:</b> {v.expires ? (
                                                                     dayjs(v.expires).isValid() ? 

@@ -1449,10 +1449,8 @@ app.get('/api/add-to-booking-items', (req, res) => {
                     const timestamp = Date.now();
                     item.image_url = `${item.image_url}?t=${timestamp}`;
                     
-                    // Also add full URL for production
-                    if (process.env.NODE_ENV === 'production') {
-                        item.image_url = `https://flyawayballooning-system.com${item.image_url}`;
-                    }
+                    // Leave as relative path - frontend will handle absolute URL conversion
+                    // This allows flexibility for different environments and cross-origin scenarios
                 }
             });
         }

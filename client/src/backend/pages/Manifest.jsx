@@ -2256,7 +2256,15 @@ const Manifest = () => {
                                                 setFlights(prev => prev.map(f => f.id === bookingDetail.booking.id ? { ...f, choose_add_on: newAddOn } : f));
                                             }}>FAB Add On</Button>
                                         </Box>
-                                        <Typography><b>WX Refundable:</b> {bookingDetail.passengers && bookingDetail.passengers.some(p => p.weather_refund === 1) ? 'Yes' : 'No'}</Typography>
+                                        <Typography>
+                                            <b>WX Refundable:</b>{' '}
+                                            {bookingDetail.passengers && bookingDetail.passengers.some(p => p.weather_refund === 1) ? (
+                                                <span>
+                                                    <span style={{ color: '#10b981', fontWeight: 'bold', marginRight: '4px' }}>✔</span>
+                                                    Yes
+                                                </span>
+                                            ) : 'No'}
+                                        </Typography>
                                         <Typography><b>Marketing:</b> {bookingDetail.booking.hear_about_us || 'N/A'}</Typography>
                                         <Typography><b>Reason for Ballooning:</b> {bookingDetail.booking.ballooning_reason || 'N/A'}</Typography>
                                     </Box>

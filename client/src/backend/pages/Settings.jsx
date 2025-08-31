@@ -98,9 +98,7 @@ const Settings = () => {
         price: '',
         price_unit: 'fixed',
         category: 'Merchandise',
-        stock_quantity: 0,
         is_physical_item: true,
-        weight_grams: 0,
         journey_types: ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'],
         locations: ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'],
         experience_types: ['Shared Flight', 'Private Charter'],
@@ -825,9 +823,7 @@ const Settings = () => {
             formData.append('price', addToBookingFormData.price);
             formData.append('price_unit', addToBookingFormData.price_unit);
             formData.append('category', addToBookingFormData.category);
-            formData.append('stock_quantity', addToBookingFormData.stock_quantity);
             formData.append('is_physical_item', addToBookingFormData.is_physical_item);
-            formData.append('weight_grams', addToBookingFormData.weight_grams);
             formData.append('journey_types', JSON.stringify(addToBookingFormData.journey_types));
             formData.append('locations', JSON.stringify(addToBookingFormData.locations));
             formData.append('experience_types', JSON.stringify(addToBookingFormData.experience_types));
@@ -841,9 +837,7 @@ const Settings = () => {
                 price: addToBookingFormData.price,
                 price_unit: addToBookingFormData.price_unit,
                 category: addToBookingFormData.category,
-                stock_quantity: addToBookingFormData.stock_quantity,
                 is_physical_item: addToBookingFormData.is_physical_item,
-                weight_grams: addToBookingFormData.weight_grams,
                 journey_types: addToBookingFormData.journey_types,
                 sort_order: addToBookingFormData.sort_order,
                 is_active: addToBookingFormData.is_active
@@ -978,9 +972,7 @@ const Settings = () => {
             price: item.price,
             price_unit: item.price_unit || 'fixed',
             category: item.category || 'Merchandise',
-            stock_quantity: item.stock_quantity || 0,
             is_physical_item: Boolean(item.is_physical_item),
-            weight_grams: item.weight_grams || 0,
             journey_types: parsedJourneyTypes,
             locations: parsedLocations,
             experience_types: parsedExperienceTypes,
@@ -1011,9 +1003,7 @@ const Settings = () => {
             price: '',
             price_unit: 'fixed',
             category: 'Merchandise',
-            stock_quantity: 0,
             is_physical_item: true,
-            weight_grams: 0,
             journey_types: ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'],
             locations: ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'],
             experience_types: ['Shared Flight', 'Private Charter'],
@@ -1918,8 +1908,6 @@ const Settings = () => {
                                             <th>JOURNEY TYPES</th>
                                             <th>LOCATIONS</th>
                                             <th>EXPERIENCE TYPES</th>
-                                            <th>STOCK</th>
-                                            <th>WEIGHT</th>
                                             <th>STATUS</th>
                                             <th>ACTIONS</th>
                                         </tr>
@@ -2119,18 +2107,6 @@ const Settings = () => {
                                                     )}
                                                 </td>
                                                 <td>
-                                                    {item.stock_quantity === 0 ? (
-                                                        <span style={{ color: '#10b981', fontSize: '12px' }}>Unlimited</span>
-                                                    ) : (
-                                                        <span style={{ color: item.stock_quantity > 10 ? '#10b981' : item.stock_quantity > 5 ? '#f59e0b' : '#ef4444' }}>
-                                                            {item.stock_quantity}
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td>
-                                                    {item.weight_grams > 0 ? `${item.weight_grams}g` : '-'}
-                                                </td>
-                                                <td>
                                                     {item.is_active ? (
                                                         <span className="status-badge active">Active</span>
                                                     ) : (
@@ -2171,9 +2147,7 @@ const Settings = () => {
                                                                     formData.append('price', item.price);
                                                                     formData.append('price_unit', item.price_unit || 'fixed');
                                                                     formData.append('category', item.category || 'Merchandise');
-                                                                    formData.append('stock_quantity', item.stock_quantity || 0);
                                                                     formData.append('is_physical_item', item.is_physical_item);
-                                                                    formData.append('weight_grams', item.weight_grams || 0);
                                                                     formData.append('journey_types', item.journey_types ? JSON.stringify(item.journey_types) : JSON.stringify(['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift']));
                                                                     formData.append('locations', item.locations ? JSON.stringify(item.locations) : JSON.stringify(['Bath', 'Devon', 'Somerset', 'Bristol Fiesta']));
                                                                     formData.append('sort_order', item.sort_order || 0);
