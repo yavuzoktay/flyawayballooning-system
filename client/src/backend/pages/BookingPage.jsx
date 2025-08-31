@@ -428,7 +428,7 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
                     finalVoucherDetail.voucherNotes = [];
                 }
 
-                setBookingDetail(finalVoucherDetail);
+setBookingDetail(finalVoucherDetail);
                 setDetailDialogOpen(true);
             } catch (err) {
                 console.error('Error fetching voucher detail:', err);
@@ -817,7 +817,7 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
             if (activeTab === 'vouchers') {
                 alert('Failed to update voucher field. Please try again.');
             } else {
-                alert('Update failed');
+            alert('Update failed');
             }
         } finally {
             setSavingEdit(false);
@@ -898,10 +898,10 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
                         console.log('✅ ULTIMATE FALLBACK 1: Using booking-based notes');
                         
                         const response = await axios.post('/api/addAdminNotes', {
-                            date: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-                            note: newNote,
-                            booking_id: bookingDetail.booking.id
-                        });
+                date: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+                note: newNote,
+                booking_id: bookingDetail.booking.id
+            });
                         
                         console.log('Add admin note (booking fallback) response:', response.data);
                         
@@ -1028,8 +1028,8 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
                 console.log('Add admin note response:', response.data);
                 
                 if (response.data) {
-                    setNewNote('');
-                    await fetchPassengers(bookingDetail.booking.id);
+            setNewNote('');
+            await fetchPassengers(bookingDetail.booking.id);
                 }
             }
         } catch (err) {
@@ -1352,7 +1352,7 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
           }
         } else {
           console.log('📝 Updating admin note via /api/updateAdminNote');
-          await axios.patch('/api/updateAdminNote', { id, note: editingNoteText });
+      await axios.patch('/api/updateAdminNote', { id, note: editingNoteText });
           
           // Refresh admin notes
           if (activeTab === 'vouchers') {
@@ -1368,13 +1368,13 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
               }
             }
           } else {
-            const res = await axios.get(`/api/getBookingDetail?booking_id=${bookingDetail.booking.id}`);
-            setBookingDetail(prev => ({ ...prev, notes: res.data.notes }));
+      const res = await axios.get(`/api/getBookingDetail?booking_id=${bookingDetail.booking.id}`);
+      setBookingDetail(prev => ({ ...prev, notes: res.data.notes }));
           }
         }
         
-        setEditingNoteId(null);
-        setEditingNoteText("");
+      setEditingNoteId(null);
+      setEditingNoteText("");
         console.log('✅ Note edit saved successfully');
       } catch (err) {
         console.error('Error updating note:', err);
@@ -1421,7 +1421,7 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
           }
         } else {
           console.log('🗑️ Deleting admin note via /api/deleteAdminNote');
-          await axios.delete('/api/deleteAdminNote', { data: { id } });
+      await axios.delete('/api/deleteAdminNote', { data: { id } });
           
           // Refresh admin notes
           if (activeTab === 'vouchers') {
@@ -1437,8 +1437,8 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
               }
             }
           } else {
-            const res = await axios.get(`/api/getBookingDetail?booking_id=${bookingDetail.booking.id}`);
-            setBookingDetail(prev => ({ ...prev, notes: res.data.notes }));
+      const res = await axios.get(`/api/getBookingDetail?booking_id=${bookingDetail.booking.id}`);
+      setBookingDetail(prev => ({ ...prev, notes: res.data.notes }));
           }
         }
         
@@ -1895,7 +1895,30 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
                 <Dialog open={detailDialogOpen} onClose={() => { setDetailDialogOpen(false); setSelectedBookingId(null); }} maxWidth="md" fullWidth>
                     <DialogTitle style={{ background: '#2d4263', color: '#fff', fontWeight: 700, fontSize: 22 }}>
                         {activeTab === 'vouchers' ? 
-                            (bookingDetail?.voucher?.voucher_type?.toLowerCase().includes('flight') ? 'Flight Voucher Details' : 'Voucher Details')
+                            (() => {
+                                const voucher = bookingDetail?.voucher;
+                                console.log('🎯 Dialog title check:', {
+                                    book_flight: voucher?.book_flight,
+                                    voucher_type: voucher?.voucher_type,
+                                    isGiftVoucher: voucher?.book_flight === 'Gift Voucher'
+                                });
+                                
+                                // Check if it's a Gift Voucher
+                                if (voucher?.book_flight === 'Gift Voucher') {
+                                    console.log('✅ Dialog: Gift Voucher Details');
+                                    return 'Gift Voucher Details';
+                                }
+                                // Check if it's a Flight Voucher
+                                else if (voucher?.voucher_type?.toLowerCase().includes('flight')) {
+                                    console.log('✅ Dialog: Flight Voucher Details');
+                                    return 'Flight Voucher Details';
+                                }
+                                // Default to Voucher Details
+                                else {
+                                    console.log('✅ Dialog: Voucher Details (default)');
+                                    return 'Voucher Details';
+                                }
+                            })()
                             : 'Booking Details'}
                     </DialogTitle>
                     <DialogContent style={{ background: '#f7f7f7', minHeight: 500 }}>
@@ -1914,7 +1937,30 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
                                 {activeTab === 'vouchers' && bookingDetail?.voucher ? (
                                     <Box sx={{ p: 3 }}>
                                         <Typography variant="h5" sx={{ mb: 3, fontWeight: 700 }}>
-                                            {bookingDetail.voucher.voucher_type?.toLowerCase().includes('flight') ? 'Flight Voucher Details' : 'Voucher Details'}
+                                            {(() => {
+                                                const voucher = bookingDetail?.voucher;
+                                                console.log('🎯 Voucher title check:', {
+                                                    book_flight: voucher?.book_flight,
+                                                    voucher_type: voucher?.voucher_type,
+                                                    isGiftVoucher: voucher?.book_flight === 'Gift Voucher'
+                                                });
+                                                
+                                                // Check if it's a Gift Voucher
+                                                if (voucher?.book_flight === 'Gift Voucher') {
+                                                    console.log('✅ Showing Gift Voucher Details');
+                                                    return 'Gift Voucher Details';
+                                                }
+                                                // Check if it's a Flight Voucher
+                                                else if (voucher?.voucher_type?.toLowerCase().includes('flight')) {
+                                                    console.log('✅ Showing Flight Voucher Details');
+                                                    return 'Flight Voucher Details';
+                                                }
+                                                // Default to Voucher Details
+                                                else {
+                                                    console.log('✅ Showing Voucher Details (default)');
+                                                    return 'Voucher Details';
+                                                }
+                                            })()}
                                         </Typography>
                                         
                                         <Grid container spacing={3}>
@@ -1933,7 +1979,16 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
                                     {/* Personal Details */}
                                     <Grid item xs={12} md={4}>
                                         <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
-                                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Personal Details</Typography>
+                                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+                                                {(() => {
+                                                    const v = bookingDetail.voucher || {};
+                                                    // For Gift Voucher (book_flight: "Gift Voucher"), show "Purchaser Information"
+                                                    if (v.book_flight === "Gift Voucher") {
+                                                        return "Purchaser Information";
+                                                    }
+                                                    return "Personal Details";
+                                                })()}
+                                            </Typography>
                                             {activeTab === 'vouchers' ? (
                                                 (() => {
                                                     const v = bookingDetail.voucher || {};
