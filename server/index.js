@@ -3493,8 +3493,10 @@ app.post('/api/createVoucher', (req, res) => {
             console.log('Email:', email);
             
             // For Flight Voucher, generate voucher code after creation
-            if (voucher_type === 'Flight Voucher') {
+            // Check both voucher_type and book_flight to determine if this is a Flight Voucher
+            if (voucher_type === 'Flight Voucher' || voucher_type === 'Any Day Flight' || voucher_type === 'Weekday Morning' || voucher_type === 'Flexible Weekday') {
                 console.log('=== GENERATING VOUCHER CODE FOR FLIGHT VOUCHER ===');
+                console.log('Voucher Type:', voucher_type);
                 generateVoucherCodeForFlightVoucher(result.insertId, name, email, paid);
             } else {
                 // Send response for non-Flight Voucher types
