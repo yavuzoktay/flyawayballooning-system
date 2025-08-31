@@ -115,9 +115,9 @@ app.post('/api/generate-voucher-code', async (req, res) => {
             });
         };
         
-        // Check for recent duplicates first
+        // Check for recent duplicates first - only prevent if there's already a NON-NULL voucher_ref
         const existingCode = await duplicateCheck();
-        if (existingCode && existingCode.length > 0) {
+        if (existingCode && existingCode.length > 0 && existingCode[0].code) {
             console.log('=== DUPLICATE VOUCHER CODE GENERATION PREVENTED ===');
             console.log('Existing code found:', existingCode[0].code);
             console.log('Customer:', customer_name, 'Email:', customer_email, 'Amount:', paid_amount);
@@ -128,6 +128,9 @@ app.post('/api/generate-voucher-code', async (req, res) => {
                 duplicate_prevented: true
             });
         }
+        
+        console.log('=== NO EXISTING VOUCHER CODE FOUND ===');
+        console.log('Proceeding with new voucher code generation for:', customer_name);
         
         // Generate voucher code based on the pattern: F/G + Category + Year + Serial
         const year = new Date().getFullYear().toString().slice(-2); // Get last 2 digits of year (25 for 2025)
@@ -2691,21 +2694,14 @@ app.get('/api/getAllBookingData', (req, res) => {
 
 // Get All Voucher Data (with booking and passenger info)
 app.get('/api/getAllVoucherData', (req, res) => {
-    // Join all_vouchers with all_booking and get only the LATEST voucher_code to prevent duplicates
+    // Get all vouchers with booking info - voucher codes are stored in all_vouchers.voucher_ref
     const voucher = `
         SELECT v.*, v.experience_type, v.book_flight, v.voucher_type as actual_voucher_type,
                b.email as booking_email, b.phone as booking_phone, b.id as booking_id,
-               vc.code as vc_code,
+               v.voucher_ref as vc_code,
                (SELECT p.weight FROM passenger p WHERE p.booking_id = b.id LIMIT 1) as passenger_weight
         FROM all_vouchers v
         LEFT JOIN all_booking b ON v.voucher_ref = b.voucher_code
-        LEFT JOIN voucher_codes vc ON vc.id = (
-            SELECT vc2.id FROM voucher_codes vc2 
-            WHERE vc2.code = v.voucher_ref 
-               OR (vc2.customer_email IS NOT NULL AND vc2.customer_email = v.email)
-            ORDER BY vc2.created_at DESC 
-            LIMIT 1
-        )
         ORDER BY v.created_at DESC
     `;
     con.query(voucher, (err, result) => {
