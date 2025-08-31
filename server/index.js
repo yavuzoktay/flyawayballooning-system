@@ -2222,15 +2222,12 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
                 return res.status(400).send('No booking/voucher data found');
             }
             
-            // İşlem başlamadan önce processed flag'ini set et
-            storeData.processed = true;
-            
             console.log('Processing webhook for session:', session_id, 'Type:', storeData.type);
             
             try {
                 if (storeData.type === 'booking') {
                     // If already processed with a booking id, skip duplicate creation
-                    if (storeData.processed && storeData.bookingData?.booking_id) {
+                    if (storeData.bookingData?.booking_id) {
                         console.log('Webhook: booking already created for session, skipping.');
                         return res.json({ received: true });
                     }
@@ -2246,14 +2243,14 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
                 } else if (storeData.type === 'voucher') {
                     console.log('Creating voucher via webhook:', storeData.voucherData);
                     
-                    // Check if session was already processed to prevent duplicate creation
-                    if (storeData.processed) {
-                        console.log('Session already processed by webhook, skipping duplicate creation');
+                    // Check if voucher was already created to prevent duplicate creation
+                    if (storeData.voucherData?.voucher_id) {
+                        console.log('Webhook: voucher already created for session, skipping. ID:', storeData.voucherData.voucher_id);
                         return res.json({ received: true });
                     }
                     
-                    // Webhook only creates the voucher, voucher code generation will be done by frontend
-                    console.log('Voucher created by webhook, voucher code generation will be done by frontend');
+                    // Webhook creates the voucher, voucher code generation will be done by createBookingFromSession
+                    console.log('Creating voucher via webhook, voucher code generation will be done by createBookingFromSession');
                     
                     // Direct database insertion instead of HTTP call
                     const voucherId = await createVoucherFromWebhook(storeData.voucherData);
@@ -2265,8 +2262,8 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
                     // Mark session as processed to prevent duplicate calls
                     storeData.processed = true;
                     
-                    // Webhook does NOT generate voucher code - this will be done by frontend
-                    console.log('Voucher code generation skipped in webhook - will be done by frontend');
+                    // Webhook does NOT generate voucher code - this will be done by createBookingFromSession
+                    console.log('Voucher code generation skipped in webhook - will be done by createBookingFromSession');
                     
                     // Immediately return to prevent further processing
                     return res.json({ received: true });
@@ -2683,15 +2680,21 @@ app.get('/api/getAllBookingData', (req, res) => {
 
 // Get All Voucher Data (with booking and passenger info)
 app.get('/api/getAllVoucherData', (req, res) => {
-    // Join all_vouchers with all_booking and get DISTINCT vouchers to prevent passenger duplicates
+    // Join all_vouchers with all_booking and get only the LATEST voucher_code to prevent duplicates
     const voucher = `
-        SELECT DISTINCT v.*, v.experience_type, v.book_flight, v.voucher_type as actual_voucher_type,
+        SELECT v.*, v.experience_type, v.book_flight, v.voucher_type as actual_voucher_type,
                b.email as booking_email, b.phone as booking_phone, b.id as booking_id,
                vc.code as vc_code,
                (SELECT p.weight FROM passenger p WHERE p.booking_id = b.id LIMIT 1) as passenger_weight
         FROM all_vouchers v
         LEFT JOIN all_booking b ON v.voucher_ref = b.voucher_code
-        LEFT JOIN voucher_codes vc ON vc.code = v.voucher_ref OR (vc.customer_email IS NOT NULL AND vc.customer_email = v.email)
+        LEFT JOIN voucher_codes vc ON vc.id = (
+            SELECT vc2.id FROM voucher_codes vc2 
+            WHERE vc2.code = v.voucher_ref 
+               OR (vc2.customer_email IS NOT NULL AND vc2.customer_email = v.email)
+            ORDER BY vc2.created_at DESC 
+            LIMIT 1
+        )
         ORDER BY v.created_at DESC
     `;
     con.query(voucher, (err, result) => {
@@ -6670,7 +6673,12 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                         console.log('Voucher code generation skipped - will be handled by frontend');
                         
                         // For Buy Gift vouchers, also generate voucher code
-                        if (storeData.voucherData.voucher_type === 'Buy Gift' || storeData.voucherData.voucher_type === 'Gift Voucher') {
+                        console.log('=== VOUCHER CODE GENERATION CHECK ===');
+                        console.log('storeData.voucherData.voucher_type:', storeData.voucherData.voucher_type);
+                        console.log('storeData.voucherData.book_flight:', storeData.voucherData.book_flight);
+                        console.log('Checking if Buy Gift or Gift Voucher...');
+                        
+                        if (storeData.voucherData.voucher_type === 'Buy Gift' || storeData.voucherData.voucher_type === 'Gift Voucher' || storeData.voucherData.book_flight === 'Gift Voucher') {
                             try {
                                 console.log('Generating voucher code for Buy Gift...');
                                 
