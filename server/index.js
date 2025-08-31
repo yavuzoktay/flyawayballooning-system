@@ -95,9 +95,10 @@ app.post('/api/generate-voucher-code', async (req, res) => {
 
     try {
         // Check for existing voucher code for same customer to prevent duplicates
+        // Gift voucher codes are stored in all_vouchers.voucher_ref, not voucher_codes table
         const duplicateCheckSql = `
-            SELECT code FROM voucher_codes 
-            WHERE customer_email = ? AND customer_name = ? AND paid_amount = ? 
+            SELECT voucher_ref as code FROM all_vouchers 
+            WHERE email = ? AND name = ? AND paid = ? 
             AND created_at > DATE_SUB(NOW(), INTERVAL 2 MINUTE) 
             LIMIT 1
         `;
@@ -187,10 +188,10 @@ app.post('/api/generate-voucher-code', async (req, res) => {
                 const serial = generateSerial();
                 voucherCode = `${prefix}${categoryCode}${year}${serial}`;
                 
-                // Check if code already exists using Promise
+                // Check if code already exists in gift vouchers (all_vouchers.voucher_ref)
                 const checkCode = () => {
                     return new Promise((resolve, reject) => {
-                        const checkSql = 'SELECT id FROM voucher_codes WHERE code = ?';
+                        const checkSql = 'SELECT id FROM all_vouchers WHERE voucher_ref = ?';
                         con.query(checkSql, [voucherCode], (err, result) => {
                             if (err) {
                                 reject(err);
@@ -226,54 +227,64 @@ app.post('/api/generate-voucher-code', async (req, res) => {
         // Create title for the voucher code
         const title = `${customer_name} - ${flight_category} - ${location}`;
         
-        // Insert into voucher_codes table
-        const insertSql = `
-            INSERT INTO voucher_codes (
-                code, title, valid_from, valid_until, max_uses, current_uses,
-                applicable_locations, applicable_experiences, applicable_voucher_types,
-                is_active, created_at, updated_at, source_type, customer_email, paid_amount
-            ) VALUES (?, ?, NOW(), ?, 1, 0, ?, ?, ?, 1, NOW(), NOW(), 'user_generated', ?, ?)
-        `;
+        // For Gift Voucher codes, find the voucher and update its voucher_ref
+        // Gift voucher codes are stored in all_vouchers.voucher_ref, not voucher_codes table
+        console.log('=== GIFT VOUCHER CODE UPDATE ===');
+        console.log('Looking for voucher with customer:', customer_name, customer_email, paid_amount);
         
-        // Set default expiration date if none provided (1 year from now)
-        const defaultExpiryDate = expires_date || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        
-        const values = [
-            voucherCode,
-            title,
-            defaultExpiryDate,
-            location || null,
-            experience_type || null,
-            voucher_type || null,
-            customer_email || null,
-            paid_amount || 0
-        ];
-        
-        // Use Promise for database insertion
-        const insertVoucherCode = () => {
+        const findAndUpdateVoucher = () => {
             return new Promise((resolve, reject) => {
-                con.query(insertSql, values, (err, result) => {
+                // Find the most recently created voucher for this customer
+                const findSql = `
+                    SELECT id FROM all_vouchers 
+                    WHERE name = ? AND email = ? AND paid = ? 
+                    AND (voucher_ref IS NULL OR voucher_ref = '') 
+                    ORDER BY created_at DESC 
+                    LIMIT 1
+                `;
+                
+                con.query(findSql, [customer_name, customer_email, paid_amount], (err, findResult) => {
                     if (err) {
                         reject(err);
-                    } else {
-                        resolve(result);
+                        return;
                     }
+                    
+                    if (findResult.length === 0) {
+                        reject(new Error('No voucher found to update with code'));
+                        return;
+                    }
+                    
+                    const voucherId = findResult[0].id;
+                    console.log('Found voucher ID to update:', voucherId);
+                    
+                    // Update the voucher with the generated code
+                    const updateSql = 'UPDATE all_vouchers SET voucher_ref = ? WHERE id = ?';
+                    con.query(updateSql, [voucherCode, voucherId], (updateErr, updateResult) => {
+                        if (updateErr) {
+                            reject(updateErr);
+                        } else {
+                            console.log('Voucher updated with code:', voucherCode);
+                            resolve({ voucherId, voucherCode });
+                        }
+                    });
                 });
             });
         };
         
         try {
-            const result = await insertVoucherCode();
+            const result = await findAndUpdateVoucher();
             res.json({
                 success: true,
-                message: 'Voucher code generated successfully',
+                message: 'Gift voucher code generated and assigned successfully',
                 voucher_code: voucherCode,
-                voucher_id: result.insertId,
-                title: title
+                voucher_id: result.voucherId,
+                customer_name: customer_name,
+                customer_email: customer_email,
+                updated_voucher: true
             });
-        } catch (insertError) {
-            console.error('Error creating voucher code:', insertError);
-            res.status(500).json({ success: false, message: 'Database error', error: insertError.message });
+        } catch (updateError) {
+            console.error('Error updating voucher with code:', updateError);
+            res.status(500).json({ success: false, message: 'Database error', error: updateError.message });
         }
         
     } catch (error) {
