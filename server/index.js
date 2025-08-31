@@ -3492,9 +3492,126 @@ app.post('/api/createVoucher', (req, res) => {
             console.log('Name:', name);
             console.log('Email:', email);
             
-            // Send response only once
-            res.status(201).json({ success: true, message: 'Voucher created successfully!', voucherId: result.insertId });
+            // For Flight Voucher, generate voucher code after creation
+            if (voucher_type === 'Flight Voucher') {
+                console.log('=== GENERATING VOUCHER CODE FOR FLIGHT VOUCHER ===');
+                generateVoucherCodeForFlightVoucher(result.insertId, name, email, paid);
+            } else {
+                // Send response for non-Flight Voucher types
+                res.status(201).json({ success: true, message: 'Voucher created successfully!', voucherId: result.insertId });
+            }
         });
+    }
+    
+    // Generate voucher code for Flight Voucher after creation
+    function generateVoucherCodeForFlightVoucher(voucherId, name, email, paid) {
+        console.log('=== GENERATING VOUCHER CODE FOR FLIGHT VOUCHER ===');
+        console.log('Voucher ID:', voucherId);
+        console.log('Name:', name);
+        console.log('Email:', email);
+        console.log('Paid:', paid);
+        
+        // Generate unique voucher code
+        const voucherCode = generateUniqueVoucherCode();
+        
+        // Update the voucher record with the generated code
+        const updateSql = `UPDATE all_vouchers SET voucher_ref = ? WHERE id = ?`;
+        
+        con.query(updateSql, [voucherCode, voucherId], (err, updateResult) => {
+            if (err) {
+                console.error('Error updating voucher with code:', err);
+                // Even if update fails, send response with voucher ID
+                res.status(201).json({ 
+                    success: true, 
+                    message: 'Voucher created successfully!', 
+                    voucherId: voucherId,
+                    voucherCode: null,
+                    note: 'Voucher created but code generation failed'
+                });
+                return;
+            }
+            
+            console.log('=== VOUCHER CODE GENERATED SUCCESSFULLY ===');
+            console.log('Voucher ID:', voucherId);
+            console.log('Voucher Code:', voucherCode);
+            
+            // Send success response with voucher code
+            res.status(201).json({ 
+                success: true, 
+                message: 'Voucher created successfully with code!', 
+                voucherId: voucherId,
+                voucherCode: voucherCode
+            });
+        });
+    }
+    
+    // Generate unique voucher code
+    function generateUniqueVoucherCode() {
+        const prefix = 'FAT'; // Flight Voucher prefix
+        const timestamp = Date.now().toString(36).toUpperCase();
+        const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+        return `${prefix}${timestamp}${random}`;
+    }
+});
+
+// Test endpoint to generate voucher code for existing voucher
+app.post('/api/generateVoucherCodeForExisting', (req, res) => {
+    const { voucher_id } = req.body;
+    
+    if (!voucher_id) {
+        return res.status(400).json({ success: false, message: 'voucher_id is required' });
+    }
+    
+    // Check if voucher exists
+    const checkSql = `SELECT id, name, email, paid, voucher_ref FROM all_vouchers WHERE id = ?`;
+    
+    con.query(checkSql, [voucher_id], (err, voucherResult) => {
+        if (err) {
+            console.error('Error checking voucher:', err);
+            return res.status(500).json({ success: false, error: 'Database query failed' });
+        }
+        
+        if (voucherResult.length === 0) {
+            return res.status(404).json({ success: false, message: 'Voucher not found' });
+        }
+        
+        const voucher = voucherResult[0];
+        
+        if (voucher.voucher_ref && voucher.voucher_ref.trim() !== '') {
+            return res.status(400).json({ success: false, message: 'Voucher already has a code', voucherCode: voucher.voucher_ref });
+        }
+        
+        // Generate unique voucher code
+        const voucherCode = generateUniqueVoucherCode();
+        
+        // Update the voucher record with the generated code
+        const updateSql = `UPDATE all_vouchers SET voucher_ref = ? WHERE id = ?`;
+        
+        con.query(updateSql, [voucherCode, voucher_id], (err, updateResult) => {
+            if (err) {
+                console.error('Error updating voucher with code:', err);
+                return res.status(500).json({ success: false, error: 'Failed to update voucher with code' });
+            }
+            
+            console.log('=== VOUCHER CODE GENERATED FOR EXISTING VOUCHER ===');
+            console.log('Voucher ID:', voucher_id);
+            console.log('Voucher Code:', voucherCode);
+            
+            res.json({ 
+                success: true, 
+                message: 'Voucher code generated successfully!', 
+                voucherId: voucher_id,
+                voucherCode: voucherCode
+            });
+        });
+    });
+    
+    // Generate unique voucher code
+    function generateUniqueVoucherCode() {
+        const prefix = 'FAT'; // Flight Voucher prefix
+        const timestamp = Date.now().toString(36).toUpperCase();
+        const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+        return `${prefix}${timestamp}${random}`;
     }
 });
 
