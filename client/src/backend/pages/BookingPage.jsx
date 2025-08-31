@@ -2023,23 +2023,26 @@ setBookingDetail(finalVoucherDetail);
                                                                 <IconButton size="small" onClick={() => handleEditClick('name', v.name)}><EditIcon fontSize="small" /></IconButton>
                                                             </>
                                                         )}</Typography>
-                                                        <Typography><b>Phone:</b> {editField === 'mobile' ? (
-                                                            <>
-                                                                <input 
-                                                                    value={editValue} 
-                                                                    onChange={e => setEditValue(e.target.value.replace(/[^0-9+\-\s()]/g, ''))} 
-                                                                    style={{marginRight: 8}} 
-                                                                    placeholder="Phone number"
-                                                                />
-                                                                <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
-                                                                <Button size="small" onClick={handleEditCancel}>Cancel</Button>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                {v.mobile || '-'}
-                                                                <IconButton size="small" onClick={() => handleEditClick('mobile', v.mobile)}><EditIcon fontSize="small" /></IconButton>
-                                                            </>
-                                                        )}</Typography>
+                                                        {/* Hide Phone field for Gift Vouchers */}
+                                                        {v.book_flight !== "Gift Voucher" && (
+                                                            <Typography><b>Phone:</b> {editField === 'mobile' ? (
+                                                                <>
+                                                                    <input 
+                                                                        value={editValue} 
+                                                                        onChange={e => setEditValue(e.target.value.replace(/[^0-9+\-\s()]/g, ''))} 
+                                                                        style={{marginRight: 8}} 
+                                                                        placeholder="Phone number"
+                                                                    />
+                                                                    <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                                    <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    {v.mobile || '-'}
+                                                                    <IconButton size="small" onClick={() => handleEditClick('mobile', v.mobile)}><EditIcon fontSize="small" /></IconButton>
+                                                                </>
+                                                            )}</Typography>
+                                                        )}
                                                         <Typography><b>Email:</b> {editField === 'email' ? (
                                                             <>
                                                                 <input 
@@ -2085,23 +2088,26 @@ setBookingDetail(finalVoucherDetail);
                                                                 dayjs(bookingDetail.voucher.expires).format('DD/MM/YYYY') : 
                                                                 bookingDetail.voucher.expires
                                                         ) : '-'}</Typography>
-                                                        <Typography><b>Weight:</b> {editField === 'weight' ? (
-                                                            <>
-                                                                <input 
-                                                                    value={editValue} 
-                                                                    onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} 
-                                                                    style={{marginRight: 8}} 
-                                                                    placeholder="Weight in kg"
-                                                                />
-                                                                <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
-                                                                <Button size="small" onClick={handleEditCancel}>Cancel</Button>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                {v.weight || '-'}kg
-                                                                <IconButton size="small" onClick={() => handleEditClick('weight', v.weight)}><EditIcon fontSize="small" /></IconButton>
-                                                            </>
-                                                        )}</Typography>
+                                                        {/* Hide Weight field for Gift Vouchers */}
+                                                        {v.book_flight !== "Gift Voucher" && (
+                                                            <Typography><b>Weight:</b> {editField === 'weight' ? (
+                                                                <>
+                                                                    <input 
+                                                                        value={editValue} 
+                                                                        onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} 
+                                                                        style={{marginRight: 8}} 
+                                                                        placeholder="Weight in kg"
+                                                                    />
+                                                                    <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                                    <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    {v.weight || '-'}kg
+                                                                    <IconButton size="small" onClick={() => handleEditClick('weight', v.weight)}><EditIcon fontSize="small" /></IconButton>
+                                                                </>
+                                                            )}</Typography>
+                                                        )}
                                                         <Typography><b>Voucher ID:</b> {v.id || '-'}</Typography>
                                                         <Typography><b>Voucher Code:</b> {v.voucher_code || '-'}</Typography>
                                                         <Typography><b>Flight Attempts:</b> {v.flight_attempts ?? '-'}</Typography>
