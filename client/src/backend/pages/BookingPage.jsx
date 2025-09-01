@@ -2420,10 +2420,17 @@ setBookingDetail(finalVoucherDetail);
                                                 </Box>
                                             ) : null}
                                             
-                                                                                        {/* Passenger Details */}
-                                            <Box sx={{ mb: 2 }}>
-                                                <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Passenger Details</Typography>
-                                                {activeTab === 'vouchers' ? (
+                                                                                        {/* Passenger Details - Hide for Gift Vouchers */}
+                                            {(() => {
+                                                const v = bookingDetail.voucher || {};
+                                                // Only show Passenger Details if it's NOT a Gift Voucher
+                                                if (v.book_flight === "Gift Voucher") {
+                                                    return null; // Don't render Passenger Details for Gift Vouchers
+                                                }
+                                                return (
+                                                    <Box sx={{ mb: 2 }}>
+                                                        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Passenger Details</Typography>
+                                                        {activeTab === 'vouchers' ? (
                                                     <>
                                                         {/* Passenger info for vouchers - show name, weight and price in Booking Details format */}
                                                         {(() => {
@@ -2653,7 +2660,9 @@ setBookingDetail(finalVoucherDetail);
                                                         </Box>
                                                     ) : null
                                                 )}
-                                            </Box>
+                                                    </Box>
+                                                );
+                                            })()}
                                             <Divider sx={{ my: 2 }} />
                                             {/* Notes */}
                                             <Box>

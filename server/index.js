@@ -3508,18 +3508,39 @@ app.post('/api/createVoucher', (req, res) => {
         console.log('Original email (should be purchaser):', email);
         console.log('Original phone (should be purchaser):', phone);
         console.log('Original mobile (should be purchaser):', mobile);
+        console.log('Explicit purchaser_name from frontend:', purchaser_name);
+        console.log('Explicit purchaser_email from frontend:', purchaser_email);
+        console.log('Explicit purchaser_phone from frontend:', purchaser_phone);
         console.log('Recipient name:', recipient_name);
         console.log('Recipient email:', recipient_email);
         console.log('Recipient phone:', recipient_phone);
         
-        // For Gift Vouchers, name/email/phone/mobile are ALWAYS purchaser info (from Purchaser Details section)
-        // These fields should never be empty for Gift Vouchers
-        finalPurchaserName = name;
-        finalPurchaserEmail = email;
-        finalPurchaserPhone = phone;
-        finalPurchaserMobile = mobile;
+        // For Gift Vouchers, use explicit purchaser fields if provided, otherwise fall back to main contact fields
+        if (purchaser_name && purchaser_name.trim() !== '') {
+            finalPurchaserName = purchaser_name;
+        } else {
+            finalPurchaserName = name;
+        }
         
-        console.log('Setting purchaser info from main contact fields (Purchaser Details):', {
+        if (purchaser_email && purchaser_email.trim() !== '') {
+            finalPurchaserEmail = purchaser_email;
+        } else {
+            finalPurchaserEmail = email;
+        }
+        
+        if (purchaser_phone && purchaser_phone.trim() !== '') {
+            finalPurchaserPhone = purchaser_phone;
+        } else {
+            finalPurchaserPhone = phone;
+        }
+        
+        if (purchaser_mobile && purchaser_mobile.trim() !== '') {
+            finalPurchaserMobile = purchaser_mobile;
+        } else {
+            finalPurchaserMobile = mobile;
+        }
+        
+        console.log('Setting purchaser info:', {
             name: finalPurchaserName,
             email: finalPurchaserEmail,
             phone: finalPurchaserPhone,
@@ -3534,6 +3555,13 @@ app.post('/api/createVoucher', (req, res) => {
         
         console.log('Final purchaser info:', { name: finalPurchaserName, email: finalPurchaserEmail, phone: finalPurchaserPhone, mobile: finalPurchaserMobile });
         console.log('Final recipient info:', { name: finalRecipientName, email: finalRecipientEmail, phone: finalRecipientPhone });
+    } else {
+        // For Flight Vouchers and Redeem Vouchers, purchaser info is the same as main contact
+        finalPurchaserName = name;
+        finalPurchaserEmail = email;
+        finalPurchaserPhone = phone;
+        finalPurchaserMobile = mobile;
+        console.log('Non-Gift Voucher - purchaser info same as main contact:', { name: finalPurchaserName, email: finalPurchaserEmail, phone: finalPurchaserPhone, mobile: finalPurchaserMobile });
     }
 
     const now = moment().format('YYYY-MM-DD HH:mm:ss');
@@ -7772,6 +7800,124 @@ const addVoucherColumnsToBooking = `
     ADD COLUMN original_amount DECIMAL(10,2) DEFAULT NULL COMMENT 'Original amount before voucher discount'
 `;
 
+// Run purchaser/recipient data fix migration
+const runPurchaserRecipientDataFix = () => {
+    console.log('🔧 Running purchaser/recipient data fix migration...');
+    
+    // Check if purchaser_name column exists
+    const checkPurchaserFields = "SHOW COLUMNS FROM all_vouchers LIKE 'purchaser_name'";
+    
+    con.query(checkPurchaserFields, (err, result) => {
+        if (err) {
+            console.error('Error checking purchaser fields:', err);
+            return;
+        }
+        
+        if (result.length === 0) {
+            console.log('📝 Adding purchaser fields to all_vouchers table...');
+            
+            // Add purchaser_name column
+            const addPurchaserName = "ALTER TABLE all_vouchers ADD COLUMN purchaser_name VARCHAR(255) COMMENT 'Name of the person who purchased the voucher' AFTER name";
+            
+            con.query(addPurchaserName, (err, result) => {
+                if (err) {
+                    console.error('Error adding purchaser_name column:', err);
+                } else {
+                    console.log('✅ purchaser_name column added successfully');
+                    
+                    // Add purchaser_email column
+                    const addPurchaserEmail = "ALTER TABLE all_vouchers ADD COLUMN purchaser_email VARCHAR(255) COMMENT 'Email of the person who purchased the voucher' AFTER purchaser_name";
+                    
+                    con.query(addPurchaserEmail, (err, result) => {
+                        if (err) {
+                            console.error('Error adding purchaser_email column:', err);
+                        } else {
+                            console.log('✅ purchaser_email column added successfully');
+                            
+                            // Add purchaser_phone column
+                            const addPurchaserPhone = "ALTER TABLE all_vouchers ADD COLUMN purchaser_phone VARCHAR(50) COMMENT 'Phone number of the person who purchased the voucher' AFTER purchaser_email";
+                            
+                            con.query(addPurchaserPhone, (err, result) => {
+                                if (err) {
+                                    console.error('Error adding purchaser_phone column:', err);
+                                } else {
+                                    console.log('✅ purchaser_phone column added successfully');
+                                    
+                                    // Add purchaser_mobile column
+                                    const addPurchaserMobile = "ALTER TABLE all_vouchers ADD COLUMN purchaser_mobile VARCHAR(50) COMMENT 'Mobile number of the person who purchased the voucher' AFTER purchaser_phone";
+                                    
+                                    con.query(addPurchaserMobile, (err, result) => {
+                                        if (err) {
+                                            console.error('Error adding purchaser_mobile column:', err);
+                                        } else {
+                                            console.log('✅ purchaser_mobile column added successfully');
+                                            
+                                            // Index'ler kaldırıldı - gereksiz karmaşıklık
+                                            console.log('✅ Purchaser columns added successfully');
+                                            
+                                            // Fix existing data
+                                            fixExistingPurchaserData();
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+        } else {
+            console.log('✅ Purchaser fields already exist, fixing existing data...');
+            fixExistingPurchaserData();
+        }
+    });
+};
+
+// Fix existing purchaser data
+const fixExistingPurchaserData = () => {
+    console.log('🔧 Fixing existing purchaser/recipient data...');
+    
+    // Fix Gift Vouchers where purchaser and recipient data are mixed up
+    const updateGiftVouchers = `
+        UPDATE all_vouchers 
+        SET 
+            purchaser_name = name,
+            purchaser_email = email,
+            purchaser_phone = phone,
+            purchaser_mobile = mobile
+        WHERE book_flight = 'Gift Voucher' 
+        AND (purchaser_name IS NULL OR purchaser_name = '' OR purchaser_name = recipient_name)
+    `;
+    
+    con.query(updateGiftVouchers, (err, result) => {
+        if (err) {
+            console.error('Error updating Gift Voucher purchaser data:', err);
+        } else {
+            console.log(`✅ Updated ${result.affectedRows} Gift Voucher records with correct purchaser data`);
+            
+            // Fix non-Gift Vouchers
+            const updateNonGiftVouchers = `
+                UPDATE all_vouchers 
+                SET 
+                    purchaser_name = name,
+                    purchaser_email = email,
+                    purchaser_phone = phone,
+                    purchaser_mobile = mobile
+                WHERE book_flight != 'Gift Voucher' 
+                AND (purchaser_name IS NULL OR purchaser_name = '')
+            `;
+            
+            con.query(updateNonGiftVouchers, (err, result) => {
+                if (err) {
+                    console.error('Error updating non-Gift Voucher purchaser data:', err);
+                } else {
+                    console.log(`✅ Updated ${result.affectedRows} non-Gift Voucher records with correct purchaser data`);
+                    console.log('🎉 Purchaser/recipient data fix migration completed successfully!');
+                }
+            });
+        }
+    });
+};
+
 // Run voucher code migrations
 const runVoucherCodeMigrations = () => {
     console.log('Running voucher code migrations...');
@@ -7874,6 +8020,9 @@ const runVoucherCodeMigrations = () => {
 
 // Run voucher code migrations when server starts
 runVoucherCodeMigrations();
+
+// Run purchaser/recipient data fix migration when server starts
+runPurchaserRecipientDataFix();
 
 // Database migrations will run when the main server starts
 
