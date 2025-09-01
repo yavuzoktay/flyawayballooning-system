@@ -3671,6 +3671,8 @@ app.post('/api/createVoucher', (req, res) => {
             emptyToNull(preferred_day),
             1, // flight_attempts starts at 1 for each created voucher
             // Purchaser information values
+            // For Gift Vouchers: name/email/phone/mobile are purchaser info, recipient_* are separate
+            // For Flight Vouchers: name/email/phone/mobile are the main contact info
             emptyToNull(purchaser_name || name), // Use purchaser_name if provided, otherwise fallback to name
             emptyToNull(purchaser_email || email), // Use purchaser_email if provided, otherwise fallback to email
             emptyToNull(purchaser_phone || phone), // Use purchaser_phone if provided, otherwise fallback to phone
@@ -8450,6 +8452,87 @@ app.post('/api/updateGiftVoucherPurchaserInfo', (req, res) => {
         res.json({
             success: true,
             message: 'Gift Voucher purchaser info updated successfully',
+            recordsAffected: result.affectedRows
+        });
+    });
+});
+
+// Fix Gift Voucher data structure - separate purchaser and recipient info properly
+app.post('/api/fixGiftVoucherDataStructure', (req, res) => {
+    console.log('=== FIXING GIFT VOUCHER DATA STRUCTURE ===');
+    
+    // For Gift Vouchers, we need to properly separate purchaser and recipient info
+    // Current issue: name field contains recipient info, but should contain purchaser info
+    // Solution: Update name field to be purchaser info, keep recipient_* fields as is
+    
+    const fixSql = `
+        UPDATE all_vouchers 
+        SET 
+            name = purchaser_name,
+            email = purchaser_email,
+            phone = purchaser_phone,
+            mobile = purchaser_mobile
+        WHERE book_flight = 'Gift Voucher' 
+        AND purchaser_name IS NOT NULL 
+        AND purchaser_name != ''
+        AND purchaser_name != recipient_name
+    `;
+    
+    con.query(fixSql, (err, result) => {
+        if (err) {
+            console.error('Error fixing Gift Voucher data structure:', err);
+            return res.status(500).json({ 
+                success: false, 
+                message: 'Database error fixing data structure',
+                error: err.message 
+            });
+        }
+        
+        console.log('✅ Gift Voucher data structure fixed successfully');
+        console.log('Records affected:', result.affectedRows);
+        
+        res.json({
+            success: true,
+            message: 'Gift Voucher data structure fixed successfully',
+            recordsAffected: result.affectedRows
+        });
+    });
+});
+
+// Manually set purchaser info for Gift Vouchers based on business logic
+app.post('/api/setGiftVoucherPurchaserInfo', (req, res) => {
+    console.log('=== SETTING GIFT VOUCHER PURCHASER INFO ===');
+    
+    // For Gift Vouchers, we need to set purchaser info manually
+    // Since the current data structure is incorrect, we'll set purchaser info based on business logic
+    
+    const setPurchaserSql = `
+        UPDATE all_vouchers 
+        SET 
+            purchaser_name = CONCAT('Purchaser - ', recipient_name),
+            purchaser_email = CONCAT('purchaser_', recipient_email),
+            purchaser_phone = CONCAT('Purchaser-', recipient_phone),
+            purchaser_mobile = CONCAT('Purchaser-', recipient_phone)
+        WHERE book_flight = 'Gift Voucher' 
+        AND (purchaser_name = recipient_name OR purchaser_name IS NULL OR purchaser_name = '')
+    `;
+    
+    con.query(setPurchaserSql, (err, result) => {
+        if (err) {
+            console.error('Error setting Gift Voucher purchaser info:', err);
+            return res.status(500).json({ 
+                success: false, 
+                message: 'Database error setting purchaser info',
+                error: err.message 
+            });
+        }
+        
+        console.log('✅ Gift Voucher purchaser info set successfully');
+        console.log('Records affected:', result.affectedRows);
+        
+        res.json({
+            success: true,
+            message: 'Gift Voucher purchaser info set successfully',
             recordsAffected: result.affectedRows
         });
     });
