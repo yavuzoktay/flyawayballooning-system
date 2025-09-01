@@ -2116,12 +2116,18 @@ app.post('/api/terms-and-conditions', (req, res) => {
     const {
         title,
         content,
+        experience_ids,
         voucher_type_id,
         voucher_type_ids,
         private_voucher_type_ids,
         is_active,
         sort_order
     } = req.body;
+    
+    // Normalize experience input
+    const normalizedExperienceIds = Array.isArray(experience_ids) && experience_ids.length > 0
+        ? experience_ids.map((v) => Number(v))
+        : [];
     
     // Normalize voucher type input
     const normalizedVoucherTypeIds = Array.isArray(voucher_type_ids) && voucher_type_ids.length > 0
@@ -2133,20 +2139,21 @@ app.post('/api/terms-and-conditions', (req, res) => {
         ? private_voucher_type_ids.map((v) => Number(v))
         : [];
 
-    // Validation - require either voucher types or private voucher types
-    if (!title || !content || (normalizedVoucherTypeIds.length === 0 && normalizedPrivateVoucherTypeIds.length === 0)) {
-        return res.status(400).json({ success: false, message: 'Missing required fields: title, content, and at least one voucher type (voucher_type_id, voucher_type_ids, or private_voucher_type_ids)' });
+    // Validation - require either experiences, voucher types, or private voucher types
+    if (!title || !content || (normalizedExperienceIds.length === 0 && normalizedVoucherTypeIds.length === 0 && normalizedPrivateVoucherTypeIds.length === 0)) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: title, content, and at least one selection (experience_ids, voucher_type_ids, or private_voucher_type_ids)' });
     }
     
     const sql = `
         INSERT INTO terms_and_conditions (
-            title, content, voucher_type_id, voucher_type_ids, private_voucher_type_ids, is_active, sort_order
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            title, content, experience_ids, voucher_type_id, voucher_type_ids, private_voucher_type_ids, is_active, sort_order
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
     
     const values = [
         title,
         content,
+        JSON.stringify(normalizedExperienceIds),
         normalizedVoucherTypeIds[0] || null,
         JSON.stringify(normalizedVoucherTypeIds),
         JSON.stringify(normalizedPrivateVoucherTypeIds),
@@ -2174,6 +2181,7 @@ app.put('/api/terms-and-conditions/:id', (req, res) => {
     const {
         title,
         content,
+        experience_ids,
         voucher_type_id,
         voucher_type_ids,
         private_voucher_type_ids,
@@ -2183,12 +2191,19 @@ app.put('/api/terms-and-conditions/:id', (req, res) => {
     
     console.log('PUT /api/terms-and-conditions/' + id + ' called');
     console.log('Request body:', req.body);
+    console.log('experience_ids type:', typeof experience_ids);
+    console.log('experience_ids value:', experience_ids);
     console.log('voucher_type_ids type:', typeof voucher_type_ids);
     console.log('voucher_type_ids value:', voucher_type_ids);
     console.log('private_voucher_type_ids type:', typeof private_voucher_type_ids);
     console.log('private_voucher_type_ids value:', private_voucher_type_ids);
     console.log('private_voucher_type_ids length:', private_voucher_type_ids ? private_voucher_type_ids.length : 'undefined');
     console.log('private_voucher_type_ids isArray:', Array.isArray(private_voucher_type_ids));
+    
+    // Normalize experience input
+    const normalizedExperienceIds = Array.isArray(experience_ids) && experience_ids.length > 0
+        ? experience_ids.map((v) => Number(v))
+        : [];
     
     // Normalize voucher type input
     const normalizedVoucherTypeIds = Array.isArray(voucher_type_ids) && voucher_type_ids.length > 0
@@ -2200,20 +2215,21 @@ app.put('/api/terms-and-conditions/:id', (req, res) => {
         ? private_voucher_type_ids.map((v) => Number(v))
         : [];
 
-    // Validation - require either voucher types or private voucher types
-    if (!title || !content || (normalizedVoucherTypeIds.length === 0 && normalizedPrivateVoucherTypeIds.length === 0)) {
-        return res.status(400).json({ success: false, message: 'Missing required fields: title, content, and at least one voucher type (voucher_type_id, voucher_type_ids, or private_voucher_type_ids)' });
+    // Validation - require either experiences, voucher types, or private voucher types
+    if (!title || !content || (normalizedExperienceIds.length === 0 && normalizedVoucherTypeIds.length === 0 && normalizedPrivateVoucherTypeIds.length === 0)) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: title, content, and at least one selection (experience_ids, voucher_type_ids, or private_voucher_type_ids)' });
     }
     
     const sql = `
         UPDATE terms_and_conditions SET 
-            title = ?, content = ?, voucher_type_id = ?, voucher_type_ids = ?, private_voucher_type_ids = ?, is_active = ?, sort_order = ?
+            title = ?, content = ?, experience_ids = ?, voucher_type_id = ?, voucher_type_ids = ?, private_voucher_type_ids = ?, is_active = ?, sort_order = ?
         WHERE id = ?
     `;
     
     const values = [
         title,
         content,
+        JSON.stringify(normalizedExperienceIds),
         normalizedVoucherTypeIds[0] || null,
         JSON.stringify(normalizedVoucherTypeIds),
         JSON.stringify(normalizedPrivateVoucherTypeIds),
@@ -8680,4 +8696,151 @@ app.patch('/api/updateVoucherField', (req, res) => {
             affectedRows: result.affectedRows
         });
     });
+});
+
+// Database migration endpoint for terms_and_conditions table
+app.post('/api/migrate-terms-table', (req, res) => {
+    console.log('POST /api/migrate-terms-table called');
+    
+    const migrationQueries = [
+        // Add experience_ids column (check if exists first)
+        `SELECT COUNT(*) as count FROM INFORMATION_SCHEMA.COLUMNS 
+         WHERE TABLE_SCHEMA = DATABASE() 
+         AND TABLE_NAME = 'terms_and_conditions' 
+         AND COLUMN_NAME = 'experience_ids'`,
+        
+        // Add private_voucher_type_ids column (check if exists first)
+        `SELECT COUNT(*) as count FROM INFORMATION_SCHEMA.COLUMNS 
+         WHERE TABLE_SCHEMA = DATABASE() 
+         AND TABLE_NAME = 'terms_and_conditions' 
+         AND COLUMN_NAME = 'private_voucher_type_ids'`,
+        
+        // Add voucher_type_id column (check if exists first)
+        `SELECT COUNT(*) as count FROM INFORMATION_SCHEMA.COLUMNS 
+         WHERE TABLE_SCHEMA = DATABASE() 
+         AND TABLE_NAME = 'terms_and_conditions' 
+         AND COLUMN_NAME = 'voucher_type_id'`
+    ];
+    
+    let completedQueries = 0;
+    let errors = [];
+    let columnExists = {
+        experience_ids: false,
+        private_voucher_type_ids: false,
+        voucher_type_id: false
+    };
+    
+    // First, check which columns exist
+    migrationQueries.forEach((query, index) => {
+        console.log(`Checking column existence ${index + 1}:`, query);
+        
+        con.query(query, (err, result) => {
+            if (err) {
+                console.error(`Error checking column ${index + 1}:`, err);
+                errors.push({ query: index + 1, error: err.message });
+            } else {
+                console.log(`Column check ${index + 1} completed:`, result);
+                const columnName = index === 0 ? 'experience_ids' : index === 1 ? 'private_voucher_type_ids' : 'voucher_type_id';
+                columnExists[columnName] = result[0].count > 0;
+                console.log(`Column ${columnName} exists:`, columnExists[columnName]);
+            }
+            
+            completedQueries++;
+            
+            if (completedQueries === migrationQueries.length) {
+                // Now add missing columns
+                addMissingColumns();
+            }
+        });
+    });
+    
+    function addMissingColumns() {
+        const addColumnQueries = [];
+        
+        if (!columnExists.experience_ids) {
+            addColumnQueries.push(`ALTER TABLE terms_and_conditions ADD COLUMN experience_ids JSON DEFAULT NULL COMMENT 'Array of experience IDs this applies to'`);
+        }
+        
+        if (!columnExists.private_voucher_type_ids) {
+            addColumnQueries.push(`ALTER TABLE terms_and_conditions ADD COLUMN private_voucher_type_ids JSON DEFAULT NULL COMMENT 'Array of private charter voucher type IDs this applies to'`);
+        }
+        
+        if (!columnExists.voucher_type_id) {
+            addColumnQueries.push(`ALTER TABLE terms_and_conditions ADD COLUMN voucher_type_id INT DEFAULT NULL COMMENT 'Single voucher type ID for backward compatibility'`);
+        }
+        
+        if (addColumnQueries.length === 0) {
+            console.log('All required columns already exist');
+            res.json({
+                success: true,
+                message: 'All required columns already exist in terms_and_conditions table'
+            });
+            return;
+        }
+        
+        let addColumnCompleted = 0;
+        
+        addColumnQueries.forEach((query, index) => {
+            console.log(`Adding column ${index + 1}:`, query);
+            
+            con.query(query, (err, result) => {
+                if (err) {
+                    console.error(`Error adding column ${index + 1}:`, err);
+                    errors.push({ query: `add_column_${index + 1}`, error: err.message });
+                } else {
+                    console.log(`Column added successfully ${index + 1}:`, result);
+                }
+                
+                addColumnCompleted++;
+                
+                if (addColumnCompleted === addColumnQueries.length) {
+                    // Update existing records
+                    updateExistingRecords();
+                }
+            });
+        });
+    }
+    
+    function updateExistingRecords() {
+        const updateQueries = [
+            `UPDATE terms_and_conditions SET experience_ids = '[]' WHERE experience_ids IS NULL`,
+            `UPDATE terms_and_conditions SET private_voucher_type_ids = '[]' WHERE private_voucher_type_ids IS NULL`,
+            `UPDATE terms_and_conditions SET voucher_type_id = JSON_UNQUOTE(JSON_EXTRACT(voucher_type_ids, '$[0]')) WHERE voucher_type_id IS NULL AND voucher_type_ids IS NOT NULL AND voucher_type_ids != '[]'`
+        ];
+        
+        let updateCompleted = 0;
+        
+        updateQueries.forEach((query, index) => {
+            console.log(`Updating records ${index + 1}:`, query);
+            
+            con.query(query, (err, result) => {
+                if (err) {
+                    console.error(`Error updating records ${index + 1}:`, err);
+                    errors.push({ query: `update_${index + 1}`, error: err.message });
+                } else {
+                    console.log(`Records updated successfully ${index + 1}:`, result);
+                }
+                
+                updateCompleted++;
+                
+                if (updateCompleted === updateQueries.length) {
+                    // Final response
+                    if (errors.length > 0) {
+                        console.error('Migration completed with errors:', errors);
+                        res.status(500).json({
+                            success: false,
+                            message: 'Migration completed with errors',
+                            errors: errors
+                        });
+                    } else {
+                        console.log('All migration queries completed successfully');
+                        res.json({
+                            success: true,
+                            message: 'Terms and conditions table migration completed successfully'
+                        });
+                    }
+                }
+            });
+        });
+    }
 });
