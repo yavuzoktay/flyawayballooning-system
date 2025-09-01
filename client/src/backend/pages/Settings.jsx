@@ -145,10 +145,13 @@ const Settings = () => {
     const [termsFormData, setTermsFormData] = useState({
         title: '',
         content: '',
+        experience_ids: [],
         voucher_type_ids: [],
         private_voucher_type_ids: [],
         is_active: true,
-        sort_order: 0
+        sort_order: 0,
+        showVoucherTypes: false,
+        showPrivateVoucherTypes: false
     });
     
     // Collapsible sections state
@@ -1308,10 +1311,13 @@ const Settings = () => {
         setTermsFormData({
             title: '',
             content: '',
+            experience_ids: [],
             voucher_type_ids: [],
             private_voucher_type_ids: [],
             is_active: true,
-            sort_order: 0
+            sort_order: 0,
+            showVoucherTypes: false,
+            showPrivateVoucherTypes: false
         });
         setSelectedTerms(null);
     };
@@ -4575,7 +4581,7 @@ const Settings = () => {
                             </div>
                             
                             <div className="form-group">
-                                <label>Voucher Types *</label>
+                                <label>Experiences *</label>
                                 <div style={{ 
                                     border: '1px solid #d1d5db', 
                                     borderRadius: '8px', 
@@ -4583,75 +4589,164 @@ const Settings = () => {
                                     background: '#f9fafb'
                                 }}>
                                     <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
-                                        Select which voucher type these terms apply to:
+                                        Select which experiences these terms apply to:
                                     </div>
-                                    <select
-                                        value={Array.isArray(termsFormData.voucher_type_ids) && termsFormData.voucher_type_ids.length > 0 ? String(termsFormData.voucher_type_ids[0]) : ''}
-                                        onChange={(e) => {
-                                            const selectedId = e.target.value ? Number(e.target.value) : null;
-                                            setTermsFormData({
-                                                ...termsFormData,
-                                                voucher_type_ids: selectedId ? [selectedId] : []
-                                            });
-                                        }}
-                                        style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #d1d5db', background: '#fff' }}
-                                    >
-                                        <option value="">Select a voucher type</option>
-                                        {voucherTypes.map((voucherType) => (
-                                            <option key={voucherType.id} value={String(voucherType.id)}>
-                                                {voucherType.title}
-                                            </option>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        {experiences.map((experience) => (
+                                            <label key={experience.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={termsFormData.experience_ids && termsFormData.experience_ids.includes(experience.id)}
+                                                                                                            onChange={(e) => {
+                                                            const experienceId = experience.id;
+                                                            const currentExperienceIds = termsFormData.experience_ids || [];
+                                                            let newExperienceIds;
+                                                            
+                                                            if (e.target.checked) {
+                                                                // Add experience
+                                                                newExperienceIds = [...currentExperienceIds, experienceId];
+                                                            } else {
+                                                                // Remove experience
+                                                                newExperienceIds = currentExperienceIds.filter(id => id !== experienceId);
+                                                            }
+                                                            
+                                                            setTermsFormData({
+                                                                ...termsFormData,
+                                                                experience_ids: newExperienceIds
+                                                            });
+                                                            
+                                                            // Auto-show/hide Voucher Types and Private Voucher Types based on experience selection
+                                                            if (experience.title === 'Shared Flight') {
+                                                                if (e.target.checked) {
+                                                                    // Show Voucher Types dropdown
+                                                                    setTermsFormData(prev => ({
+                                                                        ...prev,
+                                                                        showVoucherTypes: true
+                                                                    }));
+                                                                } else {
+                                                                    // Hide Voucher Types dropdown and clear selection
+                                                                    setTermsFormData(prev => ({
+                                                                        ...prev,
+                                                                        showVoucherTypes: false,
+                                                                        voucher_type_ids: []
+                                                                    }));
+                                                                }
+                                                            } else if (experience.title === 'Private Charter') {
+                                                                if (e.target.checked) {
+                                                                    // Show Private Voucher Types dropdown
+                                                                    setTermsFormData(prev => ({
+                                                                        ...prev,
+                                                                        showPrivateVoucherTypes: true
+                                                                    }));
+                                                                } else {
+                                                                    // Hide Private Voucher Types dropdown and clear selection
+                                                                    setTermsFormData(prev => ({
+                                                                        ...prev,
+                                                                        showPrivateVoucherTypes: false,
+                                                                        private_voucher_type_ids: []
+                                                                    }));
+                                                                }
+                                                            }
+                                                        }}
+                                                />
+                                                <span style={{ fontSize: '14px', color: '#374151' }}>
+                                                    {experience.title}
+                                                </span>
+                                            </label>
                                         ))}
-                                    </select>
-                                    {voucherTypes.length === 0 && (
+                                    </div>
+                                    {experiences.length === 0 && (
                                         <div style={{ color: '#9ca3af', fontSize: '14px', fontStyle: 'italic', marginTop: '8px' }}>
-                                            No voucher types available. Please create voucher types first.
+                                            No experiences available. Please create experiences first.
                                         </div>
                                     )}
                                 </div>
                             </div>
                             
-                            <div className="form-group">
-                                <label>Private Voucher Types</label>
-                                <div style={{ 
-                                    border: '1px solid #d1d5db', 
-                                    borderRadius: '8px', 
-                                    padding: '16px',
-                                    background: '#f9fafb'
-                                }}>
-                                    <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
-                                        Select which private charter voucher types these terms apply to:
-                                    </div>
-                                    <select
-                                        value={Array.isArray(termsFormData.private_voucher_type_ids) && termsFormData.private_voucher_type_ids.length > 0 ? String(termsFormData.private_voucher_type_ids[0]) : ''}
-                                        onChange={(e) => {
-                                            const selectedId = e.target.value ? Number(e.target.value) : null;
-                                            console.log('Private Voucher Types dropdown changed:', {
-                                                selectedId,
-                                                currentValue: e.target.value,
-                                                currentState: termsFormData.private_voucher_type_ids
-                                            });
-                                            setTermsFormData({
-                                                ...termsFormData,
-                                                private_voucher_type_ids: selectedId ? [selectedId] : []
-                                            });
-                                        }}
-                                        style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #d1d5db', background: '#fff' }}
-                                    >
-                                        <option value="">Select a private charter voucher type</option>
-                                        {privateCharterVoucherTypes.map((voucherType) => (
-                                            <option key={voucherType.id} value={String(voucherType.id)}>
-                                                {voucherType.title}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {privateCharterVoucherTypes.length === 0 && (
-                                        <div style={{ color: '#9ca3af', fontSize: '14px', fontStyle: 'italic', marginTop: '8px' }}>
-                                            No private charter voucher types available. Please create private charter voucher types first.
+                            {/* Voucher Types - only show when Shared Flight is selected */}
+                            {termsFormData.showVoucherTypes && (
+                                <div className="form-group">
+                                    <label>Voucher Types *</label>
+                                    <div style={{ 
+                                        border: '1px solid #d1d5db', 
+                                        borderRadius: '8px', 
+                                        padding: '16px',
+                                        background: '#f9fafb'
+                                    }}>
+                                        <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
+                                            Select which voucher type these terms apply to:
                                         </div>
-                                    )}
+                                        <select
+                                            value={Array.isArray(termsFormData.voucher_type_ids) && termsFormData.voucher_type_ids.length > 0 ? String(termsFormData.voucher_type_ids[0]) : ''}
+                                            onChange={(e) => {
+                                                const selectedId = e.target.value ? Number(e.target.value) : null;
+                                                setTermsFormData({
+                                                    ...termsFormData,
+                                                    voucher_type_ids: selectedId ? [selectedId] : []
+                                                });
+                                            }}
+                                            style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #d1d5db', background: '#fff' }}
+                                        >
+                                            <option value="">Select a voucher type</option>
+                                            {voucherTypes.map((voucherType) => (
+                                                <option key={voucherType.id} value={String(voucherType.id)}>
+                                                    {voucherType.title}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {voucherTypes.length === 0 && (
+                                            <div style={{ color: '#9ca3af', fontSize: '14px', fontStyle: 'italic', marginTop: '8px' }}>
+                                                No voucher types available. Please create voucher types first.
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
+                            )}
+                            
+                            {/* Private Voucher Types - only show when Private Charter is selected */}
+                            {termsFormData.showPrivateVoucherTypes && (
+                                <div className="form-group">
+                                    <label>Private Voucher Types</label>
+                                    <div style={{ 
+                                        border: '1px solid #d1d5db', 
+                                        borderRadius: '8px', 
+                                        padding: '16px',
+                                        background: '#f9fafb'
+                                    }}>
+                                        <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
+                                            Select which private charter voucher types these terms apply to:
+                                        </div>
+                                        <select
+                                            value={Array.isArray(termsFormData.private_voucher_type_ids) && termsFormData.private_voucher_type_ids.length > 0 ? String(termsFormData.private_voucher_type_ids[0]) : ''}
+                                            onChange={(e) => {
+                                                const selectedId = e.target.value ? Number(e.target.value) : null;
+                                                console.log('Private Voucher Types dropdown changed:', {
+                                                    selectedId,
+                                                    currentValue: e.target.value,
+                                                    currentState: termsFormData.private_voucher_type_ids
+                                                });
+                                                setTermsFormData({
+                                                    ...termsFormData,
+                                                    private_voucher_type_ids: selectedId ? [selectedId] : []
+                                                });
+                                            }}
+                                            style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #d1d5db', background: '#fff' }}
+                                        >
+                                            <option value="">Select a private charter voucher type</option>
+                                            {privateCharterVoucherTypes.map((voucherType) => (
+                                                <option key={voucherType.id} value={String(voucherType.id)}>
+                                                    {voucherType.title}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {privateCharterVoucherTypes.length === 0 && (
+                                            <div style={{ color: '#9ca3af', fontSize: '14px', fontStyle: 'italic', marginTop: '8px' }}>
+                                                No private charter voucher types available. Please create private charter voucher types first.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                             
                             <div className="form-group">
                                 <label>Status</label>
