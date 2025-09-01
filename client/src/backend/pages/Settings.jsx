@@ -1193,6 +1193,9 @@ const Settings = () => {
         console.log('voucher_type_ids type:', typeof termsFormData.voucher_type_ids);
         console.log('voucher_type_ids value:', termsFormData.voucher_type_ids);
         console.log('voucher_type_ids isArray:', Array.isArray(termsFormData.voucher_type_ids));
+        console.log('private_voucher_type_ids type:', typeof termsFormData.private_voucher_type_ids);
+        console.log('private_voucher_type_ids value:', termsFormData.private_voucher_type_ids);
+        console.log('private_voucher_type_ids isArray:', Array.isArray(termsFormData.private_voucher_type_ids));
         
         // Ensure voucher_type_ids is an array and also send voucher_type_id for clarity
             const normalizedIds = Array.isArray(termsFormData.voucher_type_ids)
@@ -1230,6 +1233,10 @@ const Settings = () => {
     };
 
     const handleEditTerms = (terms) => {
+        console.log('handleEditTerms called with:', terms);
+        console.log('terms.private_voucher_type_ids:', terms.private_voucher_type_ids);
+        console.log('terms.private_voucher_type_ids type:', typeof terms.private_voucher_type_ids);
+        
         setSelectedTerms(terms);
         setTermsFormData({
             title: terms.title,
