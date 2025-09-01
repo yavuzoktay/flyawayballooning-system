@@ -1071,7 +1071,29 @@ setBookingDetail(finalVoucherDetail);
                 if (response.data.success || response.data) {
                     setNewNote('');
                     
-                    // Preserve current voucher data and just refresh notes
+                    // Add new note to local state immediately for instant feedback
+                    const newNoteData = {
+                        id: response.data.id || Date.now(), // Use server ID or fallback to timestamp
+                        note: newNote,
+                        date: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+                        created_at: dayjs().format('YYYY-MM-DD HH:mm:ss')
+                    };
+                    
+                    if (window.currentVoucherSource === 'all_booking') {
+                        // For booking-based vouchers, add to notes array
+                        setBookingDetail(prev => ({
+                            ...prev,
+                            notes: [newNoteData, ...(prev.notes || [])]
+                        }));
+                    } else {
+                        // For voucher-based notes, add to voucherNotes array
+                        setBookingDetail(prev => ({
+                            ...prev,
+                            voucherNotes: [newNoteData, ...(prev.voucherNotes || [])]
+                        }));
+                    }
+                    
+                    // Preserve current voucher data and just refresh notes from server
                     try {
                         if (window.currentVoucherSource === 'all_booking') {
                             // For booking-based vouchers, refresh using the same voucher detail API
@@ -1120,8 +1142,22 @@ setBookingDetail(finalVoucherDetail);
                 console.log('Add admin note response:', response.data);
                 
                 if (response.data) {
-            setNewNote('');
-            await fetchPassengers(bookingDetail.booking.id);
+                    setNewNote('');
+                    
+                    // Add new note to local state immediately for instant feedback
+                    const newNoteData = {
+                        id: response.data.id || Date.now(),
+                        notes: newNote,
+                        date: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+                        created_at: dayjs().format('YYYY-MM-DD HH:mm:ss')
+                    };
+                    
+                    setBookingDetail(prev => ({
+                        ...prev,
+                        notes: [newNoteData, ...(prev.notes || [])]
+                    }));
+                    
+                    await fetchPassengers(bookingDetail.booking.id);
                 }
             }
         } catch (err) {
@@ -1430,7 +1466,15 @@ setBookingDetail(finalVoucherDetail);
             await axios.patch('/api/updateVoucherNote', { id, note: editingNoteText });
           }
           
-          // Refresh voucher notes
+          // Update local state immediately for instant feedback
+          setBookingDetail(prev => ({
+            ...prev,
+            voucherNotes: prev.voucherNotes?.map(note => 
+              note.id === id ? { ...note, note: editingNoteText } : note
+            ) || []
+          }));
+          
+          // Refresh voucher notes from server
           const voucherItem = bookingDetail.voucher;
           if (voucherItem?.voucher_ref) {
             const uniqueVoucherId = `voucher_${voucherItem.voucher_ref}`;
@@ -1446,7 +1490,15 @@ setBookingDetail(finalVoucherDetail);
           console.log('📝 Updating admin note via /api/updateAdminNote');
       await axios.patch('/api/updateAdminNote', { id, note: editingNoteText });
           
-          // Refresh admin notes
+          // Update local state immediately for instant feedback
+          setBookingDetail(prev => ({
+            ...prev,
+            notes: prev.notes?.map(note => 
+              note.id === id ? { ...note, notes: editingNoteText } : note
+            ) || []
+          }));
+          
+          // Refresh admin notes from server
           if (activeTab === 'vouchers') {
             const voucherItem = bookingDetail.voucher;
             if (voucherItem.voucher_ref) {
@@ -1499,7 +1551,13 @@ setBookingDetail(finalVoucherDetail);
             await axios.delete('/api/deleteVoucherNote', { data: { id } });
           }
           
-          // Refresh voucher notes
+          // Remove note from local state immediately for instant feedback
+          setBookingDetail(prev => ({
+            ...prev,
+            voucherNotes: prev.voucherNotes?.filter(note => note.id !== id) || []
+          }));
+          
+          // Refresh voucher notes from server
           const voucherItem = bookingDetail.voucher;
           if (voucherItem?.voucher_ref) {
             const uniqueVoucherId = `voucher_${voucherItem.voucher_ref}`;
@@ -1515,7 +1573,13 @@ setBookingDetail(finalVoucherDetail);
           console.log('🗑️ Deleting admin note via /api/deleteAdminNote');
       await axios.delete('/api/deleteAdminNote', { data: { id } });
           
-          // Refresh admin notes
+          // Remove note from local state immediately for instant feedback
+          setBookingDetail(prev => ({
+            ...prev,
+            notes: prev.notes?.filter(note => note.id !== id) || []
+          }));
+          
+          // Refresh admin notes from server
           if (activeTab === 'vouchers') {
             const voucherItem = bookingDetail.voucher;
             if (voucherItem.voucher_ref) {
