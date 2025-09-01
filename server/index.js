@@ -3734,6 +3734,16 @@ app.post('/api/createVoucher', (req, res) => {
     function insertVoucherRecord() {
         console.log('=== INSERTING VOUCHER RECORD ===');
         
+        // Generate a unique voucher_ref for Flight Vouchers
+        let finalVoucherRef = voucher_ref;
+        if (!finalVoucherRef && voucher_type === 'Flight Voucher') {
+            // Generate a unique voucher reference for Flight Vouchers
+            const timestamp = Date.now().toString(36);
+            const random = Math.random().toString(36).substr(2, 5);
+            finalVoucherRef = `FLT${timestamp}${random}`.toUpperCase();
+            console.log('Generated voucher_ref for Flight Voucher:', finalVoucherRef);
+        }
+        
         const insertSql = `INSERT INTO all_vouchers 
             (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, purchaser_name, purchaser_email, purchaser_phone, purchaser_mobile)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
@@ -3751,7 +3761,7 @@ app.post('/api/createVoucher', (req, res) => {
             emptyToNull(redeemed),
             paid,
             emptyToNull(offer_code),
-            emptyToNull(voucher_ref),
+            emptyToNull(finalVoucherRef), // Use generated voucher_ref
             now,
             emptyToNull(finalRecipientName), // Use final recipient values
             emptyToNull(finalRecipientEmail), // Use final recipient values
@@ -3781,16 +3791,147 @@ app.post('/api/createVoucher', (req, res) => {
             console.log('Name:', name);
             console.log('Email:', email);
             
-            // For Flight Voucher, generate voucher code after creation
-            // Check both voucher_type and book_flight to determine if this is a Flight Voucher
+            // For Flight Voucher, create booking record and generate voucher code
             if (voucher_type === 'Flight Voucher' || voucher_type === 'Any Day Flight' || voucher_type === 'Weekday Morning' || voucher_type === 'Flexible Weekday') {
-                console.log('=== GENERATING VOUCHER CODE FOR FLIGHT VOUCHER ===');
-                console.log('Voucher Type:', voucher_type);
-                generateVoucherCodeForFlightVoucher(result.insertId, name, email, paid);
+                console.log('=== CREATING BOOKING RECORD FOR FLIGHT VOUCHER ===');
+                createBookingForFlightVoucher(result.insertId, finalVoucherRef, name, email, phone, weight, paid, actualVoucherType);
             } else {
                 // Send response for non-Flight Voucher types
                 res.status(201).json({ success: true, message: 'Voucher created successfully!', voucherId: result.insertId });
             }
+        });
+    }
+    
+    // Create booking record for Flight Voucher
+    function createBookingForFlightVoucher(voucherId, voucherRef, name, email, phone, weight, paid, voucherType) {
+        console.log('=== CREATING BOOKING RECORD FOR FLIGHT VOUCHER ===');
+        console.log('Voucher ID:', voucherId);
+        console.log('Voucher Ref:', voucherRef);
+        console.log('Name:', name);
+        console.log('Email:', email);
+        console.log('Phone:', phone);
+        console.log('Weight:', weight);
+        console.log('Paid:', paid);
+        console.log('Voucher Type:', voucherType);
+        
+        // Create booking record in all_booking table
+        const bookingSql = `
+            INSERT INTO all_booking (
+                name, flight_type, flight_date, pax, location, status, paid, due,
+                voucher_code, created_at, expires, manual_status_override, additional_notes,
+                preferred_location, preferred_time, preferred_day, flight_attempts,
+                activity_id, time_slot, experience, voucher_type, voucher_discount, original_amount,
+                email, phone, weight
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+        
+        const bookingValues = [
+            name, // name
+            flight_type, // flight_type
+            null, // flight_date (null for vouchers)
+            1, // pax (default 1, will be updated when passengers are added)
+            preferred_location || null, // location
+            'Confirmed', // status
+            paid, // paid
+            0, // due
+            voucherRef, // voucher_code
+            now, // created_at
+            expiresFinal, // expires
+            0, // manual_status_override
+            null, // additional_notes
+            preferred_location || null, // preferred_location
+            preferred_time || null, // preferred_time
+            preferred_day || null, // preferred_day
+            1, // flight_attempts
+            null, // activity_id
+            null, // time_slot
+            flight_type, // experience
+            voucherType, // voucher_type
+            0, // voucher_discount
+            paid, // original_amount
+            email, // email
+            phone, // phone
+            weight // weight
+        ];
+        
+        con.query(bookingSql, bookingValues, (err, bookingResult) => {
+            if (err) {
+                console.error('Error creating booking for Flight Voucher:', err);
+                // Even if booking creation fails, send response with voucher ID
+                res.status(201).json({ 
+                    success: true, 
+                    message: 'Voucher created successfully!', 
+                    voucherId: voucherId,
+                    voucherCode: voucherRef,
+                    warning: 'Booking record creation failed'
+                });
+                return;
+            }
+            
+            console.log('=== BOOKING RECORD CREATED SUCCESSFULLY ===');
+            console.log('Booking ID:', bookingResult.insertId);
+            console.log('Voucher Ref:', voucherRef);
+            
+            // Now create passenger record
+            createPassengerForFlightVoucher(bookingResult.insertId, name, weight, paid);
+        });
+    }
+    
+    // Create passenger record for Flight Voucher
+    function createPassengerForFlightVoucher(bookingId, name, weight, paid) {
+        console.log('=== CREATING PASSENGER RECORD FOR FLIGHT VOUCHER ===');
+        console.log('Booking ID:', bookingId);
+        console.log('Name:', name);
+        console.log('Weight:', weight);
+        console.log('Paid:', paid);
+        
+        // Split name into first and last name
+        const nameParts = name.trim().split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+        
+        const passengerSql = `
+            INSERT INTO passenger (
+                booking_id, first_name, last_name, weight, price, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+        `;
+        
+        const passengerValues = [
+            bookingId, // booking_id
+            firstName, // first_name
+            lastName, // last_name
+            weight || null, // weight
+            paid, // price
+            now // created_at
+        ];
+        
+        con.query(passengerSql, passengerValues, (err, passengerResult) => {
+            if (err) {
+                console.error('Error creating passenger for Flight Voucher:', err);
+                // Even if passenger creation fails, send response with voucher ID
+                res.status(201).json({ 
+                    success: true, 
+                    message: 'Voucher created successfully!', 
+                    voucherId: voucherId,
+                    voucherCode: voucherRef,
+                    warning: 'Passenger record creation failed'
+                });
+                return;
+            }
+            
+            console.log('=== PASSENGER RECORD CREATED SUCCESSFULLY ===');
+            console.log('Passenger ID:', passengerResult.insertId);
+            console.log('Booking ID:', bookingId);
+            
+            // Send success response
+            res.status(201).json({ 
+                success: true, 
+                message: 'Flight Voucher created successfully!', 
+                voucherId: voucherId,
+                voucherCode: voucherRef,
+                bookingId: bookingId,
+                passengerId: passengerResult.insertId
+            });
         });
     }
     
