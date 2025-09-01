@@ -2668,24 +2668,14 @@ const Settings = () => {
                                 </div>
                             </div>
                         ) : (
-                            <div className="crew-table-container" style={{ 
-                                width: '100%', 
-                                overflowX: 'auto',
-                                minHeight: '400px'
-                            }}>
-                                <table className="crew-table" style={{ width: '100%', tableLayout: 'fixed' }}>
-                                    <colgroup>
-                                        <col style={{ width: '40%' }} />
-                                        <col style={{ width: '15%' }} />
-                                        <col style={{ width: '20%' }} />
-                                        <col style={{ width: '25%' }} />
-                                    </colgroup>
+                            <div className="crew-table-container">
+                                <table className="crew-table">
                                     <thead>
                                         <tr>
-                                            <th style={{ textAlign: 'left' }}>NAME</th>
-                                            <th style={{ textAlign: 'left' }}>STATUS</th>
-                                            <th style={{ textAlign: 'left' }}>CREATED</th>
-                                            <th style={{ textAlign: 'left' }}>ACTIONS</th>
+                                            <th>NAME</th>
+                                            <th>STATUS</th>
+                                            <th>CREATED</th>
+                                            <th>ACTIONS</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -2697,14 +2687,7 @@ const Settings = () => {
                                                     </div>
                                                 </td>
                                                 <td>
-                                                    <span style={{
-                                                        padding: '4px 8px',
-                                                        borderRadius: '12px',
-                                                        fontSize: '12px',
-                                                        fontWeight: '500',
-                                                        backgroundColor: crew.is_active ? '#dcfce7' : '#fef2f2',
-                                                        color: crew.is_active ? '#166534' : '#dc2626'
-                                                    }}>
+                                                    <span className={`status-badge ${crew.is_active ? 'active' : 'inactive'}`}>
                                                         {crew.is_active ? 'Active' : 'Inactive'}
                                                     </span>
                                                 </td>
@@ -2714,16 +2697,16 @@ const Settings = () => {
                                                     </span>
                                                 </td>
                                                 <td>
-                                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <div className="action-buttons">
                                                         <button
-                                                            className="btn btn-secondary btn-sm"
+                                                            className="action-btn edit"
                                                             onClick={() => handleEditCrew(crew)}
                                                             title="Edit"
                                                         >
                                                             <Edit size={16} />
                                                         </button>
                                                         <button
-                                                            className="btn btn-danger btn-sm"
+                                                            className="action-btn delete"
                                                             onClick={() => handleDeleteCrew(crew.id)}
                                                             title="Delete"
                                                         >

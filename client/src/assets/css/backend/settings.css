@@ -1061,6 +1061,149 @@
     transform: translateY(-1px);
 }
 
+/* Crew Management Table Styling */
+.crew-table-container {
+    width: 100%;
+    overflow-x: auto;
+    min-height: 400px;
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+.crew-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    background: #ffffff;
+    border-radius: 12px;
+    overflow: hidden;
+    table-layout: fixed;
+}
+
+.crew-table thead {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.crew-table th {
+    padding: 16px 12px;
+    text-align: left;
+    font-weight: 700;
+    color: #374151;
+    border-bottom: 2px solid #e5e7eb;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.crew-table td {
+    padding: 16px 12px;
+    border-bottom: 1px solid #f3f4f6;
+    color: #374151;
+    vertical-align: middle;
+}
+
+.crew-table tr:hover {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.crew-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* Column specific styling for crew table */
+.crew-table th:nth-child(1),
+.crew-table td:nth-child(1) {
+    width: 40%;
+    font-weight: 600;
+}
+
+.crew-table th:nth-child(2),
+.crew-table td:nth-child(2) {
+    width: 15%;
+    text-align: center;
+}
+
+.crew-table th:nth-child(3),
+.crew-table td:nth-child(3) {
+    width: 20%;
+    text-align: center;
+}
+
+.crew-table th:nth-child(4),
+.crew-table td:nth-child(4) {
+    width: 25%;
+    text-align: center;
+}
+
+/* Crew status badge styling */
+.crew-table .status-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.crew-table .status-badge.active {
+    background-color: #dcfce7;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+}
+
+.crew-table .status-badge.inactive {
+    background-color: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+}
+
+/* Crew action buttons styling */
+.crew-table .action-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    align-items: center;
+}
+
+.crew-table .action-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    font-size: 14px;
+}
+
+.crew-table .action-btn.edit {
+    background-color: #f3f4f6;
+    color: #374151;
+}
+
+.crew-table .action-btn.edit:hover {
+    background-color: #e5e7eb;
+    transform: translateY(-1px);
+}
+
+.crew-table .action-btn.delete {
+    background-color: #fef2f2;
+    color: #dc2626;
+}
+
+.crew-table .action-btn.delete:hover {
+    background-color: #fee2e2;
+    transform: translateY(-1px);
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .settings-container {
@@ -1117,6 +1260,17 @@
     
     .private-charter-voucher-types-table {
         min-width: 1000px;
+        margin: 0;
+    }
+    
+    .crew-table-container {
+        overflow-x: auto;
+        margin: 0 -16px;
+        padding: 0 16px;
+    }
+    
+    .crew-table {
+        min-width: 600px;
         margin: 0;
     }
     
