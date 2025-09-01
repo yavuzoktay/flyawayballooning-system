@@ -3468,7 +3468,12 @@ app.post('/api/createVoucher', (req, res) => {
         recipient_gift_date = '',
         preferred_location = '',
         preferred_time = '',
-        preferred_day = ''
+        preferred_day = '',
+        // Purchaser information fields
+        purchaser_name = '',
+        purchaser_email = '',
+        purchaser_phone = '',
+        purchaser_mobile = ''
     } = req.body;
 
     const now = moment().format('YYYY-MM-DD HH:mm:ss');
@@ -3639,8 +3644,8 @@ app.post('/api/createVoucher', (req, res) => {
         console.log('=== INSERTING VOUCHER RECORD ===');
         
         const insertSql = `INSERT INTO all_vouchers 
-            (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+            (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, purchaser_name, purchaser_email, purchaser_phone, purchaser_mobile)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
             
         const values = [
             emptyToNull(name),
@@ -3664,7 +3669,12 @@ app.post('/api/createVoucher', (req, res) => {
             emptyToNull(preferred_location),
             emptyToNull(preferred_time),
             emptyToNull(preferred_day),
-            1 // flight_attempts starts at 1 for each created voucher
+            1, // flight_attempts starts at 1 for each created voucher
+            // Purchaser information values
+            emptyToNull(purchaser_name || name), // Use purchaser_name if provided, otherwise fallback to name
+            emptyToNull(purchaser_email || email), // Use purchaser_email if provided, otherwise fallback to email
+            emptyToNull(purchaser_phone || phone), // Use purchaser_phone if provided, otherwise fallback to phone
+            emptyToNull(purchaser_mobile || mobile) // Use purchaser_mobile if provided, otherwise fallback to mobile
         ];
         
         con.query(insertSql, values, (err, result) => {
@@ -5649,8 +5659,9 @@ app.post("/api/addTestGiftVoucher", (req, res) => {
         name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, 
         expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, 
         recipient_email, recipient_phone, recipient_gift_date, preferred_location, 
-        preferred_time, preferred_day, flight_attempts, status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        preferred_time, preferred_day, flight_attempts, status, purchaser_name, 
+        purchaser_email, purchaser_phone, purchaser_mobile
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     
     const values = [
         'Gift Voucher - Book Flight',                    // name
@@ -5671,11 +5682,16 @@ app.post("/api/addTestGiftVoucher", (req, res) => {
         'recipient@example.com',                       // recipient_email
         '09876543210',                                 // recipient_phone
         '2025-12-25',                                  // recipient_gift_date
-        'Bath',                                        // preferred_location
+        'Bash',                                        // preferred_location
         'Morning',                                     // preferred_time
         'Weekend',                                     // preferred_day
         0,                                             // flight_attempts
-        'Active'                                       // status
+        'Active',                                      // status
+        // Purchaser information (same as main contact for test data)
+        'Gift Voucher - Book Flight',                    // purchaser_name
+        'gift@example.com',                            // purchaser_email
+        '01234567890',                                 // purchaser_phone
+        '01234567890'                                  // purchaser_mobile
     ];
     
     con.query(insertSql, values, (err, result) => {
@@ -8396,6 +8412,45 @@ app.get('/api/additional-information-questions', (req, res) => {
         res.json({ 
             success: true, 
             data: result 
+        });
+    });
+});
+
+// Update existing Gift Voucher records to populate purchaser fields correctly
+app.post('/api/updateGiftVoucherPurchaserInfo', (req, res) => {
+    console.log('=== UPDATING GIFT VOUCHER PURCHASER INFO ===');
+    
+    // Update all Gift Voucher records to set purchaser fields correctly
+    // For Gift Vouchers, purchaser info should come from the main contact fields (name, email, phone, mobile)
+    // Recipient info should remain separate
+    const updateSql = `
+        UPDATE all_vouchers 
+        SET 
+            purchaser_name = name,
+            purchaser_email = email,
+            purchaser_phone = phone,
+            purchaser_mobile = mobile
+        WHERE book_flight = 'Gift Voucher' 
+        AND (purchaser_name IS NULL OR purchaser_name = '' OR purchaser_name = recipient_name)
+    `;
+    
+    con.query(updateSql, (err, result) => {
+        if (err) {
+            console.error('Error updating Gift Voucher purchaser info:', err);
+            return res.status(500).json({ 
+                success: false, 
+                message: 'Database error updating purchaser info',
+                error: err.message 
+            });
+        }
+        
+        console.log('✅ Gift Voucher purchaser info updated successfully');
+        console.log('Records affected:', result.affectedRows);
+        
+        res.json({
+            success: true,
+            message: 'Gift Voucher purchaser info updated successfully',
+            recordsAffected: result.affectedRows
         });
     });
 });
