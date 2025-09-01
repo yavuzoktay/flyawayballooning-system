@@ -2194,30 +2194,37 @@ setBookingDetail(finalVoucherDetail);
                                         {activeTab !== 'vouchers' && (
                                         <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
                                             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Add On's</Typography>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                                    <Typography><b>Fab Cap:</b> {bookingDetail.booking?.choose_add_on && bookingDetail.booking.choose_add_on.includes('Fab Cap') ? 'Yes' : 'No'}</Typography>
-                                                <Button variant="outlined" size="small" onClick={async () => {
-                                                    // Fab Cap ekle
-                                                        let newAddOn = bookingDetail.booking?.choose_add_on || [];
-                                                    if (typeof newAddOn === 'string') {
-                                                        try { newAddOn = JSON.parse(newAddOn); } catch { newAddOn = []; }
-                                                    }
-                                                    if (!Array.isArray(newAddOn)) newAddOn = [];
-                                                    if (!newAddOn.includes('Fab Cap')) newAddOn.push('Fab Cap');
-                                                    await axios.patch('/api/updateBookingField', {
-                                                        booking_id: bookingDetail.booking.id,
-                                                        field: 'choose_add_on',
-                                                        value: JSON.stringify(newAddOn)
-                                                    });
-                                                    setBookingDetail(prev => ({
-                                                        ...prev,
-                                                        booking: {
-                                                            ...prev.booking,
-                                                            choose_add_on: newAddOn
+                                            
+                                            {/* Display actual add-ons from choose_add_on field */}
+                                            {(() => {
+                                                const addOns = bookingDetail.booking?.choose_add_on;
+                                                if (addOns) {
+                                                    let parsedAddOns = [];
+                                                    if (typeof addOns === 'string') {
+                                                        try {
+                                                            parsedAddOns = JSON.parse(addOns);
+                                                        } catch (e) {
+                                                            // If it's not JSON, treat as comma-separated string
+                                                            parsedAddOns = addOns.split(',').map(item => item.trim()).filter(Boolean);
                                                         }
-                                                    }));
-                                                }}>FAB Add On</Button>
-                                            </Box>
+                                                    } else if (Array.isArray(addOns)) {
+                                                        parsedAddOns = addOns;
+                                                    }
+                                                    
+                                                    if (parsedAddOns.length > 0) {
+                                                        return parsedAddOns.map((addOn, index) => {
+                                                            const addOnName = typeof addOn === 'object' ? addOn.name : addOn;
+                                                            return (
+                                                                <Typography key={index} sx={{ mb: 1 }}>
+                                                                    <b>{addOnName}:</b> <span style={{ color: '#10b981', fontWeight: 'bold' }}>Yes</span>
+                                                                </Typography>
+                                                            );
+                                                        });
+                                                    }
+                                                }
+                                                return null;
+                                            })()}
+                                            
                                             <Typography>
     <b>WX Refundable:</b>{' '}
     {(() => {

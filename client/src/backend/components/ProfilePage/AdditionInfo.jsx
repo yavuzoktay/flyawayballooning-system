@@ -22,9 +22,7 @@ const AdditionInfo = ({ detail, bookingNote, setBookingNote }) => {
             </div>
             <div className="additional-bt-wrap">
                 <h2>Add On's</h2>
-                <div className="additional-fields">
-                    <p><b>Fab Cap:</b> {detail.pax}</p>
-                </div>
+
                 <div className="additional-fields">
                     <p><b>WX Refundable:</b> {detail?.passengers?.[0]?.weather_insurance}</p>
                 </div>
