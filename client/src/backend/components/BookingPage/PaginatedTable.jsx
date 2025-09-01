@@ -14,6 +14,7 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
             if (col === 'flight_type') return 'Experience';
             if (col === 'voucher_type') return context === 'vouchers' ? 'Book Flight' : 'Voucher Type';
             if (col === 'actual_voucher_type') return 'Voucher Type';
+            if (col === 'passenger_info') return 'Passengers';
             const label = col.replace(/_/g, ' ');
             return label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
         }
@@ -26,6 +27,7 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
         if (id === 'flight_type') return 'Experience';
         if (id === 'voucher_type') return context === 'vouchers' ? 'Book Flight' : 'Voucher Type';
         if (id === 'actual_voucher_type') return 'Voucher Type';
+        if (id === 'passenger_info') return 'Passengers';
         const label = id.replace(/_/g, ' ');
         return label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
     };
@@ -90,12 +92,14 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                                        id === 'name' ? '180px' : 
                                        id === 'status' ? '120px' : 
                                        id === 'voucher_type' ? '140px' :
+                                       id === 'passenger_info' ? '200px' :
                                        id === 'created_at' || id === 'created' ? '120px' :
                                        'auto', 
                                 minWidth: id === 'email' ? '240px' : 
                                          id === 'name' ? '180px' : 
                                          id === 'status' ? '120px' : 
                                          id === 'voucher_type' ? '140px' :
+                                         id === 'passenger_info' ? '200px' :
                                          id === 'created_at' || id === 'created' ? '120px' :
                                          '80px', 
                                 maxWidth: id === 'email' ? '240px' : undefined 

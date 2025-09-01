@@ -2862,7 +2862,9 @@ app.get('/api/getAllVoucherData', (req, res) => {
                v.purchaser_name, v.purchaser_email, v.purchaser_phone, v.purchaser_mobile,
                b.email as booking_email, b.phone as booking_phone, b.id as booking_id,
                v.voucher_ref as vc_code,
-               (SELECT p.weight FROM passenger p WHERE p.booking_id = b.id LIMIT 1) as passenger_weight
+               (SELECT GROUP_CONCAT(CONCAT(p.first_name, ' ', p.last_name, ' (', p.weight, 'kg)') SEPARATOR ', ') 
+                FROM passenger p WHERE p.booking_id = b.id) as passenger_info,
+               (SELECT COUNT(*) FROM passenger p WHERE p.booking_id = b.id) as passenger_count
         FROM all_vouchers v
         LEFT JOIN all_booking b ON v.voucher_ref = b.voucher_code
         ORDER BY v.created_at DESC
@@ -2904,7 +2906,8 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     booking_email: row.booking_email ?? '',
                     booking_phone: row.booking_phone ?? '',
                     booking_id: row.booking_id ?? '',
-                    passenger_weight: row.passenger_weight ?? '',
+                    passenger_info: row.passenger_info ?? '',
+                    passenger_count: row.passenger_count ?? 0,
                     flight_attempts: row.flight_attempts ?? 0
                 };
             });

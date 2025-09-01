@@ -1680,6 +1680,7 @@ setBookingDetail(finalVoucherDetail);
         { key: 'passenger_name', label: 'Name' },
         { key: 'flight_type', label: 'Experience' },
         { key: 'voucher_type', label: 'Voucher Type' },
+        { key: 'passenger_info', label: 'Passengers' },
         { key: 'status', label: 'Status' },
         { key: 'location', label: 'Location' },
         { key: 'flight_attempts', label: 'Flight attempts' },
