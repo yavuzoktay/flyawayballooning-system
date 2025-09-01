@@ -823,20 +823,88 @@ app.delete('/api/experiences/:id', (req, res) => {
 
 // ==================== VOUCHER TYPES API ENDPOINTS ====================
 
-// Get all voucher types
+// Get all voucher types with updated pricing from activity table
 app.get('/api/voucher-types', (req, res) => {
     console.log('GET /api/voucher-types called');
-    const sql = `SELECT * FROM voucher_types ORDER BY sort_order ASC, created_at DESC`;
-    console.log('SQL Query:', sql);
     
-    con.query(sql, (err, result) => {
+    // Get location from query parameter if provided
+    const { location } = req.query;
+    
+    let sql, params = [];
+    
+    if (location) {
+        // If location is provided, get voucher types with location-specific pricing
+        sql = `
+            SELECT 
+                vt.*,
+                COALESCE(a.weekday_morning_price, vt.price_per_person) as weekday_morning_price,
+                COALESCE(a.flexible_weekday_price, vt.price_per_person) as flexible_weekday_price,
+                COALESCE(a.any_day_flight_price, vt.price_per_person) as any_day_flight_price,
+                a.shared_flight_from_price,
+                a.private_charter_from_price
+            FROM voucher_types vt
+            LEFT JOIN activity a ON a.status = 'Live' AND a.location = ?
+            ORDER BY vt.sort_order ASC, vt.created_at DESC
+        `;
+        params.push(location);
+    } else {
+        // If no location provided, get voucher types with default pricing from first available activity
+        sql = `
+            SELECT 
+                vt.*,
+                COALESCE(a.weekday_morning_price, vt.price_per_person) as weekday_morning_price,
+                COALESCE(a.flexible_weekday_price, vt.price_per_person) as flexible_weekday_price,
+                COALESCE(a.any_day_flight_price, vt.price_per_person) as any_day_flight_price,
+                a.shared_flight_from_price,
+                a.private_charter_from_price
+            FROM voucher_types vt
+            LEFT JOIN (
+                SELECT * FROM activity WHERE status = 'Live' ORDER BY id ASC LIMIT 1
+            ) a ON 1=1
+            ORDER BY vt.sort_order ASC, vt.created_at DESC
+        `;
+    }
+    
+    console.log('SQL Query:', sql);
+    console.log('SQL params:', params);
+    
+    con.query(sql, params, (err, result) => {
         if (err) {
             console.error('Error fetching voucher types:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        console.log('Query result:', result);
-        console.log('Result length:', result ? result.length : 'undefined');
-        res.json({ success: true, data: result });
+        
+        // Process the results to map voucher types to their correct pricing
+        const processedVoucherTypes = result.map(vt => {
+            let updatedPrice = vt.price_per_person;
+            
+            // Map voucher type titles to their corresponding pricing fields
+            if (vt.title === 'Weekday Morning' && vt.weekday_morning_price) {
+                updatedPrice = vt.weekday_morning_price;
+            } else if (vt.title === 'Flexible Weekday' && vt.flexible_weekday_price) {
+                updatedPrice = vt.flexible_weekday_price;
+            } else if (vt.title === 'Any Day Flight' && vt.any_day_flight_price) {
+                updatedPrice = vt.any_day_flight_price;
+            }
+            
+            return {
+                ...vt,
+                price_per_person: updatedPrice,
+                // Add the activity pricing fields for reference
+                activity_pricing: {
+                    weekday_morning_price: vt.weekday_morning_price,
+                    flexible_weekday_price: vt.flexible_weekday_price,
+                    any_day_flight_price: vt.any_day_flight_price,
+                    shared_flight_from_price: vt.shared_flight_from_price,
+                    private_charter_from_price: vt.private_charter_from_price
+                }
+            };
+        });
+        
+        console.log('Processed voucher types with updated pricing:', processedVoucherTypes);
+        console.log('Result length:', processedVoucherTypes ? processedVoucherTypes.length : 'undefined');
+        
+        res.json({ success: true, data: processedVoucherTypes });
     });
 });
 
