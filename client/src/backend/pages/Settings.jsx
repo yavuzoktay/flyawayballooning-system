@@ -3157,11 +3157,25 @@ const Settings = () => {
                                 <div style={{ fontSize: '24px', fontWeight: '600', color: '#3b82f6' }}>
                                     {termsAndConditions.filter(t => {
                                         try {
+                                            let hasVoucherTypes = false;
+                                            
+                                            // Check voucher_type_ids
                                             if (t.voucher_type_ids) {
                                                 const voucherTypeIds = JSON.parse(t.voucher_type_ids);
-                                                return Array.isArray(voucherTypeIds) && voucherTypeIds.length > 0;
+                                                if (Array.isArray(voucherTypeIds) && voucherTypeIds.length > 0) {
+                                                    hasVoucherTypes = true;
+                                                }
                                             }
-                                            return false;
+                                            
+                                            // Check private_voucher_type_ids
+                                            if (t.private_voucher_type_ids) {
+                                                const privateVoucherTypeIds = JSON.parse(t.private_voucher_type_ids);
+                                                if (Array.isArray(privateVoucherTypeIds) && privateVoucherTypeIds.length > 0) {
+                                                    hasVoucherTypes = true;
+                                                }
+                                            }
+                                            
+                                            return hasVoucherTypes;
                                         } catch (error) {
                                             return false;
                                         }
@@ -3244,6 +3258,19 @@ const Settings = () => {
                                                                     // ignore parse error here; we'll show a badge if nothing resolves
                                                                 }
                                                             }
+                                                            
+                                                            // Add private voucher type IDs
+                                                            if (terms.private_voucher_type_ids) {
+                                                                try {
+                                                                    const parsedPrivate = JSON.parse(terms.private_voucher_type_ids);
+                                                                    if (Array.isArray(parsedPrivate)) {
+                                                                        parsedPrivate.forEach((v) => idCandidates.push(Number(v)));
+                                                                    }
+                                                                } catch (e) {
+                                                                    // ignore parse error here; we'll show a badge if nothing resolves
+                                                                }
+                                                            }
+                                                            
                                                             const uniqueIds = Array.from(new Set(idCandidates.filter((v) => !Number.isNaN(v))));
                                                             if (uniqueIds.length === 0) {
                                                                 return <span style={{ color: '#9ca3af', fontSize: '12px' }}>No voucher type</span>;

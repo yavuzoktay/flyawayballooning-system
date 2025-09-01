@@ -2085,10 +2085,10 @@ app.get('/api/terms-and-conditions/voucher-type/:voucherTypeId', (req, res) => {
     const { voucherTypeId } = req.params;
     console.log('GET /api/terms-and-conditions/voucher-type/' + voucherTypeId + ' called');
     
-    const sql = `SELECT * FROM terms_and_conditions WHERE (voucher_type_id = ? OR JSON_CONTAINS(voucher_type_ids, ?)) AND is_active = 1 ORDER BY sort_order ASC`;
+    const sql = `SELECT * FROM terms_and_conditions WHERE (voucher_type_id = ? OR JSON_CONTAINS(voucher_type_ids, ?) OR JSON_CONTAINS(private_voucher_type_ids, ?)) AND is_active = 1 ORDER BY sort_order ASC`;
     console.log('SQL Query:', sql);
     
-    con.query(sql, [parseInt(voucherTypeId), JSON.stringify(parseInt(voucherTypeId))], (err, result) => {
+    con.query(sql, [parseInt(voucherTypeId), JSON.stringify(parseInt(voucherTypeId)), JSON.stringify(parseInt(voucherTypeId))], (err, result) => {
         if (err) {
             console.error('Error fetching terms and conditions for voucher type:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
@@ -2105,6 +2105,7 @@ app.post('/api/terms-and-conditions', (req, res) => {
         content,
         voucher_type_id,
         voucher_type_ids,
+        private_voucher_type_ids,
         is_active,
         sort_order
     } = req.body;
@@ -2114,15 +2115,20 @@ app.post('/api/terms-and-conditions', (req, res) => {
         ? voucher_type_ids.map((v) => Number(v))
         : (voucher_type_id ? [Number(voucher_type_id)] : []);
 
-    // Validation
-    if (!title || !content || normalizedVoucherTypeIds.length === 0) {
-        return res.status(400).json({ success: false, message: 'Missing required fields: title, content, and voucher_type (voucher_type_id or voucher_type_ids)' });
+    // Normalize private voucher type input
+    const normalizedPrivateVoucherTypeIds = Array.isArray(private_voucher_type_ids) && private_voucher_type_ids.length > 0
+        ? private_voucher_type_ids.map((v) => Number(v))
+        : [];
+
+    // Validation - require either voucher types or private voucher types
+    if (!title || !content || (normalizedVoucherTypeIds.length === 0 && normalizedPrivateVoucherTypeIds.length === 0)) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: title, content, and at least one voucher type (voucher_type_id, voucher_type_ids, or private_voucher_type_ids)' });
     }
     
     const sql = `
         INSERT INTO terms_and_conditions (
-            title, content, voucher_type_id, voucher_type_ids, is_active, sort_order
-        ) VALUES (?, ?, ?, ?, ?, ?)
+            title, content, voucher_type_id, voucher_type_ids, private_voucher_type_ids, is_active, sort_order
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
     
     const values = [
@@ -2130,6 +2136,7 @@ app.post('/api/terms-and-conditions', (req, res) => {
         content,
         normalizedVoucherTypeIds[0] || null,
         JSON.stringify(normalizedVoucherTypeIds),
+        JSON.stringify(normalizedPrivateVoucherTypeIds),
         is_active !== undefined ? is_active : true,
         sort_order || 0
     ];
@@ -2156,6 +2163,7 @@ app.put('/api/terms-and-conditions/:id', (req, res) => {
         content,
         voucher_type_id,
         voucher_type_ids,
+        private_voucher_type_ids,
         is_active,
         sort_order
     } = req.body;
@@ -2164,20 +2172,27 @@ app.put('/api/terms-and-conditions/:id', (req, res) => {
     console.log('Request body:', req.body);
     console.log('voucher_type_ids type:', typeof voucher_type_ids);
     console.log('voucher_type_ids value:', voucher_type_ids);
+    console.log('private_voucher_type_ids type:', typeof private_voucher_type_ids);
+    console.log('private_voucher_type_ids value:', private_voucher_type_ids);
     
     // Normalize voucher type input
     const normalizedVoucherTypeIds = Array.isArray(voucher_type_ids) && voucher_type_ids.length > 0
         ? voucher_type_ids.map((v) => Number(v))
         : (voucher_type_id ? [Number(voucher_type_id)] : []);
 
-    // Validation
-    if (!title || !content || normalizedVoucherTypeIds.length === 0) {
-        return res.status(400).json({ success: false, message: 'Missing required fields: title, content, and voucher_type (voucher_type_id or voucher_type_ids)' });
+    // Normalize private voucher type input
+    const normalizedPrivateVoucherTypeIds = Array.isArray(private_voucher_type_ids) && private_voucher_type_ids.length > 0
+        ? private_voucher_type_ids.map((v) => Number(v))
+        : [];
+
+    // Validation - require either voucher types or private voucher types
+    if (!title || !content || (normalizedVoucherTypeIds.length === 0 && normalizedPrivateVoucherTypeIds.length === 0)) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: title, content, and at least one voucher type (voucher_type_id, voucher_type_ids, or private_voucher_type_ids)' });
     }
     
     const sql = `
         UPDATE terms_and_conditions SET 
-            title = ?, content = ?, voucher_type_id = ?, voucher_type_ids = ?, is_active = ?, sort_order = ?
+            title = ?, content = ?, voucher_type_id = ?, voucher_type_ids = ?, private_voucher_type_ids = ?, is_active = ?, sort_order = ?
         WHERE id = ?
     `;
     
@@ -2186,6 +2201,7 @@ app.put('/api/terms-and-conditions/:id', (req, res) => {
         content,
         normalizedVoucherTypeIds[0] || null,
         JSON.stringify(normalizedVoucherTypeIds),
+        JSON.stringify(normalizedPrivateVoucherTypeIds),
         is_active !== undefined ? is_active : true,
         sort_order || 0,
         id
@@ -7387,6 +7403,37 @@ const runDatabaseMigrations = () => {
             });
         } else {
             console.log('✅ terms_and_conditions.voucher_type_id already exists');
+        }
+    });
+
+    // Check if private_voucher_type_ids column exists in terms_and_conditions
+    const checkTcPrivateVoucherTypeIdsCol = "SHOW COLUMNS FROM terms_and_conditions LIKE 'private_voucher_type_ids'";
+    con.query(checkTcPrivateVoucherTypeIdsCol, (err, result) => {
+        if (err) {
+            console.error('Error checking terms_and_conditions.private_voucher_type_ids column:', err);
+            return;
+        }
+        if (result.length === 0) {
+            console.log('Adding private_voucher_type_ids column to terms_and_conditions...');
+            const addPrivateCol = "ALTER TABLE terms_and_conditions ADD COLUMN private_voucher_type_ids JSON COMMENT 'Array of private charter voucher type IDs this applies to (e.g., [1, 2, 3])' AFTER voucher_type_ids";
+            con.query(addPrivateCol, (err) => {
+                if (err) {
+                    console.error('Error adding private_voucher_type_ids column:', err);
+                } else {
+                    console.log('✅ private_voucher_type_ids column added to terms_and_conditions');
+                    // Initialize existing terms with empty private_voucher_type_ids array
+                    const initializePrivateIds = "UPDATE terms_and_conditions SET private_voucher_type_ids = '[]' WHERE private_voucher_type_ids IS NULL";
+                    con.query(initializePrivateIds, (err) => {
+                        if (err) {
+                            console.error('Error initializing private_voucher_type_ids:', err);
+                        } else {
+                            console.log('✅ private_voucher_type_ids initialized for existing terms');
+                        }
+                    });
+                }
+            });
+        } else {
+            console.log('✅ terms_and_conditions.private_voucher_type_ids already exists');
         }
     });
 };
