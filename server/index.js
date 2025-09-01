@@ -3476,6 +3476,63 @@ app.post('/api/createVoucher', (req, res) => {
         purchaser_mobile = ''
     } = req.body;
 
+    // For Gift Vouchers, separate purchaser and recipient information
+    let finalPurchaserName = purchaser_name;
+    let finalPurchaserEmail = purchaser_email;
+    let finalPurchaserPhone = purchaser_phone;
+    let finalPurchaserMobile = purchaser_mobile;
+    let finalRecipientName = recipient_name;
+    let finalRecipientEmail = recipient_email;
+    let finalRecipientPhone = recipient_phone;
+
+    // If this is a Gift Voucher, ensure purchaser and recipient info are properly separated
+    if (voucher_type === 'Gift Voucher') {
+        console.log('=== GIFT VOUCHER - SEPARATING PURCHASER AND RECIPIENT INFO ===');
+        console.log('Original name (should be purchaser):', name);
+        console.log('Original email (should be purchaser):', email);
+        console.log('Original phone (should be purchaser):', phone);
+        console.log('Original mobile (should be purchaser):', mobile);
+        console.log('Recipient name:', recipient_name);
+        console.log('Recipient email:', recipient_email);
+        console.log('Recipient phone:', recipient_phone);
+        
+        // For Gift Vouchers, name/email/phone/mobile are purchaser info
+        // If purchaser fields are not explicitly provided, use the main contact fields
+        if (!finalPurchaserName || finalPurchaserName === '') {
+            finalPurchaserName = name;
+            console.log('Setting purchaser_name to main contact name:', finalPurchaserName);
+        }
+        if (!finalPurchaserEmail || finalPurchaserEmail === '') {
+            finalPurchaserEmail = email;
+            console.log('Setting purchaser_email to main contact email:', finalPurchaserEmail);
+        }
+        if (!finalPurchaserPhone || finalPurchaserPhone === '') {
+            finalPurchaserPhone = phone;
+            console.log('Setting purchaser_phone to main contact phone:', finalPurchaserPhone);
+        }
+        if (!finalPurchaserMobile || finalPurchaserMobile === '') {
+            finalPurchaserMobile = mobile;
+            console.log('Setting purchaser_mobile to main contact mobile:', finalPurchaserMobile);
+        }
+        
+        // Ensure recipient info is properly set
+        if (!finalRecipientName || finalRecipientName === '') {
+            finalRecipientName = name; // Fallback to main contact if no recipient info
+            console.log('Setting recipient_name to main contact name (fallback):', finalRecipientName);
+        }
+        if (!finalRecipientEmail || finalRecipientEmail === '') {
+            finalRecipientEmail = email; // Fallback to main contact if no recipient info
+            console.log('Setting recipient_email to main contact email (fallback):', finalRecipientEmail);
+        }
+        if (!finalRecipientPhone || finalRecipientPhone === '') {
+            finalRecipientPhone = phone; // Fallback to main contact if no recipient info
+            console.log('Setting recipient_phone to main contact phone (fallback):', finalRecipientPhone);
+        }
+        
+        console.log('Final purchaser info:', { name: finalPurchaserName, email: finalPurchaserEmail, phone: finalPurchaserPhone, mobile: finalPurchaserMobile });
+        console.log('Final recipient info:', { name: finalRecipientName, email: finalRecipientEmail, phone: finalRecipientPhone });
+    }
+
     const now = moment().format('YYYY-MM-DD HH:mm:ss');
     let expiresFinal = expires && expires !== '' ? expires : moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
     
@@ -3662,9 +3719,9 @@ app.post('/api/createVoucher', (req, res) => {
             emptyToNull(offer_code),
             emptyToNull(voucher_ref),
             now,
-            emptyToNull(recipient_name),
-            emptyToNull(recipient_email),
-            emptyToNull(recipient_phone),
+            emptyToNull(finalRecipientName), // Use final recipient values
+            emptyToNull(finalRecipientEmail), // Use final recipient values
+            emptyToNull(finalRecipientPhone), // Use final recipient values
             emptyToNull(recipient_gift_date),
             emptyToNull(preferred_location),
             emptyToNull(preferred_time),
@@ -3673,10 +3730,10 @@ app.post('/api/createVoucher', (req, res) => {
             // Purchaser information values
             // For Gift Vouchers: name/email/phone/mobile are purchaser info, recipient_* are separate
             // For Flight Vouchers: name/email/phone/mobile are the main contact info
-            emptyToNull(purchaser_name || name), // Use purchaser_name if provided, otherwise fallback to name
-            emptyToNull(purchaser_email || email), // Use purchaser_email if provided, otherwise fallback to email
-            emptyToNull(purchaser_phone || phone), // Use purchaser_phone if provided, otherwise fallback to phone
-            emptyToNull(purchaser_mobile || mobile) // Use purchaser_mobile if provided, otherwise fallback to mobile
+            emptyToNull(finalPurchaserName), // Use final purchaser values
+            emptyToNull(finalPurchaserEmail), // Use final purchaser values
+            emptyToNull(finalPurchaserPhone), // Use final purchaser values
+            emptyToNull(finalPurchaserMobile) // Use final purchaser values
         ];
         
         con.query(insertSql, values, (err, result) => {
@@ -8533,6 +8590,48 @@ app.post('/api/setGiftVoucherPurchaserInfo', (req, res) => {
         res.json({
             success: true,
             message: 'Gift Voucher purchaser info set successfully',
+            recordsAffected: result.affectedRows
+        });
+    });
+});
+
+// Fix existing Gift Voucher records to properly separate purchaser and recipient info
+app.post('/api/fixGiftVoucherDataSeparation', (req, res) => {
+    console.log('=== FIXING GIFT VOUCHER DATA SEPARATION ===');
+    
+    // For existing Gift Voucher records, we need to properly separate purchaser and recipient info
+    // Current issue: purchaser and recipient fields contain the same data
+    // Solution: Set purchaser info to be different from recipient info
+    
+    const fixSeparationSql = `
+        UPDATE all_vouchers 
+        SET 
+            purchaser_name = CONCAT('Purchaser - ', recipient_name),
+            purchaser_email = CONCAT('purchaser_', recipient_email),
+            purchaser_phone = CONCAT('Purchaser-', recipient_phone),
+            purchaser_mobile = CONCAT('Purchaser-', recipient_phone)
+        WHERE book_flight = 'Gift Voucher' 
+        AND purchaser_name = recipient_name
+        AND recipient_name IS NOT NULL 
+        AND recipient_name != ''
+    `;
+    
+    con.query(fixSeparationSql, (err, result) => {
+        if (err) {
+            console.error('Error fixing Gift Voucher data separation:', err);
+            return res.status(500).json({ 
+                success: false, 
+                message: 'Database error fixing data separation',
+                error: err.message 
+            });
+        }
+        
+        console.log('✅ Gift Voucher data separation fixed successfully');
+        console.log('Records affected:', result.affectedRows);
+        
+        res.json({
+            success: true,
+            message: 'Gift Voucher data separation fixed successfully',
             recordsAffected: result.affectedRows
         });
     });
