@@ -2868,8 +2868,8 @@ app.get('/api/getDateRequestData', (req, res) => {
     // First, get data from all_booking table
     const allBookingSql = 'SELECT id, name, location, flight_date AS date_requested, voucher_code, phone, email, "booking" as source FROM all_booking WHERE name IS NOT NULL AND name != ""';
     
-    // Then, get data from date_requests table
-    const dateRequestsSql = 'SELECT id, name, location, requested_date AS date_requested, "" as voucher_code, phone, email, "date_request" as source FROM date_requests';
+    // Then, get data from date_request table
+    const dateRequestsSql = 'SELECT id, name, location, requested_date AS date_requested, "" as voucher_code, phone, email, "date_request" as source FROM date_request';
     
     // Execute both queries
     con.query(allBookingSql, (err1, allBookingResult) => {
@@ -5162,27 +5162,33 @@ app.get('/api/activity/:id/rebook-availabilities', (req, res) => {
 // Add Date Request (POST)
 app.post('/api/date-request', (req, res) => {
     const { name, phone, email, location, flight_type, requested_date } = req.body;
+    console.log('POST /api/date-request called with:', { name, phone, email, location, flight_type, requested_date });
+    
     if (!name || !email || !location || !flight_type || !requested_date) {
+        console.log('Missing required fields');
         return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
-    const sql = 'INSERT INTO date_requests (name, phone, email, location, flight_type, requested_date) VALUES (?, ?, ?, ?, ?, ?)';
+    
+    const sql = 'INSERT INTO date_request (name, phone, email, location, flight_type, requested_date) VALUES (?, ?, ?, ?, ?, ?)';
     con.query(sql, [name, phone, email, location, flight_type, requested_date], (err, result) => {
         if (err) {
             console.error('Error inserting date request:', err);
             return res.status(500).json({ success: false, message: 'Database error' });
         }
+        console.log('✅ Date request inserted successfully with ID:', result.insertId);
         res.json({ success: true, id: result.insertId });
     });
 });
 
 // List Date Requests (GET)
 app.get('/api/date-requests', (req, res) => {
-    const sql = 'SELECT * FROM date_requests ORDER BY created_at DESC';
+    const sql = 'SELECT * FROM date_request ORDER BY created_at DESC';
     con.query(sql, (err, result) => {
         if (err) {
             console.error('Error fetching date requests:', err);
             return res.status(500).json({ success: false, message: 'Database error' });
         }
+        console.log('GET /api/date-requests returned', result ? result.length : 0, 'records');
         res.json({ success: true, data: result });
     });
 });
@@ -7704,36 +7710,128 @@ function runCrewAssignmentMigrations() {
 }
 runCrewAssignmentMigrations();
 
-// Create date_requests table if it doesn't exist
-const createDateRequestsTable = `
-    CREATE TABLE IF NOT EXISTS date_requests (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(255) NOT NULL COMMENT 'Customer name',
-        phone VARCHAR(50) NOT NULL COMMENT 'Customer phone number',
-        email VARCHAR(255) NOT NULL COMMENT 'Customer email address',
-        location VARCHAR(255) NOT NULL COMMENT 'Requested location (e.g., Bath, Devon, Somerset)',
-        flight_type VARCHAR(100) NOT NULL COMMENT 'Type of flight (e.g., Shared Flight, Private Charter)',
-        requested_date DATE NOT NULL COMMENT 'Requested flight date',
-        status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending' COMMENT 'Request status',
-        notes TEXT COMMENT 'Additional notes or comments',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'When the request was created',
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'When the request was last updated',
+// Update existing date_request table with missing columns
+const updateDateRequestTable = () => {
+    console.log('Checking date_request table structure...');
+    
+    // Check if phone column exists
+    const checkPhoneColumn = "SHOW COLUMNS FROM date_request LIKE 'phone'";
+    con.query(checkPhoneColumn, (err, result) => {
+        if (err) {
+            console.error('Error checking phone column:', err);
+            return;
+        }
         
-        INDEX idx_email (email),
-        INDEX idx_location (location),
-        INDEX idx_requested_date (requested_date),
-        INDEX idx_status (status),
-        INDEX idx_created_at (created_at)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Date requests submitted by customers'
-`;
+        if (result.length === 0) {
+            console.log('Adding phone column to date_request...');
+            const addPhoneColumn = "ALTER TABLE date_request ADD COLUMN phone VARCHAR(50) NOT NULL COMMENT 'Customer phone number' AFTER name";
+            con.query(addPhoneColumn, (err) => {
+                if (err) {
+                    console.error('Error adding phone column:', err);
+                } else {
+                    console.log('✅ Phone column added to date_request');
+                }
+            });
+        } else {
+            console.log('✅ Phone column already exists in date_request');
+        }
+    });
+    
+    // Check if location column exists
+    const checkLocationColumn = "SHOW COLUMNS FROM date_request LIKE 'location'";
+    con.query(checkLocationColumn, (err, result) => {
+        if (err) {
+            console.error('Error checking location column:', err);
+            return;
+        }
+        
+        if (result.length === 0) {
+            console.log('Adding location column to date_request...');
+            const addLocationColumn = "ALTER TABLE date_request ADD COLUMN location VARCHAR(255) NOT NULL COMMENT 'Requested location' AFTER phone";
+            con.query(addLocationColumn, (err) => {
+                if (err) {
+                    console.error('Error adding location column:', err);
+                } else {
+                    console.log('✅ Location column added to date_request');
+                }
+            });
+        } else {
+            console.log('✅ Location column already exists in date_request');
+        }
+    });
+    
+    // Check if flight_type column exists
+    const checkFlightTypeColumn = "SHOW COLUMNS FROM date_request LIKE 'flight_type'";
+    con.query(checkFlightTypeColumn, (err, result) => {
+        if (err) {
+            console.error('Error checking flight_type column:', err);
+            return;
+        }
+        
+        if (result.length === 0) {
+            console.log('Adding flight_type column to date_request...');
+            const addFlightTypeColumn = "ALTER TABLE date_request ADD COLUMN flight_type VARCHAR(100) NOT NULL COMMENT 'Type of flight' AFTER location";
+            con.query(addFlightTypeColumn, (err) => {
+                if (err) {
+                    console.error('Error adding flight_type column:', err);
+                } else {
+                    console.log('✅ Flight type column added to date_request');
+                }
+            });
+        } else {
+            console.log('✅ Flight type column already exists in date_request');
+        }
+    });
+    
+    // Check if notes column exists
+    const checkNotesColumn = "SHOW COLUMNS FROM date_request LIKE 'notes'";
+    con.query(checkNotesColumn, (err, result) => {
+        if (err) {
+            console.error('Error checking notes column:', err);
+            return;
+        }
+        
+        if (result.length === 0) {
+            console.log('Adding notes column to date_request...');
+            const addNotesColumn = "ALTER TABLE date_request ADD COLUMN notes TEXT COMMENT 'Additional notes' AFTER status";
+            con.query(addNotesColumn, (err) => {
+                if (err) {
+                    console.error('Error adding notes column:', err);
+                } else {
+                    console.log('✅ Notes column added to date_request');
+                }
+            });
+        } else {
+            console.log('✅ Notes column already exists in date_request');
+        }
+    });
+    
+    // Check if updated_at column exists
+    const checkUpdatedAtColumn = "SHOW COLUMNS FROM date_request LIKE 'updated_at'";
+    con.query(checkUpdatedAtColumn, (err, result) => {
+        if (err) {
+            console.error('Error checking updated_at column:', err);
+            return;
+        }
+        
+        if (result.length === 0) {
+            console.log('Adding updated_at column to date_request...');
+            const addUpdatedAtColumn = "ALTER TABLE date_request ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Last updated' AFTER created_at";
+            con.query(addUpdatedAtColumn, (err) => {
+                if (err) {
+                    console.error('Error adding updated_at column:', err);
+                } else {
+                    console.log('✅ Updated at column added to date_request');
+                }
+            });
+        } else {
+            console.log('✅ Updated at column already exists in date_request');
+        }
+    });
+};
 
-con.query(createDateRequestsTable, (err) => {
-    if (err) {
-        console.error('Error creating date_requests table:', err);
-    } else {
-        console.log('✅ Date requests table ready');
-    }
-});
+// Run date_request table updates
+updateDateRequestTable();
 
 // Get all crew assignments for a date
 app.get('/api/crew-assignments', (req, res) => {
