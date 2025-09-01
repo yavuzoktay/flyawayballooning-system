@@ -3496,24 +3496,19 @@ app.post('/api/createVoucher', (req, res) => {
         console.log('Recipient email:', recipient_email);
         console.log('Recipient phone:', recipient_phone);
         
-        // For Gift Vouchers, name/email/phone/mobile are purchaser info
-        // If purchaser fields are not explicitly provided, use the main contact fields
-        if (!finalPurchaserName || finalPurchaserName === '') {
-            finalPurchaserName = name;
-            console.log('Setting purchaser_name to main contact name:', finalPurchaserName);
-        }
-        if (!finalPurchaserEmail || finalPurchaserEmail === '') {
-            finalPurchaserEmail = email;
-            console.log('Setting purchaser_email to main contact email:', finalPurchaserEmail);
-        }
-        if (!finalPurchaserPhone || finalPurchaserPhone === '') {
-            finalPurchaserPhone = phone;
-            console.log('Setting purchaser_phone to main contact phone:', finalPurchaserPhone);
-        }
-        if (!finalPurchaserMobile || finalPurchaserMobile === '') {
-            finalPurchaserMobile = mobile;
-            console.log('Setting purchaser_mobile to main contact mobile:', finalPurchaserMobile);
-        }
+        // For Gift Vouchers, name/email/phone/mobile are ALWAYS purchaser info (from Purchaser Details section)
+        // These fields should never be empty for Gift Vouchers
+        finalPurchaserName = name;
+        finalPurchaserEmail = email;
+        finalPurchaserPhone = phone;
+        finalPurchaserMobile = mobile;
+        
+        console.log('Setting purchaser info from main contact fields (Purchaser Details):', {
+            name: finalPurchaserName,
+            email: finalPurchaserEmail,
+            phone: finalPurchaserPhone,
+            mobile: finalPurchaserMobile
+        });
         
         // Set recipient info from recipient fields (Recipient Details section)
         // NO fallback logic - keep purchaser and recipient separate
