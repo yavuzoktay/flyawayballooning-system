@@ -8628,3 +8628,61 @@ app.post('/api/fixGiftVoucherDataSeparation', (req, res) => {
         });
     });
 });
+
+// Update voucher field endpoint
+app.patch('/api/updateVoucherField', (req, res) => {
+    console.log('=== UPDATING VOUCHER FIELD ===');
+    
+    const { voucher_id, field, value } = req.body;
+    
+    if (!voucher_id || !field) {
+        return res.status(400).json({
+            success: false,
+            message: 'Missing required fields: voucher_id and field'
+        });
+    }
+    
+    console.log('Updating voucher:', { voucher_id, field, value });
+    
+    // Validate field names
+    const allowedFields = ['name', 'weight', 'paid', 'email', 'phone', 'mobile', 'expires'];
+    if (!allowedFields.includes(field)) {
+        return res.status(400).json({
+            success: false,
+            message: `Field '${field}' is not allowed to be updated`
+        });
+    }
+    
+    // Update voucher field
+    const updateSql = `UPDATE all_vouchers SET ${field} = ? WHERE id = ?`;
+    
+    con.query(updateSql, [value, voucher_id], (err, result) => {
+        if (err) {
+            console.error('Error updating voucher field:', err);
+            return res.status(500).json({
+                success: false,
+                message: 'Database error updating voucher field',
+                error: err.message
+            });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Voucher not found or no changes made'
+            });
+        }
+        
+        console.log('✅ Voucher field updated successfully');
+        console.log('Voucher ID:', voucher_id, 'Field:', field, 'New Value:', value);
+        
+        res.json({
+            success: true,
+            message: 'Voucher field updated successfully',
+            voucher_id,
+            field,
+            value,
+            affectedRows: result.affectedRows
+        });
+    });
+});

@@ -101,6 +101,11 @@ const BookingPage = () => {
     // Add state for tracking passenger prices in edit mode
     const [editPassengerPrices, setEditPassengerPrices] = useState([]);
 
+    // Add state for voucher passenger editing
+    const [editVoucherPassengerName, setEditVoucherPassengerName] = useState("");
+    const [editVoucherPassengerWeight, setEditVoucherPassengerWeight] = useState("");
+    const [editVoucherPassengerPrice, setEditVoucherPassengerPrice] = useState("");
+
     // Add to component state:
     const [selectedDateRequestIds, setSelectedDateRequestIds] = useState([]);
     
@@ -652,6 +657,86 @@ setBookingDetail(finalVoucherDetail);
     const handleEditCancel = () => {
         setEditField(null);
         setEditValue('');
+        // Reset voucher passenger edit fields
+        setEditVoucherPassengerName('');
+        setEditVoucherPassengerWeight('');
+        setEditVoucherPassengerPrice('');
+    };
+
+    // Handle voucher passenger edit click
+    const handleEditVoucherPassengerClick = (voucher) => {
+        setEditField('voucher_passenger');
+        setEditVoucherPassengerName(voucher.name || '');
+        setEditVoucherPassengerWeight(voucher.weight || '');
+        setEditVoucherPassengerPrice(voucher.paid || '');
+    };
+
+    // Handle voucher passenger save
+    const handleEditVoucherPassengerSave = async () => {
+        if (!editField || editField !== 'voucher_passenger') return;
+        setSavingEdit(true);
+        
+        try {
+            const voucher = bookingDetail?.voucher;
+            if (!voucher) {
+                alert('Voucher information not found');
+                setSavingEdit(false);
+                return;
+            }
+
+            // Update voucher fields
+            const updates = [];
+            
+            if (editVoucherPassengerName !== voucher.name) {
+                updates.push({ field: 'name', value: editVoucherPassengerName });
+            }
+            if (editVoucherPassengerWeight !== voucher.weight) {
+                updates.push({ field: 'weight', value: editVoucherPassengerWeight });
+            }
+            if (editVoucherPassengerPrice !== voucher.paid) {
+                updates.push({ field: 'paid', value: editVoucherPassengerPrice });
+            }
+
+            if (updates.length === 0) {
+                alert('No changes to save');
+                setSavingEdit(false);
+                return;
+            }
+
+            // Update each field
+            for (const update of updates) {
+                await axios.patch('/api/updateVoucherField', {
+                    voucher_id: voucher.id,
+                    field: update.field,
+                    value: update.value
+                });
+            }
+
+            // Update local state
+            setBookingDetail(prev => ({
+                ...prev,
+                voucher: {
+                    ...prev.voucher,
+                    name: editVoucherPassengerName,
+                    weight: editVoucherPassengerWeight,
+                    paid: editVoucherPassengerPrice
+                }
+            }));
+
+            // Reset edit state
+            setEditField(null);
+            setEditVoucherPassengerName('');
+            setEditVoucherPassengerWeight('');
+            setEditVoucherPassengerPrice('');
+
+            alert('Passenger details updated successfully!');
+            
+        } catch (error) {
+            console.error('Error updating voucher passenger details:', error);
+            alert('Failed to update passenger details');
+        } finally {
+            setSavingEdit(false);
+        }
     };
 
     const handleEditSave = async () => {
@@ -2340,7 +2425,7 @@ setBookingDetail(finalVoucherDetail);
                                                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Passenger Details</Typography>
                                                 {activeTab === 'vouchers' ? (
                                                     <>
-                                                        {/* Passenger info for vouchers - show name and weight in Booking Details format */}
+                                                        {/* Passenger info for vouchers - show name, weight and price in Booking Details format */}
                                                         {(() => {
                                                             const v = bookingDetail.voucher || {};
                                                             if (v.book_flight !== "Gift Voucher") {
@@ -2348,22 +2433,51 @@ setBookingDetail(finalVoucherDetail);
                                                                     <Box>
                                                                         <Typography sx={{ mb: 2 }}>
                                                                             Passenger 1: {v.name || '-'} ({v.weight || '-'}kg £{v.paid || '-'})
-                                                                            <IconButton size="small" onClick={() => handleEditClick('weight', v.weight)}><EditIcon fontSize="small" /></IconButton>
+                                                                            <IconButton size="small" onClick={() => handleEditVoucherPassengerClick(v)}><EditIcon fontSize="small" /></IconButton>
                                                                         </Typography>
                                                                         
-                                                                        {/* Weight edit field */}
-                                                                        {editField === 'weight' && (
-                                                                            <Typography sx={{ mb: 2 }}>
-                                                                                <b>Weight:</b> 
-                                                                                <input 
-                                                                                    value={editValue} 
-                                                                                    onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} 
-                                                                                    style={{marginRight: 8}} 
-                                                                                    placeholder="Weight in kg"
-                                                                                />
-                                                                                <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
-                                                                                <Button size="small" onClick={handleEditCancel}>Cancel</Button>
-                                                                            </Typography>
+                                                                        {/* Voucher passenger edit fields - name, weight, price */}
+                                                                        {editField === 'voucher_passenger' && (
+                                                                            <Box sx={{ mb: 2, p: 2, background: '#f7f7f7', borderRadius: 2 }}>
+                                                                                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>Edit Passenger Details:</Typography>
+                                                                                <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+                                                                                    <input
+                                                                                        value={editVoucherPassengerName || ''}
+                                                                                        onChange={e => setEditVoucherPassengerName(e.target.value)}
+                                                                                        placeholder="Passenger Name"
+                                                                                        style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px', minWidth: '150px' }}
+                                                                                    />
+                                                                                    <input
+                                                                                        value={editVoucherPassengerWeight || ''}
+                                                                                        onChange={e => setEditVoucherPassengerWeight(e.target.value.replace(/[^0-9.]/g, ''))}
+                                                                                        placeholder="Weight (kg)"
+                                                                                        style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px', minWidth: '80px' }}
+                                                                                    />
+                                                                                    <input
+                                                                                        value={editVoucherPassengerPrice || ''}
+                                                                                        onChange={e => setEditVoucherPassengerPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+                                                                                        placeholder="Price (£)"
+                                                                                        style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px', minWidth: '80px' }}
+                                                                                    />
+                                                                                </Box>
+                                                                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                                                                    <Button 
+                                                                                        size="small" 
+                                                                                        variant="contained" 
+                                                                                        onClick={handleEditVoucherPassengerSave} 
+                                                                                        disabled={savingEdit}
+                                                                                    >
+                                                                                        Save
+                                                                                    </Button>
+                                                                                    <Button 
+                                                                                        size="small" 
+                                                                                        variant="outlined" 
+                                                                                        onClick={handleEditCancel}
+                                                                                    >
+                                                                                        Cancel
+                                                                                    </Button>
+                                                                                </Box>
+                                                                            </Box>
                                                                         )}
                                                                     </Box>
                                                                 );
