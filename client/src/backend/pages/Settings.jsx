@@ -2493,11 +2493,7 @@ const Settings = () => {
                                 </div>
                             </div>
                         ) : (
-                            <div className="private-charter-voucher-types-table-container" style={{ 
-                                width: '100%', 
-                                overflowX: 'auto',
-                                minHeight: '400px'
-                            }}>
+                            <div className="private-charter-voucher-types-table-container">
                                 <table className="private-charter-voucher-types-table">
                                     <thead>
                                         <tr>
@@ -2564,14 +2560,14 @@ const Settings = () => {
                                                 <td>
                                                     <div className="action-buttons">
                                                         <button
-                                                            className="btn btn-icon"
+                                                            className="action-btn edit"
                                                             onClick={() => handleEditPrivateCharterVoucherType(privateCharterVoucherType)}
                                                             title="Edit"
                                                         >
                                                             <Edit size={16} />
                                                         </button>
                                                         <button
-                                                            className="btn btn-icon btn-danger"
+                                                            className="action-btn delete"
                                                             onClick={() => handleDeletePrivateCharterVoucherType(privateCharterVoucherType.id)}
                                                             title="Delete"
                                                         >
