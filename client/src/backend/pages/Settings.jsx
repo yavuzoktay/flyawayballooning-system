@@ -146,6 +146,7 @@ const Settings = () => {
         title: '',
         content: '',
         voucher_type_ids: [],
+        private_voucher_type_ids: [],
         is_active: true,
         sort_order: 0
     });
@@ -1251,6 +1252,21 @@ const Settings = () => {
                     return [];
                 }
             })(),
+            private_voucher_type_ids: (() => {
+                try {
+                    if (terms.private_voucher_type_ids) {
+                        const parsed = JSON.parse(terms.private_voucher_type_ids);
+                        if (Array.isArray(parsed)) {
+                            return parsed.map(id => Number(id));
+                        }
+                        return [];
+                    }
+                    return [];
+                } catch (error) {
+                    console.error('Error parsing private_voucher_type_ids:', error);
+                    return [];
+                }
+            })(),
             is_active: terms.is_active,
             sort_order: terms.sort_order || 0
         });
@@ -1274,6 +1290,7 @@ const Settings = () => {
             title: '',
             content: '',
             voucher_type_ids: [],
+            private_voucher_type_ids: [],
             is_active: true,
             sort_order: 0
         });
@@ -4534,6 +4551,43 @@ const Settings = () => {
                                     {voucherTypes.length === 0 && (
                                         <div style={{ color: '#9ca3af', fontSize: '14px', fontStyle: 'italic', marginTop: '8px' }}>
                                             No voucher types available. Please create voucher types first.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Private Voucher Types</label>
+                                <div style={{ 
+                                    border: '1px solid #d1d5db', 
+                                    borderRadius: '8px', 
+                                    padding: '16px',
+                                    background: '#f9fafb'
+                                }}>
+                                    <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
+                                        Select which private charter voucher types these terms apply to:
+                                    </div>
+                                    <select
+                                        value={Array.isArray(termsFormData.private_voucher_type_ids) && termsFormData.private_voucher_type_ids.length > 0 ? String(termsFormData.private_voucher_type_ids[0]) : ''}
+                                        onChange={(e) => {
+                                            const selectedId = e.target.value ? Number(e.target.value) : null;
+                                            setTermsFormData({
+                                                ...termsFormData,
+                                                private_voucher_type_ids: selectedId ? [selectedId] : []
+                                            });
+                                        }}
+                                        style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #d1d5db', background: '#fff' }}
+                                    >
+                                        <option value="">Select a private charter voucher type</option>
+                                        {privateCharterVoucherTypes.map((voucherType) => (
+                                            <option key={voucherType.id} value={String(voucherType.id)}>
+                                                {voucherType.title}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {privateCharterVoucherTypes.length === 0 && (
+                                        <div style={{ color: '#9ca3af', fontSize: '14px', fontStyle: 'italic', marginTop: '8px' }}>
+                                            No private charter voucher types available. Please create private charter voucher types first.
                                         </div>
                                     )}
                                 </div>
