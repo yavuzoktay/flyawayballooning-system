@@ -24,7 +24,7 @@ const BookingPage = () => {
     // Filters
     const [filters, setFilters] = useState({
         search: "",
-        flightType: "",
+        experience: "",
         status: "",
         location: "",
         voucherType: "",
@@ -1577,15 +1577,15 @@ setBookingDetail(finalVoucherDetail);
                                                 <InputLabel id="book-flight-type-label">Experience</InputLabel>
                                                 <Select
                                                     labelId="book-flight-type-label"
-                                                    value={filters.flightType}
+                                                    value={filters.experience}
                                                     label="Experience"
-                                                    onChange={(e) => handleFilterChange("flightType", e.target.value)}
+                                                    onChange={(e) => handleFilterChange("experience", e.target.value)}
                                                 >
                                                     <MenuItem value="">
                                                         <em>Select</em>
                                                     </MenuItem>
-                                                    <MenuItem value="Private Flight">Private</MenuItem>
-                                                    <MenuItem value="Shared Flight">Shared</MenuItem>
+                                                    <MenuItem value="Private">Private</MenuItem>
+                                                    <MenuItem value="Shared">Shared</MenuItem>
                                                 </Select>
                                             </FormControl>
                                         </div>
@@ -1670,8 +1670,11 @@ setBookingDetail(finalVoucherDetail);
                                 {/* Apply client-side filtering for bookings */}
                                 <PaginatedTable
                                     data={filteredData.filter(item => {
-                                        // Flight Type filter
-                                        if (filters.flightType && item.flight_type !== filters.flightType) return false;
+                                        // Experience filter
+                                        if (filters.experience && filters.experience !== 'Select') {
+                                            if (filters.experience === 'Private' && !item.flight_type?.toLowerCase().includes('private')) return false;
+                                            if (filters.experience === 'Shared' && !item.flight_type?.toLowerCase().includes('shared')) return false;
+                                        }
                                         // Status filter
                                         if (filters.status && item.status !== filters.status) return false;
                                         // Location filter
@@ -1767,15 +1770,15 @@ setBookingDetail(finalVoucherDetail);
                                                 <InputLabel id="book-flight-type-label">Experience</InputLabel>
                                                 <Select
                                                     labelId="book-flight-type-label"
-                                                    value={filters.flightType}
+                                                    value={filters.experience}
                                                     label="Experience"
-                                                    onChange={(e) => handleFilterChange("flightType", e.target.value)}
+                                                    onChange={(e) => handleFilterChange("experience", e.target.value)}
                                                 >
                                                     <MenuItem value="">
                                                         <em>Select</em>
                                                     </MenuItem>
-                                                    <MenuItem value="Private Flight">Private</MenuItem>
-                                                    <MenuItem value="Shared Flight">Shared</MenuItem>
+                                                    <MenuItem value="Private">Private</MenuItem>
+                                                    <MenuItem value="Shared">Shared</MenuItem>
                                                 </Select>
                                             </FormControl>
                                         </div>
@@ -1842,8 +1845,11 @@ setBookingDetail(finalVoucherDetail);
                                         if (filters.voucherType && item.voucher_type !== filters.voucherType) return false;
                                         // Actual Voucher Type filter
                                         if (filters.actualVoucherType && item.actual_voucher_type !== filters.actualVoucherType) return false;
-                                        // Flight Type filter
-                                        if (filters.flightType && item.flight_type !== filters.flightType) return false;
+                                        // Experience filter
+                                        if (filters.experience && filters.experience !== 'Select') {
+                                            if (filters.experience === 'Private' && !item.flight_type?.toLowerCase().includes('private')) return false;
+                                            if (filters.experience === 'Shared' && !item.flight_type?.toLowerCase().includes('shared')) return false;
+                                        }
                                         // Redeemed Status filter
                                         if (filters.redeemedStatus && item.redeemed !== filters.redeemedStatus) return false;
                                         // Search filter (case-insensitive, partial match)
