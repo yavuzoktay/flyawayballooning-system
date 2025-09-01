@@ -2245,8 +2245,7 @@ setBookingDetail(finalVoucherDetail);
         );
     })()}
 </Typography>
-                                                <Typography><b>Marketing:</b> {bookingDetail.booking?.hear_about_us || 'N/A'}</Typography>
-                                                <Typography><b>Reason for Ballooning:</b> {bookingDetail.booking?.ballooning_reason || 'N/A'}</Typography>
+
                                         </Box>
                                         )}
 

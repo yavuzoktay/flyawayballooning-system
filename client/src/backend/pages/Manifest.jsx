@@ -2276,8 +2276,7 @@ const Manifest = () => {
                                                 </span>
                                             ) : 'No'}
                                         </Typography>
-                                        <Typography><b>Marketing:</b> {bookingDetail.booking.hear_about_us || 'N/A'}</Typography>
-                                        <Typography><b>Reason for Ballooning:</b> {bookingDetail.booking.ballooning_reason || 'N/A'}</Typography>
+
                                     </Box>
                                     {/* Preferences Section - always visible */}
                                     <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
