@@ -2861,20 +2861,47 @@ app.get('/api/getAllVoucher', (req, res) => {
     });
 });
 
-// Get Date Requested Data (from all_booking)
+// Get Date Requested Data (from both all_booking and date_requests tables)
 app.get('/api/getDateRequestData', (req, res) => {
-    const sql = 'SELECT id, name, location, flight_date AS date_requested, voucher_code, phone, email FROM all_booking';
-    con.query(sql, (err, result) => {
-        if (err) {
-            console.error("Error occurred:", err);
-            res.status(500).send({ success: false, error: "Database query failed" });
-            return;
+    console.log('GET /api/getDateRequestData called');
+    
+    // First, get data from all_booking table
+    const allBookingSql = 'SELECT id, name, location, flight_date AS date_requested, voucher_code, phone, email, "booking" as source FROM all_booking WHERE name IS NOT NULL AND name != ""';
+    
+    // Then, get data from date_requests table
+    const dateRequestsSql = 'SELECT id, name, location, requested_date AS date_requested, "" as voucher_code, phone, email, "date_request" as source FROM date_requests';
+    
+    // Execute both queries
+    con.query(allBookingSql, (err1, allBookingResult) => {
+        if (err1) {
+            console.error("Error fetching from all_booking:", err1);
+            allBookingResult = [];
         }
-        if (result && result.length > 0) {
-            res.send({ success: true, data: result });
-        } else {
-            res.send({ success: false, message: "No bookings found" });
-        }
+        
+        con.query(dateRequestsSql, (err2, dateRequestsResult) => {
+            if (err2) {
+                console.error("Error fetching from date_requests:", err2);
+                dateRequestsResult = [];
+            }
+            
+            // Combine results
+            const combinedResult = [
+                ...(allBookingResult || []),
+                ...(dateRequestsResult || [])
+            ];
+            
+            console.log('Combined result:', {
+                all_booking_count: allBookingResult ? allBookingResult.length : 0,
+                date_requests_count: dateRequestsResult ? dateRequestsResult.length : 0,
+                total_count: combinedResult.length
+            });
+            
+            if (combinedResult && combinedResult.length > 0) {
+                res.send({ success: true, data: combinedResult });
+            } else {
+                res.send({ success: false, message: "No data found" });
+            }
+        });
     });
 });
 
@@ -7676,6 +7703,37 @@ function runCrewAssignmentMigrations() {
     });
 }
 runCrewAssignmentMigrations();
+
+// Create date_requests table if it doesn't exist
+const createDateRequestsTable = `
+    CREATE TABLE IF NOT EXISTS date_requests (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL COMMENT 'Customer name',
+        phone VARCHAR(50) NOT NULL COMMENT 'Customer phone number',
+        email VARCHAR(255) NOT NULL COMMENT 'Customer email address',
+        location VARCHAR(255) NOT NULL COMMENT 'Requested location (e.g., Bath, Devon, Somerset)',
+        flight_type VARCHAR(100) NOT NULL COMMENT 'Type of flight (e.g., Shared Flight, Private Charter)',
+        requested_date DATE NOT NULL COMMENT 'Requested flight date',
+        status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending' COMMENT 'Request status',
+        notes TEXT COMMENT 'Additional notes or comments',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'When the request was created',
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'When the request was last updated',
+        
+        INDEX idx_email (email),
+        INDEX idx_location (location),
+        INDEX idx_requested_date (requested_date),
+        INDEX idx_status (status),
+        INDEX idx_created_at (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Date requests submitted by customers'
+`;
+
+con.query(createDateRequestsTable, (err) => {
+    if (err) {
+        console.error('Error creating date_requests table:', err);
+    } else {
+        console.log('✅ Date requests table ready');
+    }
+});
 
 // Get all crew assignments for a date
 app.get('/api/crew-assignments', (req, res) => {
