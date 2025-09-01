@@ -440,6 +440,39 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
                     finalVoucherDetail.voucherNotes = [];
                 }
 
+                // Load passenger data for Flight Vouchers
+                try {
+                    console.log('🔄 Loading passenger data for Flight Voucher...');
+                    if (voucherItem.voucher_ref) {
+                        // Try to find the booking associated with this voucher
+                        const bookingResponse = await axios.get(`/api/findBookingByVoucherRef?voucher_ref=${voucherItem.voucher_ref}`);
+                        if (bookingResponse.data.success && bookingResponse.data.booking) {
+                            const bookingId = bookingResponse.data.booking.id;
+                            console.log('📥 Found booking ID:', bookingId, 'for voucher_ref:', voucherItem.voucher_ref);
+                            
+                            // Fetch passenger data for this booking
+                            const passengerResponse = await axios.get(`/api/getBookingDetail?booking_id=${bookingId}`);
+                            if (passengerResponse.data && passengerResponse.data.passengers) {
+                                console.log('✅ Loaded', passengerResponse.data.passengers.length, 'passengers for Flight Voucher');
+                                finalVoucherDetail.passengers = passengerResponse.data.passengers;
+                                finalVoucherDetail.booking = passengerResponse.data.booking;
+                            } else {
+                                console.log('⚠️ No passengers found for booking ID:', bookingId);
+                                finalVoucherDetail.passengers = [];
+                            }
+                        } else {
+                            console.log('⚠️ No booking found for voucher_ref:', voucherItem.voucher_ref);
+                            finalVoucherDetail.passengers = [];
+                        }
+                    } else {
+                        console.log('⚠️ No voucher_ref found, skipping passenger load');
+                        finalVoucherDetail.passengers = [];
+                    }
+                } catch (passengerError) {
+                    console.error('Error loading passenger data:', passengerError);
+                    finalVoucherDetail.passengers = [];
+                }
+
 setBookingDetail(finalVoucherDetail);
                 setDetailDialogOpen(true);
             } catch (err) {
