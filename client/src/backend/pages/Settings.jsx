@@ -3276,14 +3276,23 @@ const Settings = () => {
                                                                 return <span style={{ color: '#9ca3af', fontSize: '12px' }}>No voucher type</span>;
                                                             }
                                                             return uniqueIds.map((voucherTypeId) => {
-                                                                const voucherType = voucherTypes.find((vt) => Number(vt.id) === Number(voucherTypeId));
+                                                                // First try to find in normal voucher types
+                                                                let voucherType = voucherTypes.find((vt) => Number(vt.id) === Number(voucherTypeId));
+                                                                let isPrivateCharter = false;
+                                                                
+                                                                // If not found in normal voucher types, check private charter voucher types
+                                                                if (!voucherType) {
+                                                                    voucherType = privateCharterVoucherTypes.find((vt) => Number(vt.id) === Number(voucherTypeId));
+                                                                    isPrivateCharter = true;
+                                                                }
+                                                                
                                                                 return (
                                                                     <span key={voucherTypeId} style={{
                                                                         padding: '2px 8px',
                                                                         borderRadius: '12px',
                                                                         fontSize: '11px',
-                                                                        backgroundColor: '#dbeafe',
-                                                                        color: '#1e40af'
+                                                                        backgroundColor: isPrivateCharter ? '#fef3c7' : '#dbeafe',
+                                                                        color: isPrivateCharter ? '#92400e' : '#1e40af'
                                                                     }}>
                                                                         {voucherType ? voucherType.title : `#${voucherTypeId}`}
                                                                     </span>

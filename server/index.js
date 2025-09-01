@@ -2076,6 +2076,19 @@ app.get('/api/terms-and-conditions', (req, res) => {
         }
         console.log('Query result:', result);
         console.log('Result length:', result ? result.length : 'undefined');
+        
+        // Debug: Check if private_voucher_type_ids is present in results
+        if (result && result.length > 0) {
+            result.forEach((item, index) => {
+                console.log(`Item ${index + 1} - private_voucher_type_ids:`, {
+                    id: item.id,
+                    title: item.title,
+                    private_voucher_type_ids: item.private_voucher_type_ids,
+                    private_voucher_type_ids_type: typeof item.private_voucher_type_ids
+                });
+            });
+        }
+        
         res.json({ success: true, data: result });
     });
 });
@@ -2174,6 +2187,8 @@ app.put('/api/terms-and-conditions/:id', (req, res) => {
     console.log('voucher_type_ids value:', voucher_type_ids);
     console.log('private_voucher_type_ids type:', typeof private_voucher_type_ids);
     console.log('private_voucher_type_ids value:', private_voucher_type_ids);
+    console.log('private_voucher_type_ids length:', private_voucher_type_ids ? private_voucher_type_ids.length : 'undefined');
+    console.log('private_voucher_type_ids isArray:', Array.isArray(private_voucher_type_ids));
     
     // Normalize voucher type input
     const normalizedVoucherTypeIds = Array.isArray(voucher_type_ids) && voucher_type_ids.length > 0
