@@ -2340,30 +2340,32 @@ setBookingDetail(finalVoucherDetail);
                                                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Passenger Details</Typography>
                                                 {activeTab === 'vouchers' ? (
                                                     <>
-                                                        {/* Weight field for vouchers */}
+                                                        {/* Passenger info for vouchers - show name and weight in Booking Details format */}
                                                         {(() => {
                                                             const v = bookingDetail.voucher || {};
-                                                            if (v.book_flight !== "Gift Voucher" && v.weight) {
+                                                            if (v.book_flight !== "Gift Voucher") {
                                                                 return (
-                                                                    <Typography sx={{ mb: 2 }}>
-                                                                        <b>Weight:</b> {editField === 'weight' ? (
-                                                                            <>
+                                                                    <Box>
+                                                                        <Typography sx={{ mb: 2 }}>
+                                                                            Passenger 1: {v.name || '-'} ({v.weight || '-'}kg £{v.paid || '-'})
+                                                                            <IconButton size="small" onClick={() => handleEditClick('weight', v.weight)}><EditIcon fontSize="small" /></IconButton>
+                                                                        </Typography>
+                                                                        
+                                                                        {/* Weight edit field */}
+                                                                        {editField === 'weight' && (
+                                                                            <Typography sx={{ mb: 2 }}>
+                                                                                <b>Weight:</b> 
                                                                                 <input 
                                                                                     value={editValue} 
                                                                                     onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} 
                                                                                     style={{marginRight: 8}} 
-                                                                                placeholder="Weight in kg"
+                                                                                    placeholder="Weight in kg"
                                                                                 />
                                                                                 <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
                                                                                 <Button size="small" onClick={handleEditCancel}>Cancel</Button>
-                                                                            </>
-                                                                        ) : (
-                                                                            <>
-                                                                                {v.weight || '-'}kg
-                                                                                <IconButton size="small" onClick={() => handleEditClick('weight', v.weight)}><EditIcon fontSize="small" /></IconButton>
-                                                                            </>
+                                                                            </Typography>
                                                                         )}
-                                                                    </Typography>
+                                                                    </Box>
                                                                 );
                                                             }
                                                             return null;
