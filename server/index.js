@@ -2843,6 +2843,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
     // Get all vouchers with booking info - voucher codes are stored in all_vouchers.voucher_ref
     const voucher = `
         SELECT v.*, v.experience_type, v.book_flight, v.voucher_type as actual_voucher_type,
+               v.purchaser_name, v.purchaser_email, v.purchaser_phone, v.purchaser_mobile,
                b.email as booking_email, b.phone as booking_phone, b.id as booking_id,
                v.voucher_ref as vc_code,
                (SELECT p.weight FROM passenger p WHERE p.booking_id = b.id LIMIT 1) as passenger_weight
@@ -2873,6 +2874,11 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     actual_voucher_type: row.actual_voucher_type ?? '', // New field for actual voucher type
                     email: row.email ?? '',
                     phone: row.phone ?? '',
+                    // Purchaser information fields
+                    purchaser_name: row.purchaser_name ?? row.name ?? '',
+                    purchaser_email: row.purchaser_email ?? row.email ?? '',
+                    purchaser_phone: row.purchaser_phone ?? row.phone ?? '',
+                    purchaser_mobile: row.purchaser_mobile ?? row.mobile ?? '',
                     expires: expiresVal ? moment(expiresVal).format('DD/MM/YYYY') : '',
                     redeemed: row.redeemed ?? '',
                     paid: row.paid ?? '',
@@ -7536,6 +7542,81 @@ const runDatabaseMigrations = () => {
             });
         } else {
             console.log('✅ terms_and_conditions.private_voucher_type_ids already exists');
+        }
+    });
+
+    // Check if purchaser fields exist in all_vouchers table
+    const checkPurchaserFields = "SHOW COLUMNS FROM all_vouchers LIKE 'purchaser_name'";
+    con.query(checkPurchaserFields, (err, result) => {
+        if (err) {
+            console.error('Error checking purchaser fields in all_vouchers:', err);
+            return;
+        }
+        
+        if (result.length === 0) {
+            console.log('Adding purchaser fields to all_vouchers table...');
+            
+            // Add purchaser_name column
+            const addPurchaserName = "ALTER TABLE all_vouchers ADD COLUMN purchaser_name VARCHAR(255) COMMENT 'Name of the person who purchased the voucher' AFTER name";
+            con.query(addPurchaserName, (err) => {
+                if (err) {
+                    console.error('Error adding purchaser_name column:', err);
+                } else {
+                    console.log('✅ purchaser_name column added successfully');
+                    
+                    // Add purchaser_email column
+                    const addPurchaserEmail = "ALTER TABLE all_vouchers ADD COLUMN purchaser_email VARCHAR(255) COMMENT 'Email of the person who purchased the voucher' AFTER purchaser_name";
+                    con.query(addPurchaserEmail, (err) => {
+                        if (err) {
+                            console.error('Error adding purchaser_email column:', err);
+                        } else {
+                            console.log('✅ purchaser_email column added successfully');
+                            
+                            // Add purchaser_phone column
+                            const addPurchaserPhone = "ALTER TABLE all_vouchers ADD COLUMN purchaser_phone VARCHAR(50) COMMENT 'Phone number of the person who purchased the voucher' AFTER purchaser_email";
+                            con.query(addPurchaserPhone, (err) => {
+                                if (err) {
+                                    console.error('Error adding purchaser_phone column:', err);
+                                } else {
+                                    console.log('✅ purchaser_phone column added successfully');
+                                    
+                                    // Add purchaser_mobile column
+                                    const addPurchaserMobile = "ALTER TABLE all_vouchers ADD COLUMN purchaser_mobile VARCHAR(50) COMMENT 'Mobile number of the person who purchased the voucher' AFTER purchaser_phone";
+                                    con.query(addPurchaserMobile, (err) => {
+                                        if (err) {
+                                            console.error('Error adding purchaser_mobile column:', err);
+                                        } else {
+                                            console.log('✅ purchaser_mobile column added successfully');
+                                            
+                                            // Add indexes for better performance
+                                            const addIndexes = "ALTER TABLE all_vouchers ADD INDEX idx_purchaser_name (purchaser_name), ADD INDEX idx_purchaser_email (purchaser_email), ADD INDEX idx_purchaser_phone (purchaser_phone)";
+                                            con.query(addIndexes, (err) => {
+                                                if (err) {
+                                                    console.error('Error adding purchaser indexes:', err);
+                                                } else {
+                                                    console.log('✅ purchaser indexes added successfully');
+                                                    
+                                                    // Update existing Gift Voucher records to populate purchaser fields
+                                                    const updateExistingRecords = "UPDATE all_vouchers SET purchaser_name = name, purchaser_email = email, purchaser_phone = phone, purchaser_mobile = mobile WHERE book_flight = 'Gift Voucher' AND (purchaser_name IS NULL OR purchaser_name = '')";
+                                                    con.query(updateExistingRecords, (err) => {
+                                                        if (err) {
+                                                            console.error('Error updating existing records:', err);
+                                                        } else {
+                                                            console.log('✅ Existing Gift Voucher records updated with purchaser information');
+                                                        }
+                                                    });
+                                                }
+                                            });
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+        } else {
+            console.log('✅ purchaser fields already exist in all_vouchers table');
         }
     });
 };

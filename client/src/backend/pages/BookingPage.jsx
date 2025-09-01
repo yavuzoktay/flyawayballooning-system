@@ -2032,30 +2032,46 @@ setBookingDetail(finalVoucherDetail);
                                                             </>
                                                         ) : (
                                                             <>
-                                                                {v.name || '-'}
-                                                                <IconButton size="small" onClick={() => handleEditClick('name', v.name)}><EditIcon fontSize="small" /></IconButton>
+                                                                {v.book_flight === "Gift Voucher" ? (v.purchaser_name || v.name || '-') : (v.name || '-')}
+                                                                <IconButton size="small" onClick={() => handleEditClick('name', v.book_flight === "Gift Voucher" ? (v.purchaser_name || v.name) : v.name)}><EditIcon fontSize="small" /></IconButton>
                                                             </>
                                                         )}</Typography>
-                                                        {/* Hide Phone field for Gift Vouchers */}
-                                                        {v.book_flight !== "Gift Voucher" && (
-                                                            <Typography><b>Phone:</b> {editField === 'mobile' ? (
-                                                                <>
-                                                                    <input 
-                                                                        value={editValue} 
-                                                                        onChange={e => setEditValue(e.target.value.replace(/[^0-9+\-\s()]/g, ''))} 
-                                                                        style={{marginRight: 8}} 
-                                                                        placeholder="Phone number"
-                                                                    />
-                                                                    <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
-                                                                    <Button size="small" onClick={handleEditCancel}>Cancel</Button>
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    {v.mobile || '-'}
-                                                                    <IconButton size="small" onClick={() => handleEditClick('mobile', v.mobile)}><EditIcon fontSize="small" /></IconButton>
-                                                                </>
-                                                            )}</Typography>
-                                                        )}
+                                                        {/* Phone field - show purchaser_phone for Gift Vouchers, mobile for others */}
+                                                        <Typography><b>Phone:</b> {editField === 'mobile' ? (
+                                                            <>
+                                                                <input 
+                                                                    value={editValue} 
+                                                                    onChange={e => setEditValue(e.target.value.replace(/[^0-9+\-\s()]/g, ''))} 
+                                                                    style={{marginRight: 8}} 
+                                                                    placeholder="Phone number"
+                                                                />
+                                                                <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                                <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                {v.book_flight === "Gift Voucher" ? (v.purchaser_phone || v.phone || '-') : (v.mobile || '-')}
+                                                                <IconButton size="small" onClick={() => handleEditClick('mobile', v.book_flight === "Gift Voucher" ? (v.purchaser_phone || v.phone) : v.mobile)}><EditIcon fontSize="small" /></IconButton>
+                                                            </>
+                                                        )}</Typography>
+                                                        {/* Mobile field - show purchaser_mobile for Gift Vouchers */}
+                                                        <Typography><b>Mobile:</b> {editField === 'mobile' ? (
+                                                            <>
+                                                                <input 
+                                                                    value={editValue} 
+                                                                    onChange={e => setEditValue(e.target.value.replace(/[^0-9+\-\s()]/g, ''))} 
+                                                                    style={{marginRight: 8}} 
+                                                                    placeholder="Mobile number"
+                                                                />
+                                                                <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                                <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                {v.book_flight === "Gift Voucher" ? (v.purchaser_mobile || v.mobile || '-') : (v.mobile || '-')}
+                                                                <IconButton size="small" onClick={() => handleEditClick('mobile', v.book_flight === "Gift Voucher" ? (v.purchaser_mobile || v.mobile) : v.mobile)}><EditIcon fontSize="small" /></IconButton>
+                                                            </>
+                                                        )}</Typography>
                                                         <Typography><b>Email:</b> {editField === 'email' ? (
                                                             <>
                                                                 <input 
@@ -2070,8 +2086,8 @@ setBookingDetail(finalVoucherDetail);
                                                             </>
                                                         ) : (
                                                             <>
-                                                                {v.email || '-'}
-                                                                <IconButton size="small" onClick={() => handleEditClick('email', v.email)}><EditIcon fontSize="small" /></IconButton>
+                                                                {v.book_flight === "Gift Voucher" ? (v.purchaser_email || v.email || '-') : (v.email || '-')}
+                                                                <IconButton size="small" onClick={() => handleEditClick('email', v.book_flight === "Gift Voucher" ? (v.purchaser_email || v.email) : v.email)}><EditIcon fontSize="small" /></IconButton>
                                                             </>
                                                         )}</Typography>
                                                         <Typography><b>Created:</b> {bookingDetail.voucher.created_at ? (
