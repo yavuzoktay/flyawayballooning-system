@@ -2335,7 +2335,7 @@ setBookingDetail(finalVoucherDetail);
                                                 </Box>
                                             ) : null}
                                             
-                                            {/* Passenger Details */}
+                                                                                        {/* Passenger Details */}
                                             <Box sx={{ mb: 2 }}>
                                                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Passenger Details</Typography>
                                                 {activeTab === 'vouchers' ? (
@@ -2352,7 +2352,7 @@ setBookingDetail(finalVoucherDetail);
                                                                                     value={editValue} 
                                                                                     onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} 
                                                                                     style={{marginRight: 8}} 
-                                                                                    placeholder="Weight in kg"
+                                                                                placeholder="Weight in kg"
                                                                                 />
                                                                                 <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
                                                                                 <Button size="small" onClick={handleEditCancel}>Cancel</Button>
@@ -2369,12 +2369,84 @@ setBookingDetail(finalVoucherDetail);
                                                             return null;
                                                         })()}
                                                         
-                                                        {/* Passenger list */}
+                                                        {/* Passenger list for vouchers - same structure as bookings */}
                                                         {bookingDetail.passengers && bookingDetail.passengers.length > 0 ? (
                                                             <Box>
                                                                 {bookingDetail.passengers.map((p, i) => (
-                                                                    <Typography key={p.id || i}>
-                                                                        Passenger {i + 1}: {p.first_name || '-'} {p.last_name || '-'}{p.weight ? ` (${p.weight}kg${p.price ? ' £' + p.price : ''})` : ''}
+                                                                    <Typography key={p.id}>
+                                                                        Passenger {i + 1}: {editingPassenger === p.id ? (
+                                                                            <>
+                                                                                <input
+                                                                                    value={editPassengerFirstName}
+                                                                                    onChange={e => setEditPassengerFirstName(e.target.value)}
+                                                                                    placeholder="First Name"
+                                                                                    style={{ marginRight: 4, width: 90 }}
+                                                                                />
+                                                                                <input
+                                                                                    value={editPassengerLastName}
+                                                                                    onChange={e => setEditPassengerLastName(e.target.value)}
+                                                                                    placeholder="Last Name"
+                                                                                    style={{ marginRight: 4, width: 90 }}
+                                                                                />
+                                                                                <input
+                                                                                    value={editPassengerWeight}
+                                                                                    onChange={e => setEditPassengerWeight(e.target.value.replace(/[^0-9.]/g, ''))}
+                                                                                    placeholder="Weight (kg)"
+                                                                                    style={{ marginRight: 4, width: 70 }}
+                                                                                />
+                                                                                <input
+                                                                                    value={editPassengerPrice}
+                                                                                    onChange={e => setEditPassengerPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+                                                                                    placeholder="Price (£)"
+                                                                                    style={{ marginRight: 4, width: 70 }}
+                                                                                />
+                                                                                <Button size="small" onClick={async () => {
+                                                                                    // Save passenger details
+                                                                                    const newPrice = parseFloat(editPassengerPrice) || 0;
+                                                                                    await axios.patch('/api/updatePassengerField', {
+                                                                                        passenger_id: p.id,
+                                                                                        field: 'price',
+                                                                                        value: newPrice
+                                                                                    });
+                                                                                    // Update local state
+                                                                                    const updatedPrices = bookingDetail.passengers.map((pp, idx) =>
+                                                                                        pp.id === p.id ? newPrice : (pp.price ? parseFloat(pp.price) : 0)
+                                                                                    );
+                                                                                    // Update paid in backend
+                                                                                    const newPaid = updatedPrices.reduce((sum, v) => sum + v, 0);
+                                                                                    await axios.patch('/api/updateBookingField', {
+                                                                                        booking_id: bookingDetail.booking.id,
+                                                                                        field: 'paid',
+                                                                                        value: newPaid
+                                                                                    });
+                                                                                    setBookingDetail(prev => ({
+                                                                                        ...prev,
+                                                                                        booking: { ...prev.booking, paid: newPaid },
+                                                                                        passengers: prev.passengers.map(pp =>
+                                                                                            pp.id === p.id ? { ...pp, price: newPrice } : pp
+                                                                                        )
+                                                                                    }));
+                                                                                    setEditPassengerPrices(updatedPrices);
+                                                                                    setEditingPassenger(null);
+                                                                                    setEditPassengerPrice("");
+                                                                                }} disabled={savingPassengerEdit}>Save</Button>
+                                                                                <Button size="small" onClick={handleCancelPassengerEdit} disabled={savingPassengerEdit}>Cancel</Button>
+                                                                            </>
+                                                                        ) : (
+                                                                            <>
+                                                                                {p.first_name || '-'} {p.last_name || '-'}{p.weight ? ` (${p.weight}kg${p.price ? ' £' + p.price : ''})` : ''}
+                                                                                <IconButton size="small" onClick={() => handleEditPassengerClick(p)}><EditIcon fontSize="small" /></IconButton>
+                                                                                {i > 0 && ( // Only show delete button for additional passengers (not the first one)
+                                                                                    <IconButton 
+                                                                                        size="small" 
+                                                                                        onClick={() => handleDeletePassenger(p.id)}
+                                                                                        sx={{ color: 'red' }}
+                                                                                    >
+                                                                                        <DeleteIcon fontSize="small" />
+                                                                                    </IconButton>
+                                                                                )}
+                                                                            </>
+                                                                        )}
                                                                     </Typography>
                                                                 ))}
                                                             </Box>
