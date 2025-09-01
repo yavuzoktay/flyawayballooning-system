@@ -3515,19 +3515,11 @@ app.post('/api/createVoucher', (req, res) => {
             console.log('Setting purchaser_mobile to main contact mobile:', finalPurchaserMobile);
         }
         
-        // Ensure recipient info is properly set
-        if (!finalRecipientName || finalRecipientName === '') {
-            finalRecipientName = name; // Fallback to main contact if no recipient info
-            console.log('Setting recipient_name to main contact name (fallback):', finalRecipientName);
-        }
-        if (!finalRecipientEmail || finalRecipientEmail === '') {
-            finalRecipientEmail = email; // Fallback to main contact if no recipient info
-            console.log('Setting recipient_email to main contact email (fallback):', finalRecipientEmail);
-        }
-        if (!finalRecipientPhone || finalRecipientPhone === '') {
-            finalRecipientPhone = phone; // Fallback to main contact if no recipient info
-            console.log('Setting recipient_phone to main contact phone (fallback):', finalRecipientPhone);
-        }
+        // Set recipient info from recipient fields (Recipient Details section)
+        // NO fallback logic - keep purchaser and recipient separate
+        finalRecipientName = recipient_name;
+        finalRecipientEmail = recipient_email;
+        finalRecipientPhone = recipient_phone;
         
         console.log('Final purchaser info:', { name: finalPurchaserName, email: finalPurchaserEmail, phone: finalPurchaserPhone, mobile: finalPurchaserMobile });
         console.log('Final recipient info:', { name: finalRecipientName, email: finalRecipientEmail, phone: finalRecipientPhone });
