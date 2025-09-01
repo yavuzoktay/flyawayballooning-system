@@ -1201,10 +1201,17 @@ const Settings = () => {
             const normalizedIds = Array.isArray(termsFormData.voucher_type_ids)
                 ? termsFormData.voucher_type_ids.map(Number)
                 : [];
+            
+            // Ensure private_voucher_type_ids is an array
+            const normalizedPrivateIds = Array.isArray(termsFormData.private_voucher_type_ids)
+                ? termsFormData.private_voucher_type_ids.map(Number)
+                : [];
+            
             const formDataToSend = {
                 ...termsFormData,
                 voucher_type_id: normalizedIds[0] || null,
-                voucher_type_ids: normalizedIds
+                voucher_type_ids: normalizedIds,
+                private_voucher_type_ids: normalizedPrivateIds
             };
         
         console.log('Form data to send:', formDataToSend);
@@ -1261,13 +1268,18 @@ const Settings = () => {
             })(),
             private_voucher_type_ids: (() => {
                 try {
+                    console.log('Parsing private_voucher_type_ids:', terms.private_voucher_type_ids);
                     if (terms.private_voucher_type_ids) {
                         const parsed = JSON.parse(terms.private_voucher_type_ids);
+                        console.log('Parsed private_voucher_type_ids:', parsed);
                         if (Array.isArray(parsed)) {
-                            return parsed.map(id => Number(id));
+                            const result = parsed.map(id => Number(id));
+                            console.log('Final private_voucher_type_ids result:', result);
+                            return result;
                         }
                         return [];
                     }
+                    console.log('No private_voucher_type_ids found, returning empty array');
                     return [];
                 } catch (error) {
                     console.error('Error parsing private_voucher_type_ids:', error);
@@ -4614,6 +4626,11 @@ const Settings = () => {
                                         value={Array.isArray(termsFormData.private_voucher_type_ids) && termsFormData.private_voucher_type_ids.length > 0 ? String(termsFormData.private_voucher_type_ids[0]) : ''}
                                         onChange={(e) => {
                                             const selectedId = e.target.value ? Number(e.target.value) : null;
+                                            console.log('Private Voucher Types dropdown changed:', {
+                                                selectedId,
+                                                currentValue: e.target.value,
+                                                currentState: termsFormData.private_voucher_type_ids
+                                            });
                                             setTermsFormData({
                                                 ...termsFormData,
                                                 private_voucher_type_ids: selectedId ? [selectedId] : []
