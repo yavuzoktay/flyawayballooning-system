@@ -2254,7 +2254,11 @@ const Manifest = () => {
                                                         const addOnName = typeof addOn === 'object' ? addOn.name : addOn;
                                                         return (
                                                             <Typography key={index} sx={{ mb: 1 }}>
-                                                                <b>{addOnName}:</b> <span style={{ color: '#10b981', fontWeight: 'bold' }}>Yes</span>
+                                                                <b>{addOnName}:</b>{' '}
+                                                                <span style={{ color: '#10b981', fontWeight: 'bold' }}>
+                                                                    <span style={{ color: '#10b981', fontWeight: 'bold', marginRight: '4px' }}>✔</span>
+                                                                    Yes
+                                                                </span>
                                                             </Typography>
                                                         );
                                                     });
