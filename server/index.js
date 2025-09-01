@@ -2593,6 +2593,51 @@ app.get("/api/getfilteredBookings", (req, res) => {
 
 // Get all booking data
 app.get('/api/getAllBookingData', (req, res) => {
+    console.log('GET /api/getAllBookingData called with filters:', req.query);
+    
+    // Build WHERE clause based on filters
+    let whereClause = '';
+    let params = [];
+    
+    // Experience filter
+    if (req.query.experience && req.query.experience !== 'Select') {
+        if (req.query.experience === 'Private') {
+            whereClause += ' AND (ab.experience = "Private Charter" OR ab.experience = "Private")';
+        } else if (req.query.experience === 'Shared') {
+            whereClause += ' AND (ab.experience = "Shared Flight" OR ab.experience = "Shared")';
+        }
+    }
+    
+    // Status filter
+    if (req.query.status && req.query.status !== 'Select') {
+        whereClause += ' AND ab.status = ?';
+        params.push(req.query.status);
+    }
+    
+    // Voucher Type filter
+    if (req.query.voucher_type && req.query.voucher_type !== 'Select') {
+        whereClause += ' AND ab.voucher_type = ?';
+        params.push(req.query.voucher_type);
+    }
+    
+    // Location filter
+    if (req.query.location && req.query.location !== 'Select') {
+        whereClause += ' AND ab.location = ?';
+        params.push(req.query.location);
+    }
+    
+    // Search by name or email
+    if (req.query.search && req.query.search.trim() !== '') {
+        whereClause += ' AND (ab.name LIKE ? OR ab.email LIKE ?)';
+        const searchTerm = `%${req.query.search.trim()}%`;
+        params.push(searchTerm, searchTerm);
+    }
+    
+    // Remove leading ' AND ' if whereClause exists
+    if (whereClause) {
+        whereClause = 'WHERE ' + whereClause.substring(5);
+    }
+    
     const sql = `
         SELECT 
             ab.*, 
@@ -2608,10 +2653,14 @@ app.get('/api/getAllBookingData', (req, res) => {
             ON vcu.booking_id = ab.id OR (vcu.customer_email IS NOT NULL AND vcu.customer_email = ab.email)
         LEFT JOIN voucher_codes vcu_map
             ON vcu_map.id = vcu.voucher_code_id
+        ${whereClause}
         ORDER BY ab.created_at DESC
     `;
     
-    con.query(sql, async (err, result) => {
+    console.log('SQL Query:', sql);
+    console.log('SQL Parameters:', params);
+    
+    con.query(sql, params, async (err, result) => {
         if (err) {
             console.error('Error fetching all booking data:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err });

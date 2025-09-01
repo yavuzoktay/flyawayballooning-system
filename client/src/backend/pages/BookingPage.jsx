@@ -2097,26 +2097,7 @@ setBookingDetail(finalVoucherDetail);
                                                                 dayjs(bookingDetail.voucher.expires).format('DD/MM/YYYY') : 
                                                                 bookingDetail.voucher.expires
                                                         ) : '-'}</Typography>
-                                                        {/* Hide Weight field for Gift Vouchers */}
-                                                        {v.book_flight !== "Gift Voucher" && (
-                                                            <Typography><b>Weight:</b> {editField === 'weight' ? (
-                                                                <>
-                                                                    <input 
-                                                                        value={editValue} 
-                                                                        onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} 
-                                                                        style={{marginRight: 8}} 
-                                                                        placeholder="Weight in kg"
-                                                                    />
-                                                                    <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
-                                                                    <Button size="small" onClick={handleEditCancel}>Cancel</Button>
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    {v.weight || '-'}kg
-                                                                    <IconButton size="small" onClick={() => handleEditClick('weight', v.weight)}><EditIcon fontSize="small" /></IconButton>
-                                                                </>
-                                                            )}</Typography>
-                                                        )}
+                                                        {/* Weight field moved to Passenger Details section */}
                                                         <Typography><b>Voucher ID:</b> {v.id || '-'}</Typography>
                                                         <Typography><b>Voucher Code:</b> {v.voucher_code || '-'}</Typography>
                                                         <Typography><b>Flight Attempts:</b> {v.flight_attempts ?? '-'}</Typography>
@@ -2336,17 +2317,49 @@ setBookingDetail(finalVoucherDetail);
                                             <Box sx={{ mb: 2 }}>
                                                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Passenger Details</Typography>
                                                 {activeTab === 'vouchers' ? (
-                                                    bookingDetail.passengers && bookingDetail.passengers.length > 0 ? (
-                                                        <Box>
-                                                            {bookingDetail.passengers.map((p, i) => (
-                                                                <Typography key={p.id || i}>
-                                                                    Passenger {i + 1}: {p.first_name || '-'} {p.last_name || '-'}{p.weight ? ` (${p.weight}kg${p.price ? ' £' + p.price : ''})` : ''}
-                                                                </Typography>
-                                                            ))}
-                                                        </Box>
-                                                    ) : (
-                                                        <Typography>No passengers found</Typography>
-                                                    )
+                                                    <>
+                                                        {/* Weight field for vouchers */}
+                                                        {(() => {
+                                                            const v = bookingDetail.voucher || {};
+                                                            if (v.book_flight !== "Gift Voucher" && v.weight) {
+                                                                return (
+                                                                    <Typography sx={{ mb: 2 }}>
+                                                                        <b>Weight:</b> {editField === 'weight' ? (
+                                                                            <>
+                                                                                <input 
+                                                                                    value={editValue} 
+                                                                                    onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} 
+                                                                                    style={{marginRight: 8}} 
+                                                                                    placeholder="Weight in kg"
+                                                                                />
+                                                                                <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                                                <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                                            </>
+                                                                        ) : (
+                                                                            <>
+                                                                                {v.weight || '-'}kg
+                                                                                <IconButton size="small" onClick={() => handleEditClick('weight', v.weight)}><EditIcon fontSize="small" /></IconButton>
+                                                                            </>
+                                                                        )}
+                                                                    </Typography>
+                                                                );
+                                                            }
+                                                            return null;
+                                                        })()}
+                                                        
+                                                        {/* Passenger list */}
+                                                        {bookingDetail.passengers && bookingDetail.passengers.length > 0 ? (
+                                                            <Box>
+                                                                {bookingDetail.passengers.map((p, i) => (
+                                                                    <Typography key={p.id || i}>
+                                                                        Passenger {i + 1}: {p.first_name || '-'} {p.last_name || '-'}{p.weight ? ` (${p.weight}kg${p.price ? ' £' + p.price : ''})` : ''}
+                                                                    </Typography>
+                                                                ))}
+                                                            </Box>
+                                                        ) : (
+                                                            <Typography>No passengers found</Typography>
+                                                        )}
+                                                    </>
                                                 ) : (
                                                     bookingDetail.passengers && bookingDetail.passengers.length > 0 ? (
                                                         <Box>
