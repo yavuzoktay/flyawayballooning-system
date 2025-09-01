@@ -203,8 +203,8 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                                             ) : id === 'voucher_type' ? (
                                                 item[id] || ''
                                             ) : id === 'status' ? (
-                                                item[id] === 'Confirmed' ? '🕓 Scheduled' : 
-                                                item[id] === 'Scheduled' ? '🕓 Scheduled' : 
+                                                item[id] === 'Confirmed' ? 'Scheduled' : 
+                                                item[id] === 'Scheduled' ? 'Scheduled' : 
                                                 item[id]
                                             ) : item[id]}
                                         </td>

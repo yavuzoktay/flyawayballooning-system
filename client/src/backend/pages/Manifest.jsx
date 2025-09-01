@@ -296,7 +296,7 @@ const Manifest = () => {
     const getStatusWithEmoji = (status) => {
         switch (status) {
             case 'Scheduled':
-                return '🕓 Scheduled';
+                return 'Scheduled';
             case 'Checked In':
                 return '✅ Checked In';
             case 'Flown':
@@ -2554,7 +2554,7 @@ const Manifest = () => {
                                                         <TableCell>{bookingDetail.booking.flight_date ? dayjs(bookingDetail.booking.flight_date).format('DD/MM/YYYY') : '-'}</TableCell>
                                                         <TableCell>{bookingDetail.booking.flight_type || '-'}</TableCell>
                                                         <TableCell>{bookingDetail.booking.location || '-'}</TableCell>
-                                                        <TableCell>🕓 Scheduled</TableCell>
+                                                        <TableCell>Scheduled</TableCell>
                                                     </TableRow>
                                                     {bookingHistory.map((h, i) => (
                                                         <TableRow key={i}>
