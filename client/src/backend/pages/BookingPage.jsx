@@ -172,13 +172,20 @@ const BookingPage = () => {
             const dateRequestData = response.data.data || [];
             setDateRequested(dateRequestData);
             
+            // Sort by created_at (newest first) and then format
+            const sortedDateRequests = dateRequestData.sort((a, b) => {
+                const dateA = new Date(a.created_at || 0);
+                const dateB = new Date(b.created_at || 0);
+                return dateB - dateA; // Newest first
+            });
+            
             // Her zaman filteredDateRequestData'yı güncelle
-            const formattedDateRequests = dateRequestData.map((item) => ({
+            const formattedDateRequests = sortedDateRequests.map((item) => ({
                 name: item.name || "",
                 number: item.phone || "",
                 email: item.email || "",
                 location: item.location || "",
-                date_requested: item.requested_date ? dayjs(item.requested_date).format('DD/MM/YYYY') : (item.created_at ? dayjs(item.created_at).format('DD/MM/YYYY') : ""),
+                date_requested: item.date_requested ? dayjs(item.date_requested).format('DD/MM/YYYY') : (item.created_at ? dayjs(item.created_at).format('DD/MM/YYYY') : ""),
                 id: item.id || "",
                 _original: item
             }));
