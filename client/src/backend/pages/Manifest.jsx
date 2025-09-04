@@ -113,22 +113,42 @@ const Manifest = () => {
       handleGlobalMenuClose();
     };
 
-    // Confirm cancel all - proceed with deletion
+    // Confirm cancel all - update status to cancelled and increment flight_attempts
     const handleConfirmCancelAll = async () => {
       if (!globalMenuGroup?.id) { setConfirmCancelOpen(false); return; }
       setConfirmCancelLoading(true);
       try {
         const groupBookingIds = globalMenuGroupFlights.map(f => f.id);
-        await Promise.all(groupBookingIds.map(id =>
-          axios.patch('/api/updateBookingField', {
+        
+        // Update each booking: set status to 'cancelled' and increment flight_attempts
+        await Promise.all(groupBookingIds.map(async (id) => {
+          // First, get current flight_attempts
+          const currentBooking = globalMenuGroupFlights.find(f => f.id === id);
+          const currentAttempts = currentBooking?.flight_attempts || 0;
+          const newAttempts = currentAttempts + 1;
+          
+          // Update status to cancelled
+          await axios.patch('/api/updateBookingField', {
             booking_id: id,
             field: 'status',
-            value: 'Cancelled'
-          })
-        ));
+            value: 'cancelled'
+          });
+          
+          // Increment flight_attempts
+          await axios.patch('/api/updateBookingField', {
+            booking_id: id,
+            field: 'flight_attempts',
+            value: newAttempts
+          });
+        }));
+        
+        // Remove from manifest view only (not from database)
         setFlights(prev => prev.filter(f => !groupBookingIds.includes(f.id)));
         setConfirmCancelOpen(false);
         handleGlobalMenuClose();
+        
+        // Show success message
+        alert(`Successfully cancelled ${groupBookingIds.length} booking(s) and incremented flight attempts.`);
       } catch (err) {
         alert('Failed to cancel all guests: ' + (err?.response?.data?.message || err.message || 'Unknown error'));
       } finally {
