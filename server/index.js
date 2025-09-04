@@ -2941,10 +2941,10 @@ app.get('/api/getDateRequestData', (req, res) => {
     console.log('GET /api/getDateRequestData called');
     
     // First, get data from all_booking table (ordered by created_at DESC)
-    const allBookingSql = 'SELECT id, name, location, flight_date AS date_requested, voucher_code, phone, email, created_at, "booking" as source FROM all_booking WHERE name IS NOT NULL AND name != "" ORDER BY created_at DESC';
+    const allBookingSql = 'SELECT id, name, location, flight_type, flight_date AS date_requested, voucher_code, phone, email, created_at, "booking" as source FROM all_booking WHERE name IS NOT NULL AND name != "" ORDER BY created_at DESC';
     
     // Then, get data from date_request table (ordered by created_at DESC)
-    const dateRequestsSql = 'SELECT id, name, location, requested_date AS date_requested, "" as voucher_code, phone, email, created_at, "date_request" as source FROM date_request ORDER BY created_at DESC';
+    const dateRequestsSql = 'SELECT id, name, location, flight_type, requested_date AS date_requested, "" as voucher_code, phone, email, created_at, "date_request" as source FROM date_request ORDER BY created_at DESC';
     
     // Execute both queries
     con.query(allBookingSql, (err1, allBookingResult) => {
