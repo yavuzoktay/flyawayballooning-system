@@ -2939,49 +2939,14 @@ app.get('/api/getAllVoucher', (req, res) => {
 // Get Date Requested Data (from both all_booking and date_requests tables)
 app.get('/api/getDateRequestData', (req, res) => {
     console.log('GET /api/getDateRequestData called');
-    
-    // First, get data from all_booking table (ordered by created_at DESC)
-    const allBookingSql = 'SELECT id, name, location, flight_type, flight_date AS date_requested, voucher_code, phone, email, created_at, "booking" as source FROM all_booking WHERE name IS NOT NULL AND name != "" ORDER BY created_at DESC';
-    
-    // Then, get data from date_request table (ordered by created_at DESC)
-    const dateRequestsSql = 'SELECT id, name, location, flight_type, requested_date AS date_requested, "" as voucher_code, phone, email, created_at, "date_request" as source FROM date_request ORDER BY created_at DESC';
-    
-    // Execute both queries
-    con.query(allBookingSql, (err1, allBookingResult) => {
-        if (err1) {
-            console.error("Error fetching from all_booking:", err1);
-            allBookingResult = [];
+    // Only return actual date requests. Do NOT include bookings.
+    const sql = 'SELECT id, name, location, flight_type, requested_date AS date_requested, "" as voucher_code, phone, email, created_at, "date_request" as source FROM date_request ORDER BY created_at DESC';
+    con.query(sql, (err, result) => {
+        if (err) {
+            console.error('Error fetching from date_request:', err);
+            return res.status(500).send({ success: false, message: 'Database query failed' });
         }
-        
-        con.query(dateRequestsSql, (err2, dateRequestsResult) => {
-            if (err2) {
-                console.error("Error fetching from date_requests:", err2);
-                dateRequestsResult = [];
-            }
-            
-            // Combine results and sort by created_at (newest first)
-            const combinedResult = [
-                ...(allBookingResult || []),
-                ...(dateRequestsResult || [])
-            ].sort((a, b) => {
-                // Sort by created_at in descending order (newest first)
-                const dateA = new Date(a.created_at || 0);
-                const dateB = new Date(b.created_at || 0);
-                return dateB - dateA;
-            });
-            
-            console.log('Combined result:', {
-                all_booking_count: allBookingResult ? allBookingResult.length : 0,
-                date_requests_count: dateRequestsResult ? dateRequestsResult.length : 0,
-                total_count: combinedResult.length
-            });
-            
-            if (combinedResult && combinedResult.length > 0) {
-                res.send({ success: true, data: combinedResult });
-            } else {
-                res.send({ success: false, message: "No data found" });
-            }
-        });
+        return res.send({ success: true, data: result || [] });
     });
 });
 
