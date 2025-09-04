@@ -1293,33 +1293,34 @@ const Manifest = () => {
 
     const [crewList, setCrewList] = useState([]);
     const [crewAssignmentsBySlot, setCrewAssignmentsBySlot] = useState({}); // key: `${activityId}_${date}_${time}` => crew_id
+    const lastCrewFetchRef = React.useRef({ date: null, inFlight: false });
     const [crewNotification, setCrewNotification] = useState({ show: false, message: '', type: 'success' });
 
     const slotKey = (activityId, date, time) => `${activityId}_${date}_${time}`;
 
     const refreshCrewAssignments = async (date) => {
         if (!date) return;
+        // Prevent duplicate, rapid calls for the same date
+        if (lastCrewFetchRef.current.inFlight && lastCrewFetchRef.current.date === date) return;
+        if (lastCrewFetchRef.current.date === date && Object.keys(crewAssignmentsBySlot || {}).length > 0) return;
         try {
-            console.log('Refreshing crew assignments for date:', date);
+            lastCrewFetchRef.current = { date, inFlight: true };
             const res = await axios.get('/api/crew-assignments', { params: { date } });
-            console.log('Crew assignments response:', res.data);
-            
             if (res.data?.success && Array.isArray(res.data.data)) {
                 const map = {};
                 for (const row of res.data.data) {
                     const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
                     map[key] = row.crew_id;
-                    console.log('Mapping crew assignment:', key, '->', row.crew_id, 'for', row.first_name, row.last_name);
                 }
-                console.log('Final crew assignments map:', map);
                 setCrewAssignmentsBySlot(map);
             } else {
-                console.log('No crew assignments found or invalid response format');
                 setCrewAssignmentsBySlot({});
             }
         } catch (err) {
             console.error('Error refreshing crew assignments:', err);
             setCrewAssignmentsBySlot({});
+        } finally {
+            lastCrewFetchRef.current.inFlight = false;
         }
     };
 
@@ -1433,21 +1434,7 @@ const Manifest = () => {
     // Also fetch crew assignments when flights change (in case of data refresh)
     useEffect(() => {
         if (!selectedDate || flights.length === 0) return;
-        console.log('Flights changed, refreshing crew assignments for date:', selectedDate);
-        axios.get('/api/crew-assignments', { params: { date: selectedDate } })
-            .then(res => {
-                if (res.data?.success && Array.isArray(res.data.data)) {
-                    const map = {};
-                    for (const row of res.data.data) {
-                        const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
-                        map[key] = row.crew_id;
-                    }
-                    setCrewAssignmentsBySlot(map);
-                }
-            })
-            .catch((err) => {
-                console.error('Error refreshing crew assignments:', err);
-            });
+        refreshCrewAssignments(selectedDate);
     }, [selectedDate, flights]);
 
     const handleCrewChange = async (activityId, flightDateStr, crewId) => {
