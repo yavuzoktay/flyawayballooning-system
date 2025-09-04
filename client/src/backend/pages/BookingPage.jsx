@@ -2454,6 +2454,7 @@ setBookingDetail(finalVoucherDetail);
                                                                 <Typography><b>Redeemed:</b> {v.redeemed || '-'}</Typography>
                                                                 <Typography><b>Offer Code:</b> {v.offer_code || '-'}</Typography>
                                                                 <Typography><b>Voucher Ref:</b> {v.voucher_ref || '-'}</Typography>
+                                                                <Typography><b>Number of Vouchers:</b> {v.numberOfPassengers || '1'}</Typography>
                                                                 <Typography><b>Created:</b> {v.created_at ? (
                                                                     dayjs(v.created_at).isValid() ? 
                                                                         dayjs(v.created_at).format('DD/MM/YYYY') : 

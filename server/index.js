@@ -2907,6 +2907,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
     const voucher = `
         SELECT v.*, v.experience_type, v.book_flight, v.voucher_type as actual_voucher_type,
                v.purchaser_name, v.purchaser_email, v.purchaser_phone, v.purchaser_mobile,
+               v.numberOfPassengers,
                b.email as booking_email, b.phone as booking_phone, b.id as booking_id,
                v.voucher_ref as vc_code,
                (SELECT GROUP_CONCAT(CONCAT(p.first_name, ' ', p.last_name, ' (', p.weight, 'kg)') SEPARATOR ', ') 
@@ -3500,6 +3501,7 @@ app.post('/api/createVoucher', (req, res) => {
         preferred_location = '',
         preferred_time = '',
         preferred_day = '',
+        numberOfPassengers = 1,
         // Purchaser information fields
         purchaser_name = '',
         purchaser_email = '',
@@ -3757,8 +3759,8 @@ app.post('/api/createVoucher', (req, res) => {
         }
         
         const insertSql = `INSERT INTO all_vouchers 
-            (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, purchaser_name, purchaser_email, purchaser_phone, purchaser_mobile)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+            (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, purchaser_name, purchaser_email, purchaser_phone, purchaser_mobile, numberOfPassengers)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
             
         const values = [
             emptyToNull(name),
@@ -3789,7 +3791,8 @@ app.post('/api/createVoucher', (req, res) => {
             emptyToNull(finalPurchaserName), // Use final purchaser values
             emptyToNull(finalPurchaserEmail), // Use final purchaser values
             emptyToNull(finalPurchaserPhone), // Use final purchaser values
-            emptyToNull(finalPurchaserMobile) // Use final purchaser values
+            emptyToNull(finalPurchaserMobile), // Use final purchaser values
+            numberOfPassengers // Number of passengers
         ];
         
         con.query(insertSql, values, (err, result) => {
@@ -6786,7 +6789,8 @@ async function createVoucherFromWebhook(voucherData) {
             recipient_gift_date = '',
             preferred_location = '',
             preferred_time = '',
-            preferred_day = ''
+            preferred_day = '',
+            numberOfPassengers = 1
         } = voucherData;
 
         const now = moment().format('YYYY-MM-DD HH:mm:ss');
@@ -6852,8 +6856,8 @@ async function createVoucherFromWebhook(voucherData) {
             
             // No duplicates found, proceed with voucher creation
             const insertSql = `INSERT INTO all_vouchers 
-                (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, numberOfPassengers)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
             const values = [
                 emptyToNull(name),
                 emptyToNull(weight),
@@ -6876,7 +6880,8 @@ async function createVoucherFromWebhook(voucherData) {
                 emptyToNull(preferred_location),
                 emptyToNull(preferred_time),
                 emptyToNull(preferred_day),
-                1 // flight_attempts starts at 1 for each created voucher
+                1, // flight_attempts starts at 1 for each created voucher
+                numberOfPassengers // Number of passengers
             ];
             
             con.query(insertSql, values, (err, result) => {
@@ -7623,6 +7628,35 @@ app.post('/api/createTestBooking', (req, res) => {
 // Database migration function
 const runDatabaseMigrations = () => {
     console.log('Running database migrations...');
+    
+    // Add numberOfPassengers column to all_vouchers table
+    const addNumberOfPassengersColumn = `
+        ALTER TABLE all_vouchers 
+        ADD COLUMN IF NOT EXISTS numberOfPassengers INT DEFAULT 1 COMMENT 'Number of passengers for this voucher'
+    `;
+    
+    con.query(addNumberOfPassengersColumn, (err, result) => {
+        if (err) {
+            console.error('Error adding numberOfPassengers column:', err);
+        } else {
+            console.log('✅ numberOfPassengers column added successfully');
+        }
+    });
+    
+    // Update existing records to have default value of 1
+    const updateExistingRecords = `
+        UPDATE all_vouchers 
+        SET numberOfPassengers = 1 
+        WHERE numberOfPassengers IS NULL
+    `;
+    
+    con.query(updateExistingRecords, (err, result) => {
+        if (err) {
+            console.error('Error updating existing records:', err);
+        } else {
+            console.log(`✅ Updated ${result.affectedRows} existing records with default numberOfPassengers value`);
+        }
+    });
     
     // Create passengers table if it doesn't exist
     const createPassengersTable = `
