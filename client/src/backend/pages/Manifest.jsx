@@ -2168,6 +2168,7 @@ const Manifest = () => {
                                             </>
                                         )}</Typography>
                                         <Typography><b>Flight Attempts:</b> {bookingDetail.booking.flight_attempts || '-'}</Typography>
+                                        <Typography><b>Voucher Type:</b> {bookingDetail.booking.voucher_type || '-'}</Typography>
                                         <Typography><b>Expires:</b> {editField === 'expires' ? (
   <LocalizationProvider dateAdapter={AdapterDayjs}>
     <DatePicker
