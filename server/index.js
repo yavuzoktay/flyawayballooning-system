@@ -3509,6 +3509,12 @@ app.post('/api/createVoucher', (req, res) => {
         purchaser_mobile = ''
     } = req.body;
 
+    // Debug: Log numberOfPassengers received
+    console.log('=== NUMBER OF PASSENGERS DEBUG (createVoucher) ===');
+    console.log('numberOfPassengers received:', numberOfPassengers);
+    console.log('typeof numberOfPassengers:', typeof numberOfPassengers);
+    console.log('req.body.numberOfPassengers:', req.body.numberOfPassengers);
+
     // For Gift Vouchers, separate purchaser and recipient information
     let finalPurchaserName = purchaser_name;
     let finalPurchaserEmail = purchaser_email;
@@ -3794,6 +3800,12 @@ app.post('/api/createVoucher', (req, res) => {
             emptyToNull(finalPurchaserMobile), // Use final purchaser values
             numberOfPassengers // Number of passengers
         ];
+        
+        // Debug: Log the values being inserted
+        console.log('=== INSERT VALUES DEBUG ===');
+        console.log('numberOfPassengers being inserted:', numberOfPassengers);
+        console.log('typeof numberOfPassengers:', typeof numberOfPassengers);
+        console.log('values array:', values);
         
         con.query(insertSql, values, (err, result) => {
             if (err) {
