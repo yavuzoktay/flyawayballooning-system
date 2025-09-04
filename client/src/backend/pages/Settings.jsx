@@ -74,8 +74,6 @@ const Settings = () => {
         image_url: '',
         image_file: null,
         max_passengers: 8,
-        price_per_person: 300,
-        price_unit: 'pp',
         validity_months: 18,
         flight_days: 'Any Day',
         flight_time: 'AM & PM',
@@ -1945,7 +1943,7 @@ const Settings = () => {
                                         <tr>
                                             <th>ITEM</th>
                                             <th>DESCRIPTION</th>
-                                            <th>PRICE</th>
+                                            
                                             <th>CATEGORY</th>
                                             <th>JOURNEY TYPES</th>
                                             <th>LOCATIONS</th>
@@ -2539,14 +2537,7 @@ const Settings = () => {
                                                         {privateCharterVoucherType.description}
                                                     </div>
                                                 </td>
-                                                <td>
-                                                    <div style={{ fontWeight: '600' }}>
-                                                        £{privateCharterVoucherType.price_per_person || '0.00'}
-                                                        <span style={{ fontSize: '12px', color: '#6b7280', marginLeft: '4px' }}>
-                                                            {privateCharterVoucherType.price_unit === 'pp' ? 'pp' : 'fixed'}
-                                                        </span>
-                                                    </div>
-                                                </td>
+                                                
                                                 <td>{privateCharterVoucherType.flight_days}</td>
                                                 <td>{privateCharterVoucherType.flight_time}</td>
                                                 <td>{privateCharterVoucherType.validity_months} months</td>
@@ -3778,30 +3769,11 @@ const Settings = () => {
                                     />
                                 </div>
                                 
-                                <div className="form-group">
-                                    <label>Price Per Person</label>
-                                    <input
-                                        type="number"
-                                        value={privateCharterVoucherTypeFormData.price_per_person || ''}
-                                        onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, price_per_person: parseFloat(e.target.value)})}
-                                        placeholder="300.00"
-                                        min="0"
-                                        step="0.01"
-                                    />
-                                </div>
+                                
                             </div>
                             
                             <div className="form-row">
-                                <div className="form-group">
-                                    <label>Price Unit</label>
-                                    <select
-                                        value={privateCharterVoucherTypeFormData.price_unit || 'pp'}
-                                        onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, price_unit: e.target.value})}
-                                    >
-                                        <option value="pp">Per Person (pp)</option>
-                                        <option value="total">Total Price</option>
-                                    </select>
-                                </div>
+                                
                                 
                                 <div className="form-group">
                                     <label>Validity (Months)</label>
