@@ -4540,8 +4540,25 @@ app.patch('/api/updateBookingField', (req, res) => {
         sql = `UPDATE passenger SET weight = ? WHERE booking_id = ? LIMIT 1`;
         params = [value, booking_id];
     } else {
+        // Normalize status values to proper capitalization
+        let normalizedValue = value;
+        if (field === 'status') {
+            if (typeof value === 'string') {
+                const statusLower = value.toLowerCase();
+                if (statusLower === 'cancelled') {
+                    normalizedValue = 'Cancelled';
+                } else if (statusLower === 'scheduled') {
+                    normalizedValue = 'Scheduled';
+                } else if (statusLower === 'completed') {
+                    normalizedValue = 'Completed';
+                } else if (statusLower === 'pending') {
+                    normalizedValue = 'Pending';
+                }
+            }
+        }
+        
         sql = `UPDATE all_booking SET ${field} = ? WHERE id = ?`;
-        params = [value, booking_id];
+        params = [normalizedValue, booking_id];
     }
     
     console.log('updateBookingField - SQL:', sql);
@@ -4558,8 +4575,8 @@ app.patch('/api/updateBookingField', (req, res) => {
         // If status is updated, also insert into booking_status_history
         if (field === 'status') {
             const historySql = 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
-            console.log('updateBookingField - Status history ekleniyor:', { booking_id, status: value });
-            con.query(historySql, [booking_id, value], (err2) => {
+            console.log('updateBookingField - Status history ekleniyor:', { booking_id, status: normalizedValue });
+            con.query(historySql, [booking_id, normalizedValue], (err2) => {
                 if (err2) console.error('History insert error:', err2);
                 else console.log('updateBookingField - Status history başarıyla eklendi');
                 // Do not block main response

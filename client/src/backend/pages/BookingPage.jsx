@@ -1388,7 +1388,7 @@ setBookingDetail(finalVoucherDetail);
             // 5. paid güncelle
             await axios.patch('/api/updateBookingField', patchPayloads[4]);
             // 6. Eğer status Cancelled ise, Scheduled yap
-            if (bookingDetail.booking.status === 'Cancelled' || bookingDetail.booking.status === 'cancelled') {
+            if (bookingDetail.booking.status === 'Cancelled') {
                 const statusPayload = { booking_id: bookingDetail.booking.id, field: 'status', value: 'Scheduled' };
                 console.log('PATCH /api/updateBookingField payload:', statusPayload);
                 await axios.patch('/api/updateBookingField', statusPayload);
@@ -1889,7 +1889,7 @@ setBookingDetail(finalVoucherDetail);
                                         flight_type: item.flight_type || '',
                                         voucher_type: item.voucher_type || '',
                                         location: item.location || '',
-                                        flight_date: (item.status === 'Cancelled' || item.status === 'cancelled') ? '-' : (item.flight_date_display || item.flight_date || ''),
+                                        flight_date: (item.status === 'Cancelled') ? '-' : (item.flight_date_display || item.flight_date || ''),
                                         pax: item.pax || '',
                                         status: item.status ? item.status.charAt(0).toUpperCase() + item.status.slice(1).toLowerCase() : '',
                                         paid: item.paid || '',

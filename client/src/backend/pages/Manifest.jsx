@@ -131,7 +131,7 @@ const Manifest = () => {
           await axios.patch('/api/updateBookingField', {
             booking_id: id,
             field: 'status',
-            value: 'cancelled'
+            value: 'Cancelled'
           });
           
           // Increment flight_attempts
@@ -225,7 +225,7 @@ const Manifest = () => {
         if (!bookingLoading && !passengerLoading) {
             // Filter out cancelled bookings before combining with passenger data
             const activeBookings = booking.filter((b) => 
-                b.status !== 'cancelled' && b.status !== 'Cancelled'
+                b.status !== 'Cancelled'
             );
             
             const combinedFlights = activeBookings.map((b) => ({
