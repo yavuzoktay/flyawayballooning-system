@@ -1075,6 +1075,7 @@ app.get('/api/private-charter-voucher-types', (req, res) => {
     
     // Check if we want only active voucher types (default) or all
     const showOnlyActive = req.query.active !== 'false';
+    const location = req.query.location;
     
     let sql, params = [];
     if (showOnlyActive) {
@@ -1105,7 +1106,52 @@ app.get('/api/private-charter-voucher-types', (req, res) => {
         // For admin view (showOnlyActive = false), return all voucher types
         // For frontend view (showOnlyActive = true), return only active ones
         let finalResult = result;
-        
+
+        // If location is provided, enrich price_per_person from activity.private_charter_pricing
+        if (location) {
+            const actSql = 'SELECT id, activity_name, location, private_charter_pricing FROM activity WHERE status = "Live" AND location = ? ORDER BY id DESC LIMIT 1';
+            con.query(actSql, [location], (aErr, aRes) => {
+                if (aErr) {
+                    console.error('Error fetching activity for pricing:', aErr);
+                } else if (aRes && aRes.length > 0) {
+                    let pricingMap = {};
+                    try {
+                        const raw = aRes[0].private_charter_pricing;
+                        pricingMap = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
+                    } catch (e) {
+                        pricingMap = {};
+                    }
+                    const normalize = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+                    // Map titles to prices (tolerant)
+                    finalResult = finalResult.map(v => {
+                        const title = v.title || '';
+                        let matchVal = pricingMap[title];
+                        if (matchVal == null) matchVal = pricingMap[title.trim?.()];
+                        if (matchVal == null) {
+                            const normTitle = normalize(title);
+                            for (const k of Object.keys(pricingMap)) {
+                                if (normalize(k) === normTitle) { matchVal = pricingMap[k]; break; }
+                            }
+                        }
+                        if (matchVal != null && matchVal !== '') {
+                            const parsed = parseFloat(matchVal);
+                            if (!Number.isNaN(parsed)) {
+                                v.price_per_person = parsed.toFixed(2);
+                                v.price_unit = v.price_unit || 'pp';
+                            }
+                        }
+                        return v;
+                    });
+                }
+                console.log('Query result:', result);
+                console.log('Show only active:', showOnlyActive);
+                console.log('Result length:', result ? result.length : 'undefined');
+                console.log('Final result length:', finalResult ? finalResult.length : 'undefined');
+                return res.json({ success: true, data: finalResult });
+            });
+            return; // prevent double send
+        }
+
         console.log('Query result:', result);
         console.log('Show only active:', showOnlyActive);
         console.log('Result length:', result ? result.length : 'undefined');
