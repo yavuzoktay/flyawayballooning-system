@@ -1388,7 +1388,7 @@ setBookingDetail(finalVoucherDetail);
             // 5. paid güncelle
             await axios.patch('/api/updateBookingField', patchPayloads[4]);
             // 6. Eğer status Cancelled ise, Scheduled yap
-            if (bookingDetail.booking.status === 'Cancelled') {
+            if (bookingDetail.booking.status === 'Cancelled' || bookingDetail.booking.status === 'cancelled') {
                 const statusPayload = { booking_id: bookingDetail.booking.id, field: 'status', value: 'Scheduled' };
                 console.log('PATCH /api/updateBookingField payload:', statusPayload);
                 await axios.patch('/api/updateBookingField', statusPayload);
