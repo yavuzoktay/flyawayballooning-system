@@ -2416,6 +2416,9 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
                     return res.json({ received: true });
                 } else if (storeData.type === 'voucher') {
                     console.log('Creating voucher via webhook:', storeData.voucherData);
+                    console.log('=== WEBHOOK VOUCHER DATA DEBUG ===');
+                    console.log('storeData.voucherData.numberOfPassengers:', storeData.voucherData.numberOfPassengers);
+                    console.log('typeof storeData.voucherData.numberOfPassengers:', typeof storeData.voucherData.numberOfPassengers);
                     
                     // Check if voucher was already created to prevent duplicate creation
                     if (storeData.voucherData?.voucher_id) {
@@ -6928,6 +6931,14 @@ app.post('/api/create-checkout-session', async (req, res) => {
         }
         if (!bookingData && !voucherData) {
             return res.status(400).json({ success: false, message: 'Eksik veri: bookingData veya voucherData gereklidir.' });
+        }
+        
+        // Debug: Log numberOfPassengers in voucherData
+        if (voucherData) {
+            console.log('=== VOUCHER DATA DEBUG (create-checkout-session) ===');
+            console.log('voucherData.numberOfPassengers:', voucherData.numberOfPassengers);
+            console.log('typeof voucherData.numberOfPassengers:', typeof voucherData.numberOfPassengers);
+            console.log('voucherData keys:', Object.keys(voucherData));
         }
         
         console.log('Processing payment:', { totalPrice, type, hasBookingData: !!bookingData, hasVoucherData: !!voucherData });
