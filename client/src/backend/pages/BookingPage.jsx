@@ -188,6 +188,7 @@ const BookingPage = () => {
             const formattedDateRequests = sortedDateRequests.map((item) => ({
                 name: item.name || "",
                 number: item.phone || "",
+                flight_type: item.flight_type || "",
                 email: item.email || "",
                 location: item.location || "",
                 date_requested: item.date_requested ? dayjs(item.date_requested).format('DD/MM/YYYY') : (item.created_at ? dayjs(item.created_at).format('DD/MM/YYYY') : ""),
@@ -2070,16 +2071,7 @@ setBookingDetail(finalVoucherDetail);
                                     Delete
                                 </Button>
                                 <PaginatedTable
-                                    data={dateRequested.map((item) => ({
-                                        id: item.id,
-                                        name: item.name || "",
-                                        number: item.phone || "",
-                                        flight_type: item.flight_type || "",
-                                        email: item.email || "",
-                                        location: item.location || "",
-                                        // Use date_requested from API; fallback to created_at
-                                        date_requested: item.date_requested ? dayjs(item.date_requested).format('DD/MM/YYYY') : (item.created_at ? dayjs(item.created_at).format('DD/MM/YYYY') : "")
-                                    }))}
+                                    data={filteredDateRequestData}
                                     columns={["name", "number", "flight_type", "email", "location", "date_requested"]}
                                     onNameClick={handleDateRequestNameClick}
                                     selectable={true}
