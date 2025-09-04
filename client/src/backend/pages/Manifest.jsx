@@ -1655,7 +1655,7 @@ const Manifest = () => {
                     </Box>
 
                     {bookingLoading || passengerLoading || activityLoading ? (
-                        <Typography>Yükleniyor...</Typography>
+                        <Typography>Loading...</Typography>
                     ) : error ? (
                         <Typography color="error">{error}</Typography>
                     ) : filteredFlights.length > 0 ? (
