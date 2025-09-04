@@ -1647,7 +1647,18 @@ const Manifest = () => {
                     ) : error ? (
                         <Typography color="error">{error}</Typography>
                     ) : filteredFlights.length > 0 ? (
-                        Object.entries(groupedFlights).map(([groupKey, groupFlights]) => {
+                        Object.entries(groupedFlights)
+                          .sort((a, b) => {
+                            // groupKey format: "location||flight_type||HH:MM"
+                            const timeA = (a[0]?.split('||')[2] || '').padStart(5, '0');
+                            const timeB = (b[0]?.split('||')[2] || '').padStart(5, '0');
+                            // If times are missing, push them to the end
+                            if (!timeA && !timeB) return 0;
+                            if (!timeA) return 1;
+                            if (!timeB) return -1;
+                            return timeA.localeCompare(timeB);
+                          })
+                          .map(([groupKey, groupFlights]) => {
                             // Ortak başlık bilgileri
                             const first = groupFlights[0];
                             const activityName = first.location + ' - ' + first.flight_type;
