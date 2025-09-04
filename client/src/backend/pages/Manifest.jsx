@@ -223,7 +223,12 @@ const Manifest = () => {
 
     useEffect(() => {
         if (!bookingLoading && !passengerLoading) {
-            const combinedFlights = booking.map((b) => ({
+            // Filter out cancelled bookings before combining with passenger data
+            const activeBookings = booking.filter((b) => 
+                b.status !== 'cancelled' && b.status !== 'Cancelled'
+            );
+            
+            const combinedFlights = activeBookings.map((b) => ({
                 ...b,
                 passengers: passenger.filter((p) => p.booking_id === b.id),
                 totalWeight: passenger
@@ -806,8 +811,8 @@ const Manifest = () => {
                 }
             }));
             
-            // flights state'ini güncelle
-            setFlights(prev => prev.map(f => f.id === bookingDetail.booking.id ? { ...f, status: 'Cancelled', flight_attempts: newAttempts } : f));
+            // Remove cancelled booking from manifest view (don't just update status)
+            setFlights(prev => prev.filter(f => f.id !== bookingDetail.booking.id));
             
             console.log('Cancel Flight - Local state güncellemeleri tamamlandı');
             
