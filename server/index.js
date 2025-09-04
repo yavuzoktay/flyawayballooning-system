@@ -925,9 +925,10 @@ app.post('/api/voucher-types', experiencesUpload.single('voucher_type_image'), (
         is_active
     } = req.body;
     
-    // Validation
-    if (!title || !description || !price_per_person) {
-        return res.status(400).json({ success: false, message: 'Missing required fields: title, description, and price_per_person' });
+    // Validation: allow creating a voucher type without price yet
+    // Only require title and description at creation time
+    if (!title || !description) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: title and description' });
     }
     
     // Handle image upload
@@ -947,7 +948,7 @@ app.post('/api/voucher-types', experiencesUpload.single('voucher_type_image'), (
         title,
         description,
         image_url,
-        price_per_person,
+        (price_per_person === undefined || price_per_person === '' ? null : price_per_person),
         price_unit || 'pp',
         max_passengers || 8,
         validity_months || 18,
