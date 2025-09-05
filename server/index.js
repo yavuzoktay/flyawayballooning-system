@@ -2111,16 +2111,23 @@ app.delete('/api/crew/:id', (req, res) => {
 // ==================== TERMS & CONDITIONS API ENDPOINTS ====================
 
 // Get all terms and conditions
-app.get('/api/terms-and-conditions', (req, res) => {
+app.get('/api/terms-and-conditions', async (req, res) => {
     console.log('GET /api/terms-and-conditions called');
     const sql = `SELECT * FROM terms_and_conditions ORDER BY sort_order ASC, created_at DESC`;
     console.log('SQL Query:', sql);
     
-    con.query(sql, (err, result) => {
-        if (err) {
-            console.error('Error fetching terms and conditions:', err);
-            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
-        }
+    try {
+        const result = await new Promise((resolve, reject) => {
+            con.query(sql, (err, result) => {
+                if (err) {
+                    console.error('Error fetching terms and conditions:', err);
+                    reject(err);
+                } else {
+                    resolve(result);
+                }
+            });
+        });
+        
         console.log('Query result:', result);
         console.log('Result length:', result ? result.length : 'undefined');
         
@@ -2136,8 +2143,58 @@ app.get('/api/terms-and-conditions', (req, res) => {
             });
         }
         
-        res.json({ success: true, data: result });
-    });
+        // Enrich with voucher type information
+        if (result && result.length > 0) {
+            const enrichedResult = await Promise.all(result.map(async (terms) => {
+                const enrichedTerms = { ...terms };
+                
+                // Add voucher type information for private_voucher_type_ids
+                if (terms.private_voucher_type_ids && Array.isArray(terms.private_voucher_type_ids) && terms.private_voucher_type_ids.length > 0) {
+                    try {
+                        // Get private charter voucher type information
+                        const privateVoucherTypes = await new Promise((resolve, reject) => {
+                            const privateVoucherTypesQuery = `SELECT id, title FROM private_charter_voucher_types WHERE id IN (${terms.private_voucher_type_ids.map(() => '?').join(',')})`;
+                            con.query(privateVoucherTypesQuery, terms.private_voucher_type_ids, (err, result) => {
+                                if (err) reject(err);
+                                else resolve(result);
+                            });
+                        });
+                        enrichedTerms.private_voucher_types = privateVoucherTypes;
+                        console.log('🔍 Private voucher types found:', privateVoucherTypes);
+                    } catch (e) {
+                        console.error('Error fetching private_voucher_type_ids:', e);
+                    }
+                }
+                
+                // Add voucher type information for voucher_type_ids
+                if (terms.voucher_type_ids && Array.isArray(terms.voucher_type_ids) && terms.voucher_type_ids.length > 0) {
+                    try {
+                        // Get normal voucher type information
+                        const voucherTypes = await new Promise((resolve, reject) => {
+                            const voucherTypesQuery = `SELECT id, title FROM voucher_types WHERE id IN (${terms.voucher_type_ids.map(() => '?').join(',')})`;
+                            con.query(voucherTypesQuery, terms.voucher_type_ids, (err, result) => {
+                                if (err) reject(err);
+                                else resolve(result);
+                            });
+                        });
+                        enrichedTerms.voucher_types = voucherTypes;
+                        console.log('🔍 Voucher types found:', voucherTypes);
+                    } catch (e) {
+                        console.error('Error fetching voucher_type_ids:', e);
+                    }
+                }
+                
+                return enrichedTerms;
+            }));
+            
+            res.json({ success: true, data: enrichedResult });
+        } else {
+            res.json({ success: true, data: result });
+        }
+    } catch (error) {
+        console.error('Error in terms and conditions endpoint:', error);
+        res.status(500).json({ success: false, message: 'Database error', error: error.message });
+    }
 });
 
 // Get terms and conditions by voucher type
@@ -2151,6 +2208,35 @@ app.get('/api/terms-and-conditions/voucher-type/:voucherTypeId', (req, res) => {
     con.query(sql, [parseInt(voucherTypeId), JSON.stringify(parseInt(voucherTypeId)), JSON.stringify(parseInt(voucherTypeId))], (err, result) => {
         if (err) {
             console.error('Error fetching terms and conditions for voucher type:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        console.log('Query result:', result);
+        res.json({ success: true, data: result });
+    });
+});
+
+// Get terms and conditions by experience type (e.g., "Private Charter", "Shared Flight")
+app.get('/api/terms-and-conditions/experience/:experienceType', (req, res) => {
+    const { experienceType } = req.params;
+    console.log('GET /api/terms-and-conditions/experience/' + experienceType + ' called');
+    
+    // Map experience types to experience IDs
+    const experienceTypeMap = {
+        'Private Charter': 2,
+        'Shared Flight': 1
+    };
+    
+    const experienceId = experienceTypeMap[experienceType];
+    if (!experienceId) {
+        return res.status(400).json({ success: false, message: 'Invalid experience type' });
+    }
+    
+    const sql = `SELECT * FROM terms_and_conditions WHERE (JSON_CONTAINS(experience_ids, ?) OR JSON_CONTAINS(private_voucher_type_ids, ?)) AND is_active = 1 ORDER BY sort_order ASC`;
+    console.log('SQL Query:', sql);
+    
+    con.query(sql, [JSON.stringify(experienceId), JSON.stringify(experienceId)], (err, result) => {
+        if (err) {
+            console.error('Error fetching terms and conditions for experience type:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
         console.log('Query result:', result);

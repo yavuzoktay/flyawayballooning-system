@@ -1218,8 +1218,14 @@ const Settings = () => {
         console.log('Form data to send:', formDataToSend);
         
         // Form validation
-        if (!formDataToSend.title || !formDataToSend.content || formDataToSend.voucher_type_ids.length === 0) {
-            alert('Please fill in all required fields: Title, Content, and select at least one Voucher Type');
+        if (!formDataToSend.title || !formDataToSend.content) {
+            alert('Please fill in all required fields: Title and Content');
+            return;
+        }
+        
+        // Check if at least one type is selected
+        if (formDataToSend.voucher_type_ids.length === 0 && formDataToSend.private_voucher_type_ids.length === 0 && formDataToSend.experience_ids.length === 0) {
+            alert('Please select at least one Voucher Type, Private Voucher Type, or Experience');
             return;
         }
         
@@ -3244,25 +3250,35 @@ const Settings = () => {
                                                                 idCandidates.push(Number(terms.voucher_type_id));
                                                             }
                                                             if (terms.voucher_type_ids) {
-                                                                try {
-                                                                    const parsed = JSON.parse(terms.voucher_type_ids);
-                                                                    if (Array.isArray(parsed)) {
-                                                                        parsed.forEach((v) => idCandidates.push(Number(v)));
+                                                                let parsed = [];
+                                                                if (Array.isArray(terms.voucher_type_ids)) {
+                                                                    parsed = terms.voucher_type_ids;
+                                                                } else {
+                                                                    try {
+                                                                        parsed = JSON.parse(terms.voucher_type_ids);
+                                                                    } catch (e) {
+                                                                        // ignore parse error here; we'll show a badge if nothing resolves
                                                                     }
-                                                                } catch (e) {
-                                                                    // ignore parse error here; we'll show a badge if nothing resolves
+                                                                }
+                                                                if (Array.isArray(parsed)) {
+                                                                    parsed.forEach((v) => idCandidates.push(Number(v)));
                                                                 }
                                                             }
                                                             
                                                             // Add private voucher type IDs
                                                             if (terms.private_voucher_type_ids) {
-                                                                try {
-                                                                    const parsedPrivate = JSON.parse(terms.private_voucher_type_ids);
-                                                                    if (Array.isArray(parsedPrivate)) {
-                                                                        parsedPrivate.forEach((v) => idCandidates.push(Number(v)));
+                                                                let parsedPrivate = [];
+                                                                if (Array.isArray(terms.private_voucher_type_ids)) {
+                                                                    parsedPrivate = terms.private_voucher_type_ids;
+                                                                } else {
+                                                                    try {
+                                                                        parsedPrivate = JSON.parse(terms.private_voucher_type_ids);
+                                                                    } catch (e) {
+                                                                        // ignore parse error here; we'll show a badge if nothing resolves
                                                                     }
-                                                                } catch (e) {
-                                                                    // ignore parse error here; we'll show a badge if nothing resolves
+                                                                }
+                                                                if (Array.isArray(parsedPrivate)) {
+                                                                    parsedPrivate.forEach((v) => idCandidates.push(Number(v)));
                                                                 }
                                                             }
                                                             
