@@ -176,6 +176,28 @@ const Settings = () => {
     const [termsExpanded, setTermsExpanded] = useState(false);
     const [passengerTermsExpanded, setPassengerTermsExpanded] = useState(false);
     
+    // Helper: safely parse journey_types from DB (array, JSON string, CSV, or single string)
+    const safeParseJourneyTypes = (val) => {
+        try {
+            if (!val && val !== '') return [];
+            if (Array.isArray(val)) return val;
+            if (typeof val === 'string') {
+                const s = val.trim();
+                if (s.startsWith('[')) {
+                    return JSON.parse(s);
+                }
+                if (s.includes(',')) {
+                    return s.split(',').map(t => t.trim()).filter(Boolean);
+                }
+                return s.length ? [s] : [];
+            }
+            return [];
+        } catch (e) {
+            console.warn('safeParseJourneyTypes error:', e, val);
+            return [];
+        }
+    };
+    
     const [formData, setFormData] = useState({
         code: '',
         title: '',
@@ -3483,7 +3505,7 @@ const Settings = () => {
                             </div>
                             <div style={{ textAlign: 'center' }}>
                                 <div style={{ fontSize: '24px', fontWeight: '600', color: '#3b82f6' }}>
-                                    {passengerTerms.filter(t => Array.isArray(JSON.parse(t.journey_types || '[]')) && JSON.parse(t.journey_types || '[]').length > 0).length}
+                                    {passengerTerms.filter(t => safeParseJourneyTypes(t.journey_types).length > 0).length}
                                 </div>
                                 <div style={{ fontSize: '14px', color: '#6b7280' }}>Linked to Journey Types</div>
                             </div>
@@ -3546,7 +3568,7 @@ const Settings = () => {
                                                 </td>
                                                 <td>
                                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                                        {(JSON.parse(terms.journey_types || '[]') || []).map((label) => (
+                                                        {safeParseJourneyTypes(terms.journey_types).map((label) => (
                                                             <span key={`journey-${label}`} style={{
                                                                 padding: '2px 8px',
                                                                 borderRadius: '12px',
@@ -3580,7 +3602,7 @@ const Settings = () => {
                                                                 setPassengerTermsFormData({
                                                                     title: terms.title,
                                                                     content: terms.content,
-                                                                    journey_types: JSON.parse(terms.journey_types || '[]') || [],
+                                                                    journey_types: safeParseJourneyTypes(terms.journey_types),
                                                                     is_active: !!terms.is_active,
                                                                     sort_order: terms.sort_order || 0
                                                                 });
