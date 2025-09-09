@@ -2414,6 +2414,82 @@ app.delete('/api/terms-and-conditions/:id', (req, res) => {
     });
 });
 
+// ==================== PASSENGER TERMS API ENDPOINTS ====================
+// Table: passenger_terms
+// Migration
+con.query(`
+    CREATE TABLE IF NOT EXISTS passenger_terms (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        content LONGTEXT NOT NULL,
+        journey_types JSON NOT NULL,
+        is_active TINYINT(1) DEFAULT 1,
+        sort_order INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+`, (err) => {
+    if (err) console.error('Failed creating passenger_terms table:', err);
+});
+
+// List all passenger terms
+app.get('/api/passenger-terms', (req, res) => {
+    const sql = 'SELECT * FROM passenger_terms ORDER BY sort_order ASC, created_at DESC';
+    con.query(sql, (err, result) => {
+        if (err) return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        res.json({ success: true, data: result });
+    });
+});
+
+// List by journey type (Book Flight, Flight Voucher, Buy Gift, Redeem Voucher)
+app.get('/api/passenger-terms/journey/:journey', (req, res) => {
+    const journey = req.params.journey;
+    const sql = 'SELECT * FROM passenger_terms WHERE JSON_CONTAINS(journey_types, ?) AND is_active = 1 ORDER BY sort_order ASC';
+    con.query(sql, [JSON.stringify(journey)], (err, result) => {
+        if (err) return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        res.json({ success: true, data: result });
+    });
+});
+
+// Create passenger terms
+app.post('/api/passenger-terms', (req, res) => {
+    const { title, content, journey_types, is_active, sort_order } = req.body;
+    if (!title || !content || !Array.isArray(journey_types) || journey_types.length === 0) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: title, content, journey_types[]' });
+    }
+    const sql = 'INSERT INTO passenger_terms (title, content, journey_types, is_active, sort_order) VALUES (?, ?, ?, ?, ?)';
+    const values = [title, content, JSON.stringify(journey_types), is_active !== undefined ? is_active : 1, sort_order || 0];
+    con.query(sql, values, (err, result) => {
+        if (err) return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        res.json({ success: true, id: result.insertId });
+    });
+});
+
+// Update passenger terms
+app.put('/api/passenger-terms/:id', (req, res) => {
+    const { id } = req.params;
+    const { title, content, journey_types, is_active, sort_order } = req.body;
+    if (!title || !content || !Array.isArray(journey_types) || journey_types.length === 0) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: title, content, journey_types[]' });
+    }
+    const sql = 'UPDATE passenger_terms SET title=?, content=?, journey_types=?, is_active=?, sort_order=? WHERE id=?';
+    const values = [title, content, JSON.stringify(journey_types), is_active !== undefined ? is_active : 1, sort_order || 0, id];
+    con.query(sql, values, (err, result) => {
+        if (err) return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Not found' });
+        res.json({ success: true });
+    });
+});
+
+// Delete passenger terms
+app.delete('/api/passenger-terms/:id', (req, res) => {
+    const { id } = req.params;
+    con.query('DELETE FROM passenger_terms WHERE id=?', [id], (err, result) => {
+        if (err) return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Not found' });
+        res.json({ success: true });
+    });
+});
 // Simple webhook test endpoint
 app.get('/api/webhook-test', (req, res) => {
     res.json({ 
