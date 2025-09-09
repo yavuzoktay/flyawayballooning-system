@@ -797,7 +797,6 @@ app.put('/api/experiences/:id', experiencesUpload.single('experience_image'), (r
         });
     });
 });
-
 // Delete experience
 app.delete('/api/experiences/:id', (req, res) => {
     const { id } = req.params;
@@ -1581,7 +1580,6 @@ app.get('/api/add-to-booking-items', (req, res) => {
         res.json({ success: true, data: result });
     });
 });
-
 // Create new add to booking item
 app.post('/api/add-to-booking-items', experiencesUpload.single('add_to_booking_item_image'), (req, res) => {
     const {
@@ -2307,7 +2305,6 @@ app.post('/api/terms-and-conditions', (req, res) => {
         });
     });
 });
-
 // Update terms and conditions
 app.put('/api/terms-and-conditions/:id', (req, res) => {
     const { id } = req.params;
@@ -2415,23 +2412,6 @@ app.delete('/api/terms-and-conditions/:id', (req, res) => {
 });
 
 // ==================== PASSENGER TERMS API ENDPOINTS ====================
-// Table: passenger_terms
-// Migration
-con.query(`
-    CREATE TABLE IF NOT EXISTS passenger_terms (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        title VARCHAR(255) NOT NULL,
-        content LONGTEXT NOT NULL,
-        journey_types JSON NOT NULL,
-        is_active TINYINT(1) DEFAULT 1,
-        sort_order INT DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-`, (err) => {
-    if (err) console.error('Failed creating passenger_terms table:', err);
-});
-
 // List all passenger terms
 app.get('/api/passenger-terms', (req, res) => {
     const sql = 'SELECT * FROM passenger_terms ORDER BY sort_order ASC, created_at DESC';
@@ -2644,6 +2624,22 @@ const con = mysql.createPool({
     connectionLimit: 10,
     queueLimit: 0,
     multipleStatements: true
+});
+
+// Create passenger_terms table if not exists (migration)
+con.query(`
+    CREATE TABLE IF NOT EXISTS passenger_terms (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        content LONGTEXT NOT NULL,
+        journey_types JSON NOT NULL,
+        is_active TINYINT(1) DEFAULT 1,
+        sort_order INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+`, (err) => {
+    if (err) console.error('Failed creating passenger_terms table:', err);
 });
 
 // Multer storage config for activities and experiences
@@ -3065,7 +3061,6 @@ app.get('/api/getAllBookingData', (req, res) => {
         res.json({ success: true, data: enriched });
     });
 });
-
 // Get All Voucher Data (with booking and passenger info)
 app.get('/api/getAllVoucherData', (req, res) => {
     // Get all vouchers with booking info - voucher codes are stored in all_vouchers.voucher_ref
@@ -3631,7 +3626,6 @@ app.get('/api/setup-database', (req, res) => {
         res.status(200).json({ success: true, message: 'Database tables created successfully!' });
     });
 });
-
 // Create Voucher (Flight Voucher veya Redeem Voucher)
 app.post('/api/createVoucher', (req, res) => {
     console.log('=== CREATE VOUCHER ENDPOINT CALLED ===');
@@ -4238,7 +4232,6 @@ app.post('/api/generateVoucherCodeForExisting', (req, res) => {
         return `${prefix}${timestamp}${random}`;
     }
 });
-
 // Get Booking Detail (all info for popup)
 app.get('/api/getBookingDetail', async (req, res) => {
     const booking_id = req.query.booking_id;
@@ -5021,7 +5014,6 @@ app.get('/api/analytics', async (req, res) => {
         });
     });
 });
-
 // Create Activity endpoint (with image upload)
 app.post("/api/createActivity", upload.single('image'), (req, res) => {
     const { activity_name, capacity, event_time, location, flight_type, voucher_type, private_charter_voucher_types, private_charter_pricing, status, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price } = req.body;
@@ -5808,7 +5800,6 @@ app.post("/api/getActivityId", (req, res) => {
         });
     });
 });
-
 // Delete an activity and its availabilities
 app.delete('/api/activity/:id', (req, res) => {
     const { id } = req.params;
@@ -6554,7 +6545,6 @@ app.listen(PORT, '0.0.0.0', () => {
     // Set up periodic updates every 5 minutes (maintenance only)
     setInterval(updateAvailabilityStatus, 5 * 60 * 1000);
 });
-
 // Delete a booking by ID (with cascade delete for passengers)
 app.delete('/api/deleteBooking/:id', (req, res) => {
     const { id } = req.params;
@@ -7310,7 +7300,6 @@ app.post('/api/createTestBooking', (req, res) => {
             res.status(500).json({ success: false, error: error.message });
         });
 });
-
 // Fallback endpoint for creating bookings when webhook fails
 app.post('/api/createBookingFromSession', async (req, res) => {
     try {
@@ -7809,7 +7798,6 @@ app.post('/api/createTestBooking', (req, res) => {
         res.json({ success: true, message: 'Test booking created', bookingId: result.insertId });
     });
 });
-
 // Database migration function
 const runDatabaseMigrations = () => {
     console.log('Running database migrations...');
@@ -8583,7 +8571,6 @@ const updateDateRequestTable = () => {
         }
     });
 };
-
 // Run date_request table updates
 updateDateRequestTable();
 

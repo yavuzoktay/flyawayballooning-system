@@ -151,6 +151,19 @@ const Settings = () => {
         showVoucherTypes: false,
         showPrivateVoucherTypes: false
     });
+
+    // Passenger Terms state (for Passenger Information)
+    const [passengerTerms, setPassengerTerms] = useState([]);
+    const [showPassengerTermsForm, setShowPassengerTermsForm] = useState(false);
+    const [showEditPassengerTermsForm, setShowEditPassengerTermsForm] = useState(false);
+    const [selectedPassengerTerms, setSelectedPassengerTerms] = useState(null);
+    const [passengerTermsFormData, setPassengerTermsFormData] = useState({
+        title: '',
+        content: '',
+        journey_types: [],
+        is_active: true,
+        sort_order: 0
+    });
     
     // Collapsible sections state
     const [voucherCodesExpanded, setVoucherCodesExpanded] = useState(false);
@@ -190,6 +203,7 @@ const Settings = () => {
         fetchAdditionalInfoQuestions();
         fetchTermsAndConditions();
         fetchCrewMembers();
+        fetchPassengerTerms();
     }, []);
 
     const fetchVoucherCodes = async () => {
@@ -283,6 +297,17 @@ const Settings = () => {
             }
         } catch (error) {
             console.error('Error fetching terms and conditions:', error);
+        }
+    };
+
+    const fetchPassengerTerms = async () => {
+        try {
+            const response = await axios.get('/api/passenger-terms');
+            if (response.data.success) {
+                setPassengerTerms(response.data.data);
+            }
+        } catch (error) {
+            console.error('Error fetching passenger terms:', error);
         }
     };
 
@@ -3405,44 +3430,25 @@ const Settings = () => {
                         }}>
                             <div style={{ textAlign: 'center' }}>
                                 <div style={{ fontSize: '24px', fontWeight: '600', color: '#1f2937' }}>
-                                    {termsAndConditions.length}
+                                    {passengerTerms.length}
                                 </div>
                                 <div style={{ fontSize: '14px', color: '#6b7280' }}>Total Terms</div>
                             </div>
                             <div style={{ textAlign: 'center' }}>
                                 <div style={{ fontSize: '24px', fontWeight: '600', color: '#10b981' }}>
-                                    {termsAndConditions.filter(t => t.is_active).length}
+                                    {passengerTerms.filter(t => t.is_active).length}
                                 </div>
                                 <div style={{ fontSize: '14px', color: '#6b7280' }}>Active</div>
                             </div>
                             <div style={{ textAlign: 'center' }}>
                                 <div style={{ fontSize: '24px', fontWeight: '600', color: '#3b82f6' }}>
-                                    {termsAndConditions.filter(t => {
-                                        try {
-                                            let hasVoucherTypes = false;
-                                            if (t.voucher_type_ids) {
-                                                const voucherTypeIds = JSON.parse(t.voucher_type_ids);
-                                                if (Array.isArray(voucherTypeIds) && voucherTypeIds.length > 0) {
-                                                    hasVoucherTypes = true;
-                                                }
-                                            }
-                                            if (t.private_voucher_type_ids) {
-                                                const privateVoucherTypeIds = JSON.parse(t.private_voucher_type_ids);
-                                                if (Array.isArray(privateVoucherTypeIds) && privateVoucherTypeIds.length > 0) {
-                                                    hasVoucherTypes = true;
-                                                }
-                                            }
-                                            return hasVoucherTypes;
-                                        } catch (error) {
-                                            return false;
-                                        }
-                                    }).length}
+                                    {passengerTerms.filter(t => Array.isArray(JSON.parse(t.journey_types || '[]')) && JSON.parse(t.journey_types || '[]').length > 0).length}
                                 </div>
-                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Linked to Voucher Types</div>
+                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Linked to Journey Types</div>
                             </div>
                         </div>
 
-                        {termsAndConditions.length === 0 ? (
+                        {passengerTerms.length === 0 ? (
                             <div className="no-terms-message">
                                 <div style={{ textAlign: 'center', padding: '40px' }}>
                                     <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
@@ -3452,7 +3458,7 @@ const Settings = () => {
                                     </p>
                                     <button 
                                         className="btn btn-primary"
-                                        onClick={() => setShowTermsForm(true)}
+                                        onClick={() => setShowPassengerTermsForm(true)}
                                     >
                                         <Plus size={20} />
                                         Create First Terms
@@ -3470,14 +3476,14 @@ const Settings = () => {
                                         <tr>
                                             <th>Title</th>
                                             <th>Content Preview</th>
-                                            <th>Voucher Types</th>
+                                            <th>Journey Types</th>
                                             <th>Sort Order</th>
                                             <th>Status</th>
                                             <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {termsAndConditions.map((terms) => (
+                                        {passengerTerms.map((terms) => (
                                             <tr key={`passenger-${terms.id}`}>
                                                 <td>
                                                     <div style={{ fontWeight: '500', color: '#1f2937' }}>
@@ -3499,53 +3505,17 @@ const Settings = () => {
                                                 </td>
                                                 <td>
                                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                                        {(() => {
-                                                            const idCandidates = [];
-                                                            if (terms.voucher_type_id) {
-                                                                idCandidates.push(Number(terms.voucher_type_id));
-                                                            }
-                                                            if (terms.voucher_type_ids) {
-                                                                let parsed = [];
-                                                                if (Array.isArray(terms.voucher_type_ids)) {
-                                                                    parsed = terms.voucher_type_ids;
-                                                                } else {
-                                                                    try { parsed = JSON.parse(terms.voucher_type_ids); } catch {}
-                                                                }
-                                                                if (Array.isArray(parsed)) parsed.forEach((v) => idCandidates.push(Number(v)));
-                                                            }
-                                                            if (terms.private_voucher_type_ids) {
-                                                                let parsedPrivate = [];
-                                                                if (Array.isArray(terms.private_voucher_type_ids)) {
-                                                                    parsedPrivate = terms.private_voucher_type_ids;
-                                                                } else {
-                                                                    try { parsedPrivate = JSON.parse(terms.private_voucher_type_ids); } catch {}
-                                                                }
-                                                                if (Array.isArray(parsedPrivate)) parsedPrivate.forEach((v) => idCandidates.push(Number(v)));
-                                                            }
-                                                            const uniqueIds = Array.from(new Set(idCandidates.filter((v) => !Number.isNaN(v))));
-                                                            if (uniqueIds.length === 0) {
-                                                                return <span style={{ color: '#9ca3af', fontSize: '12px' }}>No voucher type</span>;
-                                                            }
-                                                            return uniqueIds.map((voucherTypeId) => {
-                                                                let voucherType = voucherTypes.find((vt) => Number(vt.id) === Number(voucherTypeId));
-                                                                let isPrivateCharter = false;
-                                                                if (!voucherType) {
-                                                                    voucherType = privateCharterVoucherTypes.find((vt) => Number(vt.id) === Number(voucherTypeId));
-                                                                    isPrivateCharter = true;
-                                                                }
-                                                                return (
-                                                                    <span key={`passenger-vt-${voucherTypeId}`} style={{
-                                                                        padding: '2px 8px',
-                                                                        borderRadius: '12px',
-                                                                        fontSize: '11px',
-                                                                        backgroundColor: isPrivateCharter ? '#fef3c7' : '#dbeafe',
-                                                                        color: isPrivateCharter ? '#92400e' : '#1e40af'
-                                                                    }}>
-                                                                        {voucherType ? voucherType.title : `#${voucherTypeId}`}
-                                                                    </span>
-                                                                );
-                                                            });
-                                                        })()}
+                                                        {(JSON.parse(terms.journey_types || '[]') || []).map((label) => (
+                                                            <span key={`journey-${label}`} style={{
+                                                                padding: '2px 8px',
+                                                                borderRadius: '12px',
+                                                                fontSize: '11px',
+                                                                backgroundColor: '#dbeafe',
+                                                                color: '#1e40af'
+                                                            }}>
+                                                                {label}
+                                                            </span>
+                                                        ))}
                                                     </div>
                                                 </td>
                                                 <td>
@@ -3564,14 +3534,32 @@ const Settings = () => {
                                                     <div className="action-buttons">
                                                         <button
                                                             className="btn btn-icon"
-                                                            onClick={() => handleEditTerms(terms)}
+                                                            onClick={() => {
+                                                                setSelectedPassengerTerms(terms);
+                                                                setPassengerTermsFormData({
+                                                                    title: terms.title,
+                                                                    content: terms.content,
+                                                                    journey_types: JSON.parse(terms.journey_types || '[]') || [],
+                                                                    is_active: !!terms.is_active,
+                                                                    sort_order: terms.sort_order || 0
+                                                                });
+                                                                setShowEditPassengerTermsForm(true);
+                                                            }}
                                                             title="Edit"
                                                         >
                                                             <Edit size={16} />
                                                         </button>
                                                         <button
                                                             className="btn btn-icon btn-danger"
-                                                            onClick={() => handleDeleteTerms(terms.id)}
+                                                            onClick={async () => {
+                                                                if (!window.confirm('Delete this passenger terms item?')) return;
+                                                                try {
+                                                                    await axios.delete(`/api/passenger-terms/${terms.id}`);
+                                                                    fetchPassengerTerms();
+                                                                } catch (e) {
+                                                                    alert('Error deleting');
+                                                                }
+                                                            }}
                                                             title="Delete"
                                                         >
                                                             <Trash2 size={16} />
