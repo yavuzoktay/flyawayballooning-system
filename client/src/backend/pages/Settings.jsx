@@ -4713,17 +4713,25 @@ const Settings = () => {
                 </div>
             )}
 
-            {/* Create/Edit Terms & Conditions Form Modal */}
-            {(showTermsForm || showEditTermsForm) && (
+            {/* Create/Edit Terms & Conditions Form Modal (includes Passenger Information terms) */}
+            {(showTermsForm || showEditTermsForm || showPassengerTermsForm || showEditPassengerTermsForm) && (
                 <div className="modal-overlay">
                     <div className="modal-content">
                         <div className="modal-header">
-                            <h3>{showEditTermsForm ? 'Edit Terms & Conditions' : 'Create New Terms & Conditions'}</h3>
+                            <h3>{
+                                showPassengerTermsForm
+                                    ? 'Create Terms & Conditions for Passenger Information'
+                                    : showEditPassengerTermsForm
+                                        ? 'Edit Terms & Conditions for Passenger Information'
+                                        : (showEditTermsForm ? 'Edit Terms & Conditions' : 'Create New Terms & Conditions')
+                            }</h3>
                             <button 
                                 className="close-btn"
                                 onClick={() => {
                                     setShowTermsForm(false);
                                     setShowEditTermsForm(false);
+                                    setShowPassengerTermsForm(false);
+                                    setShowEditPassengerTermsForm(false);
                                     resetTermsForm();
                                 }}
                             >
