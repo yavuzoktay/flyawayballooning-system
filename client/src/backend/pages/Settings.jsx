@@ -161,6 +161,7 @@ const Settings = () => {
     const [crewExpanded, setCrewExpanded] = useState(false);
     const [additionalInfoExpanded, setAdditionalInfoExpanded] = useState(false);
     const [termsExpanded, setTermsExpanded] = useState(false);
+    const [passengerTermsExpanded, setPassengerTermsExpanded] = useState(false);
     
     const [formData, setFormData] = useState({
         code: '',
@@ -3299,6 +3300,241 @@ const Settings = () => {
                                                                 
                                                                 return (
                                                                     <span key={voucherTypeId} style={{
+                                                                        padding: '2px 8px',
+                                                                        borderRadius: '12px',
+                                                                        fontSize: '11px',
+                                                                        backgroundColor: isPrivateCharter ? '#fef3c7' : '#dbeafe',
+                                                                        color: isPrivateCharter ? '#92400e' : '#1e40af'
+                                                                    }}>
+                                                                        {voucherType ? voucherType.title : `#${voucherTypeId}`}
+                                                                    </span>
+                                                                );
+                                                            });
+                                                        })()}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span style={{ color: '#6b7280', fontSize: '12px' }}>
+                                                        {terms.sort_order}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    {terms.is_active ? (
+                                                        <span className="status-badge active">Active</span>
+                                                    ) : (
+                                                        <span className="status-badge inactive">Inactive</span>
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    <div className="action-buttons">
+                                                        <button
+                                                            className="btn btn-icon"
+                                                            onClick={() => handleEditTerms(terms)}
+                                                            title="Edit"
+                                                        >
+                                                            <Edit size={16} />
+                                                        </button>
+                                                        <button
+                                                            className="btn btn-icon btn-danger"
+                                                            onClick={() => handleDeleteTerms(terms.id)}
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+
+            {/* Terms & Conditions for Passenger Information (duplicate section) */}
+            <div className="card" style={{ marginTop: '16px' }}>
+                <div
+                    className="card-header"
+                    onClick={() => setPassengerTermsExpanded(!passengerTermsExpanded)}
+                    style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        padding: '20px',
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                    }}
+                >
+                    <div>
+                        <h2 style={{ margin: 0, color: '#1f2937' }}>Terms & Conditions for Passenger Information</h2>
+                        <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
+                            Manage additional terms shown alongside Passenger Information in balloning-book.
+                        </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button 
+                            className="btn btn-primary"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowTermsForm(true);
+                            }}
+                            style={{ margin: 0 }}
+                        >
+                            <Plus size={20} />
+                            Create Terms
+                        </button>
+                        {passengerTermsExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+                    </div>
+                </div>
+                {passengerTermsExpanded && (
+                    <>
+                        <div className="terms-stats" style={{ 
+                            display: 'flex', 
+                            gap: '20px', 
+                            marginBottom: '20px',
+                            padding: '16px',
+                            background: '#f8fafc',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0'
+                        }}>
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#1f2937' }}>
+                                    {termsAndConditions.length}
+                                </div>
+                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Total Terms</div>
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#10b981' }}>
+                                    {termsAndConditions.filter(t => t.is_active).length}
+                                </div>
+                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Active</div>
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: '24px', fontWeight: '600', color: '#3b82f6' }}>
+                                    {termsAndConditions.filter(t => {
+                                        try {
+                                            let hasVoucherTypes = false;
+                                            if (t.voucher_type_ids) {
+                                                const voucherTypeIds = JSON.parse(t.voucher_type_ids);
+                                                if (Array.isArray(voucherTypeIds) && voucherTypeIds.length > 0) {
+                                                    hasVoucherTypes = true;
+                                                }
+                                            }
+                                            if (t.private_voucher_type_ids) {
+                                                const privateVoucherTypeIds = JSON.parse(t.private_voucher_type_ids);
+                                                if (Array.isArray(privateVoucherTypeIds) && privateVoucherTypeIds.length > 0) {
+                                                    hasVoucherTypes = true;
+                                                }
+                                            }
+                                            return hasVoucherTypes;
+                                        } catch (error) {
+                                            return false;
+                                        }
+                                    }).length}
+                                </div>
+                                <div style={{ fontSize: '14px', color: '#6b7280' }}>Linked to Voucher Types</div>
+                            </div>
+                        </div>
+
+                        {termsAndConditions.length === 0 ? (
+                            <div className="no-terms-message">
+                                <div style={{ textAlign: 'center', padding: '40px' }}>
+                                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
+                                    <h3 style={{ color: '#6b7280', marginBottom: '8px' }}>No Terms Yet</h3>
+                                    <p style={{ color: '#9ca3af', marginBottom: '20px' }}>
+                                        Create your first terms and conditions to display in the Passenger Information section.
+                                    </p>
+                                    <button 
+                                        className="btn btn-primary"
+                                        onClick={() => setShowTermsForm(true)}
+                                    >
+                                        <Plus size={20} />
+                                        Create First Terms
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="terms-table-container" style={{ 
+                                width: '100%', 
+                                overflowX: 'auto',
+                                minHeight: '400px'
+                            }}>
+                                <table className="terms-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Title</th>
+                                            <th>Content Preview</th>
+                                            <th>Voucher Types</th>
+                                            <th>Sort Order</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {termsAndConditions.map((terms) => (
+                                            <tr key={`passenger-${terms.id}`}>
+                                                <td>
+                                                    <div style={{ fontWeight: '500', color: '#1f2937' }}>
+                                                        {terms.title}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div style={{ 
+                                                        maxWidth: '300px', 
+                                                        fontSize: '12px', 
+                                                        color: '#6b7280',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        whiteSpace: 'nowrap'
+                                                    }}>
+                                                        {terms.content.substring(0, 100)}
+                                                        {terms.content.length > 100 && '...'}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                                        {(() => {
+                                                            const idCandidates = [];
+                                                            if (terms.voucher_type_id) {
+                                                                idCandidates.push(Number(terms.voucher_type_id));
+                                                            }
+                                                            if (terms.voucher_type_ids) {
+                                                                let parsed = [];
+                                                                if (Array.isArray(terms.voucher_type_ids)) {
+                                                                    parsed = terms.voucher_type_ids;
+                                                                } else {
+                                                                    try { parsed = JSON.parse(terms.voucher_type_ids); } catch {}
+                                                                }
+                                                                if (Array.isArray(parsed)) parsed.forEach((v) => idCandidates.push(Number(v)));
+                                                            }
+                                                            if (terms.private_voucher_type_ids) {
+                                                                let parsedPrivate = [];
+                                                                if (Array.isArray(terms.private_voucher_type_ids)) {
+                                                                    parsedPrivate = terms.private_voucher_type_ids;
+                                                                } else {
+                                                                    try { parsedPrivate = JSON.parse(terms.private_voucher_type_ids); } catch {}
+                                                                }
+                                                                if (Array.isArray(parsedPrivate)) parsedPrivate.forEach((v) => idCandidates.push(Number(v)));
+                                                            }
+                                                            const uniqueIds = Array.from(new Set(idCandidates.filter((v) => !Number.isNaN(v))));
+                                                            if (uniqueIds.length === 0) {
+                                                                return <span style={{ color: '#9ca3af', fontSize: '12px' }}>No voucher type</span>;
+                                                            }
+                                                            return uniqueIds.map((voucherTypeId) => {
+                                                                let voucherType = voucherTypes.find((vt) => Number(vt.id) === Number(voucherTypeId));
+                                                                let isPrivateCharter = false;
+                                                                if (!voucherType) {
+                                                                    voucherType = privateCharterVoucherTypes.find((vt) => Number(vt.id) === Number(voucherTypeId));
+                                                                    isPrivateCharter = true;
+                                                                }
+                                                                return (
+                                                                    <span key={`passenger-vt-${voucherTypeId}`} style={{
                                                                         padding: '2px 8px',
                                                                         borderRadius: '12px',
                                                                         fontSize: '11px',
