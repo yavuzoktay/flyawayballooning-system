@@ -4739,14 +4739,20 @@ const Settings = () => {
                             </button>
                         </div>
                         
-                        <form onSubmit={handleTermsSubmit} className="terms-form">
+                        <form onSubmit={(showPassengerTermsForm || showEditPassengerTermsForm) ? handlePassengerTermsSubmit : handleTermsSubmit} className="terms-form">
                             <div className="form-row">
                                 <div className="form-group">
                                     <label>Title *</label>
                                     <input
                                         type="text"
-                                        value={termsFormData.title}
-                                        onChange={(e) => setTermsFormData({...termsFormData, title: e.target.value})}
+                                        value={(showPassengerTermsForm || showEditPassengerTermsForm) ? passengerTermsFormData.title : termsFormData.title}
+                                        onChange={(e) => {
+                                            if (showPassengerTermsForm || showEditPassengerTermsForm) {
+                                                setPassengerTermsFormData({ ...passengerTermsFormData, title: e.target.value });
+                                            } else {
+                                                setTermsFormData({ ...termsFormData, title: e.target.value });
+                                            }
+                                        }}
                                         placeholder="e.g., Weekday Morning Terms, Any Day Flight Terms"
                                         required
                                     />
@@ -4756,8 +4762,15 @@ const Settings = () => {
                                     <label>Sort Order</label>
                                     <input
                                         type="number"
-                                        value={termsFormData.sort_order}
-                                        onChange={(e) => setTermsFormData({...termsFormData, sort_order: parseInt(e.target.value)})}
+                                        value={(showPassengerTermsForm || showEditPassengerTermsForm) ? passengerTermsFormData.sort_order : termsFormData.sort_order}
+                                        onChange={(e) => {
+                                            const val = parseInt(e.target.value);
+                                            if (showPassengerTermsForm || showEditPassengerTermsForm) {
+                                                setPassengerTermsFormData({ ...passengerTermsFormData, sort_order: val });
+                                            } else {
+                                                setTermsFormData({ ...termsFormData, sort_order: val });
+                                            }
+                                        }}
                                         placeholder="0"
                                         min="0"
                                     />
@@ -4767,8 +4780,14 @@ const Settings = () => {
                             <div className="form-group">
                                 <label>Content *</label>
                                 <textarea
-                                    value={termsFormData.content}
-                                    onChange={(e) => setTermsFormData({...termsFormData, content: e.target.value})}
+                                    value={(showPassengerTermsForm || showEditPassengerTermsForm) ? passengerTermsFormData.content : termsFormData.content}
+                                    onChange={(e) => {
+                                        if (showPassengerTermsForm || showEditPassengerTermsForm) {
+                                            setPassengerTermsFormData({ ...passengerTermsFormData, content: e.target.value });
+                                        } else {
+                                            setTermsFormData({ ...termsFormData, content: e.target.value });
+                                        }
+                                    }}
                                     placeholder="Enter the terms and conditions text content..."
                                     rows="8"
                                     required
@@ -4779,91 +4798,77 @@ const Settings = () => {
                                 </div>
                             </div>
                             
-                            <div className="form-group">
-                                <label>Experiences *</label>
-                                <div style={{ 
-                                    border: '1px solid #d1d5db', 
-                                    borderRadius: '8px', 
-                                    padding: '16px',
-                                    background: '#f9fafb'
-                                }}>
-                                    <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
-                                        Select which experiences these terms apply to:
-                                    </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                        {experiences.map((experience) => (
-                                            <label key={experience.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={termsFormData.experience_ids && termsFormData.experience_ids.includes(experience.id)}
-                                                                                                            onChange={(e) => {
+                            {!(showPassengerTermsForm || showEditPassengerTermsForm) ? (
+                                // Original experiences/voucher type UI for regular Terms & Conditions
+                                <div className="form-group">
+                                    <label>Experiences *</label>
+                                    <div style={{ border: '1px solid #d1d5db', borderRadius: '8px', padding: '16px', background: '#f9fafb' }}>
+                                        <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
+                                            Select which experiences these terms apply to:
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                            {experiences.map((experience) => (
+                                                <label key={experience.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={termsFormData.experience_ids && termsFormData.experience_ids.includes(experience.id)}
+                                                        onChange={(e) => {
                                                             const experienceId = experience.id;
                                                             const currentExperienceIds = termsFormData.experience_ids || [];
-                                                            let newExperienceIds;
-                                                            
-                                                            if (e.target.checked) {
-                                                                // Add experience
-                                                                newExperienceIds = [...currentExperienceIds, experienceId];
-                                                            } else {
-                                                                // Remove experience
-                                                                newExperienceIds = currentExperienceIds.filter(id => id !== experienceId);
-                                                            }
-                                                            
-                                                            setTermsFormData({
-                                                                ...termsFormData,
-                                                                experience_ids: newExperienceIds
-                                                            });
-                                                            
-                                                            // Auto-show/hide Voucher Types and Private Voucher Types based on experience selection
+                                                            const newExperienceIds = e.target.checked
+                                                                ? [...currentExperienceIds, experienceId]
+                                                                : currentExperienceIds.filter(id => id !== experienceId);
+                                                            setTermsFormData({ ...termsFormData, experience_ids: newExperienceIds });
                                                             if (experience.title === 'Shared Flight') {
-                                                                if (e.target.checked) {
-                                                                    // Show Voucher Types dropdown
-                                                                    setTermsFormData(prev => ({
-                                                                        ...prev,
-                                                                        showVoucherTypes: true
-                                                                    }));
-                                                                } else {
-                                                                    // Hide Voucher Types dropdown and clear selection
-                                                                    setTermsFormData(prev => ({
-                                                                        ...prev,
-                                                                        showVoucherTypes: false,
-                                                                        voucher_type_ids: []
-                                                                    }));
-                                                                }
+                                                                setTermsFormData(prev => ({ ...prev, showVoucherTypes: e.target.checked }));
                                                             } else if (experience.title === 'Private Charter') {
-                                                                if (e.target.checked) {
-                                                                    // Show Private Voucher Types dropdown
-                                                                    setTermsFormData(prev => ({
-                                                                        ...prev,
-                                                                        showPrivateVoucherTypes: true
-                                                                    }));
-                                                                } else {
-                                                                    // Hide Private Voucher Types dropdown and clear selection
-                                                                    setTermsFormData(prev => ({
-                                                                        ...prev,
-                                                                        showPrivateVoucherTypes: false,
-                                                                        private_voucher_type_ids: []
-                                                                    }));
-                                                                }
+                                                                setTermsFormData(prev => ({ ...prev, showPrivateVoucherTypes: e.target.checked }));
                                                             }
                                                         }}
-                                                />
-                                                <span style={{ fontSize: '14px', color: '#374151' }}>
-                                                    {experience.title}
-                                                </span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                    {experiences.length === 0 && (
-                                        <div style={{ color: '#9ca3af', fontSize: '14px', fontStyle: 'italic', marginTop: '8px' }}>
-                                            No experiences available. Please create experiences first.
+                                                    />
+                                                    <span style={{ fontSize: '14px', color: '#374151' }}>{experience.title}</span>
+                                                </label>
+                                            ))}
                                         </div>
-                                    )}
+                                        {experiences.length === 0 && (
+                                            <div style={{ color: '#9ca3af', fontSize: '14px', fontStyle: 'italic', marginTop: '8px' }}>
+                                                No experiences available. Please create experiences first.
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
+                            ) : (
+                                // Passenger Information: Journey Types (Flight Types)
+                                <div className="form-group">
+                                    <label>Flight Type *</label>
+                                    <div style={{ border: '1px solid #d1d5db', borderRadius: '8px', padding: '16px', background: '#f9fafb' }}>
+                                        <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
+                                            Select which flight types these terms apply to:
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                            {journeyTypes.map((label) => (
+                                                <label key={label} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={Array.isArray(passengerTermsFormData.journey_types) && passengerTermsFormData.journey_types.includes(label)}
+                                                        onChange={(e) => {
+                                                            const current = passengerTermsFormData.journey_types || [];
+                                                            const updated = e.target.checked
+                                                                ? [...current, label]
+                                                                : current.filter((x) => x !== label);
+                                                            setPassengerTermsFormData({ ...passengerTermsFormData, journey_types: updated });
+                                                        }}
+                                                    />
+                                                    <span style={{ fontSize: '14px', color: '#374151' }}>{label}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             
                             {/* Voucher Types - only show when Shared Flight is selected */}
-                            {termsFormData.showVoucherTypes && (
+                            {!(showPassengerTermsForm || showEditPassengerTermsForm) && termsFormData.showVoucherTypes && (
                                 <div className="form-group">
                                     <label>Voucher Types *</label>
                                     <div style={{ 
@@ -4903,7 +4908,7 @@ const Settings = () => {
                             )}
                             
                             {/* Private Voucher Types - only show when Private Charter is selected */}
-                            {termsFormData.showPrivateVoucherTypes && (
+                            {!(showPassengerTermsForm || showEditPassengerTermsForm) && termsFormData.showPrivateVoucherTypes && (
                                 <div className="form-group">
                                     <label>Private Voucher Types</label>
                                     <div style={{ 
