@@ -1272,6 +1272,47 @@ const Settings = () => {
         }
     };
 
+    // Passenger Terms (Passenger Information) form handling
+    const resetPassengerTermsForm = () => {
+        setPassengerTermsFormData({
+            title: '',
+            content: '',
+            journey_types: [],
+            is_active: true,
+            sort_order: 0
+        });
+        setSelectedPassengerTerms(null);
+    };
+
+    const handlePassengerTermsSubmit = async (e) => {
+        e.preventDefault();
+        const payload = { ...passengerTermsFormData };
+
+        if (!payload.title || !payload.content) {
+            alert('Please fill in all required fields: Title and Content');
+            return;
+        }
+        if (!Array.isArray(payload.journey_types) || payload.journey_types.length === 0) {
+            alert('Please select at least one Flight Type');
+            return;
+        }
+
+        try {
+            if (showEditPassengerTermsForm && selectedPassengerTerms) {
+                await axios.put(`/api/passenger-terms/${selectedPassengerTerms.id}`, payload);
+            } else {
+                await axios.post('/api/passenger-terms', payload);
+            }
+            await fetchPassengerTerms();
+            resetPassengerTermsForm();
+            setShowPassengerTermsForm(false);
+            setShowEditPassengerTermsForm(false);
+        } catch (error) {
+            console.error('Error saving passenger terms:', error);
+            alert(error.response?.data?.message || 'Error saving passenger terms');
+        }
+    };
+
     const handleEditTerms = (terms) => {
         console.log('handleEditTerms called with:', terms);
         console.log('terms.private_voucher_type_ids:', terms.private_voucher_type_ids);
