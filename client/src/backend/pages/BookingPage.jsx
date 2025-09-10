@@ -1670,6 +1670,9 @@ setBookingDetail(finalVoucherDetail);
             await Promise.all(selectedDateRequestIds.map(id => axios.delete(`/api/date-requests/${id}`)));
             // Update local state immediately for instant UI feedback
             setDateRequested(prev => prev.filter(item => !selectedDateRequestIds.includes(item.id)));
+            // Also update the rendered dataset for current tab without requiring a reload
+            setFilteredDateRequestData(prev => prev.filter(row => !selectedDateRequestIds.includes(row.id)));
+            setFilteredData(prev => prev.filter(row => !selectedDateRequestIds.includes(row.id)));
             setSelectedDateRequestIds([]);
         } catch (err) {
             alert('Failed to delete date requests.');
