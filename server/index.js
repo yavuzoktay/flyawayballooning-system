@@ -6622,13 +6622,19 @@ app.delete('/api/deleteBooking/:id', (req, res) => {
 app.delete('/api/date-requests/:id', (req, res) => {
     const { id } = req.params;
     if (!id) return res.status(400).json({ success: false, message: 'Missing id' });
-    const sql = 'DELETE FROM date_requests WHERE id = ?';
+    // Table name is singular elsewhere (GET uses `date_request`). Keep consistent here.
+    const sql = 'DELETE FROM date_request WHERE id = ?';
     con.query(sql, [id], (err, result) => {
         if (err) {
             console.error('Error deleting date request:', err);
             return res.status(500).json({ success: false, message: 'Database error' });
         }
-        res.json({ success: true });
+        if (result && result.affectedRows > 0) {
+            return res.json({ success: true, deleted: result.affectedRows });
+        } else {
+            // Not found or already deleted
+            return res.status(404).json({ success: false, message: 'Date request not found' });
+        }
     });
 });
 
