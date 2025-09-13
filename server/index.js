@@ -7645,14 +7645,16 @@ app.post('/api/fix-journey-types', async (req, res) => {
         console.log(`Total records with journey_types: ${allValid[0].total}`);
         console.log(`Valid JSON records: ${allValid[0].valid_count}`);
         
-        const success = allValid[0].total === allValid[0].valid_count;
+        const totalRecords = parseInt(allValid[0].total);
+        const validRecords = parseInt(allValid[0].valid_count);
+        const success = totalRecords === validRecords;
         
         res.json({
             success: success,
             message: success ? 'All journey_types are now valid JSON!' : 'Some records still have invalid JSON',
             updatedRecords: updateResult.affectedRows,
-            totalRecords: allValid[0].total,
-            validRecords: allValid[0].valid_count
+            totalRecords: totalRecords,
+            validRecords: validRecords
         });
         
     } catch (error) {
