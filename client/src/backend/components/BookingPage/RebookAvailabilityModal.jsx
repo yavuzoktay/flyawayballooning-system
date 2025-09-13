@@ -489,7 +489,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
 
                                         {selectedDate && (
                                             <>
-                                                <Typography variant="subtitle1" sx={{ mb: 1 }}>Available Times for {dayjs(selectedDate).format('DD/MM/YYYY')}:</Typography>
+                                                <Typography variant="h6" sx={{ mb: 2, fontSize: 18, fontWeight: 600 }}>Available Times for {dayjs(selectedDate).format('DD/MM/YYYY')}:</Typography>
                                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
                                                     {getTimesForDate(selectedDate).length === 0 && (
                                                         <Box>
@@ -513,7 +513,12 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                                     opacity: isDisabled ? 0.5 : 1,
                                                                     backgroundColor: isDisabled ? '#f5f5f5' : 'inherit',
                                                                     color: isDisabled ? '#999' : 'inherit',
-                                                                    cursor: isDisabled ? 'not-allowed' : 'pointer'
+                                                                    cursor: isDisabled ? 'not-allowed' : 'pointer',
+                                                                    fontSize: 16,
+                                                                    fontWeight: 600,
+                                                                    padding: '12px 20px',
+                                                                    minWidth: '140px',
+                                                                    height: '50px'
                                                                 }}
                                                             >
                                                                 {slot.time} ({slot.available}/{slot.capacity})
