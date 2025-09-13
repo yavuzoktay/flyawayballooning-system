@@ -294,15 +294,36 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
             // 3. Sold out değil
             const isCurrentBookingDate = bookingDetail?.booking?.flight_date && dayjs(bookingDetail.booking.flight_date).isSame(d, 'day');
             const isSelectable = inCurrentMonth && !isPast && !soldOut;
+            
+            // Debug: Tarih seçilebilirlik durumunu logla
+            if (inCurrentMonth && !isPast) {
+                console.log(`Date ${d.format('YYYY-MM-DD')}:`, {
+                    inCurrentMonth,
+                    isPast,
+                    soldOut,
+                    isSelectable,
+                    slotsLength: slots.length,
+                    totalAvailable
+                });
+            }
 
             cells.push(
                 <div
                     key={d.format('YYYY-MM-DD')}
                     onClick={() => {
+                        console.log(`Clicked on ${d.format('YYYY-MM-DD')}:`, {
+                            isSelectable,
+                            inCurrentMonth,
+                            isPast,
+                            soldOut,
+                            slotsLength: slots.length
+                        });
                         if (isSelectable) {
                             setSelectedDate(d.toDate());
                             setSelectedTime(null);
                             console.log('Date selected:', d.format('YYYY-MM-DD'), 'has slots:', slots.length > 0);
+                        } else {
+                            console.log('Date not selectable:', d.format('YYYY-MM-DD'));
                         }
                     }}
                     style={{
