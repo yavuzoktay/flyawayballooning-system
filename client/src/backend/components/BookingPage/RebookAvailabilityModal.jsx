@@ -288,6 +288,15 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
             const slots = filteredAvailabilities.filter(a => a.date === d.format('YYYY-MM-DD'));
             const totalAvailable = slots.reduce((acc, s) => acc + (Number(s.available) || 0), 0);
             const soldOut = slots.length > 0 && totalAvailable <= 0;
+            
+            // Debug: soldOut durumunu logla
+            if (slots.length > 0 && totalAvailable <= 0) {
+                console.log(`Date ${d.format('YYYY-MM-DD')} is sold out:`, {
+                    slotsLength: slots.length,
+                    totalAvailable,
+                    slots: slots.map(s => ({ id: s.id, available: s.available, capacity: s.capacity }))
+                });
+            }
             // Tarih seçilebilir olmalı eğer:
             // 1. Mevcut ay içinde
             // 2. Geçmiş değil
