@@ -7530,16 +7530,31 @@ app.post('/api/createBookingFromSession', async (req, res) => {
         // Clean up session data (keep minimal info to allow status checks for a short time)
         stripeSessionStore[session_id] = { ...stripeSessionStore[session_id], processed: true };
         
+        // Determine the correct voucher code based on type
+        let finalVoucherCode = null;
+        if (type === 'booking') {
+            finalVoucherCode = voucherCode || storeData.bookingData?.voucher_code || null;
+        } else if (type === 'voucher') {
+            finalVoucherCode = storeData.voucherData?.generated_voucher_code || null;
+        }
+        
+        console.log('=== FINAL RESPONSE DEBUG ===');
+        console.log('Type:', type);
+        console.log('voucherCode:', voucherCode);
+        console.log('storeData.bookingData?.voucher_code:', storeData.bookingData?.voucher_code);
+        console.log('storeData.voucherData?.generated_voucher_code:', storeData.voucherData?.generated_voucher_code);
+        console.log('finalVoucherCode:', finalVoucherCode);
+        
         res.json({ 
             success: true, 
             id: result, 
             message: `${type} created successfully`,
-            voucher_code: voucherCode || storeData.voucherData?.generated_voucher_code || null,
-            customer_name: storeData.voucherData?.name || storeData.bookingData?.name || null,
-            customer_email: storeData.voucherData?.email || storeData.bookingData?.email || null,
+            voucher_code: finalVoucherCode,
+            customer_name: storeData.voucherData?.name || storeData.bookingData?.passengerData?.[0]?.firstName + ' ' + storeData.bookingData?.passengerData?.[0]?.lastName || null,
+            customer_email: storeData.voucherData?.email || storeData.bookingData?.passengerData?.[0]?.email || null,
             paid_amount: storeData.voucherData?.paid || storeData.bookingData?.totalPrice || null,
-            voucher_type: storeData.voucherData?.voucher_type || null,
-            voucher_type_detail: storeData.voucherData?.voucher_type_detail || null
+            voucher_type: storeData.voucherData?.voucher_type || (type === 'booking' ? 'Book Flight' : null),
+            voucher_type_detail: storeData.voucherData?.voucher_type_detail || storeData.bookingData?.selectedVoucherType?.title || null
         });
     } catch (error) {
         console.error('Error creating from session:', error);
