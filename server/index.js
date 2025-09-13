@@ -1124,12 +1124,17 @@ app.get('/api/private-charter-voucher-types', (req, res) => {
                     // Map titles to prices (tolerant)
                     finalResult = finalResult.map(v => {
                         const title = v.title || '';
-                        let matchVal = pricingMap[title];
-                        if (matchVal == null) matchVal = pricingMap[title.trim?.()];
-                        if (matchVal == null) {
-                            const normTitle = normalize(title);
-                            for (const k of Object.keys(pricingMap)) {
-                                if (normalize(k) === normTitle) { matchVal = pricingMap[k]; break; }
+                        let matchVal = null;
+                        
+                        // Güvenli erişim için pricingMap kontrolü
+                        if (pricingMap && typeof pricingMap === 'object') {
+                            matchVal = pricingMap[title];
+                            if (matchVal == null) matchVal = pricingMap[title.trim?.()];
+                            if (matchVal == null) {
+                                const normTitle = normalize(title);
+                                for (const k of Object.keys(pricingMap)) {
+                                    if (normalize(k) === normTitle) { matchVal = pricingMap[k]; break; }
+                                }
                             }
                         }
                         if (matchVal != null && matchVal !== '') {
