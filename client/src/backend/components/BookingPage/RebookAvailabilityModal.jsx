@@ -471,7 +471,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                 ) : (
                                     <>
                                         {/* Live Availability style calendar */}
-                                        <Box sx={{ mb: 2 }}>
+                                        <Box sx={{ mb: 2 }} key={`calendar-${selectedDate ? dayjs(selectedDate).format('YYYY-MM-DD') : 'no-date'}`}>
                                             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                                                 <IconButton onClick={() => setCurrentMonth(prev => prev.subtract(1, 'month'))} size="small"><ChevronLeftIcon fontSize="small" /></IconButton>
                                                 <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 18 }}>{monthLabel}</Typography>
