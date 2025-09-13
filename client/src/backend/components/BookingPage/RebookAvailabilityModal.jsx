@@ -300,9 +300,9 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
             // Tarih seçilebilir olmalı eğer:
             // 1. Mevcut ay içinde
             // 2. Geçmiş değil
-            // 3. Sold out değil
+            // Sold out kontrolünü kaldırıyoruz - kullanıcı her tarihe tıklayabilmeli
             const isCurrentBookingDate = bookingDetail?.booking?.flight_date && dayjs(bookingDetail.booking.flight_date).isSame(d, 'day');
-            const isSelectable = inCurrentMonth && !isPast && !soldOut;
+            const isSelectable = inCurrentMonth && !isPast;
             
             // Debug: Tarih seçilebilirlik durumunu logla
             if (inCurrentMonth && !isPast) {
@@ -312,7 +312,8 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                     soldOut,
                     isSelectable,
                     slotsLength: slots.length,
-                    totalAvailable
+                    totalAvailable,
+                    note: 'Sold out kontrolü kaldırıldı - tüm tarihler tıklanabilir'
                 });
             }
 
@@ -357,18 +358,18 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                             ? '#56C1FF' 
                             : isCurrentBookingDate 
                                 ? '#3b82f6'  // Mevcut booking tarihi için mavi
-                                : (isSelectable ? '#22c55e' : '#f0f0f0'),
+                                : '#22c55e',  // Tüm tıklanabilir tarihler yeşil
                         color: isSelected 
                             ? '#fff' 
                             : isCurrentBookingDate 
                                 ? '#fff'  // Mevcut booking tarihi için beyaz yazı
-                                : (isSelectable ? '#fff' : '#999'),
+                                : '#fff',  // Tüm tıklanabilir tarihler beyaz yazı
                         display: inCurrentMonth ? 'flex' : 'none',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
                         fontWeight: 700,
-                        cursor: isSelectable ? 'pointer' : 'default',
+                        cursor: 'pointer',  // Tüm tarihler tıklanabilir
                         userSelect: 'none',
                         fontSize: 14,
                         pointerEvents: 'auto',
