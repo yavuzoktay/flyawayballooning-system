@@ -132,7 +132,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
 
     // Set calendar to current booking date when modal opens
     useEffect(() => {
-        if (open && bookingDetail?.booking?.flight_date) {
+        if (open && bookingDetail?.booking?.flight_date && selectedActivity && selectedLocation) {
             const bookingDate = dayjs(bookingDetail.booking.flight_date);
             console.log('Setting calendar to booking date:', bookingDate.format('YYYY-MM-DD HH:mm'));
             setCurrentMonth(bookingDate.startOf('month'));
@@ -144,7 +144,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                 setSelectedTime(timeString);
             }
         }
-    }, [open, bookingDetail]);
+    }, [open, bookingDetail, selectedActivity, selectedLocation]);
 
     // Debug: Track selectedDate changes
     useEffect(() => {
@@ -227,11 +227,24 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         setAvailableDates(Array.from(new Set(filtered.map(a => a.date))).filter(date => date));
     }, [selectedFlightTypes, availabilities]);
 
-    // Flight type değişince selectedDate ve selectedTime sıfırlansın
+    // Flight type değişince selectedDate ve selectedTime sıfırlansın (mevcut booking tarihini koru)
     useEffect(() => {
-        setSelectedDate(null);
-        setSelectedTime(null);
-    }, [selectedFlightTypes]);
+        // Eğer mevcut booking tarihi varsa ve modal yeni açılmışsa, tarihi koru
+        if (open && bookingDetail?.booking?.flight_date && selectedActivity && selectedLocation) {
+            const bookingDate = dayjs(bookingDetail.booking.flight_date);
+            // Sadece farklı bir tarih seçilmişse sıfırla
+            if (!selectedDate || !dayjs(selectedDate).isSame(bookingDate, 'day')) {
+                setSelectedDate(bookingDate.toDate());
+                const timeString = bookingDate.format('HH:mm');
+                if (timeString && timeString !== '00:00') {
+                    setSelectedTime(timeString);
+                }
+            }
+        } else {
+            setSelectedDate(null);
+            setSelectedTime(null);
+        }
+    }, [selectedFlightTypes, open, bookingDetail, selectedActivity, selectedLocation, selectedDate]);
 
     // Notify parent component when flight types change
     useEffect(() => {
