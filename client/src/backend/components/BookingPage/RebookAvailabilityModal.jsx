@@ -134,6 +134,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
     useEffect(() => {
         if (open && bookingDetail?.booking?.flight_date) {
             const bookingDate = dayjs(bookingDetail.booking.flight_date);
+            console.log('Setting calendar to booking date:', bookingDate.format('YYYY-MM-DD HH:mm'));
             setCurrentMonth(bookingDate.startOf('month'));
             setSelectedDate(bookingDate.toDate());
             
@@ -144,6 +145,16 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
             }
         }
     }, [open, bookingDetail]);
+
+    // Debug: Track selectedDate changes
+    useEffect(() => {
+        console.log('selectedDate changed:', selectedDate ? dayjs(selectedDate).format('YYYY-MM-DD') : 'null');
+    }, [selectedDate]);
+
+    // Debug: Track currentMonth changes
+    useEffect(() => {
+        console.log('currentMonth changed:', currentMonth.format('YYYY-MM'));
+    }, [currentMonth]);
 
     // Fetch availabilities (sadece activity/location değişince)
     useEffect(() => {
@@ -257,6 +268,9 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
             const inCurrentMonth = d.isSame(currentMonth, 'month');
             const isPast = d.isBefore(dayjs(), 'day');
             const isSelected = selectedDate && dayjs(selectedDate).isSame(d, 'day');
+            if (isSelected) {
+                console.log('Date is selected:', d.format('YYYY-MM-DD'), 'selectedDate:', selectedDate ? dayjs(selectedDate).format('YYYY-MM-DD') : 'null');
+            }
             // Aggregate availability for this date
             const slots = filteredAvailabilities.filter(a => a.date === d.format('YYYY-MM-DD'));
             const totalAvailable = slots.reduce((acc, s) => acc + (Number(s.available) || 0), 0);
