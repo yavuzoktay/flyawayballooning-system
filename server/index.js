@@ -7365,8 +7365,10 @@ app.post('/api/createBookingFromSession', async (req, res) => {
             
             // For Book Flight, generate voucher code
             try {
-                console.log('Generating voucher code for Book Flight...');
+                console.log('=== GENERATING VOUCHER CODE FOR BOOK FLIGHT ===');
                 console.log('Full storeData.bookingData:', JSON.stringify(storeData.bookingData, null, 2));
+                console.log('selectedVoucherType exists:', !!storeData.bookingData.selectedVoucherType);
+                console.log('selectedVoucherType:', storeData.bookingData.selectedVoucherType);
                 
                 // Determine flight category from booking data
                 let flightCategory = 'Any Day Flight'; // Default
@@ -7390,7 +7392,7 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                 }
                 
                 // Generate voucher code
-                const voucherCodeResponse = await axios.post(`${req.protocol}://${req.get('host')}/api/generate-voucher-code`, {
+                const voucherCodeRequest = {
                     flight_category: flightCategory,
                     customer_name: storeData.bookingData.passengerData?.[0]?.firstName + ' ' + storeData.bookingData.passengerData?.[0]?.lastName || 'Unknown Customer',
                     customer_email: storeData.bookingData.passengerData?.[0]?.email || '',
@@ -7399,7 +7401,12 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                     voucher_type: 'Book Flight',
                     paid_amount: storeData.bookingData.totalPrice || 0,
                     expires_date: null // Will use default (1 year)
-                });
+                };
+                
+                console.log('=== VOUCHER CODE REQUEST ===');
+                console.log('Request data:', JSON.stringify(voucherCodeRequest, null, 2));
+                
+                const voucherCodeResponse = await axios.post(`${req.protocol}://${req.get('host')}/api/generate-voucher-code`, voucherCodeRequest);
                 
                 if (voucherCodeResponse.data.success) {
                     console.log('Book Flight voucher code generated successfully:', voucherCodeResponse.data.voucher_code);
