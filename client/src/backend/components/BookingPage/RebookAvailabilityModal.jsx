@@ -291,14 +291,20 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
             // Tarih seçilebilir olmalı eğer:
             // 1. Mevcut ay içinde
             // 2. Geçmiş değil
-            // 3. Müsaitlik verisi var VEYA mevcut booking tarihi
+            // 3. Sold out değil
             const isCurrentBookingDate = bookingDetail?.booking?.flight_date && dayjs(bookingDetail.booking.flight_date).isSame(d, 'day');
-            const isSelectable = inCurrentMonth && !isPast && (slots.length > 0 || isCurrentBookingDate) && !soldOut;
+            const isSelectable = inCurrentMonth && !isPast && !soldOut;
 
             cells.push(
                 <div
                     key={d.format('YYYY-MM-DD')}
-                    onClick={() => isSelectable && (setSelectedDate(d.toDate()), setSelectedTime(null))}
+                    onClick={() => {
+                        if (isSelectable) {
+                            setSelectedDate(d.toDate());
+                            setSelectedTime(null);
+                            console.log('Date selected:', d.format('YYYY-MM-DD'), 'has slots:', slots.length > 0);
+                        }
+                    }}
                     style={{
                         width: 'calc((100% - 4px * 6) / 7)',
                         aspectRatio: '1 / 1',
@@ -521,8 +527,13 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                 <Typography variant="h6" sx={{ mb: 2, fontSize: 18, fontWeight: 600 }}>Available Times for {dayjs(selectedDate).format('DD/MM/YYYY')}:</Typography>
                                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
                                                     {getTimesForDate(selectedDate).length === 0 && (
-                                                        <Box>
-                                                            <Typography color="text.secondary">No available times</Typography>
+                                                        <Box sx={{ p: 2, textAlign: 'center', width: '100%' }}>
+                                                            <Typography color="text.secondary" sx={{ fontSize: 16, fontWeight: 500 }}>
+                                                                No available times for this date
+                                                            </Typography>
+                                                            <Typography color="text.secondary" sx={{ fontSize: 14, mt: 1 }}>
+                                                                Please select a different date or contact us for availability
+                                                            </Typography>
                                                         </Box>
                                                     )}
                                                     {getTimesForDate(selectedDate).map(slot => {
