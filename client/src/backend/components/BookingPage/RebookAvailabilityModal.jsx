@@ -518,20 +518,44 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                         return (
                                                             <Button
                                                                 key={slot.id}
-                                                                variant={isSelected ? 'contained' : 'outlined'}
-                                                                color={isAvailable ? 'primary' : 'inherit'}
+                                                                variant="outlined"
                                                                 disabled={isDisabled}
                                                                 onClick={() => !isDisabled && setSelectedTime(slot.time)}
                                                                 sx={{
                                                                     opacity: isDisabled ? 0.5 : 1,
-                                                                    backgroundColor: isDisabled ? '#f5f5f5' : 'inherit',
-                                                                    color: isDisabled ? '#999' : 'inherit',
+                                                                    backgroundColor: isDisabled 
+                                                                        ? '#f5f5f5' 
+                                                                        : isSelected 
+                                                                            ? '#1976d2' 
+                                                                            : '#22c55e',
+                                                                    color: isDisabled 
+                                                                        ? '#999' 
+                                                                        : isSelected 
+                                                                            ? '#fff' 
+                                                                            : '#fff',
+                                                                    borderColor: isDisabled 
+                                                                        ? '#ddd' 
+                                                                        : isSelected 
+                                                                            ? '#1976d2' 
+                                                                            : '#22c55e',
                                                                     cursor: isDisabled ? 'not-allowed' : 'pointer',
                                                                     fontSize: 16,
                                                                     fontWeight: 600,
                                                                     padding: '12px 20px',
                                                                     minWidth: '140px',
-                                                                    height: '50px'
+                                                                    height: '50px',
+                                                                    '&:hover': {
+                                                                        backgroundColor: isDisabled 
+                                                                            ? '#f5f5f5' 
+                                                                            : isSelected 
+                                                                                ? '#1565c0' 
+                                                                                : '#16a34a',
+                                                                        borderColor: isDisabled 
+                                                                            ? '#ddd' 
+                                                                            : isSelected 
+                                                                                ? '#1565c0' 
+                                                                                : '#16a34a'
+                                                                    }
                                                                 }}
                                                             >
                                                                 {slot.time} ({slot.available}/{slot.capacity})
