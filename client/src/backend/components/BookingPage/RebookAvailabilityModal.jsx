@@ -288,7 +288,12 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
             const slots = filteredAvailabilities.filter(a => a.date === d.format('YYYY-MM-DD'));
             const totalAvailable = slots.reduce((acc, s) => acc + (Number(s.available) || 0), 0);
             const soldOut = slots.length > 0 && totalAvailable <= 0;
-            const isSelectable = inCurrentMonth && !isPast && slots.length > 0 && !soldOut;
+            // Tarih seçilebilir olmalı eğer:
+            // 1. Mevcut ay içinde
+            // 2. Geçmiş değil
+            // 3. Müsaitlik verisi var VEYA mevcut booking tarihi
+            const isCurrentBookingDate = bookingDetail?.booking?.flight_date && dayjs(bookingDetail.booking.flight_date).isSame(d, 'day');
+            const isSelectable = inCurrentMonth && !isPast && (slots.length > 0 || isCurrentBookingDate) && !soldOut;
 
             cells.push(
                 <div
@@ -298,8 +303,16 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                         width: 'calc((100% - 4px * 6) / 7)',
                         aspectRatio: '1 / 1',
                         borderRadius: 10,
-                        background: isSelected ? '#56C1FF' : (isSelectable ? '#22c55e' : '#f0f0f0'),
-                        color: isSelected ? '#fff' : (isSelectable ? '#fff' : '#999'),
+                        background: isSelected 
+                            ? '#56C1FF' 
+                            : isCurrentBookingDate 
+                                ? '#3b82f6'  // Mevcut booking tarihi için mavi
+                                : (isSelectable ? '#22c55e' : '#f0f0f0'),
+                        color: isSelected 
+                            ? '#fff' 
+                            : isCurrentBookingDate 
+                                ? '#fff'  // Mevcut booking tarihi için beyaz yazı
+                                : (isSelectable ? '#fff' : '#999'),
                         display: inCurrentMonth ? 'flex' : 'none',
                         flexDirection: 'column',
                         alignItems: 'center',
@@ -312,7 +325,10 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                 >
                     <div>{d.date()}</div>
                     <div style={{ fontSize: 10, fontWeight: 600 }}>
-                        {slots.length === 0 ? '' : (soldOut ? 'Sold Out' : `${totalAvailable} Spaces`)}
+                        {isCurrentBookingDate 
+                            ? 'Current' 
+                            : (slots.length === 0 ? '' : (soldOut ? 'Sold Out' : `${totalAvailable} Spaces`))
+                        }
                     </div>
                 </div>
             );
