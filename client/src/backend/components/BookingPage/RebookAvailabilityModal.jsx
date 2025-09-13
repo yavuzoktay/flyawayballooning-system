@@ -319,21 +319,35 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
             cells.push(
                 <div
                     key={d.format('YYYY-MM-DD')}
-                    onClick={() => {
-                        console.log(`Clicked on ${d.format('YYYY-MM-DD')}:`, {
+                    onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log(`CLICKED on ${d.format('YYYY-MM-DD')}:`, {
                             isSelectable,
                             inCurrentMonth,
                             isPast,
                             soldOut,
-                            slotsLength: slots.length
+                            slotsLength: slots.length,
+                            event: e
                         });
                         if (isSelectable) {
+                            console.log('Setting selected date to:', d.format('YYYY-MM-DD'));
                             setSelectedDate(d.toDate());
                             setSelectedTime(null);
-                            console.log('Date selected:', d.format('YYYY-MM-DD'), 'has slots:', slots.length > 0);
+                            console.log('Date selected successfully:', d.format('YYYY-MM-DD'), 'has slots:', slots.length > 0);
                         } else {
                             console.log('Date not selectable:', d.format('YYYY-MM-DD'));
                         }
+                    }}
+                    onMouseDown={(e) => {
+                        console.log(`MOUSE DOWN on ${d.format('YYYY-MM-DD')}`);
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }}
+                    onMouseUp={(e) => {
+                        console.log(`MOUSE UP on ${d.format('YYYY-MM-DD')}`);
+                        e.preventDefault();
+                        e.stopPropagation();
                     }}
                     style={{
                         width: 'calc((100% - 4px * 6) / 7)',
@@ -356,7 +370,10 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                         fontWeight: 700,
                         cursor: isSelectable ? 'pointer' : 'default',
                         userSelect: 'none',
-                        fontSize: 14
+                        fontSize: 14,
+                        pointerEvents: 'auto',
+                        zIndex: 1,
+                        position: 'relative'
                     }}
                 >
                     <div>{d.date()}</div>
