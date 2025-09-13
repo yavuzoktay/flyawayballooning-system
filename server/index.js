@@ -4739,6 +4739,11 @@ app.patch('/api/updateBookingField', (req, res) => {
         params = [normalizedValue, booking_id];
     }
     
+    // normalizedValue'yu her durumda tanımla
+    if (typeof normalizedValue === 'undefined') {
+        normalizedValue = value;
+    }
+    
     console.log('updateBookingField - SQL:', sql);
     console.log('updateBookingField - Params:', params);
     
