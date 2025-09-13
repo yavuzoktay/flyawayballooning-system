@@ -130,6 +130,21 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         }
     }, [activities, open, bookingDetail, location]);
 
+    // Set calendar to current booking date when modal opens
+    useEffect(() => {
+        if (open && bookingDetail?.booking?.flight_date) {
+            const bookingDate = dayjs(bookingDetail.booking.flight_date);
+            setCurrentMonth(bookingDate.startOf('month'));
+            setSelectedDate(bookingDate.toDate());
+            
+            // Extract time from flight_date if available
+            const timeString = bookingDate.format('HH:mm');
+            if (timeString && timeString !== '00:00') {
+                setSelectedTime(timeString);
+            }
+        }
+    }, [open, bookingDetail]);
+
     // Fetch availabilities (sadece activity/location değişince)
     useEffect(() => {
         if (selectedActivity && selectedLocation) {
