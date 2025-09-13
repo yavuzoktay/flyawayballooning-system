@@ -526,7 +526,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                                     backgroundColor: isDisabled 
                                                                         ? '#f5f5f5' 
                                                                         : isSelected 
-                                                                            ? '#1976d2' 
+                                                                            ? '#56C1FF' 
                                                                             : '#22c55e',
                                                                     color: isDisabled 
                                                                         ? '#999' 
@@ -536,7 +536,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                                     borderColor: isDisabled 
                                                                         ? '#ddd' 
                                                                         : isSelected 
-                                                                            ? '#1976d2' 
+                                                                            ? '#56C1FF' 
                                                                             : '#22c55e',
                                                                     cursor: isDisabled ? 'not-allowed' : 'pointer',
                                                                     fontSize: 16,
@@ -548,12 +548,12 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                                         backgroundColor: isDisabled 
                                                                             ? '#f5f5f5' 
                                                                             : isSelected 
-                                                                                ? '#1565c0' 
+                                                                                ? '#4AB5FF' 
                                                                                 : '#16a34a',
                                                                         borderColor: isDisabled 
                                                                             ? '#ddd' 
                                                                             : isSelected 
-                                                                                ? '#1565c0' 
+                                                                                ? '#4AB5FF' 
                                                                                 : '#16a34a'
                                                                     }
                                                                 }}
