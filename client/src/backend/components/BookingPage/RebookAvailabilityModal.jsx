@@ -222,8 +222,9 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         });
  
         setFilteredAvailabilities(filtered);
-        setSelectedDate(null);
-        setSelectedTime(null);
+        // Don't reset selectedDate when flight types change - let user keep their selection
+        // setSelectedDate(null);
+        // setSelectedTime(null);
         setAvailableDates(Array.from(new Set(filtered.map(a => a.date))).filter(date => date));
     }, [selectedFlightTypes, availabilities]);
 
@@ -232,7 +233,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         // Eğer mevcut booking tarihi varsa ve modal yeni açılmışsa, tarihi koru
         if (open && bookingDetail?.booking?.flight_date && selectedActivity && selectedLocation) {
             const bookingDate = dayjs(bookingDetail.booking.flight_date);
-            // Sadece farklı bir tarih seçilmişse sıfırla
+            // Sadece farklı bir tarih seçilmişse sıfırla - ama kullanıcı manuel seçim yapmışsa koru
             if (!selectedDate || !dayjs(selectedDate).isSame(bookingDate, 'day')) {
                 setSelectedDate(bookingDate.toDate());
                 const timeString = bookingDate.format('HH:mm');
@@ -240,11 +241,12 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                     setSelectedTime(timeString);
                 }
             }
-        } else {
+        } else if (!open) {
+            // Sadece modal kapandığında sıfırla
             setSelectedDate(null);
             setSelectedTime(null);
         }
-    }, [selectedFlightTypes, open, bookingDetail, selectedActivity, selectedLocation, selectedDate]);
+    }, [open, bookingDetail, selectedActivity, selectedLocation]);
 
     // Notify parent component when flight types change
     useEffect(() => {
@@ -320,16 +322,13 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
             cells.push(
                 <div
                     key={d.format('YYYY-MM-DD')}
-                    onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
+                    onClick={() => {
                         console.log(`CLICKED on ${d.format('YYYY-MM-DD')}:`, {
                             isSelectable,
                             inCurrentMonth,
                             isPast,
                             soldOut,
-                            slotsLength: slots.length,
-                            event: e
+                            slotsLength: slots.length
                         });
                         if (isSelectable) {
                             console.log('Setting selected date to:', d.format('YYYY-MM-DD'));
@@ -340,15 +339,17 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                             console.log('Date not selectable:', d.format('YYYY-MM-DD'));
                         }
                     }}
-                    onMouseDown={(e) => {
-                        console.log(`MOUSE DOWN on ${d.format('YYYY-MM-DD')}`);
-                        e.preventDefault();
-                        e.stopPropagation();
+                    onMouseEnter={(e) => {
+                        if (isSelectable) {
+                            e.target.style.transform = 'scale(1.05)';
+                            e.target.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
+                        }
                     }}
-                    onMouseUp={(e) => {
-                        console.log(`MOUSE UP on ${d.format('YYYY-MM-DD')}`);
-                        e.preventDefault();
-                        e.stopPropagation();
+                    onMouseLeave={(e) => {
+                        if (isSelectable) {
+                            e.target.style.transform = 'scale(1)';
+                            e.target.style.boxShadow = 'none';
+                        }
                     }}
                     style={{
                         width: 'calc((100% - 4px * 6) / 7)',
@@ -369,12 +370,14 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                         alignItems: 'center',
                         justifyContent: 'center',
                         fontWeight: 700,
-                        cursor: 'pointer',  // Tüm tarihler tıklanabilir
+                        cursor: isSelectable ? 'pointer' : 'default',
                         userSelect: 'none',
                         fontSize: 14,
-                        pointerEvents: 'auto',
+                        pointerEvents: isSelectable ? 'auto' : 'none',
                         zIndex: 1,
-                        position: 'relative'
+                        position: 'relative',
+                        transition: 'all 0.2s ease',
+                        opacity: isSelectable ? 1 : 0.6
                     }}
                 >
                     <div>{d.date()}</div>
