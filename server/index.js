@@ -3379,6 +3379,9 @@ app.get('/api/getAllVoucherData', (req, res) => {
                 };
                 
                 console.log(`=== PROCESSING VOUCHER ID: ${row.id} ===`);
+                // Normalize numberOfPassengers for clients of getAllVoucherData
+                // Prefer explicit numberOfPassengers on voucher; otherwise fall back to passenger_count from linked booking
+                row.numberOfPassengers = Number.parseInt(row.numberOfPassengers, 10) || Number.parseInt(row.passenger_count, 10) || 1;
                 console.log('row.additional_information_json:', row.additional_information_json);
                 console.log('typeof row.additional_information_json:', typeof row.additional_information_json);
                 console.log('row.add_to_booking_items:', row.add_to_booking_items);
@@ -7786,8 +7789,8 @@ async function createVoucherFromWebhook(voucherData) {
 
                 // No duplicates found, proceed with voucher creation
                 const insertSql = `INSERT INTO all_vouchers 
-                    (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, additional_information_json, add_to_booking_items, voucher_passenger_details)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                    (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, numberOfPassengers, additional_information_json, add_to_booking_items, voucher_passenger_details)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
                 const values = [
                 emptyToNull(name),
                 emptyToNull(weight),
@@ -7811,6 +7814,7 @@ async function createVoucherFromWebhook(voucherData) {
                 emptyToNull(preferred_time),
                 emptyToNull(preferred_day),
                 0, // flight_attempts starts at 0 for each created voucher
+                Number.parseInt(numberOfPassengers, 10) || 1,
                 // Persist additional information answers regardless of which key frontend used
                 finalAdditionalInfoJson ? JSON.stringify(finalAdditionalInfoJson) : null,
                 add_to_booking_items ? JSON.stringify(add_to_booking_items) : null,
