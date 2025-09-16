@@ -1,0 +1,1 @@
+DESCRIBE additional_information_answers;

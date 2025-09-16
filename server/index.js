@@ -48,6 +48,20 @@ const stripe = require('stripe')(stripeSecretKey, {
     apiVersion: '2020-08-27'
 });
 
+// Create a write stream for logging
+const logStream = fs.createWriteStream(path.join(__dirname, 'server.log'), { flags: 'a' });
+
+// Helper function to log to file with timestamp
+function logToFile(message, data = null) {
+    const timestamp = new Date().toISOString();
+    const logMessage = `${timestamp} - ${message}\n`;
+    if (data) {
+        logStream.write(logMessage + JSON.stringify(data, null, 2) + '\n\n');
+    } else {
+        logStream.write(logMessage);
+    }
+}
+
 // Enable CORS
 app.use(cors({
     origin: [
@@ -95,27 +109,43 @@ app.post('/api/generate-voucher-code', async (req, res) => {
 
     try {
         // Check for existing voucher code for same customer to prevent duplicates
-        // Gift voucher codes are stored in all_vouchers.voucher_ref, not voucher_codes table
-        const duplicateCheckSql = `
-            SELECT voucher_ref as code FROM all_vouchers 
-            WHERE email = ? AND name = ? AND paid = ? 
-            AND created_at > DATE_SUB(NOW(), INTERVAL 2 MINUTE) 
-            LIMIT 1
-        `;
-        
         const duplicateCheck = () => {
             return new Promise((resolve, reject) => {
-                con.query(duplicateCheckSql, [customer_email, customer_name, paid_amount], (err, result) => {
-                    if (err) {
-                        reject(err);
-                    } else {
-                        resolve(result);
-                    }
-                });
+                if (voucher_type === 'Book Flight') {
+                    // Check in all_booking table
+                    const duplicateCheckSql = `
+                        SELECT voucher_code as code FROM all_booking 
+                        WHERE email = ? AND name = ? AND paid = ? 
+                        AND created_at > DATE_SUB(NOW(), INTERVAL 2 MINUTE) 
+                        LIMIT 1
+                    `;
+                    con.query(duplicateCheckSql, [customer_email, customer_name, paid_amount], (err, result) => {
+                        if (err) {
+                            reject(err);
+                        } else {
+                            resolve(result);
+                        }
+                    });
+                } else {
+                    // Check in all_vouchers table
+                    const duplicateCheckSql = `
+                        SELECT voucher_ref as code FROM all_vouchers 
+                        WHERE email = ? AND name = ? AND paid = ? 
+                        AND created_at > DATE_SUB(NOW(), INTERVAL 2 MINUTE) 
+                        LIMIT 1
+                    `;
+                    con.query(duplicateCheckSql, [customer_email, customer_name, paid_amount], (err, result) => {
+                        if (err) {
+                            reject(err);
+                        } else {
+                            resolve(result);
+                        }
+                    });
+                }
             });
         };
         
-        // Check for recent duplicates first - only prevent if there's already a NON-NULL voucher_ref
+        // Check for recent duplicates first - only prevent if there's already a NON-NULL code
         const existingCode = await duplicateCheck();
         if (existingCode && existingCode.length > 0 && existingCode[0].code) {
             console.log('=== DUPLICATE VOUCHER CODE GENERATION PREVENTED ===');
@@ -191,11 +221,15 @@ app.post('/api/generate-voucher-code', async (req, res) => {
                 const serial = generateSerial();
                 voucherCode = `${prefix}${categoryCode}${year}${serial}`;
                 
-                // Check if code already exists in gift vouchers (all_vouchers.voucher_ref)
+                // Check if code already exists in both tables
                 const checkCode = () => {
                     return new Promise((resolve, reject) => {
-                        const checkSql = 'SELECT id FROM all_vouchers WHERE voucher_ref = ?';
-                        con.query(checkSql, [voucherCode], (err, result) => {
+                        const checkSql = `
+                            SELECT id FROM all_vouchers WHERE voucher_ref = ?
+                            UNION
+                            SELECT id FROM all_booking WHERE voucher_code = ?
+                        `;
+                        con.query(checkSql, [voucherCode, voucherCode], (err, result) => {
                             if (err) {
                                 reject(err);
                             } else {
@@ -230,69 +264,186 @@ app.post('/api/generate-voucher-code', async (req, res) => {
         // Create title for the voucher code
         const title = `${customer_name} - ${flight_category} - ${location}`;
         
-        // For Gift Voucher codes, find the voucher and update its voucher_ref
-        // Gift voucher codes are stored in all_vouchers.voucher_ref, not voucher_codes table
-        console.log('=== GIFT VOUCHER CODE UPDATE ===');
-        console.log('Looking for voucher with customer:', customer_name, customer_email, paid_amount);
+        // Handle different voucher types
+        console.log('=== VOUCHER CODE UPDATE ===');
+        console.log('Voucher type:', voucher_type);
+        console.log('Looking for record with customer:', customer_name, customer_email, paid_amount);
         
-        const findAndUpdateVoucher = () => {
+        const findAndUpdateRecord = () => {
             return new Promise((resolve, reject) => {
-                // Find the most recently created voucher for this customer
-                const findSql = `
-                    SELECT id FROM all_vouchers 
-                    WHERE name = ? AND email = ? AND paid = ? 
-                    AND (voucher_ref IS NULL OR voucher_ref = '') 
-                    ORDER BY created_at DESC 
-                    LIMIT 1
-                `;
-                
-                con.query(findSql, [customer_name, customer_email, paid_amount], (err, findResult) => {
-                    if (err) {
-                        reject(err);
-                        return;
-                    }
-                    
-                    if (findResult.length === 0) {
-                        reject(new Error('No voucher found to update with code'));
-                        return;
-                    }
-                    
-                    const voucherId = findResult[0].id;
-                    console.log('Found voucher ID to update:', voucherId);
-                    
-                    // Update the voucher with the generated code
-                    const updateSql = 'UPDATE all_vouchers SET voucher_ref = ? WHERE id = ?';
-                    con.query(updateSql, [voucherCode, voucherId], (updateErr, updateResult) => {
-                        if (updateErr) {
-                            reject(updateErr);
-                        } else {
-                            console.log('Voucher updated with code:', voucherCode);
-                            resolve({ voucherId, voucherCode });
-                        }
+                if (voucher_type === 'Book Flight') {
+                    // For Book Flight, update the booking record
+                    console.log('=== FINDING BOOKING RECORD TO UPDATE ===');
+                    console.log('Searching for booking with:', {
+                        customer_name,
+                        customer_email,
+                        paid_amount
                     });
-                });
+                    
+                    const findSql = `
+                        SELECT id FROM all_booking 
+                        WHERE name = ? AND email = ? AND paid = ? 
+                        AND (voucher_code IS NULL OR voucher_code = '') 
+                        ORDER BY created_at DESC 
+                        LIMIT 1
+                    `;
+                    
+                    con.query(findSql, [customer_name, customer_email, paid_amount], (err, findResult) => {
+                        if (err) {
+                            console.error('Error finding booking record:', err);
+                            reject(err);
+                            return;
+                        }
+                        
+                        console.log('Found booking records:', findResult.length);
+                        console.log('Booking records:', findResult);
+                        
+                        if (findResult.length === 0) {
+                            console.log('No booking found with exact match, trying broader search...');
+                            
+                            // Try broader search without exact paid amount match
+                            const broaderSql = `
+                                SELECT id FROM all_booking 
+                                WHERE name = ? AND email = ? 
+                                AND (voucher_code IS NULL OR voucher_code = '') 
+                                ORDER BY created_at DESC 
+                                LIMIT 1
+                            `;
+                            
+                            con.query(broaderSql, [customer_name, customer_email], (broaderErr, broaderResult) => {
+                                if (broaderErr) {
+                                    console.error('Error in broader search:', broaderErr);
+                                    reject(new Error('No booking found to update with code'));
+                                    return;
+                                }
+                                
+                                if (broaderResult.length === 0) {
+                                    console.log('No booking found even with broader search');
+                                    reject(new Error('No booking found to update with code'));
+                                    return;
+                                }
+                                
+                                const bookingId = broaderResult[0].id;
+                                console.log('Found booking ID with broader search:', bookingId);
+                                
+                                // Update the booking with the generated code
+                                const updateSql = 'UPDATE all_booking SET voucher_code = ? WHERE id = ?';
+                                con.query(updateSql, [voucherCode, bookingId], (updateErr, updateResult) => {
+                                    if (updateErr) {
+                                        console.error('Error updating booking:', updateErr);
+                                        reject(updateErr);
+                                    } else {
+                                        console.log('Booking updated with code:', voucherCode);
+                                        resolve({ recordId: bookingId, voucherCode });
+                                    }
+                                });
+                            });
+                            return;
+                        }
+                        
+                        const bookingId = findResult[0].id;
+                        console.log('Found booking ID to update:', bookingId);
+                        
+                        // Update the booking with the generated code
+                        const updateSql = 'UPDATE all_booking SET voucher_code = ? WHERE id = ?';
+                        con.query(updateSql, [voucherCode, bookingId], (updateErr, updateResult) => {
+                            if (updateErr) {
+                                console.error('Error updating booking:', updateErr);
+                                reject(updateErr);
+                            } else {
+                                console.log('Booking updated with code:', voucherCode);
+                                resolve({ recordId: bookingId, voucherCode });
+                            }
+                        });
+                    });
+                } else {
+                    // For Gift Vouchers, update the voucher record
+                    console.log('Updating voucher record with voucher code');
+                    const findSql = `
+                        SELECT id FROM all_vouchers 
+                        WHERE name = ? AND email = ? AND paid = ? 
+                        AND (voucher_ref IS NULL OR voucher_ref = '') 
+                        ORDER BY created_at DESC 
+                        LIMIT 1
+                    `;
+                    
+                    con.query(findSql, [customer_name, customer_email, paid_amount], (err, findResult) => {
+                        if (err) {
+                            reject(err);
+                            return;
+                        }
+                        
+                        if (findResult.length === 0) {
+                            reject(new Error('No voucher found to update with code'));
+                            return;
+                        }
+                        
+                        const voucherId = findResult[0].id;
+                        console.log('Found voucher ID to update:', voucherId);
+                        
+                        // Update the voucher with the generated code
+                        const updateSql = 'UPDATE all_vouchers SET voucher_ref = ? WHERE id = ?';
+                        con.query(updateSql, [voucherCode, voucherId], (updateErr, updateResult) => {
+                            if (updateErr) {
+                                reject(updateErr);
+                            } else {
+                                console.log('Voucher updated with code:', voucherCode);
+                                resolve({ recordId: voucherId, voucherCode });
+                            }
+                        });
+                    });
+                }
             });
         };
         
         try {
-            const result = await findAndUpdateVoucher();
+            const result = await findAndUpdateRecord();
             res.json({
                 success: true,
-                message: 'Gift voucher code generated and assigned successfully',
+                message: `${voucher_type} code generated and assigned successfully`,
                 voucher_code: voucherCode,
-                voucher_id: result.voucherId,
+                record_id: result.recordId,
                 customer_name: customer_name,
                 customer_email: customer_email,
-                updated_voucher: true
+                updated_record: true
             });
         } catch (updateError) {
-            console.error('Error updating voucher with code:', updateError);
-            res.status(500).json({ success: false, message: 'Database error', error: updateError.message });
+            console.error('Error updating record with code:', updateError);
+            console.log('=== FALLBACK: Returning voucher code without updating record ===');
+            // Instead of failing, return the voucher code so it can be used
+            res.json({
+                success: true,
+                message: `${voucher_type} code generated successfully (record update failed)`,
+                voucher_code: voucherCode,
+                customer_name: customer_name,
+                customer_email: customer_email,
+                updated_record: false,
+                warning: 'Code generated but could not update record automatically'
+            });
         }
         
     } catch (error) {
         console.error('Error generating voucher code:', error);
-        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+        console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            requestData: {
+                flight_category,
+                customer_name,
+                customer_email,
+                location,
+                experience_type,
+                voucher_type,
+                paid_amount,
+                expires_date
+            }
+        });
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: error.message,
+            details: 'Check server logs for more information'
+        });
     }
 });
 
@@ -1075,6 +1226,7 @@ app.get('/api/private-charter-voucher-types', (req, res) => {
     // Check if we want only active voucher types (default) or all
     const showOnlyActive = req.query.active !== 'false';
     const location = req.query.location;
+    const passengers = req.query.passengers ? Number(req.query.passengers) : undefined;
     
     let sql, params = [];
     if (showOnlyActive) {
@@ -1121,6 +1273,7 @@ app.get('/api/private-charter-voucher-types', (req, res) => {
                         pricingMap = {};
                     }
                     const normalize = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+                    const selectedPassengers = passengers && [2,3,4,8].includes(passengers) ? String(passengers) : '2';
                     // Map titles to prices (tolerant)
                     finalResult = finalResult.map(v => {
                         const title = v.title || '';
@@ -1138,10 +1291,19 @@ app.get('/api/private-charter-voucher-types', (req, res) => {
                             }
                         }
                         if (matchVal != null && matchVal !== '') {
-                            const parsed = parseFloat(matchVal);
-                            if (!Number.isNaN(parsed)) {
-                                v.price_per_person = parsed.toFixed(2);
-                                v.price_unit = v.price_unit || 'pp';
+                            if (typeof matchVal === 'object') {
+                                const tierVal = matchVal[selectedPassengers] ?? matchVal['2'];
+                                const parsedTier = parseFloat(tierVal);
+                                if (!Number.isNaN(parsedTier)) {
+                                    v.price_per_person = parsedTier.toFixed(2);
+                                    v.price_unit = 'total';
+                                }
+                            } else {
+                                const parsed = parseFloat(matchVal);
+                                if (!Number.isNaN(parsed)) {
+                                    v.price_per_person = parsed.toFixed(2);
+                                    v.price_unit = 'total';
+                                }
                             }
                         }
                         return v;
@@ -2566,6 +2728,14 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
                     console.log('=== WEBHOOK VOUCHER DATA DEBUG ===');
                     console.log('storeData.voucherData.numberOfPassengers:', storeData.voucherData.numberOfPassengers);
                     console.log('typeof storeData.voucherData.numberOfPassengers:', typeof storeData.voucherData.numberOfPassengers);
+                    console.log('storeData.voucherData.additionalInfo:', storeData.voucherData.additionalInfo);
+                    console.log('storeData.voucherData.additional_information_json:', storeData.voucherData.additional_information_json);
+                    console.log('storeData.voucherData.additional_information:', storeData.voucherData.additional_information);
+                    console.log('typeof storeData.voucherData.additionalInfo:', typeof storeData.voucherData.additionalInfo);
+                    console.log('storeData.voucherData.additionalInfo keys:', storeData.voucherData.additionalInfo ? Object.keys(storeData.voucherData.additionalInfo) : 'additionalInfo is null/undefined');
+                    console.log('storeData.voucherData.add_to_booking_items:', storeData.voucherData.add_to_booking_items);
+                    console.log('typeof storeData.voucherData.add_to_booking_items:', typeof storeData.voucherData.add_to_booking_items);
+                    console.log('storeData.voucherData.add_to_booking_items length:', storeData.voucherData.add_to_booking_items ? storeData.voucherData.add_to_booking_items.length : 'add_to_booking_items is null/undefined');
                     
                     // Check if voucher was already created to prevent duplicate creation
                     if (storeData.voucherData?.voucher_id) {
@@ -2576,6 +2746,13 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
                     // Webhook creates the voucher, voucher code generation will be done by createBookingFromSession
                     console.log('Creating voucher via webhook, voucher code generation will be done by createBookingFromSession');
                     
+                    // Log the voucher data before creation
+                    logToFile('Creating voucher from webhook with data:', {
+                        additionalInfo: storeData.voucherData.additionalInfo,
+                        additional_information_json: storeData.voucherData.additional_information_json,
+                        add_to_booking_items: storeData.voucherData.add_to_booking_items
+                    });
+
                     // Direct database insertion instead of HTTP call
                     const voucherId = await createVoucherFromWebhook(storeData.voucherData);
                     console.log('Webhook voucher creation completed, ID:', voucherId);
@@ -2645,6 +2822,52 @@ con.query(`
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 `, (err) => {
     if (err) console.error('Failed creating passenger_terms table:', err);
+});
+
+// Add add_to_booking_items column to all_vouchers table if not exists (migration)
+con.query(`
+    SET @column_exists = (
+        SELECT COUNT(*) 
+        FROM information_schema.columns 
+        WHERE table_schema = DATABASE() 
+        AND table_name = 'all_vouchers' 
+        AND column_name = 'add_to_booking_items'
+    );
+    
+    SET @sql = IF(@column_exists = 0, 
+        'ALTER TABLE all_vouchers ADD COLUMN add_to_booking_items JSON DEFAULT NULL COMMENT "JSON array of selected add-to-booking items with their details"',
+        'SELECT "Column add_to_booking_items already exists" as message'
+    );
+    
+    PREPARE stmt FROM @sql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+`, (err) => {
+    if (err) console.error('Failed adding add_to_booking_items column:', err);
+    else console.log('✅ add_to_booking_items column migration completed');
+});
+
+// Add voucher_passenger_details column to all_vouchers table if not exists (migration)
+con.query(`
+    SET @column_exists = (
+        SELECT COUNT(*) 
+        FROM information_schema.columns 
+        WHERE table_schema = DATABASE() 
+        AND table_name = 'all_vouchers' 
+        AND column_name = 'voucher_passenger_details'
+    );
+    
+    SET @sql = IF(@column_exists = 0, 
+        'ALTER TABLE all_vouchers ADD COLUMN voucher_passenger_details JSON DEFAULT NULL COMMENT "JSON array of voucher passenger details when no booking exists"',
+        'SELECT "Column voucher_passenger_details already exists" as message'
+    );
+    
+    PREPARE stmt FROM @sql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+`, (err) => {
+    if (err) console.error('Failed adding voucher_passenger_details column:', err);
+    else console.log('✅ voucher_passenger_details column migration completed');
 });
 
 // Multer storage config for activities and experiences
@@ -2980,11 +3203,15 @@ app.get('/api/getAllBookingData', (req, res) => {
                         
                         // Safely parse journey_types
                         if (question.journey_types) {
-                            try {
-                                parsedJourneyTypes = JSON.parse(question.journey_types);
-                            } catch (e) {
-                                console.warn('Failed to parse journey_types for question', question.id, e);
-                                parsedJourneyTypes = [];
+                            if (Array.isArray(question.journey_types)) {
+                                parsedJourneyTypes = question.journey_types;
+                            } else if (typeof question.journey_types === 'string') {
+                                try {
+                                    parsedJourneyTypes = JSON.parse(question.journey_types);
+                                } catch (e) {
+                                    console.warn('Failed to parse journey_types for question', question.id, e);
+                                    parsedJourneyTypes = [];
+                                }
                             }
                         }
                         
@@ -3066,36 +3293,337 @@ app.get('/api/getAllBookingData', (req, res) => {
         res.json({ success: true, data: enriched });
     });
 });
+
 // Get All Voucher Data (with booking and passenger info)
 app.get('/api/getAllVoucherData', (req, res) => {
+    console.log('=== getAllVoucherData ENDPOINT CALLED ===');
+    
+    // Processing voucher data request
+    
     // Get all vouchers with booking info - voucher codes are stored in all_vouchers.voucher_ref
     const voucher = `
         SELECT v.*, v.experience_type, v.book_flight, v.voucher_type as actual_voucher_type,
                v.purchaser_name, v.purchaser_email, v.purchaser_phone, v.purchaser_mobile,
-               v.numberOfPassengers,
+               CASE 
+                   WHEN v.additional_information_json IS NOT NULL AND v.additional_information_json != 'null' 
+                   THEN v.additional_information_json 
+                   ELSE NULL 
+               END as additional_information_json,
+               v.add_to_booking_items,
+               v.voucher_passenger_details,
                b.email as booking_email, b.phone as booking_phone, b.id as booking_id,
+               CASE 
+                   WHEN b.additional_information_json IS NOT NULL AND b.additional_information_json != 'null' 
+                   THEN b.additional_information_json 
+                   ELSE NULL 
+               END as booking_additional_information_json,
                v.voucher_ref as vc_code,
                (SELECT GROUP_CONCAT(CONCAT(p.first_name, ' ', p.last_name, ' (', p.weight, 'kg)') SEPARATOR ', ') 
                 FROM passenger p WHERE p.booking_id = b.id) as passenger_info,
-               (SELECT COUNT(*) FROM passenger p WHERE p.booking_id = b.id) as passenger_count
+               (SELECT COUNT(*) FROM passenger p WHERE p.booking_id = b.id) as passenger_count,
+               (SELECT JSON_ARRAYAGG(JSON_OBJECT(
+                   'id', p.id,
+                   'first_name', p.first_name,
+                   'last_name', p.last_name,
+                   'weight', p.weight,
+                   'email', p.email,
+                   'phone', p.phone,
+                   'ticket_type', p.ticket_type,
+                   'weather_refund', p.weather_refund,
+                   'price', p.price
+               )) FROM passenger p WHERE p.booking_id = b.id) as passenger_details
         FROM all_vouchers v
         LEFT JOIN all_booking b ON v.voucher_ref = b.voucher_code
         ORDER BY v.created_at DESC
     `;
-    con.query(voucher, (err, result) => {
+    
+    console.log('SQL Query:', voucher);
+    con.query(voucher, async (err, result) => {
         if (err) {
             console.error("Error occurred:", err);
             res.status(500).send({ success: false, error: "Database query failed" });
             return;
         }
+        
+        console.log('=== DATABASE QUERY RESULT ===');
+        console.log('Number of vouchers found:', result ? result.length : 0);
+        
         if (result && result.length > 0) {
-            const formatted = result.map(row => {
+            console.log('Sample voucher data (first record):');
+            console.log('ID:', result[0].id);
+            console.log('additional_information:', result[0].additional_information);
+            console.log('additional_information_json:', result[0].additional_information_json);
+            console.log('booking_id:', result[0].booking_id);
+            console.log('booking_additional_information_json:', result[0].booking_additional_information_json);
+            
+            // Process each voucher to add additional information
+            const enriched = await Promise.all(result.map(async (row) => {
                 let expiresVal = row.expires;
                 if (!expiresVal && row.created_at) {
                     expiresVal = moment(row.created_at).add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
                 }
                 // Prefer explicit voucher_ref; if null, fill from vc_code
                 const voucher_ref = row.voucher_ref || row.vc_code || null;
+                
+                // Initialize additional information structure - always create it like getAllBookingData
+                let additionalInfo = {
+                    questions: [],
+                    answers: [],
+                    legacy: {
+                        additional_notes: null,
+                        hear_about_us: null,
+                        ballooning_reason: null,
+                        prefer: null
+                    },
+                    additional_information_json: null
+                };
+                
+                console.log(`=== PROCESSING VOUCHER ID: ${row.id} ===`);
+                console.log('row.additional_information_json:', row.additional_information_json);
+                console.log('typeof row.additional_information_json:', typeof row.additional_information_json);
+                console.log('row.add_to_booking_items:', row.add_to_booking_items);
+                console.log('typeof row.add_to_booking_items:', typeof row.add_to_booking_items);
+                console.log('row.booking_id:', row.booking_id);
+                console.log('row.booking_additional_information_json:', row.booking_additional_information_json);
+                
+                // For vouchers, we need to check if there's additional information data
+                // This can come from either the linked booking OR the voucher's own additional_information_json column
+                const hasVoucherAdditionalInfo = row.additional_information_json && 
+                    row.additional_information_json !== null && 
+                    row.additional_information_json !== 'null';
+                const hasBookingAdditionalInfo = row.booking_id && row.booking_additional_information_json;
+                
+                console.log('hasVoucherAdditionalInfo:', hasVoucherAdditionalInfo);
+                console.log('hasBookingAdditionalInfo:', hasBookingAdditionalInfo);
+                
+                // Always process additional information like getAllBookingData
+                console.log('Processing additional information for voucher:', row.id);
+                try {
+                    // Get all available questions for this journey type
+                    const [questionsRows] = await new Promise((resolve, reject) => {
+                            const questionsSql = `
+                                SELECT 
+                                    id,
+                                    question_text,
+                                    question_type,
+                                    options,
+                                    help_text,
+                                    category,
+                                    journey_types,
+                                    sort_order
+                                FROM additional_information_questions 
+                                WHERE is_active = 1 
+                                ORDER BY sort_order, id
+                            `;
+                            con.query(questionsSql, (err, rows) => {
+                                if (err) {
+                                    console.error('Error fetching questions:', err);
+                                    reject(err);
+                                } else {
+                                    resolve([rows]);
+                                }
+                            });
+                        });
+                        
+                        // Parse additional information data
+                        let additionalInfoData = null;
+                        console.log('=== PARSING ADDITIONAL INFORMATION DATA ===');
+                        
+                        // First try voucher's additional_information_json
+                        if (row.additional_information_json) {
+                            console.log('Found voucher additional_information_json:', row.additional_information_json);
+                            try {
+                                if (typeof row.additional_information_json === 'string') {
+                                    additionalInfoData = JSON.parse(row.additional_information_json);
+                                } else {
+                                    additionalInfoData = row.additional_information_json;
+                                }
+                                console.log('Successfully parsed voucher additional_information_json:', additionalInfoData);
+                            } catch (e) {
+                                console.warn('Failed to parse voucher additional_information_json:', e);
+                            }
+                        }
+                        
+                        // If no voucher data, try booking's additional_information_json
+                        if (!additionalInfoData && row.booking_additional_information_json) {
+                            logToFile('Using booking additional_information_json:', row.booking_additional_information_json);
+                            try {
+                                if (typeof row.booking_additional_information_json === 'string') {
+                                    additionalInfoData = JSON.parse(row.booking_additional_information_json);
+                                } else {
+                                    additionalInfoData = row.booking_additional_information_json;
+                                }
+                                logToFile('Successfully parsed booking additional_information_json:', additionalInfoData);
+                            } catch (e) {
+                                logToFile('Failed to parse booking additional_information_json:', e);
+                            }
+                        }
+                        
+                        // Log the state of additionalInfoData before processing answers
+                        logToFile('Final additionalInfoData before processing answers:', {
+                            additionalInfoData,
+                            hasData: !!additionalInfoData,
+                            dataType: typeof additionalInfoData,
+                            keys: additionalInfoData ? Object.keys(additionalInfoData) : []
+                        });
+                        
+                        // If still no data, check if we have answers in a different format
+                        if (!additionalInfoData && row.additional_information?.answers?.length > 0) {
+                            console.log('Found answers in additional_information:', row.additional_information.answers);
+                            additionalInfoData = row.additional_information.answers.reduce((acc, answer) => {
+                                acc[`question_${answer.question_id}`] = answer.answer;
+                                return acc;
+                            }, {});
+                            console.log('Converted answers to additionalInfoData:', additionalInfoData);
+                        }
+                        
+                        console.log('Final additionalInfoData:', additionalInfoData);
+                        
+                        // Convert additional information data to answers format
+                        let answers = [];
+                        console.log('=== CONVERTING ADDITIONAL INFO TO ANSWERS ===');
+                        console.log('additionalInfoData:', additionalInfoData);
+                        console.log('typeof additionalInfoData:', typeof additionalInfoData);
+                        
+                        if (additionalInfoData) {
+                            const questionKeys = Object.keys(additionalInfoData).filter(key => key.startsWith('question_'));
+                            console.log('Found question keys:', questionKeys);
+                            
+                            answers = questionKeys.map(key => {
+                                const questionId = parseInt(key.replace('question_', ''));
+                                const question = questionsRows.find(q => q.id === questionId);
+                                const answer = {
+                                    question_id: questionId,
+                                    question_text: question ? question.question_text : `Question ${questionId}`,
+                                    question_type: question ? question.question_type : 'text',
+                                    answer: additionalInfoData[key],
+                                    options: question && question.options ? JSON.parse(question.options) : [],
+                                    help_text: question ? question.help_text : '',
+                                    category: question ? question.category : '',
+                                    created_at: row.created_at
+                                };
+                                console.log(`Created answer for question ${questionId}:`, answer);
+                                return answer;
+                            });
+                        }
+                        
+                        console.log('Final answers array:', answers);
+                        
+                        // Format additional information - always update questions
+                        additionalInfo.questions = questionsRows.map(question => {
+                                try {
+                                    let parsedOptions = [];
+                                    let parsedJourneyTypes = [];
+                                    
+                                    // Safely parse options
+                                    if (question.options) {
+                                        try {
+                                            parsedOptions = JSON.parse(question.options);
+                                        } catch (e) {
+                                            console.warn('Failed to parse options for question', question.id, e);
+                                            parsedOptions = [];
+                                        }
+                                    }
+                                    
+                                    // Safely parse journey_types
+                                    if (question.journey_types) {
+                                        if (Array.isArray(question.journey_types)) {
+                                            parsedJourneyTypes = question.journey_types;
+                                        } else if (typeof question.journey_types === 'string') {
+                                            try {
+                                                parsedJourneyTypes = JSON.parse(question.journey_types);
+                                            } catch (e) {
+                                                console.warn('Failed to parse journey_types for question', question.id, e);
+                                                parsedJourneyTypes = [];
+                                            }
+                                        }
+                                    }
+                                    
+                                    return {
+                                        id: question.id,
+                                        question_text: question.question_text,
+                                        question_type: question.question_type,
+                                        options: parsedOptions,
+                                        help_text: question.help_text,
+                                        category: question.category,
+                                        journey_types: parsedJourneyTypes,
+                                        sort_order: question.sort_order
+                                    };
+                                } catch (error) {
+                                    console.warn('Error processing question:', question.id, error);
+                                    return {
+                                        id: question.id,
+                                        question_text: question.question_text,
+                                        question_type: question.question_type,
+                                        options: [],
+                                        help_text: question.help_text,
+                                        category: question.category,
+                                        journey_types: [],
+                                        sort_order: question.sort_order
+                                    };
+                                }
+                            });
+                        
+                        // Update answers if we have data
+                        additionalInfo.answers = answers;
+                        additionalInfo.legacy = {
+                            additional_notes: additionalInfoData?.notes || row.additional_notes || null,
+                            hear_about_us: additionalInfoData?.hear_about_us || row.hear_about_us || null,
+                            ballooning_reason: additionalInfoData?.ballooning_reason || row.ballooning_reason || null,
+                            prefer: additionalInfoData?.prefer || row.prefer || null
+                        };
+                        additionalInfo.additional_information_json = additionalInfoData;
+                        
+                        console.log('Created additionalInfo for voucher', row.id, ':', JSON.stringify(additionalInfo, null, 2));
+                    } catch (error) {
+                        console.error('Error fetching additional information for voucher:', row.id, error);
+                        // Continue without additional information if there's an error
+                    }
+                
+                // Parse add_to_booking_items if it's a JSON string
+                let parsedAddToBookingItems = null;
+                console.log(`Voucher ${row.id} - raw add_to_booking_items:`, row.add_to_booking_items);
+                console.log(`Voucher ${row.id} - typeof:`, typeof row.add_to_booking_items);
+                
+                if (row.add_to_booking_items) {
+                    try {
+                        if (typeof row.add_to_booking_items === 'string') {
+                            parsedAddToBookingItems = JSON.parse(row.add_to_booking_items);
+                            console.log(`Voucher ${row.id} - parsed from string:`, parsedAddToBookingItems);
+                        } else {
+                            parsedAddToBookingItems = row.add_to_booking_items;
+                            console.log(`Voucher ${row.id} - used as object:`, parsedAddToBookingItems);
+                        }
+                    } catch (e) {
+                        console.warn('Failed to parse add_to_booking_items for voucher', row.id, ':', e);
+                        parsedAddToBookingItems = row.add_to_booking_items;
+                    }
+                } else {
+                    console.log(`Voucher ${row.id} - add_to_booking_items is null/undefined`);
+                }
+
+                // Parse passenger details JSON (from booking or voucher fallback)
+                let passengerDetails = [];
+                if (row.passenger_details) {
+                    try {
+                        passengerDetails = typeof row.passenger_details === 'string' 
+                            ? JSON.parse(row.passenger_details) 
+                            : row.passenger_details;
+                    } catch (e) {
+                        console.warn('Failed to parse passenger_details for voucher', row.id, ':', e);
+                        passengerDetails = [];
+                    }
+                } else if (row.voucher_passenger_details) {
+                    try {
+                        passengerDetails = typeof row.voucher_passenger_details === 'string'
+                            ? JSON.parse(row.voucher_passenger_details)
+                            : row.voucher_passenger_details;
+                    } catch (e) {
+                        console.warn('Failed to parse voucher_passenger_details for voucher', row.id, ':', e);
+                        passengerDetails = [];
+                    }
+                }
+
                 return {
                     ...row,
                     voucher_ref,
@@ -3121,13 +3649,74 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     booking_id: row.booking_id ?? '',
                     passenger_info: row.passenger_info ?? '',
                     passenger_count: row.passenger_count ?? 0,
-                    flight_attempts: row.flight_attempts ?? 0
+                    passenger_details: passengerDetails, // Add parsed passenger details
+                    flight_attempts: row.flight_attempts ?? 0,
+                    additional_information: additionalInfo,
+                    additional_information_json: row.additional_information_json || null,
+                    add_to_booking_items: parsedAddToBookingItems,
+                    choose_add_on: parsedAddToBookingItems, // Same as add_to_booking_items for compatibility with getAllBookingData
+                    booking_additional_information_json: row.booking_additional_information_json || null
                 };
-            });
-            res.json({ success: true, data: formatted });
+            }));
+            
+            // Returning enriched voucher data
+            
+            res.json({ success: true, data: enriched });
         } else {
             res.json({ success: true, data: [] });
         }
+    });
+});
+
+// Test endpoint to check if additional info is being sent
+app.post('/api/testAdditionalInfo', (req, res) => {
+    console.log('=== TEST ADDITIONAL INFO ENDPOINT CALLED ===');
+    console.log('Request body:', req.body);
+    console.log('additionalInfo in body:', req.body.additionalInfo);
+    console.log('typeof additionalInfo:', typeof req.body.additionalInfo);
+    console.log('additionalInfo keys:', req.body.additionalInfo ? Object.keys(req.body.additionalInfo) : 'additionalInfo is null/undefined');
+    
+    res.json({ 
+        success: true, 
+        received: {
+            additionalInfo: req.body.additionalInfo,
+            type: typeof req.body.additionalInfo,
+            keys: req.body.additionalInfo ? Object.keys(req.body.additionalInfo) : null
+        }
+    });
+});
+
+// Debug endpoint to check raw voucher data
+app.get('/api/debugVoucherData', (req, res) => {
+    console.log('=== DEBUG VOUCHER DATA ENDPOINT CALLED ===');
+    
+    const debugSql = `
+        SELECT id, additional_information, additional_information_json, voucher_ref, created_at
+        FROM all_vouchers 
+        ORDER BY created_at DESC 
+        LIMIT 10
+    `;
+    
+    con.query(debugSql, (err, result) => {
+        if (err) {
+            console.error("Debug query error:", err);
+            res.status(500).send({ success: false, error: "Database query failed" });
+            return;
+        }
+        
+        console.log('=== DEBUG QUERY RESULT ===');
+        console.log('Number of vouchers:', result.length);
+        result.forEach((row, index) => {
+            console.log(`Voucher ${index + 1}:`);
+            console.log('  ID:', row.id);
+            console.log('  additional_information:', row.additional_information);
+            console.log('  additional_information_json:', row.additional_information_json);
+            console.log('  voucher_ref:', row.voucher_ref);
+            console.log('  created_at:', row.created_at);
+            console.log('---');
+        });
+        
+        res.json({ success: true, data: result });
     });
 });
 
@@ -3666,6 +4255,10 @@ app.post('/api/createVoucher', (req, res) => {
         preferred_time = '',
         preferred_day = '',
         numberOfPassengers = 1,
+        passengerData = null, // Array of passenger information
+        additionalInfo = null,
+        additional_information = null,
+        add_to_booking_items = null,
         // Purchaser information fields
         purchaser_name = '',
         purchaser_email = '',
@@ -3673,11 +4266,27 @@ app.post('/api/createVoucher', (req, res) => {
         purchaser_mobile = ''
     } = req.body;
 
-    // Debug: Log numberOfPassengers received
-    console.log('=== NUMBER OF PASSENGERS DEBUG (createVoucher) ===');
-    console.log('numberOfPassengers received:', numberOfPassengers);
-    console.log('typeof numberOfPassengers:', typeof numberOfPassengers);
-    console.log('req.body.numberOfPassengers:', req.body.numberOfPassengers);
+    // Processing voucher creation request
+    console.log('=== BACKEND VOUCHER CREATION DEBUG ===');
+    console.log('add_to_booking_items received:', add_to_booking_items);
+    console.log('typeof add_to_booking_items:', typeof add_to_booking_items);
+    console.log('Array.isArray(add_to_booking_items):', Array.isArray(add_to_booking_items));
+    if (Array.isArray(add_to_booking_items)) {
+        console.log('add_to_booking_items.length:', add_to_booking_items.length);
+        add_to_booking_items.forEach((item, index) => {
+            console.log(`Item ${index + 1}:`, item);
+        });
+    }
+    
+    console.log('=== ADDITIONAL INFO DEBUG (createVoucher) ===');
+    console.log('additionalInfo received:', additionalInfo);
+    console.log('typeof additionalInfo:', typeof additionalInfo);
+    console.log('additional_information received:', additional_information);
+    console.log('typeof additional_information:', typeof additional_information);
+    if (additionalInfo) {
+        console.log('additionalInfo keys:', Object.keys(additionalInfo));
+        console.log('additionalInfo JSON:', JSON.stringify(additionalInfo, null, 2));
+    }
 
     // For Gift Vouchers, separate purchaser and recipient information
     let finalPurchaserName = purchaser_name;
@@ -3929,8 +4538,8 @@ app.post('/api/createVoucher', (req, res) => {
         }
         
         const insertSql = `INSERT INTO all_vouchers 
-            (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, purchaser_name, purchaser_email, purchaser_phone, purchaser_mobile, numberOfPassengers)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+            (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, purchaser_name, purchaser_email, purchaser_phone, purchaser_mobile, numberOfPassengers, additional_information_json, add_to_booking_items)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
             
         const values = [
             emptyToNull(name),
@@ -3954,7 +4563,7 @@ app.post('/api/createVoucher', (req, res) => {
             emptyToNull(preferred_location),
             emptyToNull(preferred_time),
             emptyToNull(preferred_day),
-            1, // flight_attempts starts at 1 for each created voucher
+            0, // flight_attempts starts at 0 for each created voucher
             // Purchaser information values
             // For Gift Vouchers: name/email/phone/mobile are purchaser info, recipient_* are separate
             // For Flight Vouchers: name/email/phone/mobile are the main contact info
@@ -3962,14 +4571,13 @@ app.post('/api/createVoucher', (req, res) => {
             emptyToNull(finalPurchaserEmail), // Use final purchaser values
             emptyToNull(finalPurchaserPhone), // Use final purchaser values
             emptyToNull(finalPurchaserMobile), // Use final purchaser values
-            numberOfPassengers // Number of passengers
+            numberOfPassengers, // Number of passengers
+            // Persist additional information answers regardless of which key frontend used
+            (additional_information_json || additionalInfo || additional_information) ? JSON.stringify(additional_information_json || additionalInfo || additional_information) : null, // additional_information_json
+            add_to_booking_items ? JSON.stringify(add_to_booking_items) : null // add_to_booking_items
         ];
         
-        // Debug: Log the values being inserted
-        console.log('=== INSERT VALUES DEBUG ===');
-        console.log('numberOfPassengers being inserted:', numberOfPassengers);
-        console.log('typeof numberOfPassengers:', typeof numberOfPassengers);
-        console.log('values array:', values);
+        // Values being inserted for voucher creation
         
         con.query(insertSql, values, (err, result) => {
             if (err) {
@@ -3981,6 +4589,9 @@ app.post('/api/createVoucher', (req, res) => {
             console.log('Voucher ID:', result.insertId);
             console.log('Name:', name);
             console.log('Email:', email);
+            
+            // Additional information is already stored in additional_information_json column
+            // No need to store in additional_information_answers table for vouchers
             
             // For Flight Voucher, create booking record and generate voucher code
             if (voucher_type === 'Flight Voucher' || voucher_type === 'Any Day Flight' || voucher_type === 'Weekday Morning' || voucher_type === 'Flexible Weekday') {
@@ -4005,6 +4616,11 @@ app.post('/api/createVoucher', (req, res) => {
         console.log('Paid:', paid);
         console.log('Voucher Type:', voucherType);
         
+        // Define missing variables
+        const flight_type = 'Shared Flight'; // Default flight type for vouchers
+        const now = moment().format('YYYY-MM-DD HH:mm:ss');
+        const expiresFinal = moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+        
         // Create booking record in all_booking table
         const bookingSql = `
             INSERT INTO all_booking (
@@ -4012,7 +4628,7 @@ app.post('/api/createVoucher', (req, res) => {
                 voucher_code, created_at, expires, manual_status_override, additional_notes,
                 preferred_location, preferred_time, preferred_day, flight_attempts,
                 activity_id, time_slot, experience, voucher_type, voucher_discount, original_amount,
-                email, phone, weight
+                email, phone, weight, additional_information_json
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         
@@ -4020,8 +4636,8 @@ app.post('/api/createVoucher', (req, res) => {
             name, // name
             flight_type, // flight_type
             null, // flight_date (null for vouchers)
-            1, // pax (default 1, will be updated when passengers are added)
-            preferred_location || null, // location
+            numberOfPassengers, // pax (use the actual number of passengers)
+            null, // location
             'Confirmed', // status
             paid, // paid
             0, // due
@@ -4030,10 +4646,10 @@ app.post('/api/createVoucher', (req, res) => {
             expiresFinal, // expires
             0, // manual_status_override
             null, // additional_notes
-            preferred_location || null, // preferred_location
-            preferred_time || null, // preferred_time
-            preferred_day || null, // preferred_day
-            1, // flight_attempts
+            null, // preferred_location
+            null, // preferred_time
+            null, // preferred_day
+            0, // flight_attempts
             null, // activity_id
             null, // time_slot
             flight_type, // experience
@@ -4042,20 +4658,13 @@ app.post('/api/createVoucher', (req, res) => {
             paid, // original_amount
             email, // email
             phone, // phone
-            weight // weight
+            weight, // weight
+            null // additional_information_json
         ];
         
         con.query(bookingSql, bookingValues, (err, bookingResult) => {
             if (err) {
                 console.error('Error creating booking for Flight Voucher:', err);
-                // Even if booking creation fails, send response with voucher ID
-                res.status(201).json({ 
-                    success: true, 
-                    message: 'Voucher created successfully!', 
-                    voucherId: voucherId,
-                    voucherCode: voucherRef,
-                    warning: 'Booking record creation failed'
-                });
                 return;
             }
             
@@ -4063,42 +4672,135 @@ app.post('/api/createVoucher', (req, res) => {
             console.log('Booking ID:', bookingResult.insertId);
             console.log('Voucher Ref:', voucherRef);
             
+            // Generate voucher code for the booking
+            generateVoucherCodeForBooking(bookingResult.insertId, name, email, paid, voucherType);
+            
             // Now create passenger record
-            createPassengerForFlightVoucher(bookingResult.insertId, name, weight, paid);
+            createPassengerForFlightVoucher(bookingResult.insertId, name, weight, paid, passengerData);
         });
     }
     
-    // Create passenger record for Flight Voucher
-    function createPassengerForFlightVoucher(bookingId, name, weight, paid) {
-        console.log('=== CREATING PASSENGER RECORD FOR FLIGHT VOUCHER ===');
+    // Generate voucher code for booking
+    function generateVoucherCodeForBooking(bookingId, name, email, paid, voucherType) {
+        console.log('=== GENERATING VOUCHER CODE FOR BOOKING ===');
         console.log('Booking ID:', bookingId);
         console.log('Name:', name);
-        console.log('Weight:', weight);
+        console.log('Email:', email);
         console.log('Paid:', paid);
+        console.log('Voucher Type:', voucherType);
         
-        // Split name into first and last name
-        const nameParts = name.trim().split(' ');
-        const firstName = nameParts[0] || '';
-        const lastName = nameParts.slice(1).join(' ') || '';
+        // Call the generate-voucher-code endpoint
+        const requestData = {
+            flight_category: voucherType,
+            customer_name: name,
+            customer_email: email,
+            location: 'Somerset',
+            experience_type: 'Shared Flight',
+            voucher_type: 'Book Flight',
+            paid_amount: paid
+        };
         
+        fetch('http://localhost:3002/api/generate-voucher-code', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.voucher_code) {
+                console.log('Voucher code generated successfully:', data.voucher_code);
+                
+                // Update the booking record with the voucher code
+                con.query('UPDATE all_booking SET voucher_code = ? WHERE id = ?', [data.voucher_code, bookingId], (err) => {
+                    if (err) {
+                        console.error('Error updating booking with voucher_code:', err);
+                    } else {
+                        console.log('Booking updated with voucher_code:', data.voucher_code);
+                    }
+                });
+            } else {
+                console.error('Failed to generate voucher code:', data);
+            }
+        })
+        .catch(error => {
+            console.error('Error calling generate-voucher-code endpoint:', error);
+        });
+    }
+    
+    // Create passenger records for Flight Voucher
+    function createPassengerForFlightVoucher(bookingId, name, weight, paid, passengerDataArray) {
+        // Creating passenger records for flight voucher
+        
+        // Use passengerData if available, otherwise create from main contact info
+        let passengersToCreate = [];
+        
+        if (passengerDataArray && Array.isArray(passengerDataArray) && passengerDataArray.length > 0) {
+            passengersToCreate = passengerDataArray.map((p, index) => ({
+                firstName: p.firstName || '',
+                lastName: p.lastName || '',
+                weight: p.weight || null,
+                email: p.email || null,
+                phone: p.phone || null,
+                ticketType: p.ticketType || flight_type || 'Shared Flight', // Set flight type as ticket type
+                weatherRefund: p.weatherRefund || false
+            }));
+        } else {
+            // Split name into first and last name
+            const nameParts = name.trim().split(' ');
+            const firstName = nameParts[0] || '';
+            const lastName = nameParts.slice(1).join(' ') || '';
+            
+            // Create passengers based on numberOfPassengers
+            for (let i = 0; i < numberOfPassengers; i++) {
+                passengersToCreate.push({
+                    firstName: i === 0 ? firstName : '', // Only first passenger gets the main contact name
+                    lastName: i === 0 ? lastName : '',
+                    weight: i === 0 ? weight : null, // Only first passenger gets the main contact weight
+                    email: i === 0 ? email : null, // Only first passenger gets the main contact email
+                    phone: i === 0 ? phone : null, // Only first passenger gets the main contact phone
+                    ticketType: flight_type || 'Shared Flight', // Set flight type as ticket type
+                    weatherRefund: false
+                });
+            }
+        }
+        
+        if (passengersToCreate.length === 0) {
+            res.status(201).json({ 
+                success: true, 
+                message: 'Flight Voucher created successfully!', 
+                voucherId: voucherId,
+                voucherCode: voucherRef,
+                bookingId: bookingId,
+                warning: 'No passenger records created'
+            });
+            return;
+        }
+        
+        // Create passenger records using bulk insert
         const passengerSql = `
             INSERT INTO passenger (
-                booking_id, first_name, last_name, weight, price, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?)
+                booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund, price, created_at
+            ) VALUES ?
         `;
         
-        const passengerValues = [
+        const passengerValues = passengersToCreate.map(p => [
             bookingId, // booking_id
-            firstName, // first_name
-            lastName, // last_name
-            weight || null, // weight
-            paid, // price
+            p.firstName, // first_name
+            p.lastName, // last_name
+            p.weight, // weight
+            p.email, // email
+            p.phone, // phone
+            p.ticketType, // ticket_type
+            p.weatherRefund, // weather_refund
+            paid / passengersToCreate.length, // price (split equally among passengers)
             now // created_at
-        ];
+        ]);
         
-        con.query(passengerSql, passengerValues, (err, passengerResult) => {
+        con.query(passengerSql, [passengerValues], (err, passengerResult) => {
             if (err) {
-                console.error('Error creating passenger for Flight Voucher:', err);
+                console.error('Error creating passengers for Flight Voucher:', err);
                 // Even if passenger creation fails, send response with voucher ID
                 res.status(201).json({ 
                     success: true, 
@@ -4110,9 +4812,13 @@ app.post('/api/createVoucher', (req, res) => {
                 return;
             }
             
-            console.log('=== PASSENGER RECORD CREATED SUCCESSFULLY ===');
-            console.log('Passenger ID:', passengerResult.insertId);
-            console.log('Booking ID:', bookingId);
+            // Update the booking pax count to match the number of passengers created
+            const updatePaxSql = `UPDATE all_booking SET pax = ? WHERE id = ?`;
+            con.query(updatePaxSql, [passengersToCreate.length, bookingId], (err2) => {
+                if (err2) {
+                    console.error('Error updating pax count:', err2);
+                }
+            });
             
             // Send success response
             res.status(201).json({ 
@@ -4121,7 +4827,7 @@ app.post('/api/createVoucher', (req, res) => {
                 voucherId: voucherId,
                 voucherCode: voucherRef,
                 bookingId: bookingId,
-                passengerId: passengerResult.insertId
+                passengersCreated: passengersToCreate.length
             });
         });
     }
@@ -4469,11 +5175,15 @@ app.get('/api/getBookingDetail', async (req, res) => {
                         
                         // Safely parse journey_types
                         if (question.journey_types) {
-                            try {
-                                parsedJourneyTypes = JSON.parse(question.journey_types);
-                            } catch (e) {
-                                console.warn('Failed to parse journey_types for question', question.id, e);
-                                parsedJourneyTypes = [];
+                            if (Array.isArray(question.journey_types)) {
+                                parsedJourneyTypes = question.journey_types;
+                            } else if (typeof question.journey_types === 'string') {
+                                try {
+                                    parsedJourneyTypes = JSON.parse(question.journey_types);
+                                } catch (e) {
+                                    console.warn('Failed to parse journey_types for question', question.id, e);
+                                    parsedJourneyTypes = [];
+                                }
                             }
                         }
                         
@@ -6104,8 +6814,8 @@ app.post("/api/addTestGiftVoucher", (req, res) => {
         expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, 
         recipient_email, recipient_phone, recipient_gift_date, preferred_location, 
         preferred_time, preferred_day, flight_attempts, status, purchaser_name, 
-        purchaser_email, purchaser_phone, purchaser_mobile
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        purchaser_email, purchaser_phone, purchaser_mobile, add_to_booking_items
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     
     const values = [
         'Gift Voucher - Book Flight',                    // name
@@ -6135,7 +6845,8 @@ app.post("/api/addTestGiftVoucher", (req, res) => {
         'Gift Voucher - Book Flight',                    // purchaser_name
         'gift@example.com',                            // purchaser_email
         '01234567890',                                 // purchaser_phone
-        '01234567890'                                  // purchaser_mobile
+        '01234567890',                                 // purchaser_mobile
+        null                                           // add_to_booking_items (test data)
     ];
     
     con.query(insertSql, values, (err, result) => {
@@ -6973,7 +7684,12 @@ async function createVoucherFromWebhook(voucherData) {
             preferred_location = '',
             preferred_time = '',
             preferred_day = '',
-            numberOfPassengers = 1
+            numberOfPassengers = 1,
+            additionalInfo = null,
+            additional_information = null,
+            additional_information_json = null,
+            add_to_booking_items = null,
+            passengerData = []
         } = voucherData;
 
         const now = moment().format('YYYY-MM-DD HH:mm:ss');
@@ -6985,6 +7701,12 @@ async function createVoucherFromWebhook(voucherData) {
         console.log('Webhook voucher data received:', voucherData);
         console.log('voucher_type_detail from webhook:', voucherData.voucher_type_detail);
         console.log('voucher_type from webhook:', voucher_type);
+        console.log('=== WEBHOOK ADDITIONAL INFO DEBUG ===');
+        console.log('additionalInfo from webhook:', additionalInfo);
+        console.log('additional_information from webhook:', additional_information);
+        console.log('add_to_booking_items from webhook:', add_to_booking_items);
+        console.log('typeof additionalInfo:', typeof additionalInfo);
+        console.log('typeof add_to_booking_items:', typeof add_to_booking_items);
         
         // Check if there's a specific voucher type detail in the request
         if (voucherData.voucher_type_detail && voucherData.voucher_type_detail.trim() !== '') {
@@ -7037,11 +7759,36 @@ async function createVoucherFromWebhook(voucherData) {
                 return;
             }
             
-            // No duplicates found, proceed with voucher creation
-            const insertSql = `INSERT INTO all_vouchers 
-                (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, numberOfPassengers)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-            const values = [
+                // Ensure additionalInfo is properly stored as JSON
+                let finalAdditionalInfoJson = null;
+                if (additionalInfo) {
+                    // If additionalInfo is already a string, try to parse it
+                    if (typeof additionalInfo === 'string') {
+                        try {
+                            finalAdditionalInfoJson = JSON.parse(additionalInfo);
+                        } catch (e) {
+                            logToFile('Failed to parse additionalInfo string:', e);
+                            finalAdditionalInfoJson = additionalInfo;
+                        }
+                    } else {
+                        // If it's an object, use it directly
+                        finalAdditionalInfoJson = additionalInfo;
+                    }
+                }
+
+                // Log the data we're about to insert
+                logToFile('Inserting voucher with data:', {
+                    additionalInfo,
+                    additional_information_json,
+                    finalAdditionalInfoJson,
+                    add_to_booking_items
+                });
+
+                // No duplicates found, proceed with voucher creation
+                const insertSql = `INSERT INTO all_vouchers 
+                    (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, additional_information_json, add_to_booking_items, voucher_passenger_details)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                const values = [
                 emptyToNull(name),
                 emptyToNull(weight),
                 emptyToNull(flight_type), // This will go to experience_type column
@@ -7063,8 +7810,19 @@ async function createVoucherFromWebhook(voucherData) {
                 emptyToNull(preferred_location),
                 emptyToNull(preferred_time),
                 emptyToNull(preferred_day),
-                1, // flight_attempts starts at 1 for each created voucher
-                numberOfPassengers // Number of passengers
+                0, // flight_attempts starts at 0 for each created voucher
+                // Persist additional information answers regardless of which key frontend used
+                finalAdditionalInfoJson ? JSON.stringify(finalAdditionalInfoJson) : null,
+                add_to_booking_items ? JSON.stringify(add_to_booking_items) : null,
+                Array.isArray(passengerData) && passengerData.length > 0 ? JSON.stringify(passengerData.map(p => ({
+                    first_name: p.firstName || '',
+                    last_name: p.lastName || '',
+                    weight: p.weight || null,
+                    email: p.email || null,
+                    phone: p.phone || null,
+                    ticket_type: p.ticketType || null,
+                    weather_refund: !!p.weatherRefund
+                }))) : null
             ];
             
             con.query(insertSql, values, (err, result) => {
@@ -7073,6 +7831,31 @@ async function createVoucherFromWebhook(voucherData) {
                     return reject(err);
                 }
                 console.log('Webhook voucher created successfully, ID:', result.insertId);
+                
+                // Store additional information answers if available
+                if (additionalInfo && typeof additionalInfo === 'object') {
+                    const additionalInfoAnswers = [];
+                    
+                    // Process additionalInfo object to extract question answers
+                    Object.keys(additionalInfo).forEach(key => {
+                        if (key.startsWith('question_') && additionalInfo[key]) {
+                            const questionId = key.replace('question_', '');
+                            additionalInfoAnswers.push([result.insertId, questionId, additionalInfo[key]]);
+                        }
+                    });
+                    
+                    if (additionalInfoAnswers.length > 0) {
+                        const additionalInfoSql = 'INSERT INTO additional_information_answers (booking_id, question_id, answer) VALUES ?';
+                        con.query(additionalInfoSql, [additionalInfoAnswers], (additionalInfoErr) => {
+                            if (additionalInfoErr) {
+                                console.error('Error storing additional information answers for webhook voucher:', additionalInfoErr);
+                            } else {
+                                console.log('Additional information answers stored successfully for webhook voucher');
+                            }
+                        });
+                    }
+                }
+                
                 resolve(result.insertId);
             });
         });
@@ -7107,6 +7890,14 @@ app.post('/api/create-checkout-session', async (req, res) => {
             console.log('voucherData.numberOfPassengers:', voucherData.numberOfPassengers);
             console.log('typeof voucherData.numberOfPassengers:', typeof voucherData.numberOfPassengers);
             console.log('voucherData keys:', Object.keys(voucherData));
+            console.log('voucherData.additionalInfo:', voucherData.additionalInfo);
+            console.log('voucherData.additional_information_json:', voucherData.additional_information_json);
+            console.log('voucherData.additional_information:', voucherData.additional_information);
+            console.log('typeof voucherData.additionalInfo:', typeof voucherData.additionalInfo);
+            console.log('voucherData.additionalInfo keys:', voucherData.additionalInfo ? Object.keys(voucherData.additionalInfo) : 'additionalInfo is null/undefined');
+            console.log('voucherData.add_to_booking_items:', voucherData.add_to_booking_items);
+            console.log('typeof voucherData.add_to_booking_items:', typeof voucherData.add_to_booking_items);
+            console.log('voucherData.add_to_booking_items length:', voucherData.add_to_booking_items ? voucherData.add_to_booking_items.length : 'add_to_booking_items is null/undefined');
         }
         
         console.log('Processing payment:', { totalPrice, type, hasBookingData: !!bookingData, hasVoucherData: !!voucherData });
@@ -7151,12 +7942,30 @@ app.post('/api/create-checkout-session', async (req, res) => {
         
         // bookingData veya voucherData'yı session_id ile store'da sakla
         const session_id = session.id;
+        // Normalize voucherData to ensure additional information persists through webhook
+        const normalizedVoucherData = voucherData ? {
+            ...voucherData,
+            // Ensure additional_information_json is populated for webhook persistence
+            additional_information_json: voucherData.additional_information_json || voucherData.additionalInfo || null,
+            // Backward-compat: include choose_add_on as add_to_booking_items if only one is present
+            add_to_booking_items: voucherData.add_to_booking_items || voucherData.choose_add_on || null
+        } : null;
         stripeSessionStore[session_id] = {
             type: type || (voucherData ? 'voucher' : 'booking'),
             bookingData,
-            voucherData,
+            voucherData: normalizedVoucherData,
             timestamp: Date.now() // Add timestamp for debugging
         };
+        // File logging for saved session voucherData
+        try {
+            logToFile('SESSION STORE SAVE', {
+                session_id,
+                type: type || (voucherData ? 'voucher' : 'booking'),
+                voucherData: normalizedVoucherData
+            });
+        } catch (e) {
+            console.warn('Failed to write session log:', e);
+        }
         
         // Stripe metadata'ya session_id ekle
         await stripe.checkout.sessions.update(session_id, {
@@ -7369,6 +8178,11 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                 console.log('Full storeData.bookingData:', JSON.stringify(storeData.bookingData, null, 2));
                 console.log('selectedVoucherType exists:', !!storeData.bookingData.selectedVoucherType);
                 console.log('selectedVoucherType:', storeData.bookingData.selectedVoucherType);
+                console.log('passengerData exists:', !!storeData.bookingData.passengerData);
+                console.log('passengerData:', storeData.bookingData.passengerData);
+                console.log('chooseLocation:', storeData.bookingData.chooseLocation);
+                console.log('chooseFlightType:', storeData.bookingData.chooseFlightType);
+                console.log('totalPrice:', storeData.bookingData.totalPrice);
                 
                 // Determine flight category from booking data
                 let flightCategory = 'Any Day Flight'; // Default
@@ -7394,7 +8208,7 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                 // Generate voucher code
                 const voucherCodeRequest = {
                     flight_category: flightCategory,
-                    customer_name: storeData.bookingData.passengerData?.[0]?.firstName + ' ' + storeData.bookingData.passengerData?.[0]?.lastName || 'Unknown Customer',
+                    customer_name: (storeData.bookingData.passengerData?.[0]?.firstName || '') + ' ' + (storeData.bookingData.passengerData?.[0]?.lastName || '') || 'Unknown Customer',
                     customer_email: storeData.bookingData.passengerData?.[0]?.email || '',
                     location: storeData.bookingData.chooseLocation || 'Somerset',
                     experience_type: storeData.bookingData.chooseFlightType?.type || 'Shared Flight',
@@ -7430,10 +8244,32 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                     }
                 } else {
                     console.error('Failed to generate Book Flight voucher code:', voucherCodeResponse.data.message);
+                    // Even if the API call fails, try to use the voucher code from the response
+                    if (voucherCodeResponse.data.voucher_code) {
+                        voucherCode = voucherCodeResponse.data.voucher_code;
+                        console.log('Using voucher code from failed response:', voucherCode);
+                        // Try to persist the voucher code even if the API call failed
+                        try {
+                            await new Promise((resolve) => {
+                                con.query('UPDATE all_booking SET voucher_code = ? WHERE id = ?', [voucherCode, result], (err) => {
+                                    if (err) {
+                                        console.error('Error updating booking with voucher_code (fallback):', err);
+                                    } else {
+                                        console.log('Booking updated with voucher_code (fallback):', voucherCode);
+                                    }
+                                    resolve();
+                                });
+                            });
+                            storeData.bookingData.voucher_code = voucherCode;
+                        } catch (e) {
+                            console.error('Voucher code persist exception (fallback):', e);
+                        }
+                    }
                 }
             } catch (voucherCodeError) {
                 console.error('Error generating Book Flight voucher code:', voucherCodeError);
-                // Continue even if code generation fails
+                // Continue even if code generation fails - booking is still valid
+                console.log('Booking created successfully without voucher code. Voucher code can be generated later.');
             }
         } else if (type === 'voucher' && storeData.voucherData) {
             console.log('Creating voucher from session data');
@@ -7475,9 +8311,9 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                         console.log('storeData.voucherData.book_flight:', storeData.voucherData.book_flight);
                         console.log('Checking if Buy Gift or Gift Voucher...');
                         
-                        if (storeData.voucherData.voucher_type === 'Buy Gift' || storeData.voucherData.voucher_type === 'Gift Voucher' || storeData.voucherData.book_flight === 'Gift Voucher') {
+                        if (storeData.voucherData.voucher_type === 'Buy Gift' || storeData.voucherData.voucher_type === 'Gift Voucher' || storeData.voucherData.voucher_type === 'Flight Voucher' || storeData.voucherData.voucher_type === 'Any Day Flight' || storeData.voucherData.voucher_type === 'Weekday Morning' || storeData.voucherData.voucher_type === 'Flexible Weekday' || storeData.voucherData.book_flight === 'Gift Voucher') {
                             try {
-                                console.log('Generating voucher code for Buy Gift...');
+                                console.log('Generating voucher code for voucher type:', storeData.voucherData.voucher_type);
                                 
                                 // Determine flight category from voucher data
                                 let flightCategory = 'Any Day Flight'; // Default
@@ -7492,22 +8328,22 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                                     customer_email: storeData.voucherData.email || '',
                                     location: storeData.voucherData.preferred_location || 'Somerset',
                                     experience_type: storeData.voucherData.flight_type || 'Shared Flight',
-                                    voucher_type: 'Buy Gift',
+                                    voucher_type: storeData.voucherData.voucher_type || 'Flight Voucher',
                                     paid_amount: storeData.voucherData.paid || 0,
                                     expires_date: storeData.voucherData.expires || null
                                 });
                                 
                                 if (voucherCodeResponse.data.success) {
-                                    console.log('Buy Gift voucher code generated successfully:', voucherCodeResponse.data.voucher_code);
+                                    console.log('Voucher code generated successfully for', storeData.voucherData.voucher_type, ':', voucherCodeResponse.data.voucher_code);
                                     voucherCode = voucherCodeResponse.data.voucher_code;
                                     
                                     // Store the voucher code in the session data to prevent regeneration
                                     storeData.voucherData.generated_voucher_code = voucherCode;
                                 } else {
-                                    console.error('Failed to generate Buy Gift voucher code:', voucherCodeResponse.data.message);
+                                    console.error('Failed to generate voucher code for', storeData.voucherData.voucher_type, ':', voucherCodeResponse.data.message);
                                 }
                             } catch (voucherCodeError) {
-                                console.error('Error generating Buy Gift voucher code:', voucherCodeError);
+                                console.error('Error generating voucher code for', storeData.voucherData.voucher_type, ':', voucherCodeError);
                                 // Continue even if code generation fails
                             }
                         }
@@ -8456,6 +9292,43 @@ const fixExistingPurchaserData = () => {
     });
 };
 
+// Add additional_information columns to all_vouchers table
+const addAdditionalInfoToVouchers = () => {
+    console.log('🔍 Checking if additional_information columns exist in all_vouchers table...');
+    
+    const checkAdditionalInfo = "SHOW COLUMNS FROM all_vouchers LIKE 'additional_information'";
+    con.query(checkAdditionalInfo, (err, result) => {
+        if (err) {
+            console.error('Error checking additional_information column in all_vouchers:', err);
+        } else if (result.length === 0) {
+            console.log('📝 Adding additional_information columns to all_vouchers table...');
+            
+            // Add additional_information column
+            const addAdditionalInfo = "ALTER TABLE all_vouchers ADD COLUMN additional_information JSON COMMENT 'Additional information questions and answers' AFTER numberOfPassengers";
+            con.query(addAdditionalInfo, (err) => {
+                if (err) {
+                    console.error('Error adding additional_information column to all_vouchers:', err);
+                } else {
+                    console.log('✅ additional_information column added to all_vouchers successfully');
+                    
+                    // Add additional_information_json column
+                    const addAdditionalInfoJson = "ALTER TABLE all_vouchers ADD COLUMN additional_information_json JSON COMMENT 'Additional information in JSON format' AFTER additional_information";
+                    con.query(addAdditionalInfoJson, (err) => {
+                        if (err) {
+                            console.error('Error adding additional_information_json column to all_vouchers:', err);
+                        } else {
+                            console.log('✅ additional_information_json column added to all_vouchers successfully');
+                            console.log('🎉 Additional information columns migration completed successfully!');
+                        }
+                    });
+                }
+            });
+        } else {
+            console.log('✅ additional_information columns already exist in all_vouchers');
+        }
+    });
+};
+
 // Run voucher code migrations
 const runVoucherCodeMigrations = () => {
     console.log('Running voucher code migrations...');
@@ -8562,7 +9435,57 @@ runVoucherCodeMigrations();
 // Run purchaser/recipient data fix migration when server starts
 runPurchaserRecipientDataFix();
 
+// Add additional_information columns to all_vouchers table when server starts
+addAdditionalInfoToVouchers();
+
 // Database migrations will run when the main server starts
+
+// Debug endpoint to check voucher data
+app.get('/api/debug/voucher-data/:id', (req, res) => {
+    const { id } = req.params;
+    
+    const sql = `
+        SELECT 
+            id, name, email, 
+            additional_information_json, 
+            add_to_booking_items,
+            created_at
+        FROM all_vouchers 
+        WHERE id = ?
+    `;
+    
+    con.query(sql, [id], (err, result) => {
+        if (err) {
+            console.error('Error fetching voucher data:', err);
+            return res.status(500).json({ success: false, error: err.message });
+        }
+        
+        if (result.length === 0) {
+            return res.status(404).json({ success: false, message: 'Voucher not found' });
+        }
+        
+        const voucher = result[0];
+        console.log('=== DEBUG VOUCHER DATA ===');
+        console.log('Voucher ID:', voucher.id);
+        console.log('Name:', voucher.name);
+        console.log('Email:', voucher.email);
+        console.log('additional_information_json:', voucher.additional_information_json);
+        console.log('add_to_booking_items:', voucher.add_to_booking_items);
+        console.log('Created at:', voucher.created_at);
+        
+        res.json({
+            success: true,
+            data: {
+                id: voucher.id,
+                name: voucher.name,
+                email: voucher.email,
+                additional_information_json: voucher.additional_information_json,
+                add_to_booking_items: voucher.add_to_booking_items,
+                created_at: voucher.created_at
+            }
+        });
+    });
+});
 
 // Debug endpoint to check table structure
 app.get('/api/debug/table-structure', (req, res) => {
@@ -8574,6 +9497,20 @@ app.get('/api/debug/table-structure', (req, res) => {
         }
         
         console.log('Table structure:', result);
+        res.json({ success: true, data: result });
+    });
+});
+
+// Debug endpoint to check all_vouchers table structure
+app.get('/api/debug/vouchers-table-structure', (req, res) => {
+    const sql = "DESCRIBE all_vouchers";
+    con.query(sql, (err, result) => {
+        if (err) {
+            console.error('Error checking all_vouchers table structure:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err });
+        }
+        
+        console.log('All vouchers table structure:', result);
         res.json({ success: true, data: result });
     });
 });
@@ -8818,14 +9755,6 @@ app.post('/api/crew-assignment', (req, res) => {
             });
         });
     });
-});
-
-// Place this at the very end, after all API endpoints:
-app.use(express.static(path.join(__dirname, '../client/build')));
-
-// Catch-all route for SPA - must be at the very end
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/build/index.html'));
 });
 
 // Debug endpoint to check crew assignments table

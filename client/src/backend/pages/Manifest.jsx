@@ -2068,13 +2068,28 @@ const Manifest = () => {
                                                                                     fontSize: '14px',
                                                                                     marginTop: '2px'
                                                                                 }}>
-                                                                                    {`${p.first_name || ''} ${p.last_name || ''}`.trim()} {p.weight ? `(${p.weight}kg)` : ''}
+                                                                                    {`${p.first_name || ''} ${p.last_name || ''}`.trim()}
                                                                                 </div>
                                                                             ))}
                                                                         </div>
                                                                     )}
                                                                 </TableCell>
-                                                                <TableCell>{firstPassenger ? firstPassenger.weight : ''}</TableCell>
+                                                                <TableCell>
+                                                                    {Array.isArray(flight.passengers) && flight.passengers.length > 0 ? (
+                                                                        <div>
+                                                                            {flight.passengers.map((p, i) => (
+                                                                                <div key={`${flight.id}-weight-${i}`} style={{ 
+                                                                                    fontSize: '14px',
+                                                                                    marginBottom: i < flight.passengers.length - 1 ? '2px' : '0'
+                                                                                }}>
+                                                                                    {p.weight ? `${p.weight}kg` : ''}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    ) : (
+                                                                        firstPassenger ? firstPassenger.weight : ''
+                                                                    )}
+                                                                </TableCell>
                                                                 <TableCell>{flight.phone || ''}</TableCell>
                                                                 <TableCell>{flight.email || ''}</TableCell>
                                                                 <TableCell>{passenger.weatherRefund || passenger.weather_refund ? 'Yes' : 'No'}</TableCell>

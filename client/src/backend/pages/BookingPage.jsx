@@ -414,6 +414,37 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
     finalVoucherDetail.voucher.expires = voucherItem.expires || finalVoucherDetail.voucher.expires;
     // Use paid information from getAllVoucherData instead of voucher detail API
     finalVoucherDetail.voucher.paid = voucherItem.paid || finalVoucherDetail.voucher.paid;
+    
+    // Copy additional information data from getAllVoucherData
+    if (voucherItem.additional_information) {
+        console.log('🔍 Copying additional_information from voucherItem:', voucherItem.additional_information);
+        finalVoucherDetail.voucher.additional_information = voucherItem.additional_information;
+    }
+    if (voucherItem.additional_information_json) {
+        console.log('🔍 Copying additional_information_json from voucherItem:', voucherItem.additional_information_json);
+        finalVoucherDetail.voucher.additional_information_json = voucherItem.additional_information_json;
+    }
+    
+    // Copy add to booking items data from getAllVoucherData
+    if (voucherItem.add_to_booking_items) {
+        console.log('🔍 Copying add_to_booking_items from voucherItem:', voucherItem.add_to_booking_items);
+        finalVoucherDetail.voucher.add_to_booking_items = voucherItem.add_to_booking_items;
+    }
+
+    // Copy passenger details from getAllVoucherData so popup can render immediately
+    if (voucherItem.passenger_details) {
+        try {
+            const passengersFromList = Array.isArray(voucherItem.passenger_details)
+                ? voucherItem.passenger_details
+                : (typeof voucherItem.passenger_details === 'string' ? JSON.parse(voucherItem.passenger_details) : []);
+            console.log('🔍 Copying passenger_details from voucherItem:', passengersFromList);
+            finalVoucherDetail.voucher.passenger_details = passengersFromList;
+        } catch (e) {
+            console.warn('⚠️ Failed to copy/parse passenger_details from voucherItem:', e);
+        }
+    }
+    
+    console.log('🔍 Final voucher object after copying additional info and add to booking:', finalVoucherDetail.voucher);
 }
 
                 // Load voucher notes when opening popup
@@ -538,8 +569,25 @@ setBookingDetail(finalVoucherDetail);
                 })
                 .finally(() => setLoadingDetail(false));
         } else if (detailDialogOpen && !selectedBookingId && activeTab === 'vouchers') {
-            // Voucher'lar için bookingDetail zaten set edilmiş, sıfırlama
-            console.log('Voucher dialog open, not resetting bookingDetail');
+            // Voucher'lar için bookingDetail zaten set edilmiş, additional information'ı yükle
+            console.log('Voucher dialog open, loading additional information');
+            console.log('Voucher additional_information:', bookingDetail?.voucher?.additional_information);
+            console.log('Voucher additional_information_json:', bookingDetail?.voucher?.additional_information_json);
+            
+            if (bookingDetail?.voucher?.additional_information || bookingDetail?.voucher?.additional_information_json) {
+                console.log('✅ Using voucher additional_information data');
+                // Combine additional_information (questions) with additional_information_json (answers)
+                const combinedInfo = {
+                    questions: bookingDetail.voucher.additional_information?.questions || [],
+                    answers: bookingDetail.voucher.additional_information?.answers || [],
+                    additional_information_json: bookingDetail.voucher.additional_information_json || {},
+                    legacy: bookingDetail.voucher.additional_information?.legacy || {}
+                };
+                setAdditionalInformation(combinedInfo);
+            } else {
+                console.log('❌ No additional information found for voucher');
+                setAdditionalInformation(null);
+            }
         } else if (!detailDialogOpen) {
             // Dialog kapandığında sıfırla
             setBookingDetail(null);
@@ -547,6 +595,40 @@ setBookingDetail(finalVoucherDetail);
             setAdditionalInformation(null);
         }
     }, [detailDialogOpen, selectedBookingId, activeTab]);
+
+    // Load additional information for vouchers when bookingDetail changes
+    useEffect(() => {
+        if (activeTab === 'vouchers' && bookingDetail?.voucher) {
+            console.log('Loading additional information for voucher:', bookingDetail.voucher);
+            console.log('Voucher additional_information:', bookingDetail.voucher.additional_information);
+            console.log('Voucher additional_information_json:', bookingDetail.voucher.additional_information_json);
+            
+            if (bookingDetail.voucher.additional_information || bookingDetail.voucher.additional_information_json) {
+                console.log('✅ Using voucher additional_information data in useEffect');
+                console.log('🔍 Voucher additional_information:', bookingDetail.voucher.additional_information);
+                console.log('🔍 Voucher additional_information_json:', bookingDetail.voucher.additional_information_json);
+                console.log('🔍 Voucher additional_information.questions:', bookingDetail.voucher.additional_information?.questions);
+                console.log('🔍 Voucher additional_information.questions length:', bookingDetail.voucher.additional_information?.questions?.length);
+                console.log('🔍 Full voucher object keys:', Object.keys(bookingDetail.voucher));
+                
+                // Combine additional_information (questions) with additional_information_json (answers)
+                const combinedInfo = {
+                    questions: bookingDetail.voucher.additional_information?.questions || [],
+                    answers: bookingDetail.voucher.additional_information?.answers || [],
+                    additional_information_json: bookingDetail.voucher.additional_information_json || {},
+                    legacy: bookingDetail.voucher.additional_information?.legacy || {}
+                };
+                
+                console.log('🔍 Combined info created:', combinedInfo);
+                console.log('🔍 Questions in combined info:', combinedInfo.questions);
+                console.log('🔍 Questions length:', combinedInfo.questions?.length);
+                setAdditionalInformation(combinedInfo);
+            } else {
+                console.log('❌ No additional information found for voucher in useEffect');
+                setAdditionalInformation(null);
+            }
+        }
+    }, [bookingDetail, activeTab]);
 
     // Notes handling removed - now handled in Additional Information section
 
@@ -2494,12 +2576,10 @@ setBookingDetail(finalVoucherDetail);
                                                     )}
                                                 </Box>
                                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 140 }}>
-                                                    {/* Butonlar sadece booking için aktif, voucher için gizli */}
-                                                    {activeTab !== 'vouchers' && <>
-                                                        <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleRebook}>Rebook</Button>
+                                                    {/* Always show booking action buttons (including in Flight Voucher Details) */}
+                                                    <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleRebook}>Rebook</Button>
                                                     <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleAddGuestClick}>Add Guest</Button>
-                                                        <Button variant="contained" color="info" sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d' }} onClick={handleCancelFlight}>Cancel Flight</Button>
-                                                    </>}
+                                                    <Button variant="contained" color="info" sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d' }} onClick={handleCancelFlight}>Cancel Flight</Button>
                                                 </Box>
                                             </Box>
                                             <Divider sx={{ my: 2 }} />
@@ -2530,150 +2610,31 @@ setBookingDetail(finalVoucherDetail);
                                                         <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Passenger Details</Typography>
                                                         {activeTab === 'vouchers' ? (
                                                     <>
-                                                        {/* Passenger info for vouchers - show name, weight and price in Booking Details format */}
+                                                        {/* Passenger list for vouchers using passenger_details from voucher */}
                                                         {(() => {
                                                             const v = bookingDetail.voucher || {};
-                                                            if (v.book_flight !== "Gift Voucher") {
-                                                                return (
-                                                                    <Box>
-                                                                        <Typography sx={{ mb: 2 }}>
-                                                                            Passenger 1: {v.name || '-'} ({v.weight || '-'}kg £{v.paid || '-'})
-                                                                            <IconButton size="small" onClick={() => handleEditVoucherPassengerClick(v)}><EditIcon fontSize="small" /></IconButton>
-                                                                        </Typography>
-                                                                        
-                                                                        {/* Voucher passenger edit fields - name, weight, price */}
-                                                                        {editField === 'voucher_passenger' && (
-                                                                            <Box sx={{ mb: 2, p: 2, background: '#f7f7f7', borderRadius: 2 }}>
-                                                                                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>Edit Passenger Details:</Typography>
-                                                                                <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-                                                                                    <input
-                                                                                        value={editVoucherPassengerName || ''}
-                                                                                        onChange={e => setEditVoucherPassengerName(e.target.value)}
-                                                                                        placeholder="Passenger Name"
-                                                                                        style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px', minWidth: '150px' }}
-                                                                                    />
-                                                                                    <input
-                                                                                        value={editVoucherPassengerWeight || ''}
-                                                                                        onChange={e => setEditVoucherPassengerWeight(e.target.value.replace(/[^0-9.]/g, ''))}
-                                                                                        placeholder="Weight (kg)"
-                                                                                        style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px', minWidth: '80px' }}
-                                                                                    />
-                                                                                    <input
-                                                                                        value={editVoucherPassengerPrice || ''}
-                                                                                        onChange={e => setEditVoucherPassengerPrice(e.target.value.replace(/[^0-9.]/g, ''))}
-                                                                                        placeholder="Price (£)"
-                                                                                        style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px', minWidth: '80px' }}
-                                                                                    />
-                                                                                </Box>
-                                                                                <Box sx={{ display: 'flex', gap: 1 }}>
-                                                                                    <Button 
-                                                                                        size="small" 
-                                                                                        variant="contained" 
-                                                                                        onClick={handleEditVoucherPassengerSave} 
-                                                                                        disabled={savingEdit}
-                                                                                    >
-                                                                                        Save
-                                                                                    </Button>
-                                                                                    <Button 
-                                                                                        size="small" 
-                                                                                        variant="outlined" 
-                                                                                        onClick={handleEditCancel}
-                                                                                    >
-                                                                                        Cancel
-                                                                                    </Button>
-                                                                                </Box>
-                                                                            </Box>
-                                                                        )}
-                                                                    </Box>
-                                                                );
+                                                            // Prefer voucher.passenger_details; fallback to bookingDetail.passenger_details if present
+                                                            const passengers = Array.isArray(v.passenger_details)
+                                                                ? v.passenger_details
+                                                                : (Array.isArray(bookingDetail.passenger_details) ? bookingDetail.passenger_details : []);
+                                                            if (passengers.length === 0) {
+                                                                return <Typography sx={{ color: '#888' }}>No passengers found</Typography>;
                                                             }
-                                                            return null;
+                                                            return (
+                                                                <Box>
+                                                                    {passengers.map((p, i) => {
+                                                                        const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim() || '-';
+                                                                        const weight = (p.weight !== undefined && p.weight !== null && p.weight !== '') ? p.weight : '-';
+                                                                        const price = (p.price !== undefined && p.price !== null && p.price !== '') ? p.price : '-';
+                                                                        return (
+                                                                            <Typography key={`${p.id || i}-${fullName}-${i}`}>
+                                                                                {`Passenger ${i + 1}: ${fullName} (${weight}kg £${price})`}
+                                                                            </Typography>
+                                                                        );
+                                                                    })}
+                                                                </Box>
+                                                            );
                                                         })()}
-                                                        
-                                                        {/* Passenger list for vouchers - same structure as bookings */}
-                                                        {bookingDetail.passengers && bookingDetail.passengers.length > 0 ? (
-                                                            <Box>
-                                                                {bookingDetail.passengers.map((p, i) => (
-                                                                    <Typography key={p.id}>
-                                                                        Passenger {i + 1}: {editingPassenger === p.id ? (
-                                                                            <>
-                                                                                <input
-                                                                                    value={editPassengerFirstName}
-                                                                                    onChange={e => setEditPassengerFirstName(e.target.value)}
-                                                                                    placeholder="First Name"
-                                                                                    style={{ marginRight: 4, width: 90 }}
-                                                                                />
-                                                                                <input
-                                                                                    value={editPassengerLastName}
-                                                                                    onChange={e => setEditPassengerLastName(e.target.value)}
-                                                                                    placeholder="Last Name"
-                                                                                    style={{ marginRight: 4, width: 90 }}
-                                                                                />
-                                                                                <input
-                                                                                    value={editPassengerWeight}
-                                                                                    onChange={e => setEditPassengerWeight(e.target.value.replace(/[^0-9.]/g, ''))}
-                                                                                    placeholder="Weight (kg)"
-                                                                                    style={{ marginRight: 4, width: 70 }}
-                                                                                />
-                                                                                <input
-                                                                                    value={editPassengerPrice}
-                                                                                    onChange={e => setEditPassengerPrice(e.target.value.replace(/[^0-9.]/g, ''))}
-                                                                                    placeholder="Price (£)"
-                                                                                    style={{ marginRight: 4, width: 70 }}
-                                                                                />
-                                                                                <Button size="small" onClick={async () => {
-                                                                                    // Save passenger details
-                                                                                    const newPrice = parseFloat(editPassengerPrice) || 0;
-                                                                                    await axios.patch('/api/updatePassengerField', {
-                                                                                        passenger_id: p.id,
-                                                                                        field: 'price',
-                                                                                        value: newPrice
-                                                                                    });
-                                                                                    // Update local state
-                                                                                    const updatedPrices = bookingDetail.passengers.map((pp, idx) =>
-                                                                                        pp.id === p.id ? newPrice : (pp.price ? parseFloat(pp.price) : 0)
-                                                                                    );
-                                                                                    // Update paid in backend
-                                                                                    const newPaid = updatedPrices.reduce((sum, v) => sum + v, 0);
-                                                                                    await axios.patch('/api/updateBookingField', {
-                                                                                        booking_id: bookingDetail.booking.id,
-                                                                                        field: 'paid',
-                                                                                        value: newPaid
-                                                                                    });
-                                                                                    setBookingDetail(prev => ({
-                                                                                        ...prev,
-                                                                                        booking: { ...prev.booking, paid: newPaid },
-                                                                                        passengers: prev.passengers.map(pp =>
-                                                                                            pp.id === p.id ? { ...pp, price: newPrice } : pp
-                                                                                        )
-                                                                                    }));
-                                                                                    setEditPassengerPrices(updatedPrices);
-                                                                                    setEditingPassenger(null);
-                                                                                    setEditPassengerPrice("");
-                                                                                }} disabled={savingPassengerEdit}>Save</Button>
-                                                                                <Button size="small" onClick={handleCancelPassengerEdit} disabled={savingPassengerEdit}>Cancel</Button>
-                                                                            </>
-                                                                        ) : (
-                                                                            <>
-                                                                                {p.first_name || '-'} {p.last_name || '-'}{p.weight ? ` (${p.weight}kg${p.price ? ' £' + p.price : ''})` : ''}
-                                                                                <IconButton size="small" onClick={() => handleEditPassengerClick(p)}><EditIcon fontSize="small" /></IconButton>
-                                                                                {i > 0 && ( // Only show delete button for additional passengers (not the first one)
-                                                                                    <IconButton 
-                                                                                        size="small" 
-                                                                                        onClick={() => handleDeletePassenger(p.id)}
-                                                                                        sx={{ color: 'red' }}
-                                                                                    >
-                                                                                        <DeleteIcon fontSize="small" />
-                                                                                    </IconButton>
-                                                                                )}
-                                                                            </>
-                                                                        )}
-                                                                    </Typography>
-                                                                ))}
-                                                            </Box>
-                                                        ) : (
-                                                            <Typography>No passengers found</Typography>
-                                                        )}
                                                     </>
                                                 ) : (
                                                     bookingDetail.passengers && bookingDetail.passengers.length > 0 ? (
@@ -2839,10 +2800,23 @@ setBookingDetail(finalVoucherDetail);
                                                 })()}
                                             </Box>
                                             <Divider sx={{ my: 2 }} />
-                                            {/* Additional Information Section */}
-                                            {additionalInformation && (
+                                            {/* Additional Information Section - Show for both bookings and vouchers */}
+                                            {(additionalInformation || (activeTab === 'vouchers' && bookingDetail?.voucher)) && (
                                                 <Box>
                                                     <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Additional Information & Notes</Typography>
+                                                    {console.log('🔍 Additional Information Debug:', {
+                                                        additionalInformation,
+                                                        questions: additionalInformation?.questions,
+                                                        questionsLength: additionalInformation?.questions?.length,
+                                                        answers: additionalInformation?.answers,
+                                                        additional_information_json: additionalInformation?.additional_information_json,
+                                                        activeTab,
+                                                        isVoucher: activeTab === 'vouchers',
+                                                        voucherData: activeTab === 'vouchers' ? bookingDetail?.voucher : null,
+                                                        voucherAdditionalInfo: activeTab === 'vouchers' ? bookingDetail?.voucher?.additional_information : null,
+                                                        voucherAdditionalInfoJson: activeTab === 'vouchers' ? bookingDetail?.voucher?.additional_information_json : null,
+                                                        fullVoucherData: activeTab === 'vouchers' ? JSON.stringify(bookingDetail?.voucher, null, 2) : null
+                                                    })}
                                                     {additionalInfoLoading ? (
                                                         <Typography>Loading additional information...</Typography>
                                                     ) : (
@@ -2856,33 +2830,100 @@ setBookingDetail(finalVoucherDetail);
                                                             )}
                                                             
                                                             {/* Show all available questions with their answers (or "Not answered") - Only this section */}
-                                                            {additionalInformation.questions && additionalInformation.questions.length > 0 && (
+                                                            {(() => {
+                                                                // Use additionalInformation if available, otherwise try to get from voucher data
+                                                                const questions = additionalInformation?.questions || 
+                                                                                 (activeTab === 'vouchers' && bookingDetail?.voucher?.additional_information?.questions) || 
+                                                                                 [];
+                                                                const answers = additionalInformation?.answers || 
+                                                                               (activeTab === 'vouchers' && bookingDetail?.voucher?.additional_information?.answers) || 
+                                                                               [];
+                                                                const additionalInfoJson = additionalInformation?.additional_information_json || 
+                                                                                           (activeTab === 'vouchers' && bookingDetail?.voucher?.additional_information_json) || 
+                                                                                           {};
+                                                                
+                                                                console.log('🔍 Questions Debug:', {
+                                                                    questions,
+                                                                    questionsLength: questions?.length,
+                                                                    answers,
+                                                                    additionalInfoJson,
+                                                                    fromAdditionalInformation: additionalInformation?.questions,
+                                                                    fromVoucher: activeTab === 'vouchers' ? bookingDetail?.voucher?.additional_information?.questions : null
+                                                                });
+                                                                
+                                                                return questions && questions.length > 0;
+                                                            })() && (
                                                                 <>
-                                                                    {additionalInformation.questions.map((question, index) => {
+                                                                    {(() => {
+                                                                        // Use additionalInformation if available, otherwise try to get from voucher data
+                                                                        const questions = additionalInformation?.questions || 
+                                                                                         (activeTab === 'vouchers' && bookingDetail?.voucher?.additional_information?.questions) || 
+                                                                                         [];
+                                                                        const answers = additionalInformation?.answers || 
+                                                                                       (activeTab === 'vouchers' && bookingDetail?.voucher?.additional_information?.answers) || 
+                                                                                       [];
+                                                                        const additionalInfoJson = additionalInformation?.additional_information_json || 
+                                                                                                   (activeTab === 'vouchers' && bookingDetail?.voucher?.additional_information_json) || 
+                                                                                                   {};
+                                                                        
+                                                                        return questions.map((question, index) => {
                                                                         // Find answer from multiple sources to avoid duplication
                                                                         let answer = null;
                                                                         
+                                                                        console.log(`🔍 Looking for answer for question ${question.id}: "${question.question_text}"`);
+                                                                        
                                                                         // First try to find in answers array
-                                                                        const answerFromAnswers = additionalInformation.answers?.find(a => a.question_id === question.id);
+                                                                        const answerFromAnswers = answers?.find(a => a.question_id === question.id);
                                                                         if (answerFromAnswers) {
                                                                             answer = answerFromAnswers.answer;
+                                                                            console.log(`✅ Found answer in answers array: "${answer}"`);
                                                                         }
                                                                         
                                                                         // If not found in answers, try JSON data
-                                                                        if (!answer && additionalInformation.additional_information_json) {
+                                                                        if (!answer && additionalInfoJson) {
                                                                             const jsonKey = `question_${question.id}`;
-                                                                            if (additionalInformation.additional_information_json[jsonKey]) {
-                                                                                answer = additionalInformation.additional_information_json[jsonKey];
+                                                                            if (additionalInfoJson[jsonKey]) {
+                                                                                answer = additionalInfoJson[jsonKey];
+                                                                                console.log(`✅ Found answer in additionalInfoJson: "${answer}"`);
+                                                                            }
+                                                                        }
+                                                                        
+                                                                        // For vouchers, also check the voucher's additional_information_json directly
+                                                                        if (!answer && activeTab === 'vouchers' && bookingDetail?.voucher?.additional_information_json) {
+                                                                            let voucherJson = bookingDetail.voucher.additional_information_json;
+                                                                            if (typeof voucherJson === 'string') {
+                                                                                try {
+                                                                                    voucherJson = JSON.parse(voucherJson);
+                                                                                } catch (e) {
+                                                                                    console.warn('Failed to parse voucher additional_information_json:', e);
+                                                                                    voucherJson = {};
+                                                                                }
+                                                                            }
+                                                                            
+                                                                            const jsonKey = `question_${question.id}`;
+                                                                            if (voucherJson && voucherJson[jsonKey]) {
+                                                                                answer = voucherJson[jsonKey];
+                                                                                console.log(`✅ Found answer in voucher JSON: "${answer}"`);
                                                                             }
                                                                         }
                                                                         
                                                                         // If still not found, try legacy fields for specific questions
-                                                                        if (!answer && additionalInformation.legacy) {
-                                                                            if (question.question_text.toLowerCase().includes('hear about us') && additionalInformation.legacy.hear_about_us) {
-                                                                                answer = additionalInformation.legacy.hear_about_us;
-                                                                            } else if (question.question_text.toLowerCase().includes('ballooning') && additionalInformation.legacy.ballooning_reason) {
-                                                                                answer = additionalInformation.legacy.ballooning_reason;
+                                                                        const legacy = additionalInformation?.legacy || (activeTab === 'vouchers' && bookingDetail?.voucher?.additional_information?.legacy) || {};
+                                                                        if (!answer && legacy) {
+                                                                            if (question.question_text.toLowerCase().includes('hear about us') && legacy.hear_about_us) {
+                                                                                answer = legacy.hear_about_us;
+                                                                                console.log(`✅ Found answer in legacy hear_about_us: "${answer}"`);
+                                                                            } else if (question.question_text.toLowerCase().includes('ballooning') && legacy.ballooning_reason) {
+                                                                                answer = legacy.ballooning_reason;
+                                                                                console.log(`✅ Found answer in legacy ballooning_reason: "${answer}"`);
+                                                                            } else if (question.question_text.toLowerCase().includes('prefer') && legacy.prefer) {
+                                                                                answer = legacy.prefer;
+                                                                                console.log(`✅ Found answer in legacy prefer: "${answer}"`);
                                                                             }
+                                                                        }
+                                                                        
+                                                                        if (!answer) {
+                                                                            console.log(`❌ No answer found for question ${question.id}`);
                                                                         }
                                                                         
                                                                         return (
@@ -2901,18 +2942,127 @@ setBookingDetail(finalVoucherDetail);
 
                                                                             </Box>
                                                                         );
-                                                                    })}
+                                                                        });
+                                                                    })()}
                                                                 </>
                                                             )}
                                                             
                                                             {/* Show message if no questions available */}
-                                                            {(!additionalInformation.questions || additionalInformation.questions.length === 0) && (
+                                                            {(() => {
+                                                                const questions = additionalInformation?.questions || 
+                                                                                 (activeTab === 'vouchers' && bookingDetail?.voucher?.additional_information?.questions) || 
+                                                                                 [];
+                                                                return (!questions || questions.length === 0);
+                                                            })() && (
                                                                 <Typography sx={{ fontStyle: 'italic', color: '#666' }}>No additional information questions available</Typography>
                                                             )}
                                                         </Box>
                                                     )}
                                                 </Box>
                                             )}
+                                            
+                                            {/* Add To Booking Items Section - Only for vouchers */}
+                                            {activeTab === 'vouchers' && bookingDetail?.voucher?.add_to_booking_items && (
+                                                <Box>
+                                                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Add To Booking Items</Typography>
+                                                    {(() => {
+                                                        const addToBookingItems = bookingDetail.voucher.add_to_booking_items;
+                                                        console.log('🔍 Add to booking items data:', addToBookingItems);
+                                                        let parsedItems = [];
+                                                        
+                                                        if (typeof addToBookingItems === 'string') {
+                                                            try {
+                                                                parsedItems = JSON.parse(addToBookingItems);
+                                                            } catch (e) {
+                                                                console.warn('Failed to parse add_to_booking_items:', e);
+                                                                parsedItems = [];
+                                                            }
+                                                        } else if (Array.isArray(addToBookingItems)) {
+                                                            parsedItems = addToBookingItems;
+                                                        }
+                                                        
+                                                        if (parsedItems && parsedItems.length > 0) {
+                                                            return (
+                                                                <Box>
+                                                                    {parsedItems.map((item, index) => (
+                                                                        <Box key={index} sx={{ mb: 2, p: 2, background: '#f0f8ff', borderRadius: 1, border: '1px solid #e0e0e0' }}>
+                                                                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>
+                                                                                {item.name || item.title || `Item ${index + 1}`}
+                                                                            </Typography>
+                                                                            {item.description && (
+                                                                                <Typography sx={{ color: '#666', mb: 1 }}>
+                                                                                    {item.description}
+                                                                                </Typography>
+                                                                            )}
+                                                                            {item.price && (
+                                                                                <Typography sx={{ color: '#333', fontWeight: 500 }}>
+                                                                                    Price: £{item.price}
+                                                                                </Typography>
+                                                                            )}
+                                                                        </Box>
+                                                                    ))}
+                                                                </Box>
+                                                            );
+                                                        } else {
+                                                            return (
+                                                                <Typography sx={{ fontStyle: 'italic', color: '#666' }}>No add-to-booking items selected</Typography>
+                                                            );
+                                                        }
+                                                    })()}
+                                                </Box>
+                                            )}
+                                            
+                                            {/* Choose Add-On Section - Only for vouchers */}
+                                            {activeTab === 'vouchers' && bookingDetail?.voucher?.choose_add_on && (
+                                                <Box sx={{ mt: 2 }}>
+                                                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Selected Add-Ons</Typography>
+                                                    {(() => {
+                                                        const chooseAddOn = bookingDetail.voucher.choose_add_on;
+                                                        console.log('🔍 Choose add-on data:', chooseAddOn);
+                                                        let parsedAddOns = [];
+                                                        
+                                                        if (typeof chooseAddOn === 'string') {
+                                                            try {
+                                                                parsedAddOns = JSON.parse(chooseAddOn);
+                                                            } catch (e) {
+                                                                console.warn('Failed to parse choose_add_on:', e);
+                                                                parsedAddOns = [];
+                                                            }
+                                                        } else if (Array.isArray(chooseAddOn)) {
+                                                            parsedAddOns = chooseAddOn;
+                                                        }
+                                                        
+                                                        if (parsedAddOns && parsedAddOns.length > 0) {
+                                                            return (
+                                                                <Box>
+                                                                    {parsedAddOns.map((addon, index) => (
+                                                                        <Box key={index} sx={{ mb: 2, p: 2, background: '#f0f8ff', borderRadius: 1, border: '1px solid #e0e0e0' }}>
+                                                                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>
+                                                                                {addon.name || addon.title || `Add-On ${index + 1}`}
+                                                                            </Typography>
+                                                                            {addon.description && (
+                                                                                <Typography sx={{ color: '#666', mb: 1 }}>
+                                                                                    {addon.description}
+                                                                                </Typography>
+                                                                            )}
+                                                                            {addon.price && (
+                                                                                <Typography sx={{ color: '#333', fontWeight: 500 }}>
+                                                                                    Price: £{addon.price}
+                                                                                </Typography>
+                                                                            )}
+                                                                        </Box>
+                                                                    ))}
+                                                                </Box>
+                                                            );
+                                                        } else {
+                                                            return (
+                                                                <Typography sx={{ fontStyle: 'italic', color: '#666' }}>No add-ons selected</Typography>
+                                                            );
+                                                        }
+                                                    })()}
+                                                </Box>
+                                            )}
+                                            
                                             <Divider sx={{ my: 2 }} />
                                             {/* HISTORY SECTION - Only for bookings, not vouchers */}
                                             {activeTab !== 'vouchers' && (

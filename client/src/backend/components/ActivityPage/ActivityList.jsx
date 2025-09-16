@@ -51,6 +51,10 @@ const ActivityList = ({ activity }) => {
     const [availActivity, setAvailActivity] = useState(null);
     const [privateCharterVoucherTypes, setPrivateCharterVoucherTypes] = useState([]);
     const [privateCharterVoucherTypesLoading, setPrivateCharterVoucherTypesLoading] = useState(false);
+    // Passenger tier selection for group pricing (Create form)
+    const [groupPassengerTier, setGroupPassengerTier] = useState(2);
+    // Passenger tier selection for group pricing (Edit form)
+    const [editGroupPassengerTier, setEditGroupPassengerTier] = useState(2);
     const navigate = useNavigate();
 
     // Fetch private charter voucher types on component mount
@@ -116,11 +120,16 @@ const ActivityList = ({ activity }) => {
             // Find the voucher type by ID to get the title
             const voucherType = privateCharterVoucherTypes.find(vt => vt.id.toString() === voucherTypeId);
             if (voucherType) {
+                // Ensure nested structure for tiered pricing
+                const existingForTitle = form.private_charter_pricing[voucherType.title];
+                const pricingForTitle = (existingForTitle && typeof existingForTitle === 'object') ? { ...existingForTitle } : {};
+                const tierKey = String(groupPassengerTier);
+                pricingForTitle[tierKey] = value;
                 setForm({
                     ...form,
                     private_charter_pricing: {
                         ...form.private_charter_pricing,
-                        [voucherType.title]: value // Store by title instead of ID
+                        [voucherType.title]: pricingForTitle // Store by title with passenger tiers
                     }
                 });
             }
@@ -232,11 +241,15 @@ const ActivityList = ({ activity }) => {
             // Find the voucher type by ID to get the title
             const voucherType = privateCharterVoucherTypes.find(vt => vt.id.toString() === voucherTypeId);
             if (voucherType) {
+                const existingForTitle = editForm.private_charter_pricing ? editForm.private_charter_pricing[voucherType.title] : undefined;
+                const pricingForTitle = (existingForTitle && typeof existingForTitle === 'object') ? { ...existingForTitle } : {};
+                const tierKey = String(editGroupPassengerTier);
+                pricingForTitle[tierKey] = value;
                 setEditForm({
                     ...editForm,
                     private_charter_pricing: {
                         ...editForm.private_charter_pricing,
-                        [voucherType.title]: value // Store by title instead of ID
+                        [voucherType.title]: pricingForTitle // Store by title with passenger tiers
                     }
                 });
             }
@@ -582,6 +595,16 @@ const ActivityList = ({ activity }) => {
                                     <div style={{ marginBottom: '16px', fontWeight: '600', color: '#856404' }}>
                                         Group Pricing for Selected Voucher Types
                                     </div>
+                                    {/* Passenger tier selector */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                                        <label style={{ color: '#856404', fontWeight: 500 }}>Passengers</label>
+                                        <TextField select size="small" value={groupPassengerTier} onChange={(e) => setGroupPassengerTier(Number(e.target.value))} style={{ width: 180 }}>
+                                            <MenuItem value={2}>2 passengers</MenuItem>
+                                            <MenuItem value={3}>3 passengers</MenuItem>
+                                            <MenuItem value={4}>4 passengers</MenuItem>
+                                            <MenuItem value={8}>8 passengers</MenuItem>
+                                        </TextField>
+                                    </div>
                                     {privateCharterVoucherTypes.map((voucherType) => (
                                         <div key={voucherType.id} style={{ marginBottom: '12px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -597,7 +620,7 @@ const ActivityList = ({ activity }) => {
                                                     size="small"
                                                     type="number"
                                                     name={`private_charter_price_${voucherType.id}`}
-                                                    value={form.private_charter_pricing[voucherType.title] || ''}
+                                                    value={(typeof form.private_charter_pricing[voucherType.title] === 'object' ? (form.private_charter_pricing[voucherType.title][String(groupPassengerTier)] || '') : (groupPassengerTier === 2 ? (form.private_charter_pricing[voucherType.title] || '') : ''))}
                                                     onChange={handleChange}
                                                     placeholder="0.00"
                                                     min="0"
@@ -958,6 +981,16 @@ const ActivityList = ({ activity }) => {
                                     <div style={{ marginBottom: '16px', fontWeight: '600', color: '#856404' }}>
                                         Group Pricing for Selected Voucher Types
                                     </div>
+                                    {/* Passenger tier selector */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                                        <label style={{ color: '#856404', fontWeight: 500 }}>Passengers</label>
+                                        <TextField select size="small" value={editGroupPassengerTier} onChange={(e) => setEditGroupPassengerTier(Number(e.target.value))} style={{ width: 180 }}>
+                                            <MenuItem value={2}>2 passengers</MenuItem>
+                                            <MenuItem value={3}>3 passengers</MenuItem>
+                                            <MenuItem value={4}>4 passengers</MenuItem>
+                                            <MenuItem value={8}>8 passengers</MenuItem>
+                                        </TextField>
+                                    </div>
                                     {privateCharterVoucherTypes.map((voucherType) => (
                                         <div key={voucherType.id} style={{ marginBottom: '12px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -973,7 +1006,9 @@ const ActivityList = ({ activity }) => {
                                                     size="small"
                                                     type="number"
                                                     name={`private_charter_price_${voucherType.id}`}
-                                                    value={editForm.private_charter_pricing && editForm.private_charter_pricing[voucherType.title] ? editForm.private_charter_pricing[voucherType.title] : ''}
+                                                    value={(editForm.private_charter_pricing && typeof editForm.private_charter_pricing[voucherType.title] === 'object')
+                                                        ? (editForm.private_charter_pricing[voucherType.title][String(editGroupPassengerTier)] || '')
+                                                        : ((editGroupPassengerTier === 2 && editForm.private_charter_pricing && editForm.private_charter_pricing[voucherType.title]) ? editForm.private_charter_pricing[voucherType.title] : '')}
                                                     onChange={handleEditChange}
                                                     placeholder="0.00"
                                                     min="0"
