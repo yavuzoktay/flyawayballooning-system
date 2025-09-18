@@ -7252,6 +7252,14 @@ const checkAndFixDuplicateAvailability = async () => {
     }
 };
 
+// Serve React frontend from client/build (exclude /api routes)
+app.use(express.static(path.join(__dirname, '../client/build')));
+
+// Serve index.html for non-API routes (supports client-side routing)
+app.get(/^\/(?!api\/).*/, (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/build/index.html'));
+});
+
 // Start the server
 const PORT = process.env.PORT || 3002;
 app.listen(PORT, '0.0.0.0', () => {
