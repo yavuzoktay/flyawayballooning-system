@@ -30,9 +30,9 @@ jobs:
           if [ -d "client" ]; then
             echo "Building client application..."
             cd client
-            npm install
+            npm ci --prefer-offline --no-audit --no-fund
             echo "Dependencies installed, starting build..."
-            CI=false npm run build
+            GENERATE_SOURCEMAP=false CI=false npm run build
             echo "Client build completed successfully"
             echo "Build directory contents:"
             ls -la build/
@@ -74,38 +74,19 @@ jobs:
             echo "Downloading deployment package from S3..."
             aws s3 cp s3://flyawayballooning-backend/backend-deploy.zip .
             
-            echo "Cleaning up old files with proper permissions..."
+            echo "Cleaning up old client build..."
             sudo rm -rf client/build
-            sudo rm -rf server/public
             
             echo "Extracting deployment package..."
             unzip -o backend-deploy.zip -d .
             
-            echo "Setting proper ownership and permissions for client build..."
-            sudo chown -R ec2-user:ec2-user client/build
+            echo "Setting proper ownership and permissions for client build (served by Nginx)..."
+            sudo chown -R nginx:nginx client/build
             sudo chmod -R 755 client/build
             
-            echo "Creating server/public directory..."
-            mkdir -p server/public
-            
-            echo "Copying client build files to server/public..."
-            cp -r client/build/* server/public/
-            
-            echo "Verifying copied files..."
-            echo "server/public contents:"
-            ls -la server/public/
-            echo "server/public/static/js contents:"
-            ls -la server/public/static/js/
-            echo "Checking for CreateAvailabilitiesModal in server/public:"
-            grep -r "CreateAvailabilitiesModal" server/public/ || echo "CreateAvailabilitiesModal not found in server/public"
-            
-            echo "Setting proper ownership and permissions for server/public..."
-            sudo chown -R nginx:nginx server/public
-            sudo chmod -R 755 server/public
-            
-            echo "Setting SELinux context for server/public..."
-            sudo semanage fcontext -a -t httpd_sys_content_t "/home/ec2-user/flyawayballooning-system-backend/server/public(/.*)?" 2>/dev/null || true
-            sudo restorecon -Rv /home/ec2-user/flyawayballooning-system-backend/server/public
+            echo "Setting SELinux context for client/build (if SELinux enabled)..."
+            sudo semanage fcontext -a -t httpd_sys_content_t "/home/ec2-user/flyawayballooning-system-backend/client/build(/.*)?" 2>/dev/null || true
+            sudo restorecon -Rv /home/ec2-user/flyawayballooning-system-backend/client/build
             
             echo "Installing server dependencies..."
             cd server
@@ -145,6 +126,6 @@ jobs:
             sudo systemctl restart nginx
             
             echo "Deployment completed successfully!"
-            echo "Current server/public contents:"
-            ls -la /home/ec2-user/flyawayballooning-system-backend/server/public/
+            echo "Current client/build contents:"
+            ls -la /home/ec2-user/flyawayballooning-system-backend/client/build/
           ' 
