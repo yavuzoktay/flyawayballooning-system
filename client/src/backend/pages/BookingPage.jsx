@@ -2539,9 +2539,15 @@ setBookingDetail(finalVoucherDetail);
                                                                 <Typography><b>Redeemed:</b> {v.redeemed || '-'}</Typography>
                                                                 <Typography><b>Offer Code:</b> {v.offer_code || '-'}</Typography>
                                                                 <Typography><b>Voucher Ref:</b> {v.voucher_ref || '-'}</Typography>
-                                                                {v.book_flight === "Gift Voucher" && (
-                                                                    <Typography><b>Number of Vouchers:</b> {v.numberOfPassengers || '1'}</Typography>
-                                                                )}
+                                                                {/* Show number of vouchers/passengers for voucher details (from API's numberOfPassengers) */}
+                                                                <Typography>
+                                                                    <b>Number of Vouchers:</b>{' '}
+                                                                    {(() => {
+                                                                        const fromVoucher = v.numberOfPassengers;
+                                                                        const fromRelatedBooking = bookingDetail.booking?.pax || bookingDetail.booking?.passenger_count;
+                                                                        return fromVoucher || fromRelatedBooking || 1;
+                                                                    })()}
+                                                                </Typography>
                                                                 <Typography><b>Created:</b> {v.created_at ? (
                                                                     dayjs(v.created_at).isValid() ? 
                                                                         dayjs(v.created_at).format('DD/MM/YYYY') : 

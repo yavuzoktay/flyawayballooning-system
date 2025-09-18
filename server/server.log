@@ -51169,3 +51169,8344 @@ getAllBookingData - Returning bookings with additional info: {
   ]
 }
 
+2025-09-16T21:05:14.228Z - SESSION STORE SAVE
+{
+  "session_id": "cs_test_a1xppg9rauhfCN1zewflEnbHjVmYh14menCRAIuzsiuF3jFB33QJAkclx5",
+  "type": "voucher",
+  "voucherData": {
+    "name": "tes tes",
+    "weight": "",
+    "flight_type": "Shared Flight",
+    "voucher_type": "Gift Voucher",
+    "voucher_type_detail": "Any Day Flight",
+    "email": "",
+    "phone": "35",
+    "mobile": "35",
+    "redeemed": "No",
+    "paid": 440,
+    "offer_code": "",
+    "voucher_ref": "",
+    "recipient_name": "test",
+    "recipient_email": "test@gmail.com",
+    "recipient_phone": "35353",
+    "recipient_gift_date": "2025-09-27",
+    "purchaser_name": "tes tes",
+    "purchaser_email": "",
+    "purchaser_phone": "35",
+    "purchaser_mobile": "35",
+    "numberOfPassengers": 2,
+    "passengerData": [
+      {
+        "firstName": "tes",
+        "lastName": "tes",
+        "weight": "",
+        "phone": "35",
+        "email": "",
+        "weatherRefund": false
+      }
+    ],
+    "preferred_location": "",
+    "preferred_time": "",
+    "preferred_day": "",
+    "additionalInfo": {
+      "notes": ""
+    },
+    "add_to_booking_items": null,
+    "additional_information_json": {
+      "notes": ""
+    }
+  }
+}
+
+2025-09-16T21:05:46.631Z - Inserting voucher with data:
+{
+  "additionalInfo": {
+    "notes": ""
+  },
+  "additional_information_json": {
+    "notes": ""
+  },
+  "finalAdditionalInfoJson": {
+    "notes": ""
+  },
+  "add_to_booking_items": null
+}
+
+2025-09-16T21:05:52.410Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:05:52.414Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:05:52.417Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:05:52.418Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:05:52.419Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:05:52.421Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fe",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:05:52.423Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Printed Advert, Poster or Banner",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:05:52.425Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:05:52.425Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:05:52.427Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.506Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.508Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.510Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fef",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:05:52.513Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.516Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.517Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.518Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.528Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.529Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.530Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.605Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.609Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.610Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.611Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.612Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.613Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.614Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-16T21:05:52.632Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-16T21:05:52.636Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.637Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.700Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:05:52.703Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.705Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.707Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.708Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.709Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.710Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.736Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.741Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.743Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.794Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:05:52.797Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:05:52.800Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.801Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 3",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:05:52.803Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 2",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:05:52.807Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:52.809Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:05:52.841Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:05:52.846Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:05:53.183Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:05:53.185Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:05:53.186Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:05:53.187Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:05:53.189Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fe",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:05:53.190Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Printed Advert, Poster or Banner",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:05:53.192Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:05:53.194Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:05:53.195Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:05:53.288Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.290Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.292Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.293Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fef",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:05:53.296Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.297Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.298Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.299Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.300Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.301Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.387Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.389Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.390Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.391Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.392Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.392Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.393Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.395Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-16T21:05:53.405Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-16T21:05:53.407Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.482Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.484Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:05:53.487Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.488Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.489Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.491Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.492Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.498Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.510Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.511Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.576Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.578Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:05:53.581Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:05:53.583Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.585Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 3",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:05:53.587Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 2",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:05:53.589Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:05:53.607Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:05:53.614Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:05:53.617Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:07:35.082Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:07:35.083Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:07:35.084Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:07:35.084Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:07:35.085Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fe",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:07:35.089Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Printed Advert, Poster or Banner",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:07:35.090Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:07:35.092Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:07:35.092Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:07:35.094Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.179Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.180Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.181Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fef",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:07:35.183Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.184Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.185Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.186Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.196Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.197Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.197Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.273Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.280Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.281Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.282Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.283Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.284Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-16T21:07:35.285Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.301Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-16T21:07:35.303Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.304Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.368Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:07:35.374Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.375Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.376Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.377Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.377Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.382Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.407Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.408Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.409Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.462Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:07:35.468Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:07:35.469Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.470Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 3",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:07:35.471Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 2",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:07:35.473Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.475Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:07:35.513Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:07:35.514Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:07:35.852Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:07:35.855Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:07:35.855Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:07:35.856Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:07:35.857Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fe",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:07:35.859Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Printed Advert, Poster or Banner",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:07:35.863Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:07:35.864Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:07:35.865Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:07:35.938Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.946Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.947Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.949Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fef",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:07:35.950Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.950Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.951Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.956Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.969Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:35.970Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:36.043Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:36.044Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:36.044Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:36.045Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:36.046Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:36.047Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:36.048Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:36.050Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-16T21:07:36.072Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-16T21:07:36.075Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:36.137Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:36.139Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:07:36.141Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:36.142Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:36.142Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:36.143Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:36.144Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:36.147Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:36.188Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:36.190Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:36.235Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:36.236Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:07:36.260Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:07:36.262Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:36.262Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 3",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:07:36.274Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 2",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:07:36.275Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:07:36.275Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:07:36.292Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:07:36.293Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:17:03.099Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:17:03.101Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:17:03.102Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:17:03.102Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:17:03.104Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:17:03.105Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:17:03.106Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fe",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:17:03.108Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Printed Advert, Poster or Banner",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:17:03.125Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:17:03.126Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.194Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.195Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.196Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fef",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:17:03.197Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.198Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.199Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.200Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.213Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.231Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.232Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.288Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.289Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.289Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.291Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.292Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.293Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.294Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-16T21:17:03.318Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-16T21:17:03.335Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.337Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.384Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:17:03.386Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.386Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.387Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.389Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.390Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.391Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.423Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.439Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.440Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.478Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:17:03.480Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:17:03.481Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.481Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 3",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:17:03.486Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 2",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:17:03.488Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.489Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:17:03.527Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:17:03.543Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:17:03.863Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:17:03.864Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:17:03.865Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:17:03.866Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:17:03.867Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fe",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:17:03.868Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Printed Advert, Poster or Banner",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:17:03.870Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:17:03.872Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:17:03.873Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-16T21:17:03.960Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.961Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.962Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.963Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fef",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:17:03.965Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.965Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.966Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.975Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.979Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:03.991Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:04.056Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:04.057Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:04.058Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:04.059Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:04.060Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:04.061Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:04.062Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:04.080Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-16T21:17:04.083Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-16T21:17:04.096Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:04.151Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:04.152Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:04.152Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-16T21:17:04.153Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:04.154Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:04.155Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:04.156Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:04.185Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:04.187Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:04.202Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:04.245Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:04.247Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:17:04.250Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:17:04.253Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:04.254Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 3",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:17:04.256Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 2",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:17:04.257Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-16T21:17:04.290Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:17:04.294Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-16T21:17:04.306Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-17T11:28:02.341Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-17T11:28:02.347Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-17T11:28:02.347Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-17T11:28:02.350Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-17T11:28:02.431Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-17T11:28:02.739Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-17T11:28:02.742Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-17T11:28:02.743Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fe",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-17T11:28:02.749Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Printed Advert, Poster or Banner",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-17T11:28:02.944Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:03.048Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:03.049Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:03.050Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fef",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-17T11:28:03.059Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:03.151Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:03.176Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:03.177Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:03.353Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:03.373Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:03.374Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:03.374Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:03.455Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:03.538Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:03.544Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:03.545Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:03.546Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:03.638Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-17T11:28:03.640Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-17T11:28:03.641Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:03.653Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:03.730Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-17T11:28:03.732Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:03.737Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:03.738Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:04.040Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:04.042Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:04.043Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:04.044Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:04.348Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:04.350Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:04.351Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-17T11:28:04.353Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-17T11:28:04.568Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:04.569Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 3",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-17T11:28:04.583Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 2",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-17T11:28:04.598Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:04.684Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-17T11:28:04.686Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-17T11:28:04.757Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-17T11:28:05.211Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-17T11:28:05.213Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-17T11:28:05.214Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-17T11:28:05.215Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-17T11:28:05.297Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-17T11:28:05.299Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-17T11:28:05.301Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fe",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-17T11:28:05.312Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Printed Advert, Poster or Banner",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-17T11:28:05.385Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-17T11:28:05.394Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:05.395Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:05.405Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:05.473Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fef",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-17T11:28:05.482Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:05.483Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:05.512Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:05.566Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:05.567Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:05.569Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:05.599Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:05.911Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:05.912Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:05.915Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:05.916Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:06.016Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:06.019Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:06.020Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-17T11:28:06.022Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-17T11:28:06.229Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:06.231Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:06.232Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-17T11:28:06.235Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:06.361Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:06.362Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:06.363Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:06.364Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:06.824Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:06.827Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:06.828Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:06.829Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:07.040Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-17T11:28:07.044Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-17T11:28:07.045Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:07.125Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 3",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-17T11:28:07.168Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 2",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-17T11:28:07.170Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-17T11:28:07.170Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-17T11:28:07.318Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-17T11:28:07.321Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:38:57.430Z - SESSION STORE SAVE
+{
+  "session_id": "cs_test_a18oVWP9y0eHf0TS9pSJlH0oa9O9XeQmyhNrEuDvCoScJdogrvjVxdz7HD",
+  "type": "voucher",
+  "voucherData": {
+    "name": "new1 new1",
+    "weight": "35",
+    "flight_type": "Shared Flight",
+    "voucher_type": "Flight Voucher",
+    "voucher_type_detail": "Any Day Flight",
+    "email": "test@gmail.com",
+    "phone": "35",
+    "mobile": "35",
+    "redeemed": "No",
+    "paid": 440,
+    "offer_code": "",
+    "voucher_ref": "",
+    "recipient_name": "",
+    "recipient_email": "",
+    "recipient_phone": "",
+    "recipient_gift_date": "",
+    "purchaser_name": "",
+    "purchaser_email": "",
+    "purchaser_phone": "",
+    "purchaser_mobile": "",
+    "numberOfPassengers": 2,
+    "passengerData": [
+      {
+        "firstName": "new1",
+        "lastName": "new1",
+        "weight": "35",
+        "phone": "35",
+        "email": "test@gmail.com",
+        "weatherRefund": false
+      },
+      {
+        "firstName": "new2",
+        "lastName": "new2",
+        "weight": "3",
+        "phone": "",
+        "email": "",
+        "weatherRefund": false
+      }
+    ],
+    "preferred_location": "",
+    "preferred_time": "",
+    "preferred_day": "",
+    "additionalInfo": {
+      "notes": "",
+      "__requiredKeys": [
+        "question_14",
+        "question_13"
+      ],
+      "question_14": "No",
+      "question_13": "TripAdvisor"
+    },
+    "add_to_booking_items": null,
+    "additional_information_json": {
+      "notes": "",
+      "__requiredKeys": [
+        "question_14",
+        "question_13"
+      ],
+      "question_14": "No",
+      "question_13": "TripAdvisor"
+    }
+  }
+}
+
+2025-09-18T12:39:23.306Z - Inserting voucher with data:
+{
+  "additionalInfo": {
+    "notes": "",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ],
+    "question_14": "No",
+    "question_13": "TripAdvisor"
+  },
+  "additional_information_json": {
+    "notes": "",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ],
+    "question_14": "No",
+    "question_13": "TripAdvisor"
+  },
+  "finalAdditionalInfoJson": {
+    "notes": "",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ],
+    "question_14": "No",
+    "question_13": "TripAdvisor"
+  },
+  "add_to_booking_items": null
+}
+
+2025-09-18T12:39:29.074Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:29.087Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:29.088Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:29.089Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:29.091Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Printed Advert, Poster or Banner",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:29.096Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:29.098Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:29.101Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:29.155Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:29.182Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.183Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.184Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.185Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fef",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:29.186Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.187Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.191Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.236Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.277Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.281Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.283Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.283Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.314Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.318Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.319Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.349Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.365Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.367Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-18T12:39:29.404Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-18T12:39:29.405Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.405Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.457Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:29.460Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.462Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.463Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:29.481Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fe",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:29.492Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.495Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.503Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.509Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.510Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.540Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.551Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.555Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:29.562Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:29.571Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.579Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 3",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:29.580Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 2",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:29.597Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:29.598Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:29.600Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:29.627Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:30.222Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:30.224Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:30.235Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:30.238Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fe",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:30.241Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:30.243Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:30.243Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:30.245Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:30.294Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:30.309Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Printed Advert, Poster or Banner",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:30.346Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.347Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.348Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:30.350Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fef",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:30.352Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.353Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.354Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.354Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.394Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.424Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.472Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.473Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.473Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.474Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.474Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.475Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.527Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.528Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.528Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-18T12:39:30.529Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-18T12:39:30.562Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.563Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.564Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:30.565Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.566Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.572Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.629Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.629Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.641Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.642Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.651Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.662Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.687Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:30.688Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:30.690Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.691Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 3",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:30.718Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 2",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:30.721Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:30.730Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:30.746Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:31.057Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:40.015Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:40.017Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:40.052Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:40.055Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:40.055Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:40.056Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:40.064Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:40.069Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:40.539Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fe",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:40.541Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Printed Advert, Poster or Banner",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:40.543Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:40.553Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:40.554Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:40.555Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:40.556Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fef",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:40.559Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:40.647Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:40.817Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:40.818Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:40.818Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:40.819Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:40.819Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:40.820Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:40.820Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:40.821Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:40.924Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:41.021Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:41.164Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:41.165Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-18T12:39:41.167Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-18T12:39:41.168Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:41.168Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:41.168Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:41.169Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:41.255Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:41.320Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:41.418Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:41.550Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:41.552Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:41.553Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:41.554Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:41.570Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:41.571Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:41.598Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:41.657Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:41.658Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 3",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:41.781Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 2",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:41.880Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:41.881Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:41.882Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:41.883Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:42.473Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:42.474Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:42.476Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:42.477Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:42.489Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:42.490Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:42.491Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Printed Advert, Poster or Banner",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:42.494Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:42.500Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fe",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:42.510Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:39:42.620Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:42.621Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:42.622Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:42.662Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:42.675Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fef",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:42.677Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:42.677Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:42.678Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:42.680Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:42.681Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:42.812Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:42.813Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:42.814Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:42.815Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:42.902Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:42.903Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:42.903Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:42.905Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:42.907Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-18T12:39:42.909Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-18T12:39:42.992Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:42.994Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:42.994Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:39:42.995Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:43.081Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:43.082Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:43.082Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:43.118Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:43.119Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:43.123Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:43.158Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:43.177Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 3",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:43.182Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:43.201Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 2",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:43.308Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:43.309Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:43.312Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:43.328Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:39:43.955Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:44.005Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:39:44.075Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:24.178Z - SESSION STORE SAVE
+{
+  "session_id": "cs_test_a1So2FfmtF2LIGf8zQWp1Uvi7S5YCyRN36uio2GToaxMhOnaWx3Lre74Jq",
+  "type": "voucher",
+  "voucherData": {
+    "name": "gift voucher gift voucher",
+    "weight": "",
+    "flight_type": "Shared Flight",
+    "voucher_type": "Gift Voucher",
+    "voucher_type_detail": "Any Day Flight",
+    "email": "test@gmail.com",
+    "phone": "34",
+    "mobile": "34",
+    "redeemed": "No",
+    "paid": 225,
+    "offer_code": "",
+    "voucher_ref": "",
+    "recipient_name": "test",
+    "recipient_email": "test@gmail.com",
+    "recipient_phone": "353",
+    "recipient_gift_date": "2025-09-26",
+    "purchaser_name": "gift voucher gift voucher",
+    "purchaser_email": "test@gmail.com",
+    "purchaser_phone": "34",
+    "purchaser_mobile": "34",
+    "numberOfPassengers": 1,
+    "passengerData": [
+      {
+        "firstName": "gift voucher",
+        "lastName": "gift voucher",
+        "weight": "",
+        "phone": "34",
+        "email": "test@gmail.com",
+        "weatherRefund": false
+      }
+    ],
+    "preferred_location": "",
+    "preferred_time": "",
+    "preferred_day": "",
+    "additionalInfo": {
+      "notes": ""
+    },
+    "add_to_booking_items": [
+      {
+        "name": "Postal Voucher ",
+        "price": "5.00"
+      }
+    ],
+    "additional_information_json": {
+      "notes": ""
+    }
+  }
+}
+
+2025-09-18T12:46:44.716Z - Inserting voucher with data:
+{
+  "additionalInfo": {
+    "notes": ""
+  },
+  "additional_information_json": {
+    "notes": ""
+  },
+  "finalAdditionalInfoJson": {
+    "notes": ""
+  },
+  "add_to_booking_items": [
+    {
+      "name": "Postal Voucher ",
+      "price": "5.00"
+    }
+  ]
+}
+
+2025-09-18T12:46:54.807Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:46:54.811Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:46:54.844Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:46:54.845Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:46:54.846Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:46:54.875Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:46:54.875Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:46:54.876Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:46:54.878Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fe",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:46:54.899Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:46:54.901Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Printed Advert, Poster or Banner",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:46:54.903Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:46:54.952Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:54.953Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:54.954Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:54.998Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fef",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:46:55.000Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.001Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.014Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.015Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.016Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.020Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.047Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.048Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.049Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.099Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.101Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.102Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.107Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-18T12:46:55.116Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.117Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-18T12:46:55.119Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.129Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.135Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.135Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:46:55.218Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.226Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.263Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.264Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.275Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.277Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.278Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.279Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:46:55.284Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:46:55.317Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.318Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 3",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:46:55.351Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 2",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:46:55.352Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:55.360Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:46:55.368Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:46:55.370Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:46:55.488Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.216Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:46:56.219Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:46:56.219Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:46:56.222Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:46:56.223Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:46:56.224Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:46:56.227Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:46:56.228Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:46:56.228Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-18T12:46:56.252Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fe",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:46:56.303Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Printed Advert, Poster or Banner",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:46:56.307Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:46:56.308Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.331Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.334Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.343Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fef",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:46:56.345Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.359Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.360Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.382Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.440Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.441Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.444Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.456Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.458Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.461Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.462Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.480Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.482Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.483Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-18T12:46:56.527Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-18T12:46:56.530Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.531Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.548Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-18T12:46:56.550Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.551Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.560Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.575Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.579Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.580Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.609Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.618Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.619Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.638Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:46:56.640Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:46:56.642Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.643Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 3",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:46:56.670Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 2",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:46:56.671Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-18T12:46:56.672Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:46:56.693Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-18T12:46:56.706Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
