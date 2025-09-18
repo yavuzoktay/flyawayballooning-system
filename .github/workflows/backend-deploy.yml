@@ -63,69 +63,80 @@ jobs:
         run: |
           aws s3 cp backend-deploy.zip s3://flyawayballooning-backend/backend-deploy.zip
       
-      - name: Deploy to EC2
+      - name: Deploy to EC2 instances (matrix via SSH_HOSTS)
+        env:
+          SSH_HOSTS: ${{ secrets.SSH_HOSTS }}
         run: |
+          set -e
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > deploy_key
           chmod 600 deploy_key
-          ssh -i deploy_key -o StrictHostKeyChecking=no ec2-user@34.205.25.8 '
-            echo "Starting deployment process..."
-            cd ~/flyawayballooning-system-backend
-            
-            echo "Downloading deployment package from S3..."
-            aws s3 cp s3://flyawayballooning-backend/backend-deploy.zip .
-            
-            echo "Cleaning up old client build..."
-            sudo rm -rf client/build
-            
-            echo "Extracting deployment package..."
-            unzip -o backend-deploy.zip -d .
-            
-            echo "Setting proper ownership and permissions for client build (served by Nginx)..."
-            sudo chown -R nginx:nginx client/build
-            sudo chmod -R 755 client/build
-            
-            echo "Setting SELinux context for client/build (if SELinux enabled)..."
-            sudo semanage fcontext -a -t httpd_sys_content_t "/home/ec2-user/flyawayballooning-system-backend/client/build(/.*)?" 2>/dev/null || true
-            sudo restorecon -Rv /home/ec2-user/flyawayballooning-system-backend/client/build
-            
-            echo "Installing server dependencies..."
-            cd server
-            npm install
-            
-            echo "Installing PM2 globally if not present..."
-            if ! command -v pm2 > /dev/null; then 
-              sudo npm install -g pm2
-            fi
-            
-            echo "Creating environment file for production..."
-            cat > .env << EOF
-            # Database Configuration
-            DB_HOST=trip-booking-database.c9mqyasow9hg.us-east-1.rds.amazonaws.com
-            DB_USER=admin
-            DB_PASSWORD=qumton-jeghuz-doKxy3
-            DB_NAME=trip_booking
-            
-            # Stripe Configuration (Test Mode)
-            STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
-            STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
-            
-            # Server Configuration
-            PORT=3002
-            NODE_ENV=production
-            EOF
-            
-            echo "Restarting application with PM2..."
-            pm2 delete flyawayballooning-server 2>/dev/null || true
-            PORT=3002 pm2 start index.js --name flyawayballooning-server
-            pm2 save
-            
-            echo "Setting up PM2 startup script..."
-            sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u ec2-user --hp /home/ec2-user || true
-            
-            echo "Restarting Nginx..."
-            sudo systemctl restart nginx
-            
-            echo "Deployment completed successfully!"
-            echo "Current client/build contents:"
-            ls -la /home/ec2-user/flyawayballooning-system-backend/client/build/
-          ' 
+          if [ -z "$SSH_HOSTS" ]; then
+            echo "ERROR: SSH_HOSTS secret is empty. Provide comma-separated hostnames/IPs."
+            exit 1
+          fi
+          for HOST in $(echo "$SSH_HOSTS" | tr ',' ' '); do
+            echo "Deploying to $HOST ..."
+            ssh -i deploy_key -o StrictHostKeyChecking=no ec2-user@$HOST '
+              set -e
+              echo "Starting deployment process on $(hostname)..."
+              cd ~/flyawayballooning-system-backend
+              
+              echo "Downloading deployment package from S3..."
+              aws s3 cp s3://flyawayballooning-backend/backend-deploy.zip .
+              
+              echo "Cleaning up old client build..."
+              sudo rm -rf client/build
+              
+              echo "Extracting deployment package..."
+              unzip -o backend-deploy.zip -d .
+              
+              echo "Setting proper ownership and permissions for client build (served by Nginx)..."
+              sudo chown -R nginx:nginx client/build
+              sudo chmod -R 755 client/build
+              
+              echo "Setting SELinux context for client/build (if SELinux enabled)..."
+              sudo semanage fcontext -a -t httpd_sys_content_t "/home/ec2-user/flyawayballooning-system-backend/client/build(/.*)?" 2>/dev/null || true
+              sudo restorecon -Rv /home/ec2-user/flyawayballooning-system-backend/client/build
+              
+              echo "Installing server dependencies..."
+              cd server
+              npm install
+              
+              echo "Installing PM2 globally if not present..."
+              if ! command -v pm2 > /dev/null; then 
+                sudo npm install -g pm2
+              fi
+              
+              echo "Creating environment file for production..."
+              cat > .env << EOF
+              # Database Configuration
+              DB_HOST=trip-booking-database.c9mqyasow9hg.us-east-1.rds.amazonaws.com
+              DB_USER=admin
+              DB_PASSWORD=qumton-jeghuz-doKxy3
+              DB_NAME=trip_booking
+              
+              # Stripe Configuration (Test Mode)
+              STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
+              STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}
+              
+              # Server Configuration
+              PORT=3002
+              NODE_ENV=production
+              EOF
+              
+              echo "Restarting application with PM2..."
+              pm2 delete flyawayballooning-server 2>/dev/null || true
+              PORT=3002 pm2 start index.js --name flyawayballooning-server
+              pm2 save
+              
+              echo "Setting up PM2 startup script..."
+              sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u ec2-user --hp /home/ec2-user || true
+              
+              echo "Restarting Nginx..."
+              sudo systemctl restart nginx
+              
+              echo "Deployment completed successfully on $(hostname)!"
+              echo "Current client/build contents:"
+              ls -la /home/ec2-user/flyawayballooning-system-backend/client/build/
+            '
+          done
