@@ -153720,3 +153720,4479 @@ getAllBookingData - Returning bookings with additional info: {
   ]
 }
 
+2025-09-23T17:42:24.785Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:24.887Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fere",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:24.891Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:42:24.969Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:42:24.973Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:42:25.053Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:42:25.054Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:42:25.055Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Received Gift Voucher",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:25.057Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Received Gift Voucher",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:25.058Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:42:25.059Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:42:25.061Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:25.062Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:25.063Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:42:25.064Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:25.135Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Printed Advert, Poster or Banner",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:25.136Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:42:25.137Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fe",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:25.138Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:25.139Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.139Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.140Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.145Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fef",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:25.146Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.147Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.216Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.218Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.220Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.220Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.221Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.223Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.225Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.226Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.227Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.227Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.297Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.298Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-23T17:42:25.301Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-23T17:42:25.302Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.302Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.304Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:25.305Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.308Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.309Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.309Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.378Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.379Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.383Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.384Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.385Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.386Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:42:25.388Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:42:25.390Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.391Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 3",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:42:25.392Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 2",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:42:25.459Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.459Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:42:25.464Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:42:25.466Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:42:25.743Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:25.745Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Received Gift Voucher",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:25.748Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Received Gift Voucher",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:25.752Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fere",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:25.755Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:25.758Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:42:25.760Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:25.763Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:25.779Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:42:25.812Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:42:25.824Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:42:25.826Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:42:25.828Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:42:25.834Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:42:25.836Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:42:25.839Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:42:25.840Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fe",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:25.844Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Printed Advert, Poster or Banner",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:25.861Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:25.893Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.906Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.907Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.908Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fef",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:25.915Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.916Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.920Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.921Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.926Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.943Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.982Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.987Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.989Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.989Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.997Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:25.998Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:26.002Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:26.004Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-23T17:42:26.008Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-23T17:42:26.025Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:26.063Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:26.068Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:42:26.069Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:26.071Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:26.078Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:26.079Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:26.084Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:26.092Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:26.093Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:26.108Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:26.144Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:26.148Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:42:26.151Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:42:26.152Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:26.159Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 3",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:42:26.161Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 2",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:42:26.165Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:42:26.174Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:42:26.176Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:42:26.192Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:46:21.391Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fere",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:21.397Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Received Gift Voucher",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:21.398Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:46:21.400Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:21.402Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:46:21.403Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:21.410Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Received Gift Voucher",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:21.413Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:21.417Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:21.418Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:46:21.480Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:46:21.482Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:46:21.484Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:46:21.486Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:46:21.488Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:46:21.522Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:46:21.555Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fe",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:21.556Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Printed Advert, Poster or Banner",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:21.559Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:21.560Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.560Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.561Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.563Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fef",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:21.584Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.584Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.604Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.636Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.637Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.640Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.641Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.641Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.643Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.644Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.664Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.665Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.686Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.718Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-23T17:46:21.721Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-23T17:46:21.725Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.726Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.727Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:21.730Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.731Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.744Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.745Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.768Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.800Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.802Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.803Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.807Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.810Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:46:21.811Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:46:21.815Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.826Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 3",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:46:21.827Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 2",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:46:21.849Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:21.882Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:46:21.884Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:46:21.887Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:46:22.159Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:22.166Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fere",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:22.172Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:46:22.173Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:46:22.175Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Received Gift Voucher",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:22.178Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Received Gift Voucher",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:22.179Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:22.180Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:22.183Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:46:22.184Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:22.237Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:46:22.248Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:46:22.252Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:46:22.254Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:46:22.255Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:46:22.259Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:46:22.260Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fe",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:22.263Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Printed Advert, Poster or Banner",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:22.264Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:22.267Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.317Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.329Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.331Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fef",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:22.334Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.335Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.341Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.342Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.343Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.345Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.348Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.397Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.411Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.411Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.412Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.415Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.421Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.423Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-23T17:46:22.424Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-23T17:46:22.426Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.430Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.477Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:46:22.491Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.493Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.506Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.507Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.507Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.507Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.508Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.508Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.512Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.558Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:46:22.571Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:46:22.576Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.588Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 3",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:46:22.589Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 2",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:46:22.591Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:46:22.592Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:46:22.594Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:46:22.595Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:56:44.001Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:44.012Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:44.014Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:56:44.014Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:44.015Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fere",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:44.023Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:56:44.024Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Received Gift Voucher",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:44.025Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Received Gift Voucher",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:44.028Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:44.029Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:56:44.083Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:56:44.093Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:56:44.094Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:56:44.094Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:56:44.096Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:56:44.103Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:56:44.105Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fe",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:44.108Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Printed Advert, Poster or Banner",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:44.111Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:44.112Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.164Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.173Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fef",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:44.174Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.175Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.177Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.183Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.185Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.189Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.191Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.192Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.246Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.253Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.254Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.254Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.258Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.264Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.266Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-23T17:56:44.271Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-23T17:56:44.272Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.274Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.327Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:44.333Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.334Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.334Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.340Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.345Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.346Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.353Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.354Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.355Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.409Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:56:44.415Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:56:44.416Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.417Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 3",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:56:44.422Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 2",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:56:44.426Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.427Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:56:44.443Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:56:44.447Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:56:44.745Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:56:44.746Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:44.748Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:44.761Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:56:44.761Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:44.762Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Received Gift Voucher",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:44.763Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:44.766Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fere",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:44.771Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Received Gift Voucher",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:44.795Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:56:44.824Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:56:44.826Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:56:44.827Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:56:44.847Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:56:44.864Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:56:44.874Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-09-23T17:56:44.876Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fe",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:44.886Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Printed Advert, Poster or Banner",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:44.888Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Word of Mouth",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:44.889Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.904Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.906Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.919Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "fef",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:44.930Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.945Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.955Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.957Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.967Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.969Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.970Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.985Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.986Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:44.998Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:45.011Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:45.028Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:45.036Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:45.037Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-23T17:56:45.049Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "question_13": "Google",
+    "question_14": "Yes"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "question_13",
+    "question_14"
+  ]
+}
+
+2025-09-23T17:56:45.050Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:45.051Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:45.065Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-09-23T17:56:45.067Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:45.078Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:45.092Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:45.109Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:45.118Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:45.119Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:45.131Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:45.132Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:45.133Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:45.145Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:56:45.148Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:56:45.159Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:45.173Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 3",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:56:45.191Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final 2",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:56:45.200Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": null,
+  "hasData": false,
+  "dataType": "object",
+  "keys": []
+}
+
+2025-09-23T17:56:45.204Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes final",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:56:45.226Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 5",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+
+2025-09-23T17:56:45.230Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Test notes 4",
+    "question_13": "Google",
+    "question_14": "Yes",
+    "question_16": "Champagne"
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16"
+  ]
+}
+

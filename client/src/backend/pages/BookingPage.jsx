@@ -2369,6 +2369,26 @@ setBookingDetail(finalVoucherDetail);
                                     })}
                                     columns={["created", "name", "flight_type", "voucher_type", "actual_voucher_type", "email", "phone", "expires", "redeemed", "paid", "offer_code", "voucher_ref"]}
                                     onNameClick={handleNameClick}
+                                    onEmailClick={(voucher) => {
+                                        const faux = { id: voucher.id, name: voucher.name, email: voucher.email, flight_type: voucher.flight_type };
+                                        handleEmailClick(faux);
+                                        (async () => {
+                                            try {
+                                                const resp = await axios.get(`/api/recipientEmails`, { params: { email: voucher.email } });
+                                                setEmailLogs(resp.data?.data || []);
+                                            } catch {}
+                                        })();
+                                    }}
+                                    onSmsClick={(voucher) => {
+                                        const faux = { id: voucher.id, name: voucher.name, phone: voucher.phone };
+                                        handleSmsClick(faux);
+                                        (async () => {
+                                            try {
+                                                const resp = await axios.get(`/api/recipientSms`, { params: { to: voucher.phone } });
+                                                setSmsLogs(resp.data?.data || []);
+                                            } catch {}
+                                        })();
+                                    }}
                                     context="vouchers"
                                 />
                             </>

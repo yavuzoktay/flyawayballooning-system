@@ -47,8 +47,8 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
     columns.forEach((item) => {
         mainHead.push(getColLabel(item));
     });
-    // Add Actions column for bookings context
-    if (context === 'bookings' && onEmailClick) {
+    // Add Actions column for bookings/vouchers context
+    if ((context === 'bookings' || context === 'vouchers') && onEmailClick) {
         mainHead.push('Actions');
     }
 
@@ -324,8 +324,8 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                             }} />
                         );
                     })}
-                    {/* Actions column for bookings */}
-                    {context === 'bookings' && onEmailClick && <col style={{ width: '100px', minWidth: '100px' }} />}
+                    {/* Actions column for bookings/vouchers */}
+                    {(context === 'bookings' || context === 'vouchers') && onEmailClick && <col style={{ width: '160px', minWidth: '160px' }} />}
                 </colgroup>
                 <thead style={{ background: "#3274b4", color: "#FFF" }}>
                     <tr>
@@ -529,8 +529,8 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                                         </td>
                                     );
                                 })}
-                                {/* Actions column for bookings */}
-                                {context === 'bookings' && onEmailClick && (
+                                {/* Actions column for bookings/vouchers */}
+                                {(context === 'bookings' || context === 'vouchers') && onEmailClick && (
                                     <td style={{ textAlign: "center", padding: "8px" }}>
                                         <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
                                             <button
