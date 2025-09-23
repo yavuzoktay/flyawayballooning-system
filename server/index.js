@@ -11021,8 +11021,8 @@ app.post('/api/sendBookingEmail', async (req, res) => {
         
         console.log('SendGrid response:', response[0].statusCode);
         
-        // Log email activity to database (optional)
-        if (bookingId) {
+        // Log email activity (bookingId may be null)
+        {
             const logSql = `
                 INSERT INTO email_logs (
                     booking_id,
@@ -11041,7 +11041,7 @@ app.post('/api/sendBookingEmail', async (req, res) => {
             `;
             ensureEmailLogsSchema(() => {
                 const messageId = response[0]?.headers?.['x-message-id'] || null;
-                con.query(logSql, [bookingId, to, subject, template || 'custom', messageId], (err) => {
+                con.query(logSql, [bookingId || null, to, subject, template || 'custom', messageId], (err) => {
                     if (err) {
                         console.error('Error logging email activity:', err);
                     } else {
@@ -11102,6 +11102,17 @@ app.get('/api/bookingEmails/:bookingId', (req, res) => {
             success: true,
             data: result || []
         });
+    });
+});
+
+// Fetch email logs by recipient email (for vouchers/no-booking)
+app.get('/api/recipientEmails', (req, res) => {
+    const { email } = req.query || {};
+    if (!email) return res.status(400).json({ success: false, message: 'email is required' });
+    const sql = `SELECT * FROM email_logs WHERE recipient_email = ? ORDER BY sent_at DESC`;
+    con.query(sql, [email], (err, rows) => {
+        if (err) return res.status(500).json({ success: false, message: err.message });
+        res.json({ success: true, data: rows || [] });
     });
 });
 
@@ -11268,6 +11279,19 @@ app.get('/api/bookingSms/:bookingId', (req, res) => {
     ensureSmsLogsSchema(() => {
         const sql = `SELECT * FROM sms_logs WHERE booking_id = ? ORDER BY sent_at DESC`;
         con.query(sql, [bookingId], (err, rows) => {
+            if (err) return res.status(500).json({ success: false, message: err.message });
+            res.json({ success: true, data: rows || [] });
+        });
+    });
+});
+
+// Fetch SMS logs by recipient number
+app.get('/api/recipientSms', (req, res) => {
+    const { to } = req.query || {};
+    if (!to) return res.status(400).json({ success: false, message: 'to is required' });
+    ensureSmsLogsSchema(() => {
+        const sql = `SELECT * FROM sms_logs WHERE to_number = ? ORDER BY sent_at DESC`;
+        con.query(sql, [to], (err, rows) => {
             if (err) return res.status(500).json({ success: false, message: err.message });
             res.json({ success: true, data: rows || [] });
         });
