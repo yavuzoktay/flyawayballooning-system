@@ -865,6 +865,56 @@
     min-height: 400px;
 }
 
+/* Resources Tables */
+.resources-table-container,
+.resource-groups-table-container {
+    width: 100%;
+    overflow-x: auto;
+    min-height: 200px;
+}
+
+.resources-table,
+.resource-groups-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border-radius: 12px;
+    overflow: visible;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e2e8f0;
+    margin-top: 20px;
+    min-width: 900px;
+}
+
+.resources-table thead th,
+.resource-groups-table thead th {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    padding: 16px 12px;
+    text-align: left;
+    font-weight: 700;
+    color: #1e293b;
+    font-size: 12px;
+    border-bottom: 2px solid #e2e8f0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.resources-table td,
+.resource-groups-table td {
+    padding: 16px 12px;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+}
+
+.resources-table tr:hover,
+.resource-groups-table tr:hover {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
 /* Sync Pricing Button */
 .btn-secondary {
     background-color: #6b7280;

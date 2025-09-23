@@ -113,6 +113,179 @@ const BookingPage = () => {
     const [additionalInformation, setAdditionalInformation] = useState(null);
     const [additionalInfoLoading, setAdditionalInfoLoading] = useState(false);
 
+    // Email modal state
+    const [emailModalOpen, setEmailModalOpen] = useState(false);
+    const [selectedBookingForEmail, setSelectedBookingForEmail] = useState(null);
+    const [emailForm, setEmailForm] = useState({
+        to: '',
+        subject: '',
+        message: '',
+        template: 'custom'
+    });
+    const [sendingEmail, setSendingEmail] = useState(false);
+    const [emailLogs, setEmailLogs] = useState([]);
+    const [emailLogsLoading, setEmailLogsLoading] = useState(false);
+    const [emailLogsPollId, setEmailLogsPollId] = useState(null);
+
+    // SMS state
+    const [smsModalOpen, setSmsModalOpen] = useState(false);
+    const [smsForm, setSmsForm] = useState({ to: '', message: '' });
+    const [smsSending, setSmsSending] = useState(false);
+    const [smsLogs, setSmsLogs] = useState([]);
+    const [smsLogsLoading, setSmsLogsLoading] = useState(false);
+    const [smsPollId, setSmsPollId] = useState(null);
+
+    // Email handlers
+    const handleEmailClick = (booking) => {
+        setSelectedBookingForEmail(booking);
+        setEmailForm({
+            to: booking.email || '',
+            subject: `Regarding your Fly Away Ballooning booking - ${booking.name}`,
+            message: '',
+            template: 'custom'
+        });
+        setEmailModalOpen(true);
+        // Fetch existing email logs for this booking
+        (async () => {
+            try {
+                setEmailLogsLoading(true);
+                const resp = await axios.get(`/api/bookingEmails/${booking.id}`);
+                setEmailLogs(resp.data?.data || []);
+            } catch (e) {
+                setEmailLogs([]);
+            } finally {
+                setEmailLogsLoading(false);
+            }
+        })();
+
+        // Start polling every 15s while modal is open to reflect opens/clicks from webhook
+        if (emailLogsPollId) {
+            clearInterval(emailLogsPollId);
+        }
+        const pollId = setInterval(async () => {
+            try {
+                const resp = await axios.get(`/api/bookingEmails/${booking.id}`);
+                setEmailLogs(resp.data?.data || []);
+            } catch {}
+        }, 15000);
+        setEmailLogsPollId(pollId);
+    };
+
+    // Clear polling when modal closes
+    useEffect(() => {
+        if (!emailModalOpen && emailLogsPollId) {
+            clearInterval(emailLogsPollId);
+            setEmailLogsPollId(null);
+        }
+    }, [emailModalOpen]);
+
+    const handleSendEmail = async () => {
+        if (!emailForm.to || !emailForm.subject || !emailForm.message) {
+            alert('Please fill in all fields');
+            return;
+        }
+
+        setSendingEmail(true);
+        try {
+            const response = await axios.post('/api/sendBookingEmail', {
+                bookingId: selectedBookingForEmail.id,
+                to: emailForm.to,
+                subject: emailForm.subject,
+                message: emailForm.message,
+                template: emailForm.template,
+                bookingData: selectedBookingForEmail
+            });
+
+            if (response.data.success) {
+                alert('Email sent successfully!');
+                setEmailModalOpen(false);
+                setEmailForm({ to: '', subject: '', message: '', template: 'custom' });
+                // Refresh logs after send
+                if (selectedBookingForEmail?.id) {
+                    try {
+                        const resp = await axios.get(`/api/bookingEmails/${selectedBookingForEmail.id}`);
+                        setEmailLogs(resp.data?.data || []);
+                    } catch {}
+                }
+            } else {
+                alert('Failed to send email: ' + response.data.message);
+            }
+        } catch (error) {
+            console.error('Error sending email:', error);
+            alert('Error sending email: ' + (error.response?.data?.message || error.message));
+        }
+        setSendingEmail(false);
+    };
+
+    const handleEmailTemplateChange = (template) => {
+        let subject = '';
+        let message = '';
+
+        switch (template) {
+            case 'confirmation':
+                subject = `Booking Confirmation - ${selectedBookingForEmail?.name}`;
+                message = `Dear ${selectedBookingForEmail?.name},
+
+Thank you for booking with Fly Away Ballooning! Your booking has been confirmed.
+
+Booking Details:
+- Experience: ${selectedBookingForEmail?.flight_type}
+- Location: ${selectedBookingForEmail?.location}
+- Passengers: ${selectedBookingForEmail?.pax}
+- Flight Date: ${selectedBookingForEmail?.flight_date || 'To be scheduled'}
+- Booking ID: ${selectedBookingForEmail?.id}
+
+We will contact you soon with more details about your flight.
+
+Best regards,
+Fly Away Ballooning Team`;
+                break;
+            case 'reminder':
+                subject = `Flight Reminder - ${selectedBookingForEmail?.name}`;
+                message = `Dear ${selectedBookingForEmail?.name},
+
+This is a reminder about your upcoming balloon flight with Fly Away Ballooning.
+
+Flight Details:
+- Date: ${selectedBookingForEmail?.flight_date || 'To be confirmed'}
+- Experience: ${selectedBookingForEmail?.flight_type}
+- Location: ${selectedBookingForEmail?.location}
+- Passengers: ${selectedBookingForEmail?.pax}
+
+Please ensure you arrive 30 minutes before your scheduled flight time.
+
+Best regards,
+Fly Away Ballooning Team`;
+                break;
+            case 'reschedule':
+                subject = `Flight Rescheduling - ${selectedBookingForEmail?.name}`;
+                message = `Dear ${selectedBookingForEmail?.name},
+
+We need to reschedule your balloon flight due to weather conditions.
+
+Current Booking:
+- Experience: ${selectedBookingForEmail?.flight_type}
+- Location: ${selectedBookingForEmail?.location}
+- Passengers: ${selectedBookingForEmail?.pax}
+
+We will contact you shortly to arrange a new date that works for you.
+
+Best regards,
+Fly Away Ballooning Team`;
+                break;
+            default:
+                subject = `Regarding your Fly Away Ballooning booking - ${selectedBookingForEmail?.name}`;
+                message = '';
+        }
+
+        setEmailForm(prev => ({
+            ...prev,
+            subject,
+            message,
+            template
+        }));
+    };
+
     // Fetch data
     const voucherData = async () => {
         try {
@@ -1773,6 +1946,54 @@ setBookingDetail(finalVoucherDetail);
         { key: 'expires_display', label: 'Expires' }
     ];
 
+    const handleSmsClick = (booking) => {
+        setSelectedBookingForEmail(booking); // reuse selected booking
+        setSmsForm({ to: booking.phone || '', message: '' });
+        setSmsModalOpen(true);
+        // Load sms logs
+        (async () => {
+            try {
+                setSmsLogsLoading(true);
+                const resp = await axios.get(`/api/bookingSms/${booking.id}`);
+                setSmsLogs(resp.data?.data || []);
+            } catch { setSmsLogs([]); }
+            finally { setSmsLogsLoading(false); }
+        })();
+        if (smsPollId) clearInterval(smsPollId);
+        const pid = setInterval(async () => {
+            try {
+                const resp = await axios.get(`/api/bookingSms/${booking.id}`);
+                setSmsLogs(resp.data?.data || []);
+            } catch {}
+        }, 15000);
+        setSmsPollId(pid);
+    };
+
+    useEffect(() => {
+        if (!smsModalOpen && smsPollId) { clearInterval(smsPollId); setSmsPollId(null); }
+    }, [smsModalOpen]);
+
+    const handleSendSms = async () => {
+        if (!smsForm.to || !smsForm.message) { alert('Please fill phone and message'); return; }
+        setSmsSending(true);
+        try {
+            const resp = await axios.post('/api/sendBookingSms', {
+                bookingId: selectedBookingForEmail?.id,
+                to: smsForm.to,
+                body: smsForm.message
+            });
+            if (resp.data?.success) {
+                const logs = await axios.get(`/api/bookingSms/${selectedBookingForEmail?.id}`);
+                setSmsLogs(logs.data?.data || []);
+            } else {
+                alert('Failed to send SMS: ' + (resp.data?.message || ''));
+            }
+        } catch (e) {
+            alert('SMS error: ' + (e.response?.data?.message || e.message));
+        }
+        setSmsSending(false);
+    };
+
     return (
         <div className="booking-page-wrap">
             <Container maxWidth="xl">
@@ -1971,6 +2192,7 @@ setBookingDetail(finalVoucherDetail);
                                         name: (Array.isArray(item.passengers) && item.passengers.length > 0
                                             ? `${item.passengers[0]?.first_name || ''} ${item.passengers[0]?.last_name || ''}`.trim() || item.name || ''
                                             : item.name || ''),
+                                        email: item.email || '',
                                         flight_type: item.flight_type || '',
                                         voucher_type: item.voucher_type || '',
                                         location: item.location || '',
@@ -1999,6 +2221,8 @@ setBookingDetail(finalVoucherDetail);
                                         "expires"
                                     ]}
                                     onNameClick={handleNameClick}
+                                    onSmsClick={handleSmsClick}
+                                    onEmailClick={handleEmailClick}
                                     context="bookings"
                                 />
                             </>
@@ -3191,6 +3415,182 @@ setBookingDetail(finalVoucherDetail);
                     onSlotSelect={handleRebookSlotSelect}
                     bookingDetail={bookingDetail}
                 />
+
+                {/* Email Modal */}
+                <Dialog 
+                    open={emailModalOpen} 
+                    onClose={() => setEmailModalOpen(false)}
+                    maxWidth="md"
+                    fullWidth
+                >
+                    <DialogTitle>
+                        Send Email to Customer
+                        {selectedBookingForEmail && (
+                            <Typography variant="subtitle2" color="textSecondary">
+                                Booking: {selectedBookingForEmail.name} ({selectedBookingForEmail.id})
+                            </Typography>
+                        )}
+                    </DialogTitle>
+                    <DialogContent>
+                        <Grid container spacing={2} sx={{ mt: 1 }}>
+                            <Grid item xs={12}>
+                                <FormControl fullWidth size="small">
+                                    <InputLabel>Email Template</InputLabel>
+                                    <Select
+                                        value={emailForm.template}
+                                        onChange={(e) => handleEmailTemplateChange(e.target.value)}
+                                        label="Email Template"
+                                    >
+                                        <MenuItem value="custom">Custom Message</MenuItem>
+                                        <MenuItem value="confirmation">Booking Confirmation</MenuItem>
+                                        <MenuItem value="reminder">Flight Reminder</MenuItem>
+                                        <MenuItem value="reschedule">Flight Rescheduling</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12}>
+                                <TextField
+                                    fullWidth
+                                    label="To Email"
+                                    value={emailForm.to}
+                                    onChange={(e) => setEmailForm(prev => ({ ...prev, to: e.target.value }))}
+                                    size="small"
+                                    required
+                                />
+                            </Grid>
+                            <Grid item xs={12}>
+                                <TextField
+                                    fullWidth
+                                    label="Subject"
+                                    value={emailForm.subject}
+                                    onChange={(e) => setEmailForm(prev => ({ ...prev, subject: e.target.value }))}
+                                    size="small"
+                                    required
+                                />
+                            </Grid>
+                            <Grid item xs={12}>
+                                <TextField
+                                    fullWidth
+                                    label="Message"
+                                    value={emailForm.message}
+                                    onChange={(e) => setEmailForm(prev => ({ ...prev, message: e.target.value }))}
+                                    multiline
+                                    rows={10}
+                                    required
+                                />
+                            </Grid>
+                            {/* Email Logs */}
+                            <Grid item xs={12}>
+                                <Divider sx={{ my: 2 }} />
+                                <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
+                                    Sent Emails
+                                </Typography>
+                                {emailLogsLoading ? (
+                                    <Typography variant="body2">Loading...</Typography>
+                                ) : (emailLogs && emailLogs.length > 0 ? (
+                                    <Table size="small">
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell>Date</TableCell>
+                                                <TableCell>To</TableCell>
+                                                <TableCell>Subject</TableCell>
+                                                <TableCell>Status</TableCell>
+                                                <TableCell align="right">Opens</TableCell>
+                                                <TableCell align="right">Clicks</TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {emailLogs.map((log) => (
+                                                <TableRow key={log.id}>
+                                                    <TableCell>{(() => { try { return dayjs(log.sent_at).format('DD/MM/YYYY HH:mm'); } catch { return String(log.sent_at || ''); } })()}</TableCell>
+                                                    <TableCell>{log.recipient_email}</TableCell>
+                                                    <TableCell>{log.subject}</TableCell>
+                                                    <TableCell>
+                                                        <span style={{
+                                                            padding: '2px 6px',
+                                                            borderRadius: 4,
+                                                            background: log.status === 'delivered' ? '#d4edda' : (log.status === 'open' || log.opens > 0 ? '#e3f2fd' : '#fff3cd'),
+                                                            color: '#000',
+                                                            fontSize: 12
+                                                        }}>{log.last_event || log.status}</span>
+                                                    </TableCell>
+                                                    <TableCell align="right">{log.opens || 0}</TableCell>
+                                                    <TableCell align="right">{log.clicks || 0}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                ) : (
+                                    <Typography variant="body2">No sent emails yet for this booking.</Typography>
+                                ))}
+                            </Grid>
+                        </Grid>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setEmailModalOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button 
+                            onClick={handleSendEmail}
+                            variant="contained"
+                            disabled={sendingEmail || !emailForm.to || !emailForm.subject || !emailForm.message}
+                        >
+                            {sendingEmail ? 'Sending...' : 'Send Email'}
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+
+                {/* SMS Modal */}
+                <Dialog open={smsModalOpen} onClose={() => setSmsModalOpen(false)} maxWidth="sm" fullWidth>
+                    <DialogTitle>
+                        Send SMS to Customer
+                        {selectedBookingForEmail && (
+                            <Typography variant="subtitle2" color="textSecondary">
+                                Booking: {selectedBookingForEmail.name} ({selectedBookingForEmail.id})
+                            </Typography>
+                        )}
+                    </DialogTitle>
+                    <DialogContent>
+                        <Grid container spacing={2} sx={{ mt: 1 }}>
+                            <Grid item xs={12}>
+                                <TextField fullWidth label="To Phone (+44...)" value={smsForm.to} size="small" onChange={(e)=>setSmsForm(prev=>({...prev,to:e.target.value}))} required />
+                            </Grid>
+                            <Grid item xs={12}>
+                                <TextField fullWidth label="Message" value={smsForm.message} onChange={(e)=>setSmsForm(prev=>({...prev,message:e.target.value}))} multiline rows={6} required />
+                            </Grid>
+                            <Grid item xs={12}>
+                                <Divider sx={{ my: 2 }} />
+                                <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>Sent SMS</Typography>
+                                {smsLogsLoading ? (
+                                    <Typography variant="body2">Loading...</Typography>
+                                ) : (smsLogs && smsLogs.length > 0 ? (
+                                    <Table size="small">
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell>Date</TableCell>
+                                                <TableCell>To</TableCell>
+                                                <TableCell>Status</TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {smsLogs.map((log) => (
+                                                <TableRow key={log.id}>
+                                                    <TableCell>{(() => { try { return dayjs(log.sent_at).format('DD/MM/YYYY HH:mm'); } catch { return String(log.sent_at || ''); } })()}</TableCell>
+                                                    <TableCell>{log.to_number}</TableCell>
+                                                    <TableCell>{log.status}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                ) : (<Typography variant="body2">No SMS yet.</Typography>))}
+                            </Grid>
+                        </Grid>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setSmsModalOpen(false)}>Cancel</Button>
+                        <Button onClick={handleSendSms} variant="contained" disabled={smsSending || !smsForm.to || !smsForm.message}>{smsSending ? 'Sending...' : 'Send SMS'}</Button>
+                    </DialogActions>
+                </Dialog>
             </Container>
         </div>
     );
