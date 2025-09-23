@@ -14,12 +14,27 @@ const moment = require('moment');
 const multer = require('multer');
 const dotenv = require('dotenv');
 const axios = require('axios');
+const sgMail = require('@sendgrid/mail');
+const { EventWebhook, EventWebhookHeader } = require('@sendgrid/eventwebhook');
+const Twilio = require('twilio');
 dotenv.config();
+
+// Configure SendGrid
+if (process.env.SENDGRID_API_KEY) {
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+} else {
+    console.warn('SENDGRID_API_KEY not found in environment variables');
+}
 
 
 
 // Middleware
-app.use(express.json());
+// Capture raw body for webhook signature verification
+app.use(express.json({
+    verify: (req, res, buf) => {
+        try { req.rawBody = buf.toString('utf8'); } catch (e) { /* ignore */ }
+    }
+}));
 app.use(express.urlencoded({ extended: true }));
 
 // Cache control middleware for all routes
@@ -398,6 +413,42 @@ app.post('/api/generate-voucher-code', async (req, res) => {
         
         try {
             const result = await findAndUpdateRecord();
+
+            // Ensure the generated code shows in settings as user_generated
+            const defaultExpiryDate = (expires_date && expires_date !== '')
+                ? expires_date
+                : dayjs().add(24, 'month').format('YYYY-MM-DD');
+            const insertUserCodeSql = `
+                INSERT INTO voucher_codes (
+                    code, title, valid_from, valid_until, max_uses, current_uses,
+                    applicable_locations, applicable_experiences, applicable_voucher_types,
+                    is_active, created_at, updated_at, source_type, customer_email, paid_amount
+                ) VALUES (?, ?, NOW(), ?, 1, 0, ?, ?, ?, 1, NOW(), NOW(), 'user_generated', ?, ?)
+                ON DUPLICATE KEY UPDATE 
+                    source_type = VALUES(source_type),
+                    title = VALUES(title),
+                    valid_until = VALUES(valid_until),
+                    applicable_locations = VALUES(applicable_locations),
+                    applicable_experiences = VALUES(applicable_experiences),
+                    applicable_voucher_types = VALUES(applicable_voucher_types),
+                    updated_at = NOW()
+            `;
+            const insertVals = [
+                voucherCode,
+                title,
+                defaultExpiryDate,
+                location || null,
+                experience_type || null,
+                voucher_type || null,
+                customer_email || null,
+                paid_amount || 0
+            ];
+            con.query(insertUserCodeSql, insertVals, (insErr) => {
+                if (insErr) {
+                    console.warn('Warning: could not upsert user_generated voucher code:', insErr.message);
+                }
+            });
+
             res.json({
                 success: true,
                 message: `${voucher_type} code generated and assigned successfully`,
@@ -410,7 +461,40 @@ app.post('/api/generate-voucher-code', async (req, res) => {
         } catch (updateError) {
             console.error('Error updating record with code:', updateError);
             console.log('=== FALLBACK: Returning voucher code without updating record ===');
-            // Instead of failing, return the voucher code so it can be used
+            // Still upsert into voucher_codes so it appears in settings
+            try {
+                const defaultExpiryDate = (expires_date && expires_date !== '')
+                    ? expires_date
+                    : dayjs().add(24, 'month').format('YYYY-MM-DD');
+                const insertUserCodeSql = `
+                    INSERT INTO voucher_codes (
+                        code, title, valid_from, valid_until, max_uses, current_uses,
+                        applicable_locations, applicable_experiences, applicable_voucher_types,
+                        is_active, created_at, updated_at, source_type, customer_email, paid_amount
+                    ) VALUES (?, ?, NOW(), ?, 1, 0, ?, ?, ?, 1, NOW(), NOW(), 'user_generated', ?, ?)
+                    ON DUPLICATE KEY UPDATE 
+                        source_type = VALUES(source_type),
+                        title = VALUES(title),
+                        valid_until = VALUES(valid_until),
+                        applicable_locations = VALUES(applicable_locations),
+                        applicable_experiences = VALUES(applicable_experiences),
+                        applicable_voucher_types = VALUES(applicable_voucher_types),
+                        updated_at = NOW()
+                `;
+                const insertVals = [
+                    voucherCode,
+                    title,
+                    defaultExpiryDate,
+                    location || null,
+                    experience_type || null,
+                    voucher_type || null,
+                    customer_email || null,
+                    paid_amount || 0
+                ];
+                con.query(insertUserCodeSql, insertVals, () => {});
+            } catch (e) {}
+
+            // Return the voucher code so it can be used
             res.json({
                 success: true,
                 message: `${voucher_type} code generated successfully (record update failed)`,
@@ -633,45 +717,64 @@ app.post('/api/voucher-codes/validate', (req, res) => {
         console.log('Database result:', result);
         
         if (result.length === 0) {
-            console.log('No voucher found - checking conditions...');
-            // Let's check what's in the database for this code
-            con.query('SELECT * FROM voucher_codes WHERE code = ?', [code.toUpperCase()], (err2, checkResult) => {
-                if (err2) {
-                    console.error('Error checking voucher details:', err2);
-                } else {
-                    console.log('Voucher details found:', checkResult);
-                    if (checkResult.length > 0) {
-                        const v = checkResult[0];
-                        console.log('Voucher status:', {
-                            is_active: v.is_active,
-                            valid_from: v.valid_from,
-                            valid_until: v.valid_until,
-                            current_uses: v.current_uses,
-                            max_uses: v.max_uses,
-                            source_type: v.source_type,
-                            now: new Date()
-                        });
-                        
-                        // Daha detaylı hata mesajları
-                        if (!v.is_active) {
-                            return res.json({ success: false, message: 'Voucher code is inactive' });
-                        }
-                        if (v.valid_from && new Date() < new Date(v.valid_from)) {
-                            return res.json({ success: false, message: 'Voucher code is not yet valid' });
-                        }
-                        if (v.valid_until && new Date() > new Date(v.valid_until)) {
-                            return res.json({ success: false, message: 'Voucher code has expired' });
-                        }
-                        if (v.max_uses && v.current_uses >= v.max_uses) {
-                            return res.json({ success: false, message: `Voucher code usage limit reached (${v.current_uses}/${v.max_uses})` });
-                        }
-                        if (v.source_type && v.source_type !== 'admin_created' && v.source_type !== 'user_generated') {
-                            return res.json({ success: false, message: 'Voucher code source type is invalid' });
-                        }
+            console.log('No voucher_codes match. Falling back to all_vouchers/all_booking for voucher_ref/voucher_code...');
+            const fallbackSql = `
+                SELECT 
+                    v.*, 
+                    v.voucher_ref AS code_from_vouchers,
+                    CASE WHEN v.expires IS NOT NULL THEN v.expires ELSE DATE_ADD(v.created_at, INTERVAL 24 MONTH) END AS computed_expires,
+                    v.redeemed,
+                    'voucher_ref' AS code_source
+                FROM all_vouchers v
+                WHERE v.voucher_ref = ?
+                UNION ALL
+                SELECT 
+                    b.*, 
+                    b.voucher_code AS code_from_vouchers,
+                    NULL AS computed_expires,
+                    NULL AS redeemed,
+                    'booking_voucher_code' AS code_source
+                FROM all_booking b
+                WHERE b.voucher_code = ?
+                LIMIT 1
+            `;
+            con.query(fallbackSql, [code.toUpperCase(), code.toUpperCase()], (fbErr, fbRows) => {
+                if (fbErr) {
+                    console.error('Error in voucher fallback lookup:', fbErr);
+                    return res.json({ success: false, message: 'Invalid or expired voucher code' });
+                }
+                if (!fbRows || fbRows.length === 0) {
+                    return res.json({ success: false, message: 'Invalid or expired voucher code' });
+                }
+                const row = fbRows[0];
+                // Basic checks for voucher_ref path
+                if (row.code_source === 'voucher_ref') {
+                    const now = new Date();
+                    const exp = row.computed_expires ? new Date(row.computed_expires) : null;
+                    if (row.redeemed && String(row.redeemed).toLowerCase() === 'yes') {
+                        return res.json({ success: false, message: 'Voucher already redeemed' });
+                    }
+                    if (exp && now > exp) {
+                        return res.json({ success: false, message: 'Voucher code has expired' });
                     }
                 }
+                // Treat as valid for redeem flow
+                return res.json({
+                    success: true,
+                    message: 'Voucher code is valid',
+                    data: {
+                        code: code.toUpperCase(),
+                        source: row.code_source,
+                        // Prefer canonical fields if available
+                        experience_type: row.experience_type || null,
+                        voucher_type: row.voucher_type || row.actual_voucher_type || null,
+                        expires: row.computed_expires || null,
+                        redeemed: row.redeemed || null,
+                        final_amount: booking_amount
+                    }
+                });
             });
-            return res.json({ success: false, message: 'Invalid or expired voucher code' });
+            return; // prevent continuing
         }
         
         const voucher = result[0];
@@ -722,6 +825,9 @@ app.post('/api/voucher-codes/validate', (req, res) => {
             message: 'Voucher code is valid',
             data: {
                 ...voucher,
+                // Keep response shape consistent with getAllVoucherData fields when possible
+                experience_type: voucher.applicable_experiences || null,
+                voucher_type: voucher.applicable_voucher_types || null,
                 final_amount: booking_amount // No discount applied
             }
         });
@@ -754,6 +860,199 @@ app.get('/api/voucher-codes/:id/usage', (req, res) => {
         }
         
         res.json({ success: true, data: result });
+    });
+});
+
+// Simple booking creation for Redeem Voucher
+app.post('/api/createRedeemBooking', (req, res) => {
+    const {
+        activitySelect,
+        chooseLocation,
+        chooseFlightType,
+        passengerData,
+        additionalInfo,
+        selectedDate,
+        selectedTime,
+        voucher_code,
+        totalPrice = 0
+    } = req.body;
+
+    // Basic validation
+    if (!chooseLocation || !chooseFlightType || !passengerData || !passengerData[0]) {
+        return res.status(400).json({ success: false, error: 'Missing required booking information' });
+    }
+
+    const passengerName = `${passengerData[0].firstName} ${passengerData[0].lastName}`;
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    
+    // Format booking date
+    let bookingDateTime = selectedDate;
+    if (selectedDate && selectedTime) {
+        const datePart = selectedDate.split(' ')[0] || selectedDate.substring(0, 10);
+        bookingDateTime = `${datePart} ${selectedTime}`;
+    }
+
+    // Simple SQL with only essential columns
+    const bookingSql = `
+        INSERT INTO all_booking (
+            name,
+            flight_type, 
+            flight_date, 
+            pax, 
+            location, 
+            status, 
+            paid, 
+            due,
+            voucher_code,
+            created_at,
+            email,
+            phone
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    const bookingValues = [
+        passengerName,
+        chooseFlightType.type || 'Shared Flight',
+        bookingDateTime,
+        chooseFlightType.passengerCount || 1,
+        chooseLocation,
+        'Open',
+        totalPrice,
+        0,
+        voucher_code || null,
+        now,
+        passengerData[0].email || null,
+        passengerData[0].phone || null
+    ];
+
+    console.log('=== REDEEM BOOKING SQL ===');
+    console.log('SQL:', bookingSql);
+    console.log('Values:', bookingValues);
+
+    con.query(bookingSql, bookingValues, (err, result) => {
+        if (err) {
+            console.error('=== REDEEM BOOKING ERROR ===');
+            console.error('Error:', err);
+            return res.status(500).json({ 
+                success: false, 
+                error: 'Database query failed to create booking', 
+                details: err.message 
+            });
+        }
+
+        const bookingId = result.insertId;
+        console.log('=== REDEEM BOOKING SUCCESS ===');
+        console.log('Booking ID:', bookingId);
+
+        // Create passenger record
+        if (passengerData && passengerData.length > 0) {
+            const passengerSql = `
+                INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone)
+                VALUES (?, ?, ?, ?, ?, ?)
+            `;
+            
+            passengerData.forEach((passenger, index) => {
+                if (passenger.firstName) {
+                    const passengerValues = [
+                        bookingId,
+                        passenger.firstName,
+                        passenger.lastName || '',
+                        passenger.weight || '',
+                        passenger.email || '',
+                        passenger.phone || ''
+                    ];
+                    
+                    con.query(passengerSql, passengerValues, (passengerErr) => {
+                        if (passengerErr) {
+                            console.error('Error creating passenger:', passengerErr);
+                        } else {
+                            console.log(`Passenger ${index + 1} created for booking ${bookingId}`);
+                        }
+                    });
+                }
+            });
+        }
+
+        res.json({ 
+            success: true, 
+            message: 'Booking created successfully', 
+            bookingId: bookingId 
+        });
+    });
+});
+
+// Mark voucher as redeemed
+app.post('/api/redeem-voucher', (req, res) => {
+    const { voucher_code, booking_id } = req.body;
+    
+    if (!voucher_code) {
+        return res.status(400).json({ success: false, message: 'Voucher code is required' });
+    }
+    
+    console.log('=== MARKING VOUCHER AS REDEEMED ===');
+    console.log('Voucher Code:', voucher_code);
+    console.log('Voucher Code (uppercase):', voucher_code.toUpperCase());
+    console.log('Booking ID:', booking_id);
+    
+    // First check if voucher exists
+    const checkVoucherSql = `SELECT * FROM all_vouchers WHERE voucher_ref = ?`;
+    
+    con.query(checkVoucherSql, [voucher_code.toUpperCase()], (checkErr, checkResult) => {
+        if (checkErr) {
+            console.error('Error checking voucher existence:', checkErr);
+            return res.status(500).json({ success: false, message: 'Database error', error: checkErr.message });
+        }
+        
+        console.log('=== VOUCHER CHECK RESULT ===');
+        console.log('Found vouchers:', checkResult.length);
+        if (checkResult.length > 0) {
+            console.log('Voucher details:', {
+                id: checkResult[0].id,
+                voucher_ref: checkResult[0].voucher_ref,
+                current_redeemed_status: checkResult[0].redeemed,
+                name: checkResult[0].name
+            });
+        } else {
+            console.log('No voucher found with code:', voucher_code.toUpperCase());
+        }
+        
+        // Update voucher in all_vouchers table
+        const updateVoucherSql = `
+            UPDATE all_vouchers 
+            SET redeemed = 'Yes', 
+                updated_at = NOW() 
+            WHERE voucher_ref = ?
+        `;
+        
+        console.log('=== EXECUTING UPDATE ===');
+        console.log('SQL:', updateVoucherSql);
+        console.log('Parameter:', voucher_code.toUpperCase());
+        
+        con.query(updateVoucherSql, [voucher_code.toUpperCase()], (err, result) => {
+            if (err) {
+                console.error('=== UPDATE ERROR ===');
+                console.error('Error marking voucher as redeemed:', err);
+                return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+            }
+            
+            console.log('=== UPDATE RESULT ===');
+            console.log('Voucher redemption update result:', {
+                affectedRows: result.affectedRows,
+                changedRows: result.changedRows,
+                insertId: result.insertId,
+                warningCount: result.warningCount
+            });
+            
+            if (result.affectedRows === 0) {
+                console.warn('=== NO ROWS AFFECTED ===');
+                console.warn('No voucher found to update with code:', voucher_code);
+                return res.json({ success: false, message: 'Voucher not found or already redeemed' });
+            }
+            
+            console.log('=== SUCCESS ===');
+            console.log('Voucher marked as redeemed successfully');
+            res.json({ success: true, message: 'Voucher marked as redeemed' });
+        });
     });
 });
 
@@ -1946,17 +2245,19 @@ app.get('/uploads/experiences/:filename', (req, res) => {
     
     // Add cache control headers
     res.set({
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Cache-Control': 'public, max-age=60',
         'Pragma': 'no-cache',
         'Expires': '0'
     });
     
-    res.sendFile(filePath, (err) => {
-        if (err) {
-            console.error('Error serving image:', err);
-            res.status(404).send('Image not found');
-        }
-    });
+    if (fs.existsSync(filePath)) {
+        return res.sendFile(filePath);
+    }
+    console.warn('Experience image not found:', filePath);
+    // Return a 1x1 transparent PNG to avoid client errors
+    const placeholder = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
+    res.setHeader('Content-Type', 'image/png');
+    return res.status(200).send(placeholder);
 });
 
 // ==================== ADDITIONAL INFORMATION QUESTIONS API ENDPOINTS ====================
@@ -3298,9 +3599,11 @@ app.get('/api/getAllBookingData', (req, res) => {
 app.get('/api/getAllVoucherData', (req, res) => {
     console.log('=== getAllVoucherData ENDPOINT CALLED ===');
     
-    // Processing voucher data request
+    // Optional filters: vc_code or voucher_ref
+    const { vc_code, voucher_ref } = req.query || {};
+    console.log('Request query:', req.query);
     
-    // Get all vouchers with booking info - voucher codes are stored in all_vouchers.voucher_ref
+    // Get vouchers with booking info; optionally filter by code
     const voucher = `
         SELECT v.*, v.experience_type, v.book_flight, v.voucher_type as actual_voucher_type,
                v.purchaser_name, v.purchaser_email, v.purchaser_phone, v.purchaser_mobile,
@@ -3334,11 +3637,14 @@ app.get('/api/getAllVoucherData', (req, res) => {
                )) FROM passenger p WHERE p.booking_id = b.id) as passenger_details
         FROM all_vouchers v
         LEFT JOIN all_booking b ON v.voucher_ref = b.voucher_code
+        ${vc_code || voucher_ref ? 'WHERE v.voucher_ref = ?' : ''}
         ORDER BY v.created_at DESC
     `;
     
     console.log('SQL Query:', voucher);
-    con.query(voucher, async (err, result) => {
+    const params = [];
+    if (vc_code || voucher_ref) params.push((vc_code || voucher_ref).toUpperCase());
+    con.query(voucher, params, async (err, result) => {
         if (err) {
             console.error("Error occurred:", err);
             res.status(500).send({ success: false, error: "Database query failed" });
@@ -4028,10 +4334,21 @@ app.post('/api/createBooking', (req, res) => {
         ];
         console.log('bookingValues:', bookingValues);
 
+        console.log('=== EXECUTING BOOKING SQL ===');
+        console.log('SQL:', bookingSql);
+        console.log('Values:', bookingValues);
+        console.log('Values length:', bookingValues.length);
+        
         con.query(bookingSql, bookingValues, (err, result) => {
             if (err) {
-                console.error('Error creating booking:', err);
-                return res.status(500).json({ success: false, error: 'Database query failed to create booking' });
+                console.error('=== DATABASE ERROR DETAILS ===');
+                console.error('Error code:', err.code);
+                console.error('Error message:', err.message);
+                console.error('SQL State:', err.sqlState);
+                console.error('Error number:', err.errno);
+                console.error('Full error:', err);
+                console.error('=== END ERROR DETAILS ===');
+                return res.status(500).json({ success: false, error: 'Database query failed to create booking', details: err.message });
             }
 
             const bookingId = result.insertId;
@@ -4600,8 +4917,11 @@ app.post('/api/createVoucher', (req, res) => {
             if (voucher_type === 'Flight Voucher' || voucher_type === 'Any Day Flight' || voucher_type === 'Weekday Morning' || voucher_type === 'Flexible Weekday') {
                 console.log('=== CREATING BOOKING RECORD FOR FLIGHT VOUCHER ===');
                 createBookingForFlightVoucher(result.insertId, finalVoucherRef, name, email, phone, weight, paid, actualVoucherType);
+            } else if (voucher_type === 'Redeem Voucher') {
+                console.log('=== CREATING BOOKING RECORD FOR REDEEM VOUCHER ===');
+                createBookingForRedeemVoucher(result.insertId, finalVoucherRef || voucher_ref, name, email, phone, weight, paid, actualVoucherType);
             } else {
-                // Send response for non-Flight Voucher types
+                // Send response for other voucher types (Gift Voucher, etc.)
                 res.status(201).json({ success: true, message: 'Voucher created successfully!', voucherId: result.insertId });
             }
         });
@@ -4680,6 +5000,123 @@ app.post('/api/createVoucher', (req, res) => {
             
             // Now create passenger record
             createPassengerForFlightVoucher(bookingResult.insertId, name, weight, paid, passengerData);
+        });
+    }
+    
+    // Create booking record for Redeem Voucher
+    function createBookingForRedeemVoucher(voucherId, voucherCode, name, email, phone, weight, paid, voucherType) {
+        console.log('=== CREATING BOOKING RECORD FOR REDEEM VOUCHER ===');
+        console.log('Voucher ID:', voucherId);
+        console.log('Voucher Code:', voucherCode);
+        console.log('Name:', name);
+        console.log('Email:', email);
+        console.log('Phone:', phone);
+        console.log('Weight:', weight);
+        console.log('Paid:', paid);
+        console.log('Voucher Type:', voucherType);
+        
+        // Define variables for Redeem Voucher booking
+        const flight_type_redeem = flight_type || 'Shared Flight'; // Use the flight type from request or default
+        const now = moment().format('YYYY-MM-DD HH:mm:ss');
+        const expiresFinal = moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+        
+        // Create booking record in all_booking table for Redeem Voucher
+        const bookingSql = `
+            INSERT INTO all_booking (
+                name, flight_type, flight_date, pax, location, status, paid, due,
+                voucher_code, created_at, expires, manual_status_override, additional_notes,
+                preferred_location, preferred_time, preferred_day, flight_attempts,
+                activity_id, time_slot, experience, voucher_type, voucher_discount, original_amount,
+                email, phone, weight, additional_information_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+        
+        const bookingValues = [
+            name, // name
+            flight_type_redeem, // flight_type
+            null, // flight_date (will be set when booking is confirmed)
+            numberOfPassengers || 1, // pax
+            preferred_location || 'TBD', // location
+            'Open', // status
+            0, // paid (Redeem Voucher doesn't involve payment)
+            0, // due
+            voucherCode, // voucher_code
+            now, // created_at
+            expiresFinal, // expires
+            null, // manual_status_override
+            'Created from Redeem Voucher', // additional_notes
+            emptyToNull(preferred_location), // preferred_location
+            emptyToNull(preferred_time), // preferred_time
+            emptyToNull(preferred_day), // preferred_day
+            0, // flight_attempts
+            null, // activity_id
+            null, // time_slot
+            flight_type_redeem, // experience
+            voucherType, // voucher_type
+            0, // voucher_discount (no discount for redeem)
+            0, // original_amount
+            email, // email
+            phone, // phone
+            weight, // weight
+            (additional_information_json || additionalInfo || additional_information) ? JSON.stringify(additional_information_json || additionalInfo || additional_information) : null // additional_information_json
+        ];
+        
+        con.query(bookingSql, bookingValues, (err, bookingResult) => {
+            if (err) {
+                console.error('Error creating booking for Redeem Voucher:', err);
+                // Still send success response for voucher creation even if booking fails
+                return res.status(201).json({ 
+                    success: true, 
+                    message: 'Voucher redeemed successfully but booking creation failed', 
+                    voucherId: voucherId,
+                    warning: 'Booking record could not be created'
+                });
+            }
+            
+            console.log('=== BOOKING CREATED FOR REDEEM VOUCHER ===');
+            console.log('Booking ID:', bookingResult.insertId);
+            
+            // Now mark the original voucher as redeemed in all_vouchers table
+            updateVoucherRedemptionStatus(voucherCode, voucherId, bookingResult.insertId);
+        });
+    }
+    
+    // Update voucher redemption status in all_vouchers table
+    function updateVoucherRedemptionStatus(voucherCode, voucherId, bookingId) {
+        console.log('=== UPDATING VOUCHER REDEMPTION STATUS ===');
+        console.log('Voucher Code:', voucherCode);
+        console.log('Voucher ID:', voucherId);
+        console.log('Booking ID:', bookingId);
+        
+        // Update the original voucher to mark it as redeemed
+        const updateVoucherSql = `
+            UPDATE all_vouchers 
+            SET redeemed = 'Yes', 
+                updated_at = NOW() 
+            WHERE voucher_ref = ? OR id = (
+                SELECT id FROM all_vouchers 
+                WHERE voucher_ref = ? 
+                ORDER BY created_at DESC 
+                LIMIT 1
+            )
+        `;
+        
+        con.query(updateVoucherSql, [voucherCode, voucherCode], (err, updateResult) => {
+            if (err) {
+                console.error('Error updating voucher redemption status:', err);
+            } else {
+                console.log('Voucher redemption status updated successfully');
+                console.log('Affected rows:', updateResult.affectedRows);
+            }
+            
+            // Send final success response
+            res.status(201).json({ 
+                success: true, 
+                message: 'Voucher redeemed successfully and booking created!', 
+                voucherId: voucherId,
+                bookingId: bookingId,
+                voucherCode: voucherCode
+            });
         });
     }
     
@@ -10470,4 +10907,380 @@ app.post('/api/migrate-terms-table', (req, res) => {
             });
         });
     }
+});
+
+// ==================== EMAIL ENDPOINTS ====================
+
+// Ensure email_logs table and columns exist (idempotent)
+let emailLogsSchemaEnsured = false;
+function ensureEmailLogsSchema(callback) {
+    if (emailLogsSchemaEnsured) return callback && callback();
+
+    const createTableSql = `
+        CREATE TABLE IF NOT EXISTS email_logs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            booking_id INT,
+            recipient_email VARCHAR(255),
+            subject VARCHAR(500),
+            template_type VARCHAR(50),
+            sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            status VARCHAR(50) DEFAULT 'sent',
+            message_id VARCHAR(255),
+            opens INT DEFAULT 0,
+            clicks INT DEFAULT 0,
+            last_event VARCHAR(50),
+            last_event_at TIMESTAMP NULL DEFAULT NULL,
+            INDEX idx_booking_id (booking_id),
+            INDEX idx_recipient (recipient_email),
+            INDEX idx_sent_at (sent_at),
+            INDEX idx_message_id (message_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `;
+
+    const alterStatements = [
+        "ALTER TABLE email_logs ADD COLUMN message_id VARCHAR(255)",
+        "ALTER TABLE email_logs ADD COLUMN opens INT DEFAULT 0",
+        "ALTER TABLE email_logs ADD COLUMN clicks INT DEFAULT 0",
+        "ALTER TABLE email_logs ADD COLUMN last_event VARCHAR(50)",
+        "ALTER TABLE email_logs ADD COLUMN last_event_at TIMESTAMP NULL DEFAULT NULL",
+        "ALTER TABLE email_logs MODIFY COLUMN status VARCHAR(50) DEFAULT 'sent'",
+        "ALTER TABLE email_logs ADD INDEX idx_message_id (message_id)"
+    ];
+
+    con.query(createTableSql, (err) => {
+        if (err) {
+            console.error('Error creating email_logs table:', err);
+            emailLogsSchemaEnsured = true; // avoid loop
+            return callback && callback();
+        }
+        // Run ALTERs sequentially; ignore duplicate errors
+        let i = 0;
+        const next = () => {
+            if (i >= alterStatements.length) { emailLogsSchemaEnsured = true; return callback && callback(); }
+            con.query(alterStatements[i], (e) => {
+                i++;
+                next();
+            });
+        };
+        next();
+    });
+}
+
+// Send booking email via SendGrid
+app.post('/api/sendBookingEmail', async (req, res) => {
+    console.log('POST /api/sendBookingEmail called');
+    const { bookingId, to, subject, message, template, bookingData } = req.body;
+    
+    try {
+        // Validate required fields
+        if (!to || !subject || !message) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields: to, subject, and message are required'
+            });
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(to)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid email format'
+            });
+        }
+
+        // Check if SendGrid is configured
+        if (!process.env.SENDGRID_API_KEY) {
+            console.error('SendGrid API key not configured');
+            return res.status(500).json({
+                success: false,
+                message: 'Email service not configured'
+            });
+        }
+
+        // Prepare email content
+        const emailContent = {
+            to: to,
+            from: {
+                email: process.env.SENDGRID_FROM_EMAIL || 'booking@flyawayballooning.com',
+                name: 'Fly Away Ballooning'
+            },
+            subject: subject,
+            text: message,
+            html: message.replace(/\n/g, '<br>'),
+            // Add custom tracking
+            custom_args: {
+                booking_id: bookingId?.toString() || 'unknown',
+                template_type: template || 'custom'
+            }
+        };
+
+        // Send email via SendGrid
+        console.log('Sending email via SendGrid to:', to);
+        const response = await sgMail.send(emailContent);
+        
+        console.log('SendGrid response:', response[0].statusCode);
+        
+        // Log email activity to database (optional)
+        if (bookingId) {
+            const logSql = `
+                INSERT INTO email_logs (
+                    booking_id,
+                    recipient_email,
+                    subject,
+                    template_type,
+                    sent_at,
+                    status,
+                    message_id,
+                    opens,
+                    clicks,
+                    last_event,
+                    last_event_at
+                )
+                VALUES (?, ?, ?, ?, NOW(), 'sent', ?, 0, 0, 'sent', NOW())
+            `;
+            ensureEmailLogsSchema(() => {
+                const messageId = response[0]?.headers?.['x-message-id'] || null;
+                con.query(logSql, [bookingId, to, subject, template || 'custom', messageId], (err) => {
+                    if (err) {
+                        console.error('Error logging email activity:', err);
+                    } else {
+                        console.log('Email activity logged successfully');
+                    }
+                });
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Email sent successfully',
+            messageId: response[0].headers['x-message-id']
+        });
+
+    } catch (error) {
+        console.error('Error sending email:', error);
+        
+        // Handle SendGrid specific errors
+        if (error.response) {
+            console.error('SendGrid error response:', error.response.body);
+            return res.status(error.code || 500).json({
+                success: false,
+                message: 'Failed to send email',
+                error: error.response.body?.errors?.[0]?.message || error.message
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            message: 'Failed to send email',
+            error: error.message
+        });
+    }
+});
+
+// Get email logs for a booking
+app.get('/api/bookingEmails/:bookingId', (req, res) => {
+    const { bookingId } = req.params;
+    
+    const sql = `
+        SELECT * FROM email_logs 
+        WHERE booking_id = ? 
+        ORDER BY sent_at DESC
+    `;
+    
+    con.query(sql, [bookingId], (err, result) => {
+        if (err) {
+            console.error('Error fetching email logs:', err);
+            return res.status(500).json({
+                success: false,
+                message: 'Database error',
+                error: err.message
+            });
+        }
+        
+        res.json({
+            success: true,
+            data: result || []
+        });
+    });
+});
+
+// SendGrid Event Webhook to track deliveries/opens/clicks
+// Configure this URL in SendGrid: POST https://YOUR_DOMAIN/api/sendgrid/webhook
+app.post('/api/sendgrid/webhook', (req, res) => {
+    try {
+        let events = Array.isArray(req.body) ? req.body : [];
+
+        // Optional: signature verification if enabled in SendGrid
+        try {
+            const verificationKey = process.env.SENDGRID_WEBHOOK_PUBLIC_KEY; // Base64 public key from SendGrid
+            const signature = req.get('X-Twilio-Email-Event-Webhook-Signature');
+            const timestamp = req.get('X-Twilio-Email-Event-Webhook-Timestamp');
+            const ecPublicKey = verificationKey ? Buffer.from(verificationKey, 'base64') : null;
+            if (verificationKey && signature && timestamp) {
+                const ew = new EventWebhook();
+                const bodyString = req.rawBody || JSON.stringify(req.body);
+                const isValid = ew.verifySignature(ecPublicKey, bodyString, signature, timestamp);
+                if (!isValid) {
+                    console.warn('SendGrid webhook signature verification failed');
+                    return res.status(400).json({ success: false });
+                }
+            }
+        } catch (e) {
+            console.warn('Webhook signature verification error (continuing without reject):', e.message);
+        }
+        if (events.length === 0) {
+            return res.json({ success: true });
+        }
+
+        // Process each event; update by message_id primarily
+        events.forEach((evt) => {
+            const messageId = evt['sg_message_id'] || evt['sg_message_id_v2'] || evt['smtp-id'] || (evt['headers'] && /X-Message-Id:\s*(.*)/i.test(evt['headers']) ? RegExp.$1.trim() : null);
+            const email = evt.email || evt.recipient || null;
+            const eventType = evt.event || evt.event_type || null; // delivered, open, click, bounce, dropped, spamreport, deferred
+            const eventTime = evt.timestamp ? new Date(evt.timestamp * 1000) : new Date();
+
+            if (!messageId && !email) return;
+
+            // Build update SQL based on event type
+            let updateSql = '';
+            let params = [];
+            if (eventType === 'open') {
+                updateSql = `UPDATE email_logs SET opens = opens + 1, status = 'open', last_event = 'open', last_event_at = ? WHERE ${messageId ? 'message_id = ?' : 'recipient_email = ?'} ORDER BY sent_at DESC LIMIT 1`;
+                params = [eventTime, messageId || email];
+            } else if (eventType === 'click') {
+                updateSql = `UPDATE email_logs SET clicks = clicks + 1, status = 'click', last_event = 'click', last_event_at = ? WHERE ${messageId ? 'message_id = ?' : 'recipient_email = ?'} ORDER BY sent_at DESC LIMIT 1`;
+                params = [eventTime, messageId || email];
+            } else if (['delivered','processed','deferred','dropped','bounce','blocked','spamreport','unsubscribe'].includes(eventType)) {
+                updateSql = `UPDATE email_logs SET status = ?, last_event = ?, last_event_at = ? WHERE ${messageId ? 'message_id = ?' : 'recipient_email = ?'} ORDER BY sent_at DESC LIMIT 1`;
+                params = [eventType, eventType, eventTime, messageId || email];
+            }
+
+            if (updateSql) {
+                con.query(updateSql, params, (err) => {
+                    if (err) {
+                        console.error('Error updating email_logs from webhook:', err, evt);
+                    }
+                });
+            }
+        });
+
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Webhook error:', e);
+        res.status(200).json({ success: true });
+    }
+});
+
+// ==================== SMS ENDPOINTS ====================
+
+// Ensure sms_logs table
+let smsLogsSchemaEnsured = false;
+function ensureSmsLogsSchema(callback) {
+    if (smsLogsSchemaEnsured) return callback && callback();
+    const createTableSql = `
+        CREATE TABLE IF NOT EXISTS sms_logs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            booking_id INT,
+            to_number VARCHAR(32),
+            body TEXT,
+            status VARCHAR(50) DEFAULT 'queued',
+            sid VARCHAR(64),
+            sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_event_at TIMESTAMP NULL DEFAULT NULL,
+            error_message VARCHAR(255),
+            INDEX idx_booking_id (booking_id),
+            INDEX idx_sid (sid)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `;
+    con.query(createTableSql, (err) => {
+        if (err) console.error('Error creating sms_logs:', err);
+        smsLogsSchemaEnsured = true;
+        callback && callback();
+    });
+}
+
+// Send SMS
+app.post('/api/sendBookingSms', async (req, res) => {
+    try {
+        const { bookingId, to, body } = req.body;
+        if (!to || !body) return res.status(400).json({ success: false, message: 'to and body required' });
+
+        const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, TWILIO_MESSAGING_SERVICE_SID } = process.env;
+        if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || (!TWILIO_FROM_NUMBER && !TWILIO_MESSAGING_SERVICE_SID)) {
+            const missing = [
+                !TWILIO_ACCOUNT_SID ? 'TWILIO_ACCOUNT_SID' : null,
+                !TWILIO_AUTH_TOKEN ? 'TWILIO_AUTH_TOKEN' : null,
+                (!TWILIO_FROM_NUMBER && !TWILIO_MESSAGING_SERVICE_SID) ? 'TWILIO_FROM_NUMBER or TWILIO_MESSAGING_SERVICE_SID' : null
+            ].filter(Boolean).join(', ');
+            console.error('Twilio not configured. Missing:', missing);
+            return res.status(500).json({ success: false, message: `Twilio not configured: missing ${missing}` });
+        }
+
+        const client = Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+        const createParams = {
+            to,
+            body,
+            statusCallback: process.env.TWILIO_STATUS_CALLBACK_URL || undefined
+        };
+        if (TWILIO_MESSAGING_SERVICE_SID) {
+            createParams.messagingServiceSid = TWILIO_MESSAGING_SERVICE_SID;
+        } else {
+            createParams.from = TWILIO_FROM_NUMBER;
+        }
+        const msg = await client.messages.create(createParams);
+
+        ensureSmsLogsSchema(() => {
+            const sql = `INSERT INTO sms_logs (booking_id, to_number, body, status, sid, sent_at) VALUES (?, ?, ?, ?, ?, NOW())`;
+            con.query(sql, [bookingId || null, to, body, msg.status || 'queued', msg.sid], (err) => {
+                if (err) console.error('Error logging sms:', err);
+            });
+        });
+
+        res.json({ success: true, sid: msg.sid, status: msg.status });
+    } catch (e) {
+        console.error('SMS send error:', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+// Twilio status callback webhook
+app.post('/api/twilio/sms-status', (req, res) => {
+    try {
+        const { MessageSid, MessageStatus, ErrorMessage } = req.body || {};
+        if (!MessageSid) return res.status(200).send('ok');
+        ensureSmsLogsSchema(() => {
+            const sql = `UPDATE sms_logs SET status = ?, error_message = COALESCE(?, error_message), last_event_at = NOW() WHERE sid = ?`;
+            con.query(sql, [MessageStatus || 'unknown', ErrorMessage || null, MessageSid], (err) => {
+                if (err) console.error('SMS status update error:', err);
+            });
+        });
+        res.status(200).send('ok');
+    } catch (e) {
+        console.error('SMS status webhook error:', e);
+        res.status(200).send('ok');
+    }
+});
+
+// Fetch SMS logs for a booking
+app.get('/api/bookingSms/:bookingId', (req, res) => {
+    const { bookingId } = req.params;
+    ensureSmsLogsSchema(() => {
+        const sql = `SELECT * FROM sms_logs WHERE booking_id = ? ORDER BY sent_at DESC`;
+        con.query(sql, [bookingId], (err, rows) => {
+            if (err) return res.status(500).json({ success: false, message: err.message });
+            res.json({ success: true, data: rows || [] });
+        });
+    });
+});
+
+// Quick diagnostics for Twilio env config
+app.get('/api/diagnostics/twilio', (req, res) => {
+    res.json({
+        accountSidSet: Boolean(process.env.TWILIO_ACCOUNT_SID),
+        authTokenSet: Boolean(process.env.TWILIO_AUTH_TOKEN),
+        fromNumberSet: Boolean(process.env.TWILIO_FROM_NUMBER),
+        messagingServiceSidSet: Boolean(process.env.TWILIO_MESSAGING_SERVICE_SID),
+        statusCallbackSet: Boolean(process.env.TWILIO_STATUS_CALLBACK_URL)
+    });
 });

@@ -165,6 +165,33 @@ const Settings = () => {
         sort_order: 0
     });
     
+    // Resources & Resource Groups state
+    const [resources, setResources] = useState([]);
+    const [resourceGroups, setResourceGroups] = useState([]);
+    const [resourcesExpanded, setResourcesExpanded] = useState(false);
+    const [resourceGroupsExpanded, setResourceGroupsExpanded] = useState(false);
+    const [showResourceForm, setShowResourceForm] = useState(false);
+    const [showResourceGroupForm, setShowResourceGroupForm] = useState(false);
+    const [resourceGroupFormData, setResourceGroupFormData] = useState({ name: '' });
+    const [showEditResourceGroupForm, setShowEditResourceGroupForm] = useState(false);
+    const [selectedResourceGroup, setSelectedResourceGroup] = useState(null);
+    const [resourceGroupEditFormData, setResourceGroupEditFormData] = useState({
+        name: '',
+        resource_ids: []
+    });
+    const [resourceFormData, setResourceFormData] = useState({
+        name: '',
+        resource_group_id: '',
+        experience_types: [],
+        max_uses: 1,
+        sort_order: 1,
+        color: '#0ea5e9',
+        icon: 'Generic',
+        quantity: 1
+    });
+    const [showEditResourceForm, setShowEditResourceForm] = useState(false);
+    const [selectedResource, setSelectedResource] = useState(null);
+    
     // Collapsible sections state
     const [voucherCodesExpanded, setVoucherCodesExpanded] = useState(false);
     const [experiencesExpanded, setExperiencesExpanded] = useState(false);
@@ -226,6 +253,8 @@ const Settings = () => {
         fetchTermsAndConditions();
         fetchCrewMembers();
         fetchPassengerTerms();
+        fetchResources();
+        fetchResourceGroups();
     }, []);
 
     const fetchVoucherCodes = async () => {
@@ -342,6 +371,40 @@ const Settings = () => {
         } catch (error) {
             console.error('Error fetching crew members:', error);
         }
+    };
+
+    const fetchResources = async () => {
+        try {
+            const response = await axios.get('/api/resources');
+            if (response.data?.success) {
+                setResources(response.data.data);
+                return;
+            }
+        } catch (error) {
+            console.warn('Resources API not available, using demo data');
+        }
+        // Fallback demo data (for UI only)
+        setResources([
+            { id: 1, name: 'Balloon 210', group: 'Balloon 210', max_uses: 8, sort_order: 1, color: '#0ea5e9', experience_types: ['Shared Flight'] },
+            { id: 2, name: 'Hot Air Balloon 105', group: 'Balloon 105', max_uses: 4, sort_order: 1, color: '#f97316', experience_types: ['Private Charter'] }
+        ]);
+    };
+
+    const fetchResourceGroups = async () => {
+        try {
+            const response = await axios.get('/api/resource-groups');
+            if (response.data?.success) {
+                setResourceGroups(response.data.data);
+                return;
+            }
+        } catch (error) {
+            console.warn('Resource Groups API not available, using demo data');
+        }
+        // Fallback demo data (for UI only)
+        setResourceGroups([
+            { id: 1, name: 'Balloon 210', used_by: 'Somerset Private +8 more', sort_order: 1, color: '#0ea5e9' },
+            { id: 2, name: 'Balloon 105', used_by: 'Somerset Private +5 more', sort_order: 1, color: '#f97316' }
+        ]);
     };
 
     const handleSubmit = async (e) => {
@@ -3638,6 +3701,781 @@ const Settings = () => {
                     </>
                 )}
             </div>
+
+            {/* Resources Section (under Passenger Information terms) */}
+            <div className="settings-card" style={{ marginBottom: '24px' }}>
+                <div 
+                    className="card-header"
+                    onClick={() => setResourcesExpanded(!resourcesExpanded)}
+                    style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        padding: '20px',
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                    }}
+                >
+                    <div>
+                        <h2 style={{ margin: 0, color: '#1f2937' }}>Resources</h2>
+                        <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
+                            Manage your inventory of resources, helping you assign, schedule, and share resources across activities.
+                        </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button 
+                            className="btn btn-primary"
+                            onClick={(e) => { e.stopPropagation(); setShowResourceForm(true); }}
+                            style={{ margin: 0 }}
+                        >
+                            <Plus size={20} />
+                            Create Resources
+                        </button>
+                        {resourcesExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+                    </div>
+                </div>
+
+                {resourcesExpanded && (
+                    resources.length === 0 ? (
+                        <div className="no-crew-message">
+                            <div style={{ textAlign: 'center', padding: '40px' }}>
+                                <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎈</div>
+                                <h3 style={{ color: '#6b7280', marginBottom: '8px' }}>No Resources Yet</h3>
+                                <p style={{ color: '#9ca3af', marginBottom: '20px' }}>
+                                    Create your first resource to start scheduling and assigning resources.
+                                </p>
+                                <button className="btn btn-primary" onClick={() => setShowResourceForm(true)}>
+                                    <Plus size={20} />
+                                    Create First Resource
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="resources-table-container">
+                            <table className="resources-table">
+                                <thead>
+                                    <tr>
+                                        <th>NAME</th>
+                                        <th>GROUP</th>
+                                        <th>MAX USES</th>
+                                        <th>SORT ORDER</th>
+                                        <th>ACTIONS</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {resources.map((r) => (
+                                        <tr key={r.id}>
+                                            <td>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <span style={{ width: 10, height: 10, borderRadius: 10, background: r.color || '#3b82f6', display: 'inline-block' }} />
+                                                    <span style={{ fontWeight: 500, color: '#1f2937' }}>{r.name}</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span style={{ background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: 6, fontSize: 12 }}>{r.group}</span>
+                                            </td>
+                                            <td>{r.max_uses}</td>
+                                            <td><span style={{ color: '#6b7280' }}>{r.sort_order}</span></td>
+                                            <td>
+                                                <div className="action-buttons">
+                                                    <button
+                                                        className="action-btn edit"
+                                                        title="Edit"
+                                                        onClick={() => {
+                                                            setSelectedResource(r);
+                                                            setResourceFormData({
+                                                                name: r.name,
+                                                                resource_group_id: resourceGroups.find(g => g.name === r.group)?.id || '',
+                                                                experience_types: Array.isArray(r.experience_types) ? r.experience_types : (r.experience_type ? [r.experience_type] : []),
+                                                                max_uses: r.max_uses,
+                                                                sort_order: r.sort_order,
+                                                                color: r.color || '#0ea5e9',
+                                                                icon: r.icon || 'Generic',
+                                                                quantity: 1
+                                                            });
+                                                            setShowEditResourceForm(true);
+                                                        }}
+                                                    >
+                                                        <Edit size={16} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )
+                )}
+            </div>
+
+            {/* Resource Groups Section */}
+            <div className="settings-card" style={{ marginBottom: '24px' }}>
+                <div 
+                    className="card-header"
+                    onClick={() => setResourceGroupsExpanded(!resourceGroupsExpanded)}
+                    style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        padding: '20px',
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                    }}
+                >
+                    <div>
+                        <h2 style={{ margin: 0, color: '#1f2937' }}>Resource Groups</h2>
+                        <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
+                            Organize resources into groups for easier scheduling and assignment.
+                        </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button 
+                            className="btn btn-primary"
+                            onClick={(e) => { e.stopPropagation(); setShowResourceGroupForm(true); }}
+                            style={{ margin: 0 }}
+                        >
+                            <Plus size={20} />
+                            Create Resource Group
+                        </button>
+                        {resourceGroupsExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+                    </div>
+                </div>
+
+                {resourceGroupsExpanded && (
+                    resourceGroups.length === 0 ? (
+                        <div className="no-crew-message">
+                            <div style={{ textAlign: 'center', padding: '40px' }}>
+                                <div style={{ fontSize: '48px', marginBottom: '16px' }}>🧩</div>
+                                <h3 style={{ color: '#6b7280', marginBottom: '8px' }}>No Resource Groups Yet</h3>
+                                <p style={{ color: '#9ca3af', marginBottom: '20px' }}>
+                                    Create your first resource group to categorize resources.
+                                </p>
+                                <button className="btn btn-primary" onClick={() => setShowResourceGroupForm(true)}>
+                                    <Plus size={20} />
+                                    Create First Group
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="resource-groups-table-container">
+                            <table className="resource-groups-table">
+                                <thead>
+                                    <tr>
+                                        <th>GROUP NAME</th>
+                                        <th>USED BY</th>
+                                        <th>ITEMS</th>
+                                        <th>TOTAL PAX</th>
+                                        <th>ACTIONS</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {resourceGroups.map((g) => {
+                                        const items = resources.filter(r => (r.group && r.group === g.name) || String(r.resource_group_id) === String(g.id)).length;
+                                        const totalPax = resources
+                                            .filter(r => (r.group && r.group === g.name) || String(r.resource_group_id) === String(g.id))
+                                            .reduce((sum, r) => sum + (Number(r.max_uses) || 0), 0);
+                                        return (
+                                            <tr key={g.id}>
+                                                <td>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <span style={{ width: 10, height: 10, borderRadius: 10, background: g.color || '#94a3b8', display: 'inline-block' }} />
+                                                        <span style={{ fontWeight: 500, color: '#1f2937' }}>{g.name}</span>
+                                                    </div>
+                                                </td>
+                                                <td><span style={{ color: '#475569' }}>{g.used_by || '—'}</span></td>
+                                                <td>{items}</td>
+                                                <td>{totalPax}</td>
+                                                <td>
+                                                    <div className="action-buttons">
+                                                        <button
+                                                            className="action-btn edit"
+                                                            title="Edit"
+                                                            onClick={() => {
+                                                                setSelectedResourceGroup(g);
+                                                                const selectedIds = resources
+                                                                    .filter(r => (r.group && r.group === g.name) || String(r.resource_group_id) === String(g.id))
+                                                                    .map(r => r.id);
+                                                                setResourceGroupEditFormData({ name: g.name, resource_ids: selectedIds });
+                                                                setShowEditResourceGroupForm(true);
+                                                            }}
+                                                        >
+                                                            <Edit size={16} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )
+                )}
+            </div>
+
+            {/* Create Resource Group Modal */}
+            {showResourceGroupForm && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h3>Add Resource Group</h3>
+                            <button 
+                                className="close-btn"
+                                onClick={() => setShowResourceGroupForm(false)}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div className="voucher-form" style={{ paddingTop: 16 }}>
+                            <p style={{ color: '#6b7280', marginTop: 0 }}>
+                                A resource group allows you to group your resources together, and assign the group of resources to an activity.
+                            </p>
+                            <div className="form-group">
+                                <label>Name</label>
+                                <input
+                                    type="text"
+                                    placeholder="Canoe"
+                                    value={resourceGroupFormData.name}
+                                    onChange={(e) => setResourceGroupFormData({ name: e.target.value })}
+                                />
+                            </div>
+                            <div className="form-actions" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={() => setShowResourceGroupForm(false)}
+                                >
+                                    Back
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    onClick={async () => {
+                                        const payload = { name: resourceGroupFormData.name };
+                                        let success = false;
+                                        try {
+                                            const resp = await axios.post('/api/resource-groups', payload);
+                                            success = !!resp.data?.success;
+                                        } catch (apiErr) {
+                                            console.warn('Resource Groups create API not available, mocking create');
+                                        }
+                                        if (!success) {
+                                            setResourceGroups(prev => [{ id: Date.now(), name: payload.name, used_by: '—', sort_order: 0, color: '#94a3b8' }, ...prev]);
+                                        } else {
+                                            await fetchResourceGroups();
+                                        }
+                                        setShowResourceGroupForm(false);
+                                        setResourceGroupFormData({ name: '' });
+                                    }}
+                                >
+                                    Save
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Resource Group Modal */}
+            {showEditResourceGroupForm && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h3>Edit Resource Group</h3>
+                            <button 
+                                className="close-btn"
+                                onClick={() => setShowEditResourceGroupForm(false)}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div className="voucher-form" style={{ paddingTop: 16 }}>
+                            <p style={{ color: '#6b7280', marginTop: 0 }}>
+                                A resource group allows you to group your resources together, and assign the group of resources to an activity.
+                            </p>
+                            <div className="form-group">
+                                <label>Name</label>
+                                <input
+                                    type="text"
+                                    value={resourceGroupEditFormData.name}
+                                    onChange={(e) => setResourceGroupEditFormData({ ...resourceGroupEditFormData, name: e.target.value })}
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label>Resources</label>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
+                                    {resources.map(r => (
+                                        <label key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#374151' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={resourceGroupEditFormData.resource_ids.includes(r.id)}
+                                                onChange={(e) => {
+                                                    const checked = e.target.checked;
+                                                    setResourceGroupEditFormData(prev => {
+                                                        const set = new Set(prev.resource_ids);
+                                                        if (checked) set.add(r.id); else set.delete(r.id);
+                                                        return { ...prev, resource_ids: Array.from(set) };
+                                                    });
+                                                }}
+                                            />
+                                            {r.name}
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="form-actions" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <button
+                                    type="button"
+                                    className="btn btn-danger"
+                                    onClick={async () => {
+                                        if (!selectedResourceGroup) return;
+                                        if (!window.confirm('Delete this resource group?')) return;
+                                        let success = false;
+                                        try {
+                                            const resp = await axios.delete(`/api/resource-groups/${selectedResourceGroup.id}`);
+                                            success = !!resp.data?.success;
+                                        } catch (apiErr) {
+                                            console.warn('Resource Groups delete API not available, removing locally');
+                                        }
+                                        if (!success) {
+                                            setResourceGroups(prev => prev.filter(g => g.id !== selectedResourceGroup.id));
+                                            // Also clear assignment from resources
+                                            setResources(prev => prev.map(r => ((String(r.resource_group_id) === String(selectedResourceGroup.id)) || (r.group === selectedResourceGroup.name)) ? { ...r, resource_group_id: undefined, group: '' } : r));
+                                        } else {
+                                            await fetchResourceGroups();
+                                            await fetchResources();
+                                        }
+                                        setShowEditResourceGroupForm(false);
+                                        setSelectedResourceGroup(null);
+                                    }}
+                                >
+                                    Delete
+                                </button>
+                                <div>
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        onClick={() => setShowEditResourceGroupForm(false)}
+                                    >
+                                        Back
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-primary"
+                                        onClick={async () => {
+                                            if (!selectedResourceGroup) return;
+                                            const payload = {
+                                                name: resourceGroupEditFormData.name,
+                                                resource_ids: resourceGroupEditFormData.resource_ids
+                                            };
+                                            let success = false;
+                                            try {
+                                                const resp = await axios.put(`/api/resource-groups/${selectedResourceGroup.id}`, payload);
+                                                success = !!resp.data?.success;
+                                            } catch (apiErr) {
+                                                console.warn('Resource Groups update API not available, mocking update');
+                                            }
+                                            if (!success) {
+                                                // Update groups list
+                                                setResourceGroups(prev => prev.map(g => g.id === selectedResourceGroup.id ? { ...g, name: payload.name } : g));
+                                                // Reassign resources locally
+                                                setResources(prev => prev.map(r => {
+                                                    const isSelected = payload.resource_ids.includes(r.id);
+                                                    if (isSelected) {
+                                                        return { ...r, group: payload.name, resource_group_id: selectedResourceGroup.id };
+                                                    }
+                                                    if ((String(r.resource_group_id) === String(selectedResourceGroup.id)) || (r.group === selectedResourceGroup.name)) {
+                                                        return { ...r, group: '', resource_group_id: undefined };
+                                                    }
+                                                    return r;
+                                                }));
+                                            } else {
+                                                await fetchResourceGroups();
+                                                await fetchResources();
+                                            }
+                                            setShowEditResourceGroupForm(false);
+                                            setSelectedResourceGroup(null);
+                                        }}
+                                    >
+                                        Save
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Create Resources Form Modal */}
+            {showResourceForm && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h3>Create New Resources</h3>
+                            <button 
+                                className="close-btn"
+                                onClick={() => setShowResourceForm(false)}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <form 
+                            onSubmit={async (e) => {
+                                e.preventDefault();
+                                try {
+                                    const payload = {
+                                        name: resourceFormData.name,
+                                        resource_group_id: resourceFormData.resource_group_id,
+                                        experience_types: resourceFormData.experience_types,
+                                        max_uses: Number(resourceFormData.max_uses) || 1,
+                                        sort_order: Number(resourceFormData.sort_order) || 1,
+                                        color: resourceFormData.color,
+                                        icon: resourceFormData.icon,
+                                        quantity: Number(resourceFormData.quantity) || 1
+                                    };
+                                    let success = false;
+                                    try {
+                                        const resp = await axios.post('/api/resources', payload);
+                                        success = !!resp.data?.success;
+                                    } catch (apiErr) {
+                                        console.warn('Resources create API not available, mocking create');
+                                    }
+                                    if (!success) {
+                                        // Fallback: push to UI list
+                                        const groupName = (resourceGroups.find(g => String(g.id) === String(payload.resource_group_id)) || {}).name || payload.resource_group_id;
+                                        const newItems = Array.from({ length: payload.quantity }).map((_, idx) => ({
+                                            id: `${Date.now()}-${idx}`,
+                                            name: payload.name || `Resource #${Math.floor(Math.random()*1000)}`,
+                                            group: groupName,
+                                            experience_types: payload.experience_types,
+                                            max_uses: payload.max_uses,
+                                            sort_order: payload.sort_order,
+                                            color: payload.color
+                                        }));
+                                        setResources(prev => [...newItems, ...prev]);
+                                    } else {
+                                        await fetchResources();
+                                    }
+                                    setShowResourceForm(false);
+                                    setResourceFormData({ name: '', resource_group_id: '', experience_types: [], max_uses: 1, sort_order: 1, color: '#0ea5e9', icon: 'Generic', quantity: 1 });
+                                } catch (err) {
+                                    alert('Error saving resource');
+                                }
+                            }}
+                            className="voucher-form"
+                        >
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Resource Name</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Resource #244"
+                                        value={resourceFormData.name}
+                                        onChange={(e) => setResourceFormData({ ...resourceFormData, name: e.target.value })}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Resource Group</label>
+                                    <select
+                                        value={resourceFormData.resource_group_id}
+                                        onChange={(e) => setResourceFormData({ ...resourceFormData, resource_group_id: e.target.value })}
+                                        required
+                                    >
+                                        <option value="" disabled>Select group</option>
+                                        {resourceGroups.map(g => (
+                                            <option key={g.id} value={g.id}>{g.name}</option>
+                                        ))}
+                                    </select>
+                                    <small>Assign this resource to a Resource Group</small>
+                                </div>
+                            </div>
+
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Max Uses</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={resourceFormData.max_uses}
+                                        onChange={(e) => setResourceFormData({ ...resourceFormData, max_uses: e.target.value })}
+                                    />
+                                    <small>Max number of times this resource can be used at one time.</small>
+                                </div>
+                                <div className="form-group">
+                                    <label>Sort Order</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={resourceFormData.sort_order}
+                                        onChange={(e) => setResourceFormData({ ...resourceFormData, sort_order: e.target.value })}
+                                    />
+                                    <small>Sort order to display resources on Manifest Timeline</small>
+                                </div>
+                            </div>
+
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Experience</label>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
+                                        {experienceTypes.map(opt => (
+                                            <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={resourceFormData.experience_types.includes(opt)}
+                                                    onChange={(e) => {
+                                                        const checked = e.target.checked;
+                                                        setResourceFormData(prev => {
+                                                            const set = new Set(prev.experience_types);
+                                                            if (checked) set.add(opt); else set.delete(opt);
+                                                            return { ...prev, experience_types: Array.from(set) };
+                                                        });
+                                                    }}
+                                                />
+                                                {opt}
+                                            </label>
+                                        ))}
+                                    </div>
+                                    <small>Choose which experience this resource is used for</small>
+                                </div>
+                                <div className="form-group">
+                                    <label>Display Color</label>
+                                    <input
+                                        type="color"
+                                        value={resourceFormData.color}
+                                        onChange={(e) => setResourceFormData({ ...resourceFormData, color: e.target.value })}
+                                    />
+                                    <small>The color to use when showing this resource on the manifest</small>
+                                </div>
+                                <div className="form-group">
+                                    <label>Icon</label>
+                                    <select
+                                        value={resourceFormData.icon}
+                                        onChange={(e) => setResourceFormData({ ...resourceFormData, icon: e.target.value })}
+                                    >
+                                        <option value="Generic">Generic</option>
+                                        <option value="Balloon">Balloon</option>
+                                        <option value="Vehicle">Vehicle</option>
+                                        <option value="Equipment">Equipment</option>
+                                    </select>
+                                    <small>Icon used on manifest and booking views</small>
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label>Number of Resources</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    value={resourceFormData.quantity}
+                                    onChange={(e) => setResourceFormData({ ...resourceFormData, quantity: e.target.value })}
+                                />
+                                <small>The number of resources you'd like to create.</small>
+                            </div>
+
+                            <div className="form-actions">
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowResourceForm(false)}>Cancel</button>
+                                <button type="submit" className="btn btn-primary"><Plus size={16} /> Create</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Resource Form Modal */}
+            {showEditResourceForm && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h3>Edit Resource</h3>
+                            <button 
+                                className="close-btn"
+                                onClick={() => setShowEditResourceForm(false)}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <form 
+                            onSubmit={async (e) => {
+                                e.preventDefault();
+                                if (!selectedResource) return;
+                                try {
+                                    const payload = {
+                                        name: resourceFormData.name,
+                                        resource_group_id: resourceFormData.resource_group_id,
+                                        experience_types: resourceFormData.experience_types,
+                                        max_uses: Number(resourceFormData.max_uses) || 1,
+                                        sort_order: Number(resourceFormData.sort_order) || 1,
+                                        color: resourceFormData.color,
+                                        icon: resourceFormData.icon
+                                    };
+                                    let success = false;
+                                    try {
+                                        const resp = await axios.put(`/api/resources/${selectedResource.id}`, payload);
+                                        success = !!resp.data?.success;
+                                    } catch (apiErr) {
+                                        console.warn('Resources update API not available, mocking update');
+                                    }
+                                    if (!success) {
+                                        const groupName = (resourceGroups.find(g => String(g.id) === String(payload.resource_group_id)) || {}).name || selectedResource.group;
+                                        setResources(prev => prev.map(r => r.id === selectedResource.id ? {
+                                            ...r,
+                                            name: payload.name,
+                                            group: groupName,
+                                            experience_types: payload.experience_types,
+                                            max_uses: payload.max_uses,
+                                            sort_order: payload.sort_order,
+                                            color: payload.color,
+                                            icon: payload.icon
+                                        } : r));
+                                    } else {
+                                        await fetchResources();
+                                    }
+                                    setShowEditResourceForm(false);
+                                    setSelectedResource(null);
+                                } catch (err) {
+                                    alert('Error updating resource');
+                                }
+                            }}
+                            className="voucher-form"
+                        >
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Resource Name</label>
+                                    <input
+                                        type="text"
+                                        value={resourceFormData.name}
+                                        onChange={(e) => setResourceFormData({ ...resourceFormData, name: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Display Color</label>
+                                    <input
+                                        type="color"
+                                        value={resourceFormData.color}
+                                        onChange={(e) => setResourceFormData({ ...resourceFormData, color: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Max Uses</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={resourceFormData.max_uses}
+                                        onChange={(e) => setResourceFormData({ ...resourceFormData, max_uses: e.target.value })}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Icon</label>
+                                    <select
+                                        value={resourceFormData.icon}
+                                        onChange={(e) => setResourceFormData({ ...resourceFormData, icon: e.target.value })}
+                                    >
+                                        <option value="Generic">Generic</option>
+                                        <option value="Anchor">Anchor</option>
+                                        <option value="Balloon">Balloon</option>
+                                        <option value="Vehicle">Vehicle</option>
+                                        <option value="Equipment">Equipment</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Experience</label>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
+                                        {experienceTypes.map(opt => (
+                                            <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={resourceFormData.experience_types.includes(opt)}
+                                                    onChange={(e) => {
+                                                        const checked = e.target.checked;
+                                                        setResourceFormData(prev => {
+                                                            const set = new Set(prev.experience_types);
+                                                            if (checked) set.add(opt); else set.delete(opt);
+                                                            return { ...prev, experience_types: Array.from(set) };
+                                                        });
+                                                    }}
+                                                />
+                                                {opt}
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="form-group">
+                                    <label>Resource Group</label>
+                                    <select
+                                        value={resourceFormData.resource_group_id}
+                                        onChange={(e) => setResourceFormData({ ...resourceFormData, resource_group_id: e.target.value })}
+                                    >
+                                        <option value="" disabled>Select group</option>
+                                        {resourceGroups.map(g => (
+                                            <option key={g.id} value={g.id}>{g.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label>Sort Order</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={resourceFormData.sort_order}
+                                        onChange={(e) => setResourceFormData({ ...resourceFormData, sort_order: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-actions" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <div>
+                                    <button
+                                        type="button"
+                                        className="btn btn-danger"
+                                        onClick={async () => {
+                                            if (!selectedResource) return;
+                                            if (!window.confirm('Delete this resource?')) return;
+                                            let success = false;
+                                            try {
+                                                const resp = await axios.delete(`/api/resources/${selectedResource.id}`);
+                                                success = !!resp.data?.success;
+                                            } catch (apiErr) {
+                                                console.warn('Resources delete API not available, removing locally');
+                                            }
+                                            if (!success) {
+                                                setResources(prev => prev.filter(r => r.id !== selectedResource.id));
+                                            } else {
+                                                await fetchResources();
+                                            }
+                                            setShowEditResourceForm(false);
+                                            setSelectedResource(null);
+                                        }}
+                                    >
+                                        Delete
+                                    </button>
+                                </div>
+                                <div>
+                                    <button type="button" className="btn btn-secondary" onClick={() => setShowEditResourceForm(false)}>Cancel</button>
+                                    <button type="submit" className="btn btn-primary">Save</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* Create/Edit Voucher Form Modal */}
             {(showCreateForm || showEditForm) && (
