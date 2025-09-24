@@ -775,9 +775,11 @@ const Manifest = () => {
     const handleCancelFlight = async () => {
         if (!bookingDetail?.booking?.id) return;
         try {
+            console.log('Cancel Flight - Cancelling booking:', bookingDetail.booking.id);
+            console.log('Cancel Flight - Current status:', bookingDetail.booking.status);
+            
             // Debug: Mevcut flight_attempts değerini logla
             console.log('Cancel Flight - Mevcut flight_attempts:', bookingDetail.booking.flight_attempts);
-            console.log('Cancel Flight - Mevcut status:', bookingDetail.booking.status);
             
             // flight_attempts +1
             const currentAttempts = parseInt(bookingDetail.booking.flight_attempts || 0, 10);

@@ -758,6 +758,22 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                         return res.json({ success: false, message: 'Voucher code has expired' });
                     }
                 }
+                // Also validate expiry when the code originates from booking table
+                else if (row.code_source === 'booking_voucher_code') {
+                    const now = new Date();
+                    // Prefer explicit expires; otherwise compute 24 months from created_at if available
+                    let exp = null;
+                    if (row.expires) {
+                        exp = new Date(row.expires);
+                    } else if (row.created_at) {
+                        const created = new Date(row.created_at);
+                        exp = new Date(created.getTime());
+                        exp.setMonth(exp.getMonth() + 24);
+                    }
+                    if (exp && now > exp) {
+                        return res.json({ success: false, message: 'Voucher code has expired' });
+                    }
+                }
                 // Treat as valid for redeem flow
                 return res.json({
                     success: true,
@@ -768,7 +784,8 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                         // Prefer canonical fields if available
                         experience_type: row.experience_type || null,
                         voucher_type: row.voucher_type || row.actual_voucher_type || null,
-                        expires: row.computed_expires || null,
+                        // Provide expires for both voucher and booking sourced codes
+                        expires: row.computed_expires || row.expires || null,
                         redeemed: row.redeemed || null,
                         final_amount: booking_amount
                     }
@@ -5849,6 +5866,63 @@ app.post('/api/updateBookingStatus', (req, res) => {
     });
 });
 
+// Helper function to handle flight attempts increment for voucher cancellations
+const handleFlightAttemptsIncrement = async (booking_id) => {
+    try {
+        // Find voucher_code from booking
+        const [rows] = await new Promise((resolve, reject) => {
+            con.query("SELECT voucher_code FROM all_booking WHERE id = ?", [booking_id], (err, rows) => {
+                if (err) reject(err); else resolve([rows]);
+            });
+        });
+        const voucherCode = rows && rows[0] ? rows[0].voucher_code : null;
+        if (!voucherCode) {
+            console.log('No voucher code found for booking:', booking_id);
+            return;
+        }
+        
+        console.log('Handling flight attempts increment for voucher:', voucherCode, 'booking:', booking_id);
+        
+        // Get current attempts and increment
+        const [voucherRows] = await new Promise((resolve, reject) => {
+            con.query("SELECT flight_attempts, booking_references FROM all_vouchers WHERE voucher_code = ?", [voucherCode], (err, rows) => {
+                if (err) reject(err); else resolve([rows]);
+            });
+        });
+        
+        if (voucherRows && voucherRows.length > 0) {
+            const currentAttempts = parseInt(voucherRows[0].flight_attempts || 0, 10);
+            const newAttempts = currentAttempts + 1;
+            
+            // Update booking_references to link this attempt to the specific booking
+            let bookingRefs = [];
+            try {
+                bookingRefs = voucherRows[0].booking_references ? JSON.parse(voucherRows[0].booking_references) : [];
+            } catch (e) {
+                console.warn('Failed to parse booking_references:', e);
+            }
+            
+            // Add this booking to the references
+            bookingRefs.push({
+                booking_id: booking_id,
+                cancelled_at: new Date().toISOString(),
+                attempt_number: newAttempts
+            });
+            
+            await new Promise((resolve, reject) => {
+                con.query("UPDATE all_vouchers SET flight_attempts = ?, booking_references = ? WHERE voucher_code = ?", 
+                    [newAttempts, JSON.stringify(bookingRefs), voucherCode], (err, result) => {
+                    if (err) reject(err); else resolve(result);
+                });
+            });
+            
+            console.log(`Incremented flight_attempts for voucher ${voucherCode} to ${newAttempts} due to booking ${booking_id} cancellation`);
+        }
+    } catch (e) {
+        console.error('Failed to increment flight_attempts for voucher:', e);
+    }
+};
+
 app.patch('/api/updateBookingField', (req, res) => {
     const { booking_id, field, value } = req.body;
     
@@ -5905,13 +5979,19 @@ app.patch('/api/updateBookingField', (req, res) => {
         
         console.log('updateBookingField - Database güncelleme başarılı:', { field, value, affectedRows: result.affectedRows });
         
-        // If status is updated, also insert into booking_status_history
+        // If status is updated, also insert into booking_status_history and handle flight attempts
         if (field === 'status') {
             const historySql = 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
             console.log('updateBookingField - Status history ekleniyor:', { booking_id, status: normalizedValue });
             con.query(historySql, [booking_id, normalizedValue], (err2) => {
                 if (err2) console.error('History insert error:', err2);
                 else console.log('updateBookingField - Status history başarıyla eklendi');
+                
+                // Handle flight attempts increment for voucher cancellations
+                if (normalizedValue === 'Cancelled') {
+                    handleFlightAttemptsIncrement(booking_id);
+                }
+                
                 // Do not block main response
                 res.json({ success: true });
             });
@@ -6868,7 +6948,7 @@ app.get('/api/getVoucherDetail', async (req, res) => {
     try {
         // 1. Voucher ana bilgileri
         const [voucherRows] = await new Promise((resolve, reject) => {
-            con.query('SELECT * FROM all_vouchers WHERE ' + (voucher_ref ? 'voucher_ref = ?' : 'id = ?'), [voucher_ref || id], (err, rows) => {
+            con.query('SELECT *, booking_references FROM all_vouchers WHERE ' + (voucher_ref ? 'voucher_ref = ?' : 'id = ?'), [voucher_ref || id], (err, rows) => {
                 if (err) reject(err);
                 else resolve([rows]);
             });
@@ -6878,6 +6958,19 @@ app.get('/api/getVoucherDetail', async (req, res) => {
             return res.status(200).json({ success: true, voucher: { id, voucher_ref }, booking: null, passengers: [], notes: [] });
         }
         const voucher = voucherRows[0];
+        
+        // Parse booking_references JSON if it exists
+        if (voucher.booking_references) {
+            try {
+                voucher.booking_references = JSON.parse(voucher.booking_references);
+            } catch (e) {
+                console.warn('Failed to parse booking_references for voucher:', voucher.id, e);
+                voucher.booking_references = [];
+            }
+        } else {
+            voucher.booking_references = [];
+        }
+        
         // 2. İlgili booking (varsa)
         let booking = null;
         let passengers = [];
@@ -7371,10 +7464,10 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
     try {
         // 1. Update booking status
         const updateBookingSql = "UPDATE all_booking SET status = ? WHERE id = ?";
-        // If status change indicates a cancellation or retry, also increment related voucher's flight_attempts
+        // Only increment flight_attempts when a voucher is redeemed and booking is cancelled
         const incrementAttemptsForVoucher = async () => {
             try {
-                // Find voucher_ref from booking
+                // Find voucher_code from booking
                 const [rows] = await new Promise((resolve, reject) => {
                     con.query("SELECT voucher_code FROM all_booking WHERE id = ?", [booking_id], (err, rows) => {
                         if (err) reject(err); else resolve([rows]);
@@ -7382,14 +7475,49 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
                 });
                 const voucherCode = rows && rows[0] ? rows[0].voucher_code : null;
                 if (!voucherCode) return;
-                // Increment attempts if status is Cancelled or Pending or Rescheduled etc.
-                const shouldIncrement = ['Cancelled', 'Pending', 'Rescheduled'].includes(new_status);
+                
+                // Only increment attempts if:
+                // 1. Status is being changed to 'Cancelled'
+                // 2. The voucher was redeemed (not just purchased)
+                // 3. This is a voucher-based booking
+                const shouldIncrement = new_status === 'Cancelled' && voucherCode;
                 if (!shouldIncrement) return;
-                await new Promise((resolve, reject) => {
-                    con.query("UPDATE all_vouchers SET flight_attempts = COALESCE(flight_attempts,0) + 1 WHERE voucher_ref = ?", [voucherCode], (err, result) => {
-                        if (err) reject(err); else resolve(result);
+                
+                // Get current attempts and increment
+                const [voucherRows] = await new Promise((resolve, reject) => {
+                    con.query("SELECT flight_attempts, booking_references FROM all_vouchers WHERE voucher_code = ?", [voucherCode], (err, rows) => {
+                        if (err) reject(err); else resolve([rows]);
                     });
                 });
+                
+                if (voucherRows && voucherRows.length > 0) {
+                    const currentAttempts = parseInt(voucherRows[0].flight_attempts || 0, 10);
+                    const newAttempts = currentAttempts + 1;
+                    
+                    // Update booking_references to link this attempt to the specific booking
+                    let bookingRefs = [];
+                    try {
+                        bookingRefs = voucherRows[0].booking_references ? JSON.parse(voucherRows[0].booking_references) : [];
+                    } catch (e) {
+                        console.warn('Failed to parse booking_references:', e);
+                    }
+                    
+                    // Add this booking to the references
+                    bookingRefs.push({
+                        booking_id: booking_id,
+                        cancelled_at: new Date().toISOString(),
+                        attempt_number: newAttempts
+                    });
+                    
+                    await new Promise((resolve, reject) => {
+                        con.query("UPDATE all_vouchers SET flight_attempts = ?, booking_references = ? WHERE voucher_code = ?", 
+                            [newAttempts, JSON.stringify(bookingRefs), voucherCode], (err, result) => {
+                            if (err) reject(err); else resolve(result);
+                        });
+                    });
+                    
+                    console.log(`Incremented flight_attempts for voucher ${voucherCode} to ${newAttempts} due to booking ${booking_id} cancellation`);
+                }
             } catch (e) {
                 console.error('Failed to increment flight_attempts for voucher:', e);
             }
