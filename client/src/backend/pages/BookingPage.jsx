@@ -1520,9 +1520,11 @@ setBookingDetail(finalVoucherDetail);
     const handleCancelFlight = async () => {
         if (!bookingDetail?.booking?.id) return;
         try {
+            console.log('Cancel Flight - Cancelling booking:', bookingDetail.booking.id);
+            console.log('Cancel Flight - Current status:', bookingDetail.booking.status);
+            
             // Debug: Mevcut flight_attempts değerini logla
             console.log('Cancel Flight - Mevcut flight_attempts:', bookingDetail.booking.flight_attempts);
-            console.log('Cancel Flight - Mevcut status:', bookingDetail.booking.status);
             
             // flight_attempts +1
             const currentAttempts = parseInt(bookingDetail.booking.flight_attempts || 0, 10);
@@ -1557,7 +1559,6 @@ setBookingDetail(finalVoucherDetail);
             }));
             
             // Tabloyu güncellemek için tekrar veri çek
-            // (veya setBooking ile localde güncelle)
             setBooking(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, status: 'Cancelled', flight_attempts: newAttempts } : b));
             setFilteredData(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, status: 'Cancelled', flight_attempts: newAttempts } : b));
             
@@ -2628,6 +2629,14 @@ setBookingDetail(finalVoucherDetail);
                                                         <Typography><b>Voucher ID:</b> {v.id || '-'}</Typography>
                                                         <Typography><b>Voucher Code:</b> {v.voucher_code || '-'}</Typography>
                                                         <Typography><b>Flight Attempts:</b> {v.flight_attempts ?? '-'}</Typography>
+                                                        {v.booking_references && v.booking_references.length > 0 && (
+                                                            <Typography><b>Attempt History:</b></Typography>
+                                                        )}
+                                                        {v.booking_references && v.booking_references.map((ref, idx) => (
+                                                            <Typography key={idx} style={{ marginLeft: '20px', fontSize: '0.9em' }}>
+                                                                Attempt {ref.attempt_number}: Booking #{ref.booking_id} cancelled on {new Date(ref.cancelled_at).toLocaleDateString()}
+                                                            </Typography>
+                                                        ))}
                                                     </>;
                                                 })()
                                             ) : (
