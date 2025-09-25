@@ -81,6 +81,25 @@ const Manifest = () => {
     const [rebookLoading, setRebookLoading] = useState(false);
     const [bookingHistory, setBookingHistory] = useState([]);
     
+    // Email modal state
+    const [emailModalOpen, setEmailModalOpen] = useState(false);
+    const [selectedBookingForEmail, setSelectedBookingForEmail] = useState(null);
+    const [emailForm, setEmailForm] = useState({
+        to: '',
+        subject: '',
+        message: ''
+    });
+    const [sendingEmail, setSendingEmail] = useState(false);
+    const [emailLogs, setEmailLogs] = useState([]);
+    const [emailLogsPollId, setEmailLogsPollId] = useState(null);
+
+    // SMS state
+    const [smsModalOpen, setSmsModalOpen] = useState(false);
+    const [smsForm, setSmsForm] = useState({ to: '', message: '' });
+    const [smsSending, setSmsSending] = useState(false);
+    const [smsLogs, setSmsLogs] = useState([]);
+    const [smsPollId, setSmsPollId] = useState(null);
+    
     // Additional information state
     const [additionalInformation, setAdditionalInformation] = useState(null);
     const [additionalInfoLoading, setAdditionalInfoLoading] = useState(false);
@@ -157,6 +176,115 @@ const Manifest = () => {
     };
     const handleConfirmCancelClose = () => {
       setConfirmCancelOpen(false);
+    };
+
+    // Email handlers
+    const handleEmailClick = (booking) => {
+        setSelectedBookingForEmail(booking);
+        setEmailForm({
+            to: booking.email || '',
+            subject: '',
+            message: ''
+        });
+        setEmailModalOpen(true);
+        
+        // Fetch email logs
+        (async () => {
+            try {
+                const resp = await axios.get(`/api/bookingEmails/${booking.id}`);
+                setEmailLogs(resp.data?.data || []);
+            } catch (err) {
+                console.error('Error fetching email logs:', err);
+            }
+        })();
+    };
+
+    const handleSendEmail = async () => {
+        if (!emailForm.to || !emailForm.subject || !emailForm.message) {
+            alert('Please fill all fields');
+            return;
+        }
+        
+        setSendingEmail(true);
+        try {
+            const response = await axios.post('/api/sendBookingEmail', {
+                bookingId: selectedBookingForEmail?.id,
+                to: emailForm.to,
+                subject: emailForm.subject,
+                message: emailForm.message,
+                template: 'custom',
+                bookingData: selectedBookingForEmail
+            });
+            
+            if (response.data?.success) {
+                alert('Email sent successfully!');
+                setEmailModalOpen(false);
+                // Refresh email logs by booking id for sync
+                if (selectedBookingForEmail?.id) {
+                    try {
+                        const resp = await axios.get(`/api/bookingEmails/${selectedBookingForEmail.id}`);
+                        setEmailLogs(resp.data?.data || []);
+                    } catch {}
+                }
+            } else {
+                alert('Failed to send email: ' + (response.data?.message || 'Unknown error'));
+            }
+        } catch (err) {
+            alert('Failed to send email: ' + (err?.response?.data?.message || err.message));
+        } finally {
+            setSendingEmail(false);
+        }
+    };
+
+    // SMS handlers
+    const handleSmsClick = (booking) => {
+        setSelectedBookingForEmail(booking);
+        setSmsForm({ to: booking.phone || '', message: '' });
+        setSmsModalOpen(true);
+        
+        // Fetch SMS logs
+        (async () => {
+            try {
+                const resp = await axios.get(`/api/bookingSms/${booking.id}`);
+                setSmsLogs(resp.data?.data || []);
+            } catch (err) {
+                console.error('Error fetching SMS logs:', err);
+            }
+        })();
+    };
+
+    const handleSendSms = async () => {
+        if (!smsForm.to || !smsForm.message) {
+            alert('Please fill phone and message');
+            return;
+        }
+        
+        setSmsSending(true);
+        try {
+            const resp = await axios.post('/api/sendBookingSms', {
+                bookingId: selectedBookingForEmail?.id,
+                to: smsForm.to,
+                body: smsForm.message
+            });
+            
+            if (resp.data?.success) {
+                alert('SMS sent successfully!');
+                setSmsModalOpen(false);
+                // Refresh SMS logs by booking id for sync
+                if (selectedBookingForEmail?.id) {
+                    try {
+                        const r = await axios.get(`/api/bookingSms/${selectedBookingForEmail.id}`);
+                        setSmsLogs(r.data?.data || []);
+                    } catch {}
+                }
+            } else {
+                alert('Failed to send SMS: ' + (resp.data?.message || 'Unknown error'));
+            }
+        } catch (err) {
+            alert('Failed to send SMS: ' + (err?.response?.data?.message || err.message));
+        } finally {
+            setSmsSending(false);
+        }
     };
 
     const booking = useMemo(() => Array.isArray(bookingHook.booking) ? bookingHook.booking : [], [bookingHook.booking]);
@@ -2037,6 +2165,7 @@ const Manifest = () => {
                                                         <TableCell>Add On's</TableCell>
                                                         <TableCell>Notes</TableCell>
                                                         <TableCell>Status</TableCell>
+                                                        <TableCell>Actions</TableCell>
                                                     </TableRow>
                                                 </TableHead>
                                                 <TableBody>
@@ -2135,12 +2264,48 @@ const Manifest = () => {
                                                                         <MenuItem value="No Show">❌ No Show</MenuItem>
                                                                     </Select>
                                                                 </TableCell>
+                                                                <TableCell>
+                                                                    <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                                                                        <button
+                                                                            onClick={() => handleEmailClick(flight)}
+                                                                            style={{
+                                                                                padding: "4px 8px",
+                                                                                backgroundColor: "#28a745",
+                                                                                color: "white",
+                                                                                border: "none",
+                                                                                borderRadius: "4px",
+                                                                                cursor: "pointer",
+                                                                                fontSize: "12px",
+                                                                                fontWeight: "500"
+                                                                            }}
+                                                                            title="Send Email"
+                                                                        >
+                                                                            📧 Email
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleSmsClick(flight)}
+                                                                            style={{
+                                                                                padding: "4px 8px",
+                                                                                backgroundColor: "#17a2b8",
+                                                                                color: "white",
+                                                                                border: "none",
+                                                                                borderRadius: "4px",
+                                                                                cursor: "pointer",
+                                                                                fontSize: "12px",
+                                                                                fontWeight: "500"
+                                                                            }}
+                                                                            title="Send SMS"
+                                                                        >
+                                                                            📱 SMS
+                                                                        </button>
+                                                                    </div>
+                                                                </TableCell>
                                                             </TableRow>
                                                         );
                                                     })}
                                                     {/* Move the summary row here, inside TableBody */}
                                                     <TableRow>
-                                                        <TableCell colSpan={10} style={{ textAlign: 'right', fontWeight: 600, background: '#f5f5f5' }}>
+                                                        <TableCell colSpan={11} style={{ textAlign: 'right', fontWeight: 600, background: '#f5f5f5' }}>
                                                                                                             Total Price: £{groupFlights.reduce((sum, f) => sum + (parseFloat(f.paid) || 0), 0)} &nbsp;&nbsp;|
                                                 Total Weight: {totalWeightDisplay} kg &nbsp;&nbsp;|
                                                 Total Pax: {passengerCountDisplay}
@@ -2804,6 +2969,162 @@ const Manifest = () => {
                   {confirmCancelLoading ? 'Cancelling...' : 'Yes, Cancel All'}
                 </Button>
               </DialogActions>
+            </Dialog>
+
+            {/* Email Modal */}
+            <Dialog 
+                open={emailModalOpen} 
+                onClose={() => setEmailModalOpen(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>
+                    Send Email to Customer
+                    {selectedBookingForEmail && (
+                        <Typography variant="subtitle2" color="textSecondary">
+                            Booking: {selectedBookingForEmail.name} ({selectedBookingForEmail.id})
+                        </Typography>
+                    )}
+                </DialogTitle>
+                <DialogContent>
+                    <Grid container spacing={2}>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                label="To"
+                                value={emailForm.to}
+                                onChange={(e) => setEmailForm(prev => ({ ...prev, to: e.target.value }))}
+                                margin="normal"
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                label="Subject"
+                                value={emailForm.subject}
+                                onChange={(e) => setEmailForm(prev => ({ ...prev, subject: e.target.value }))}
+                                margin="normal"
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                label="Message"
+                                multiline
+                                rows={4}
+                                value={emailForm.message}
+                                onChange={(e) => setEmailForm(prev => ({ ...prev, message: e.target.value }))}
+                                margin="normal"
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>Email History</Typography>
+                            {emailLogs.length === 0 ? (
+                                <Typography variant="body2">No emails sent yet.</Typography>
+                            ) : (
+                                <Table size="small">
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell>Date</TableCell>
+                                            <TableCell>To</TableCell>
+                                            <TableCell>Subject</TableCell>
+                                            <TableCell>Status</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {emailLogs.map((log) => (
+                                            <TableRow key={log.id}>
+                                                <TableCell>{(() => { try { return dayjs(log.sent_at).format('DD/MM/YYYY HH:mm'); } catch { return String(log.sent_at || ''); } })()}</TableCell>
+                                                <TableCell>{log.to_email}</TableCell>
+                                                <TableCell>{log.subject}</TableCell>
+                                                <TableCell>{log.status}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </Grid>
+                    </Grid>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setEmailModalOpen(false)}>
+                        Cancel
+                    </Button>
+                    <Button 
+                        onClick={handleSendEmail}
+                        variant="contained"
+                        disabled={sendingEmail || !emailForm.to || !emailForm.subject || !emailForm.message}
+                    >
+                        {sendingEmail ? 'Sending...' : 'Send Email'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* SMS Modal */}
+            <Dialog open={smsModalOpen} onClose={() => setSmsModalOpen(false)} maxWidth="sm" fullWidth>
+                <DialogTitle>
+                    Send SMS to Customer
+                    {selectedBookingForEmail && (
+                        <Typography variant="subtitle2" color="textSecondary">
+                            Booking: {selectedBookingForEmail.name} ({selectedBookingForEmail.id})
+                        </Typography>
+                    )}
+                </DialogTitle>
+                <DialogContent>
+                    <Grid container spacing={2}>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                label="To"
+                                value={smsForm.to}
+                                onChange={(e) => setSmsForm(prev => ({ ...prev, to: e.target.value }))}
+                                margin="normal"
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                label="Message"
+                                multiline
+                                rows={4}
+                                value={smsForm.message}
+                                onChange={(e) => setSmsForm(prev => ({ ...prev, message: e.target.value }))}
+                                margin="normal"
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>SMS History</Typography>
+                            {smsLogs.length === 0 ? (
+                                <Typography variant="body2">No SMS sent yet.</Typography>
+                            ) : (
+                                <Table size="small">
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell>Date</TableCell>
+                                            <TableCell>To</TableCell>
+                                            <TableCell>Status</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {smsLogs.map((log) => (
+                                            <TableRow key={log.id}>
+                                                <TableCell>{(() => { try { return dayjs(log.sent_at).format('DD/MM/YYYY HH:mm'); } catch { return String(log.sent_at || ''); } })()}</TableCell>
+                                                <TableCell>{log.to_number}</TableCell>
+                                                <TableCell>{log.status}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </Grid>
+                    </Grid>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setSmsModalOpen(false)}>Cancel</Button>
+                    <Button onClick={handleSendSms} variant="contained" disabled={smsSending || !smsForm.to || !smsForm.message}>
+                        {smsSending ? 'Sending...' : 'Send SMS'}
+                    </Button>
+                </DialogActions>
             </Dialog>
         </div>
     );
