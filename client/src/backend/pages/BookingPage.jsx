@@ -1997,7 +1997,7 @@ setBookingDetail(finalVoucherDetail);
 
     return (
         <div className="booking-page-wrap">
-            <Container maxWidth="xl">
+            <Container maxWidth={false}>
                 <div className="heading-wrap">
                     <h2>
                         BOOKING PAGE
@@ -2620,11 +2620,29 @@ setBookingDetail(finalVoucherDetail);
                                                                 <IconButton size="small" onClick={() => handleEditClick('paid', v.paid)}><EditIcon fontSize="small" /></IconButton>
                                                             </>
                                                         )}</Typography>
-                                                        <Typography><b>Expires:</b> {bookingDetail.voucher.expires ? (
-                                                            dayjs(bookingDetail.voucher.expires).isValid() ? 
-                                                                dayjs(bookingDetail.voucher.expires).format('DD/MM/YYYY') : 
-                                                                bookingDetail.voucher.expires
-                                                        ) : '-'}</Typography>
+                                                        <Typography><b>Expires:</b> {editField === 'expires' ? (
+                                                            <>
+                                                                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                                                                    <DatePicker
+                                                                        value={editValue ? dayjs(editValue) : (bookingDetail.voucher.expires ? dayjs(bookingDetail.voucher.expires) : null)}
+                                                                        onChange={date => setEditValue(date ? date.format('YYYY-MM-DD') : '')}
+                                                                        format="DD/MM/YYYY"
+                                                                        slotProps={{ textField: { size: 'small' } }}
+                                                                    />
+                                                                </LocalizationProvider>
+                                                                <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                                <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                {bookingDetail.voucher.expires ? (
+                                                                    dayjs(bookingDetail.voucher.expires).isValid() ? 
+                                                                        dayjs(bookingDetail.voucher.expires).format('DD/MM/YYYY') : 
+                                                                        bookingDetail.voucher.expires
+                                                                ) : '-'}
+                                                                <IconButton size="small" onClick={() => handleEditClick('expires', bookingDetail.voucher.expires)}><EditIcon fontSize="small" /></IconButton>
+                                                            </>
+                                                        )}</Typography>
                                                         {/* Weight field moved to Passenger Details section */}
                                                         <Typography><b>Voucher ID:</b> {v.id || '-'}</Typography>
                                                         <Typography><b>Voucher Code:</b> {v.voucher_code || '-'}</Typography>

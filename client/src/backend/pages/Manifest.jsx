@@ -1662,7 +1662,7 @@ const Manifest = () => {
 
     return (
         <div className="final-menifest-wrap">
-            <Container maxWidth="xl">
+            <Container maxWidth={false}>
                 <div className="heading-wrap">
                     <h2>MANIFEST PAGE</h2>
                     <hr />
