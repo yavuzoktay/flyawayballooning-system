@@ -135,6 +135,25 @@ const BookingPage = () => {
     const [smsLogsLoading, setSmsLogsLoading] = useState(false);
     const [smsPollId, setSmsPollId] = useState(null);
 
+    // Normalize UK phone numbers to +44 format for SMS
+    const normalizeUkPhone = (raw) => {
+        if (!raw) return '';
+        let s = String(raw).trim();
+        // Replace whitespace, dashes, parentheses
+        s = s.replace(/[\s\-()]/g, '');
+        // Convert leading 00 to +
+        if (s.startsWith('00')) s = '+' + s.slice(2);
+        // If already E.164
+        if (s.startsWith('+')) return s;
+        // If leading 0 assume UK national format
+        if (s.startsWith('0')) {
+            return '+44' + s.slice(1);
+        }
+        // If 10-11 digits and likely UK mobile (starts with 7)
+        if (/^7\d{8,9}$/.test(s)) return '+44' + s;
+        return s; // fallback - leave as is
+    };
+
     // Email handlers
     const handleEmailClick = (booking) => {
         setSelectedBookingForEmail(booking);
@@ -1949,7 +1968,7 @@ setBookingDetail(finalVoucherDetail);
 
     const handleSmsClick = (booking) => {
         setSelectedBookingForEmail(booking); // reuse selected booking
-        setSmsForm({ to: booking.phone || '', message: '' });
+        setSmsForm({ to: normalizeUkPhone(booking.phone || ''), message: '' });
         setSmsModalOpen(true);
         // Load sms logs
         (async () => {
