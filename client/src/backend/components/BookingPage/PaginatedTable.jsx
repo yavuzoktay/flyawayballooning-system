@@ -299,6 +299,7 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                 </div>
             )}
             
+            <div style={{ width: '100%', overflowX: 'auto' }}>
             <table border="1" style={{ width: "100%", background: "#FFF", marginTop: "10px", borderCollapse: "collapse", tableLayout: "fixed" }}>
                 <colgroup>
                     {selectable && <col style={{ width: '40px', minWidth: '40px', maxWidth: '40px' }} />}
@@ -325,7 +326,7 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                         );
                     })}
                     {/* Actions column for bookings/vouchers */}
-                    {(context === 'bookings' || context === 'vouchers') && onEmailClick && <col style={{ width: '160px', minWidth: '160px' }} />}
+                    {(context === 'bookings' || context === 'vouchers') && onEmailClick && <col style={{ width: '120px', minWidth: '120px' }} />}
                 </colgroup>
                 <thead style={{ background: "#3274b4", color: "#FFF" }}>
                     <tr>
@@ -532,18 +533,19 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                                 {/* Actions column for bookings/vouchers */}
                                 {(context === 'bookings' || context === 'vouchers') && onEmailClick && (
                                     <td style={{ textAlign: "center", padding: "8px" }}>
-                                        <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
                                             <button
                                                 onClick={() => onEmailClick(item)}
                                                 style={{
-                                                    padding: "4px 8px",
+                                                    padding: "3px 6px",
                                                     backgroundColor: "#28a745",
                                                     color: "white",
                                                     border: "none",
                                                     borderRadius: "4px",
                                                     cursor: "pointer",
-                                                    fontSize: "12px",
-                                                    fontWeight: "500"
+                                                    fontSize: "11px",
+                                                    fontWeight: "500",
+                                                    lineHeight: 1
                                                 }}
                                                 title="Send Email"
                                             >
@@ -553,14 +555,15 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                                                 <button
                                                     onClick={() => onSmsClick(item)}
                                                     style={{
-                                                        padding: "4px 8px",
+                                                        padding: "3px 6px",
                                                         backgroundColor: "#17a2b8",
                                                         color: "white",
                                                         border: "none",
                                                         borderRadius: "4px",
                                                         cursor: "pointer",
-                                                        fontSize: "12px",
-                                                        fontWeight: "500"
+                                                        fontSize: "11px",
+                                                        fontWeight: "500",
+                                                        lineHeight: 1
                                                     }}
                                                     title="Send SMS"
                                                 >
@@ -575,6 +578,7 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                     })}
                 </tbody>
             </table>
+            </div>
 
             {/* Pagination Controls */}
             <div style={{ marginTop: "10px", textAlign: "center", display: 'flex', justifyContent: 'center', gap: 6, flexWrap: 'wrap' }}>
