@@ -236,10 +236,21 @@ const Manifest = () => {
         }
     };
 
+    // Normalize UK phone numbers to +44 format
+    const normalizeUkPhone = (raw) => {
+        if (!raw) return '';
+        let s = String(raw).trim().replace(/[\s\-()]/g, '');
+        if (s.startsWith('00')) s = '+' + s.slice(2);
+        if (s.startsWith('+')) return s;
+        if (s.startsWith('0')) return '+44' + s.slice(1);
+        if (/^7\d{8,9}$/.test(s)) return '+44' + s;
+        return s;
+    };
+
     // SMS handlers
     const handleSmsClick = (booking) => {
         setSelectedBookingForEmail(booking);
-        setSmsForm({ to: booking.phone || '', message: '' });
+        setSmsForm({ to: normalizeUkPhone(booking.phone || ''), message: '' });
         setSmsModalOpen(true);
         
         // Fetch SMS logs
