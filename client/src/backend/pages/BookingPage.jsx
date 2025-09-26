@@ -2083,7 +2083,7 @@ setBookingDetail(finalVoucherDetail);
                                     </div>
                                     <div className="booking-filter-wrap">
                                         <div className="booking-filter-field">
-                                            <FormControl sx={{ m: 1, minWidth: 120 }} size="small" className="booking-filter-field">
+                                            <FormControl sx={{ m: 1, minWidth: 160 }} size="small" className="booking-filter-field">
                                                 <InputLabel id="book-flight-type-label">Experience</InputLabel>
                                                 <Select
                                                     labelId="book-flight-type-label"
@@ -2100,7 +2100,7 @@ setBookingDetail(finalVoucherDetail);
                                             </FormControl>
                                         </div>
                                         <div className="booking-filter-field">
-                                            <FormControl sx={{ m: 1, minWidth: 120 }} size="small">
+                                            <FormControl sx={{ m: 1, minWidth: 160 }} size="small">
                                                 <InputLabel id="book-Select-label">Status</InputLabel>
                                                 <Select
                                                     labelId="book-Select-label"
@@ -2121,7 +2121,7 @@ setBookingDetail(finalVoucherDetail);
                                             </FormControl>
                                         </div>
                                         <div className="booking-filter-field">
-                                            <FormControl sx={{ m: 1, minWidth: 120 }} size="small">
+                                            <FormControl sx={{ m: 1, minWidth: 180 }} size="small">
                                                 <InputLabel id="book-voucher-type-label">Voucher Type</InputLabel>
                                                 <Select
                                                     labelId="book-voucher-type-label"
@@ -2139,7 +2139,7 @@ setBookingDetail(finalVoucherDetail);
                                             </FormControl>
                                         </div>
                                         <div className="booking-filter-field">
-                                            <FormControl sx={{ m: 1, minWidth: 120 }} size="small">
+                                            <FormControl sx={{ m: 1, minWidth: 160 }} size="small">
                                                 <InputLabel id="book-location-label">Location</InputLabel>
                                                 <Select
                                                     labelId="book-location-label"
@@ -2262,7 +2262,7 @@ setBookingDetail(finalVoucherDetail);
                                     </div>
                                     <div className="booking-filter-wrap">
                                         <div className="booking-filter-field">
-                                            <FormControl sx={{ m: 1, minWidth: 120 }} size="small">
+                                            <FormControl sx={{ m: 1, minWidth: 160 }} size="small">
                                                 <InputLabel id="book-voucher-type-label">Book Flight</InputLabel>
                                                 <Select
                                                     labelId="book-voucher-type-label"
@@ -2279,7 +2279,7 @@ setBookingDetail(finalVoucherDetail);
                                             </FormControl>
                                         </div>
                                         <div className="booking-filter-field">
-                                            <FormControl sx={{ m: 1, minWidth: 120 }} size="small">
+                                            <FormControl sx={{ m: 1, minWidth: 160 }} size="small">
                                                 <InputLabel id="book-flight-type-label">Experience</InputLabel>
                                                 <Select
                                                     labelId="book-flight-type-label"
@@ -2296,7 +2296,7 @@ setBookingDetail(finalVoucherDetail);
                                             </FormControl>
                                         </div>
                                         <div className="booking-filter-field">
-                                            <FormControl sx={{ m: 1, minWidth: 120 }} size="small">
+                                            <FormControl sx={{ m: 1, minWidth: 180 }} size="small">
                                                 <InputLabel id="book-actual-voucher-type-label">Voucher Type</InputLabel>
                                                 <Select
                                                     labelId="book-actual-voucher-type-label"
@@ -2314,7 +2314,7 @@ setBookingDetail(finalVoucherDetail);
                                             </FormControl>
                                         </div>
                                         <div className="booking-filter-field">
-                                            <FormControl sx={{ m: 1, minWidth: 120 }} size="small">
+                                            <FormControl sx={{ m: 1, minWidth: 160 }} size="small">
                                                 <InputLabel id="book-redeemed-status-label">Redeemed Status</InputLabel>
                                                 <Select
                                                     labelId="book-redeemed-status-label"
