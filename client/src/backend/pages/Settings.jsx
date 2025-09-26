@@ -1582,7 +1582,7 @@ const Settings = () => {
                                     e.stopPropagation();
                                     setShowCreateForm(true);
                                 }}
-                                style={{ margin: 0 }}
+                                style={{ margin: 0, minWidth: 260 }}
                             >
                                 <Plus size={20} />
                                 Create Voucher Code
@@ -1866,7 +1866,7 @@ const Settings = () => {
                                     e.stopPropagation();
                                     setShowExperiencesForm(true);
                                 }}
-                                style={{ margin: 0 }}
+                                style={{ margin: 0, minWidth: 260 }}
                             >
                                 <Plus size={20} />
                                 Create Experience
@@ -2033,7 +2033,7 @@ const Settings = () => {
                                 e.stopPropagation();
                                 setShowAddToBookingForm(true);
                             }}
-                            style={{ margin: 0 }}
+                            style={{ margin: 0, minWidth: 260 }}
                         >
                             <Plus size={20} />
                             Create Item
