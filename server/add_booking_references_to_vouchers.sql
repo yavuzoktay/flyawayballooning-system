@@ -18,3 +18,5 @@ COMMENT 'JSON array storing booking references for each flight attempt';
 --     "attempt_number": 2
 --   }
 -- ]
+
+
