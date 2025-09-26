@@ -49,7 +49,7 @@ const Header = () => {
     <AppBar position="sticky">
       <Container maxWidth="xl">
         <Toolbar>
-          <Grid container alignItems="center" justifyContent="space-between">
+          <Grid container alignItems="center" justifyContent="center">
             {/* Right: Menu Items */}
             {isMobile ? (
               <Grid item>
@@ -76,7 +76,7 @@ const Header = () => {
             ) : (
               <Grid item>
                 <div className="header-nav-wrap">
-                  <Box display="flex">
+                  <Box display="flex" justifyContent="center" alignItems="center">
                     {menuItems.map((item, index) => (
                       <MenuItem
                         key={index}
