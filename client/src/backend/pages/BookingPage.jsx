@@ -2079,7 +2079,7 @@ setBookingDetail(finalVoucherDetail);
                                             Export
                                         </Button>
                                         <OutlinedInput placeholder="Search by name, email, phone, location..." value={filters.search}
-                                            onChange={(e) => handleFilterChange("search", e.target.value)} />
+                                            onChange={(e) => handleFilterChange("search", e.target.value)} sx={{ fontSize: 14, '& input::placeholder': { fontSize: 14 } }} />
                                     </div>
                                     <div className="booking-filter-wrap">
                                         <div className="booking-filter-field">
@@ -2258,7 +2258,7 @@ setBookingDetail(finalVoucherDetail);
                                             Export
                                         </Button>
                                         <OutlinedInput placeholder="Search by name, email, phone, voucher ref, offer code..." value={filters.search}
-                                            onChange={(e) => handleFilterChange("search", e.target.value)} />
+                                            onChange={(e) => handleFilterChange("search", e.target.value)} sx={{ fontSize: 14, '& input::placeholder': { fontSize: 14 } }} />
                                     </div>
                                     <div className="booking-filter-wrap">
                                         <div className="booking-filter-field">
