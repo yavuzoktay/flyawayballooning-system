@@ -1926,11 +1926,11 @@ const Settings = () => {
                                     <table className="experiences-table">
                                         <thead>
                                             <tr>
-                                                <th>TITLE</th>
-                                                <th>DESCRIPTION</th>
-                                                <th>MAX PASSENGERS</th>
-                                                <th>STATUS</th>
-                                                <th>ACTIONS</th>
+                                                <th style={{ textAlign: 'center' }}>TITLE</th>
+                                                <th style={{ textAlign: 'center' }}>DESCRIPTION</th>
+                                                <th style={{ textAlign: 'center' }}>MAX PASSENGERS</th>
+                                                <th style={{ textAlign: 'center' }}>STATUS</th>
+                                                <th style={{ textAlign: 'center' }}>ACTIONS</th>
                                             </tr>
                                         </thead>
                                         <tbody>
