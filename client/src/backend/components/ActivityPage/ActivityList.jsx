@@ -11,7 +11,8 @@ import DialogActions from '@mui/material/DialogActions';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
 import dayjs from 'dayjs';
-import EditIcon from '@mui/icons-material/Edit';
+import EditIcon from '@mui/icons-material/EditOutlined';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHighOutlined';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { Checkbox, FormControlLabel, FormGroup } from '@mui/material';
 import CreateAvailabilitiesModal from './CreateAvailabilitiesModal';
@@ -731,14 +732,14 @@ const ActivityList = ({ activity }) => {
                                     </Link>
                                 </TableCell>
                                 <TableCell>
-                                    <EditIcon
+                                    <AutoFixHighIcon
                                         titleAccess="Edit Availabilities"
                                         style={{ cursor: 'pointer' }}
                                         onClick={() => navigate(`/activity/${item.id}/availabilities`)}
                                     />
                                 </TableCell>
                                 <TableCell>
-                                    <EditIcon style={{ cursor: 'pointer' }} onClick={() => alert(`Resources for activity: ${item.activity_name}`)} />
+                                    <AutoFixHighIcon style={{ cursor: 'pointer' }} onClick={() => alert(`Resources for activity: ${item.activity_name}`)} />
                                 </TableCell>
                             </TableRow>
                         ))}
