@@ -1866,7 +1866,7 @@ const Settings = () => {
                                     e.stopPropagation();
                                     setShowExperiencesForm(true);
                                 }}
-                                style={{ margin: 0, minWidth: 260 }}
+                                style={{ margin: 0}}
                             >
                                 <Plus size={20} />
                                 Create Experience
@@ -2033,7 +2033,7 @@ const Settings = () => {
                                 e.stopPropagation();
                                 setShowAddToBookingForm(true);
                             }}
-                            style={{ margin: 0, minWidth: 260 }}
+                            style={{ margin: 0}}
                         >
                             <Plus size={20} />
                             Create Item
