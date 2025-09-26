@@ -1,6 +1,6 @@
 import { Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from "@mui/material";
 import React, { useState, useEffect } from "react";
-import EditNoteIcon from '@mui/icons-material/EditNote';
+import ModeEditOutlineOutlinedIcon from '@mui/icons-material/ModeEditOutlineOutlined';
 import {Link, useNavigate} from 'react-router-dom';
 import Button from '@mui/material/Button';
 import AddIcon from '@mui/icons-material/Add';
@@ -728,7 +728,7 @@ const ActivityList = ({ activity }) => {
                                 <TableCell>{item?.status || 'Live'}</TableCell>
                                 <TableCell>
                                     <Link to="#" className="edit-activity" onClick={() => openEditModal(item.id)}>
-                                        <EditNoteIcon />
+                                        <ModeEditOutlineOutlinedIcon />
                                     </Link>
                                 </TableCell>
                                 <TableCell>
