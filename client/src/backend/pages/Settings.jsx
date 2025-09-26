@@ -1694,18 +1694,18 @@ const Settings = () => {
                                                     </div>
                                                 </div>
                                                 
-                                                <table className="voucher-codes-table">
-                                                    <thead>
-                                                        <tr>
-                                                            <th>CODE</th>
-                                                            <th>TITLE</th>
-                                                            <th>VALID FROM</th>
-                                                            <th>VALID UNTIL</th>
-                                                            <th>MAX USES</th>
-                                                            <th>STATUS</th>
-                                                            <th>ACTIONS</th>
-                                                        </tr>
-                                                    </thead>
+                                               <table className="voucher-codes-table">
+                                                   <thead>
+                                                       <tr>
+                                                           <th style={{ textAlign: 'center' }}>CODE</th>
+                                                           <th style={{ textAlign: 'center' }}>TITLE</th>
+                                                           <th style={{ textAlign: 'center' }}>VALID FROM</th>
+                                                           <th style={{ textAlign: 'center' }}>VALID UNTIL</th>
+                                                           <th style={{ textAlign: 'center' }}>MAX USES</th>
+                                                           <th style={{ textAlign: 'center' }}>STATUS</th>
+                                                           <th style={{ textAlign: 'center' }}>ACTIONS</th>
+                                                       </tr>
+                                                   </thead>
                                                     <tbody>
                                                         {voucherCodes.map((voucher) => (
                                                             <tr key={voucher.id}>
