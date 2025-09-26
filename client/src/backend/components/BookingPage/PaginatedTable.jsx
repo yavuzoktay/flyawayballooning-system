@@ -309,6 +309,7 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                             <col key={id} style={{ 
                                 width: id === 'email' ? '240px' : 
                                        id === 'name' ? '180px' : 
+                                       id === 'voucher_code' ? '120px' :
                                        id === 'status' ? '120px' : 
                                        id === 'voucher_type' ? '140px' :
                                        id === 'passenger_info' ? '200px' :
@@ -316,6 +317,7 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                                        'auto', 
                                 minWidth: id === 'email' ? '240px' : 
                                          id === 'name' ? '180px' : 
+                                         id === 'voucher_code' ? '120px' :
                                          id === 'status' ? '120px' : 
                                          id === 'voucher_type' ? '140px' :
                                          id === 'passenger_info' ? '200px' :
@@ -362,7 +364,7 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                                                 {columns.map((col) => {
                                                     const id = getColId(col);
                                                     return (
-                                                        <td key={id} style={{ textAlign: "center", padding: "8px", wordBreak: "break-all", overflowWrap: "break-word" }}>
+                                                        <td key={id} style={{ textAlign: "center", padding: "8px", wordBreak: id === 'voucher_code' ? 'normal' : 'break-all', overflowWrap: id === 'voucher_code' ? 'normal' : 'break-word', whiteSpace: id === 'voucher_code' ? 'nowrap' : 'normal' }}>
                                                             {id === 'name' ? (
                                                                 selectable ? (
                                                                     <span>{item[id]}</span>
