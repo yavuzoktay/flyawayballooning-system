@@ -50,22 +50,6 @@ const Header = () => {
       <Container maxWidth="xl">
         <Toolbar>
           <Grid container alignItems="center" justifyContent="space-between">
-            {/* Left: Search Bar */}
-            <Grid item>
-              <Box
-                display="flex"
-                alignItems="center"
-                sx={{
-                  backgroundColor: 'white',
-                  borderRadius: 1,
-                  padding: '5px 10px',
-                }}
-              >
-                <SearchIcon />
-                <InputBase placeholder="Search…" sx={{ marginLeft: 1 }} />
-              </Box>
-            </Grid>
-
             {/* Right: Menu Items */}
             {isMobile ? (
               <Grid item>
