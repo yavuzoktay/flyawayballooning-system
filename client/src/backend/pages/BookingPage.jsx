@@ -2865,9 +2865,17 @@ setBookingDetail(finalVoucherDetail);
     </a>
   ) : '-'}</Typography>
 )}
-                                                    <Typography>
-                                                        <b>Redeemed Voucher:</b> {bookingDetail.booking?.voucher_code ? <span style={{ color: 'green', fontWeight: 600 }}>Yes</span> : <span style={{ color: 'red', fontWeight: 600 }}>No</span>} <span style={{ fontWeight: 500 }}>{bookingDetail.booking?.voucher_code || ''}</span>
-                                                    </Typography>
+                                                    {(() => {
+                                                        // Consider voucher redeemed ONLY if explicit redeemed flag is present
+                                                        const b = bookingDetail.booking || {};
+                                                        const v = bookingDetail.voucher || {};
+                                                        const redeemed = (b.redeemed === true) || (b.voucher_redeemed === 1) || (typeof b.redeemed_at === 'string' && b.redeemed_at) || (v.redeemed === 'Yes' || v.redeemed === true);
+                                                        return (
+                                                            <Typography>
+                                                                <b>Redeemed Voucher:</b> {redeemed ? <span style={{ color: 'green', fontWeight: 600 }}>Yes</span> : <span style={{ color: 'red', fontWeight: 600 }}>No</span>} <span style={{ fontWeight: 500 }}>{b.voucher_code || ''}</span>
+                                                            </Typography>
+                                                        );
+                                                    })()}
                                                         </>
                                                     )}
                                                 </Box>
