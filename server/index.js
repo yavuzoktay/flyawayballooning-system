@@ -3737,7 +3737,15 @@ app.get('/api/getAllVoucherData', (req, res) => {
             const enriched = await Promise.all(result.map(async (row) => {
                 let expiresVal = row.expires;
                 if (!expiresVal && row.created_at) {
-                    expiresVal = moment(row.created_at).add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+                    // Shared Flight: Any Day Flight = 24 months, others = 18 months; Private Charter = 18 months
+                    let durationMonths = 24;
+                    if (row.experience_type === 'Private Charter') {
+                        durationMonths = 18;
+                    } else if (row.experience_type === 'Shared Flight') {
+                        const vt = row.actual_voucher_type || row.voucher_type || '';
+                        durationMonths = (vt === 'Any Day Flight') ? 24 : 18;
+                    }
+                    expiresVal = moment(row.created_at).add(durationMonths, 'months').format('YYYY-MM-DD HH:mm:ss');
                 }
                 // Prefer explicit voucher_ref; if null, fill from vc_code
                 const voucher_ref = row.voucher_ref || row.vc_code || null;
@@ -5037,7 +5045,12 @@ app.post('/api/createVoucher', (req, res) => {
         // Define missing variables
         const flight_type = 'Shared Flight'; // Default flight type for vouchers
         const now = moment().format('YYYY-MM-DD HH:mm:ss');
-        const expiresFinal = moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+        // Shared Flight: Any Day Flight = 24 months, others = 18 months; Private Charter = 18 months
+        let durationMonths = 24;
+        if (voucherType && voucherType !== 'Any Day Flight') {
+            durationMonths = 18;
+        }
+        const expiresFinal = moment().add(durationMonths, 'months').format('YYYY-MM-DD HH:mm:ss');
         
         // Create booking record in all_booking table
         const bookingSql = `
@@ -5113,7 +5126,12 @@ app.post('/api/createVoucher', (req, res) => {
         // Define variables for Redeem Voucher booking
         const flight_type_redeem = flight_type || 'Shared Flight'; // Use the flight type from request or default
         const now = moment().format('YYYY-MM-DD HH:mm:ss');
-        const expiresFinal = moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+        // Shared Flight: Any Day Flight = 24 months, others = 18 months; Private Charter = 18 months
+        let durationMonths = 24;
+        if (voucherType && voucherType !== 'Any Day Flight') {
+            durationMonths = 18;
+        }
+        const expiresFinal = moment().add(durationMonths, 'months').format('YYYY-MM-DD HH:mm:ss');
         
         // Create booking record in all_booking table for Redeem Voucher
         const bookingSql = `
@@ -8293,9 +8311,12 @@ async function createBookingFromWebhook(bookingData) {
             }
         }
 
-        // Calculate expires date (Private Charter = 18 months, others = 24 months)
+        // Calculate expires date (Private Charter = 18 months; Shared Flight: Any Day Flight = 24 months, others = 18 months)
         if (chooseFlightType.type === 'Private Charter') {
             expiresDate = now.add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
+        } else if (chooseFlightType.type === 'Shared Flight') {
+            const vt = actualVoucherType || '';
+            expiresDate = now.add((vt === 'Any Day Flight') ? 24 : 18, 'months').format('YYYY-MM-DD HH:mm:ss');
         } else {
             expiresDate = now.add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
         }
