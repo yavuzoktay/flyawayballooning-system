@@ -388,21 +388,7 @@ const Manifest = () => {
         
         // Fetch crew assignments for the new date
         if (newDate) {
-            axios.get('/api/crew-assignments', { params: { date: newDate } })
-                .then(res => {
-                    if (res.data?.success && Array.isArray(res.data.data)) {
-                        const map = {};
-                        for (const row of res.data.data) {
-                            const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
-                            map[key] = row.crew_id;
-                        }
-                        console.log('Crew assignments loaded for new date:', map);
-                        setCrewAssignmentsBySlot(map);
-                    }
-                })
-                .catch((err) => {
-                    console.error('Error fetching crew assignments for new date:', err);
-                });
+            refreshCrewAssignments(newDate);
         }
     };
 
@@ -1609,10 +1595,14 @@ const Manifest = () => {
         if (typeof flightDateStr === 'string') {
             const parts = flightDateStr.split(' ');
             date = parts[0];
-            time = (parts[1] || '').substring(0,5) + ':00';
+            // ensure we have HH:mm:ss
+            const hhmm = (parts[1] || '').substring(0,5);
+            if (hhmm && /^\d{2}:\d{2}$/.test(hhmm)) {
+                time = hhmm + ':00';
+            }
         }
         if (!date || !time) {
-            console.error('Invalid flight date string:', flightDateStr);
+            console.error('Invalid flight date string for crew assignment:', flightDateStr);
             return;
         }
         
