@@ -2579,24 +2579,7 @@ setBookingDetail(finalVoucherDetail);
                                                                 <IconButton size="small" onClick={() => handleEditClick('mobile', v.book_flight === "Gift Voucher" ? (v.purchaser_phone || v.phone) : v.mobile)}><EditIcon fontSize="small" /></IconButton>
                                                             </>
                                                         )}</Typography>
-                                                        {/* Mobile field - show purchaser_mobile for Gift Vouchers */}
-                                                        <Typography><b>Mobile:</b> {editField === 'mobile' ? (
-                                                            <>
-                                                                <input 
-                                                                    value={editValue} 
-                                                                    onChange={e => setEditValue(e.target.value.replace(/[^0-9+\-\s()]/g, ''))} 
-                                                                    style={{marginRight: 8}} 
-                                                                    placeholder="Mobile number"
-                                                                />
-                                                                <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
-                                                                <Button size="small" onClick={handleEditCancel}>Cancel</Button>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                {v.book_flight === "Gift Voucher" ? (v.purchaser_mobile || v.mobile || '-') : (v.mobile || '-')}
-                                                                <IconButton size="small" onClick={() => handleEditClick('mobile', v.book_flight === "Gift Voucher" ? (v.purchaser_mobile || v.mobile) : v.mobile)}><EditIcon fontSize="small" /></IconButton>
-                                                            </>
-                                                        )}</Typography>
+                                                        {/* Remove explicit Mobile row from Voucher Details popups */}
                                                         <Typography><b>Email:</b> {editField === 'email' ? (
                                                             <>
                                                                 <input 
