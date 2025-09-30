@@ -2863,8 +2863,14 @@ setBookingDetail(finalVoucherDetail);
                                                     )}
                                                 </Box>
                                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 140 }}>
-                                                    {/* Rename Rebook to Redeem for Gift/Flight Voucher Details */}
-                                                    <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleRebook}>Redeem</Button>
+                                                    {(() => {
+                                                        const v = bookingDetail?.voucher || {};
+                                                        const isVoucherDetails = (v?.book_flight === 'Gift Voucher') || (v?.voucher_type && typeof v.voucher_type === 'string' && v.voucher_type.toLowerCase().includes('flight'));
+                                                        const label = isVoucherDetails ? 'Redeem' : 'Rebook';
+                                                        return (
+                                                            <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleRebook}>{label}</Button>
+                                                        );
+                                                    })()}
                                                     <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleAddGuestClick}>Add Guest</Button>
                                                     <Button variant="contained" color="info" sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d' }} onClick={handleCancelFlight}>Cancel Flight</Button>
                                                 </Box>
