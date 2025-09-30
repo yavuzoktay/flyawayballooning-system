@@ -374,7 +374,12 @@ const Manifest = () => {
                     .filter((p) => p.booking_id === b.id)
                     .reduce((sum, p) => sum + parseFloat(p.weight || 0), 0),
             }));
-            setFlights(combinedFlights);
+            // Normalize activity id for each flight to ensure crew assignment payload is valid
+            const normalized = combinedFlights.map(f => ({
+                ...f,
+                activity_id: f.activity_id ?? f.activityId ?? f.activityID ?? (f.activity && (f.activity.id ?? f.activity.activity_id)) ?? null
+            }));
+            setFlights(normalized);
         }
     }, [booking, passenger, bookingLoading, passengerLoading]);
 
