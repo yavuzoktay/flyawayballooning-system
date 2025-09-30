@@ -696,12 +696,16 @@ app.post('/api/voucher-codes/validate', (req, res) => {
         return res.status(400).json({ success: false, message: 'Voucher code is required' });
     }
     
+    // Enforce single-use for codes with NULL max_uses (Voucher Codes Management entries)
     const sql = `
         SELECT * FROM voucher_codes 
         WHERE code = ? AND is_active = 1
         AND (valid_from IS NULL OR valid_from <= NOW())
         AND (valid_until IS NULL OR valid_until >= NOW())
-        AND (max_uses IS NULL OR current_uses < max_uses)
+        AND (
+            (max_uses IS NULL AND COALESCE(current_uses,0) < 1) OR
+            (max_uses IS NOT NULL AND COALESCE(current_uses,0) < max_uses)
+        )
         AND (source_type = 'admin_created' OR source_type = 'user_generated')
     `;
     
@@ -1070,7 +1074,12 @@ app.post('/api/redeem-voucher', (req, res) => {
             
             console.log('=== SUCCESS ===');
             console.log('Voucher marked as redeemed successfully');
-            res.json({ success: true, message: 'Voucher marked as redeemed' });
+            // Also increment current_uses on voucher_codes table (single use enforcement)
+            const incSql = `UPDATE voucher_codes SET current_uses = COALESCE(current_uses,0) + 1 WHERE code = ?`;
+            con.query(incSql, [voucher_code.toUpperCase()], () => {
+                // ignore errors here; primary enforcement is validation
+                res.json({ success: true, message: 'Voucher marked as redeemed' });
+            });
         });
     });
 });
