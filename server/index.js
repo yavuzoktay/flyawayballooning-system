@@ -4588,6 +4588,66 @@ app.post('/api/createBooking', (req, res) => {
     }
 });
 
+// Endpoint to update expires dates for Flexible Weekday and Weekday Morning
+app.post('/api/update-expires-dates', (req, res) => {
+    console.log('=== UPDATE EXPIRES DATES ENDPOINT CALLED ===');
+    
+    const updateBookingSql = `
+        UPDATE all_booking 
+        SET expires = DATE_ADD(created_at, INTERVAL 18 MONTH) 
+        WHERE voucher_type IN ('Flexible Weekday', 'Weekday Morning') 
+          AND experience = 'Shared Flight' 
+          AND expires > DATE_ADD(created_at, INTERVAL 18 MONTH)
+    `;
+    
+    const updateVoucherSql = `
+        UPDATE all_vouchers 
+        SET expires = DATE_ADD(created_at, INTERVAL 18 MONTH) 
+        WHERE voucher_type_detail IN ('Flexible Weekday', 'Weekday Morning') 
+          AND experience_type = 'Shared Flight' 
+          AND expires > DATE_ADD(created_at, INTERVAL 18 MONTH)
+    `;
+    
+    con.query(updateBookingSql, (err, bookingResult) => {
+        if (err) {
+            console.error('Error updating all_booking:', err);
+            return res.status(500).json({ success: false, error: 'Failed to update all_booking' });
+        }
+        
+        console.log('Updated all_booking records:', bookingResult.affectedRows);
+        
+        // Show sample updated records
+        const sampleSql = `
+            SELECT 
+                id, 
+                voucher_type, 
+                experience, 
+                created_at, 
+                expires,
+                DATEDIFF(expires, created_at) as days_from_creation
+            FROM all_booking 
+            WHERE voucher_type IN ('Flexible Weekday', 'Weekday Morning') 
+              AND experience = 'Shared Flight'
+            ORDER BY created_at DESC
+            LIMIT 10
+        `;
+        
+        con.query(sampleSql, (err, sampleResult) => {
+            if (err) {
+                console.error('Error fetching sample records:', err);
+                return res.status(500).json({ success: false, error: 'Failed to fetch sample records' });
+            }
+            
+            res.json({ 
+                success: true, 
+                message: 'Expires dates updated successfully',
+                updated_bookings: bookingResult.affectedRows,
+                sample_records: sampleResult
+            });
+        });
+    });
+});
+
 // Endpoint to create necessary tables
 app.get('/api/setup-database', (req, res) => {
     const setupQueries = `
