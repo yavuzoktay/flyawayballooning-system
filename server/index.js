@@ -1034,10 +1034,10 @@ app.post('/api/redeem-voucher', (req, res) => {
         }
         
         // Update voucher in all_vouchers table
+        // Some environments may not have updated_at column; avoid referencing it
         const updateVoucherSql = `
             UPDATE all_vouchers 
-            SET redeemed = 'Yes', 
-                updated_at = NOW() 
+            SET redeemed = 'Yes'
             WHERE voucher_ref = ?
         `;
         
@@ -5108,8 +5108,7 @@ app.post('/api/createVoucher', (req, res) => {
         // Update the original voucher to mark it as redeemed
         const updateVoucherSql = `
             UPDATE all_vouchers 
-            SET redeemed = 'Yes', 
-                updated_at = NOW() 
+            SET redeemed = 'Yes'
             WHERE voucher_ref = ? OR id = (
                 SELECT id FROM all_vouchers 
                 WHERE voucher_ref = ? 
