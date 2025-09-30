@@ -4755,7 +4755,9 @@ app.post('/api/createVoucher', (req, res) => {
     }
 
     const now = moment().format('YYYY-MM-DD HH:mm:ss');
-    let expiresFinal = expires && expires !== '' ? expires : moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+    // Expiry: Any Day Flight = 24 months, others (Weekday Morning, Flexible Weekday) = 18 months
+    const voucherExpiryMonths = (voucher_type === 'Any Day Flight' || actualVoucherType === 'Any Day Flight') ? 24 : 18;
+    let expiresFinal = expires && expires !== '' ? expires : moment().add(voucherExpiryMonths, 'months').format('YYYY-MM-DD HH:mm:ss');
     
     // Determine the actual voucher type based on the input
     let actualVoucherType = '';
@@ -8325,7 +8327,14 @@ async function createVoucherFromWebhook(voucherData) {
         } = voucherData;
 
         const now = moment().format('YYYY-MM-DD HH:mm:ss');
-        let expiresFinal = expires && expires !== '' ? expires : moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+        // Expiry months: Private Charter = 18; Shared Flight 'Any Day Flight' = 24; Shared 'Weekday Morning' or 'Flexible Weekday' = 18
+        let expiryMonthsWebhook = 24;
+        if (flight_type === 'Private Charter') {
+            expiryMonthsWebhook = 18;
+        } else if (flight_type === 'Shared Flight') {
+            expiryMonthsWebhook = (actualVoucherType === 'Any Day Flight') ? 24 : 18;
+        }
+        let expiresFinal = expires && expires !== '' ? expires : moment().add(expiryMonthsWebhook, 'months').format('YYYY-MM-DD HH:mm:ss');
         
         // Determine the actual voucher type based on the input
         let actualVoucherType = '';
