@@ -696,7 +696,7 @@ app.post('/api/voucher-codes/validate', (req, res) => {
         return res.status(400).json({ success: false, message: 'Voucher code is required' });
     }
     
-    // Enforce single-use for codes with NULL max_uses (Voucher Codes Management entries)
+    // Enforce single-use for codes (Voucher Codes Management entries)
     const sql = `
         SELECT * FROM voucher_codes 
         WHERE code = ? AND is_active = 1
@@ -8310,12 +8310,12 @@ async function createVoucherFromWebhook(voucherData) {
             return reject(new Error('Missing voucher type detail. Please select a specific voucher type before proceeding.'));
         }
         
-        // Validate that the voucher type detail is one of the valid types
-        const validVoucherTypes = ['Weekday Morning', 'Flexible Weekday', 'Any Day Flight'];
-        if (!validVoucherTypes.includes(actualVoucherType)) {
-            console.error('ERROR: Invalid voucher type detail from webhook:', actualVoucherType);
-            console.error('Valid types are:', validVoucherTypes);
-            return reject(new Error(`Invalid voucher type detail: ${actualVoucherType}. Valid types are: ${validVoucherTypes.join(', ')}`));
+        // Do not restrict to shared-only voucher types.
+        // Accept any non-empty voucher_type_detail so Private Charter (e.g., Proposal Flight) works too.
+        // Keep a soft log for unexpected blanks only.
+        if (!actualVoucherType || actualVoucherType.trim() === '') {
+            console.error('ERROR: Missing voucher type detail after resolution.');
+            return reject(new Error('Missing voucher type detail.'));
         }
         
         console.log('Final actualVoucherType from webhook:', actualVoucherType);
@@ -8892,21 +8892,24 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                         // Webhook only creates the voucher entry
                         console.log('Voucher code generation skipped - will be handled by frontend');
                         
-                        // For Buy Gift vouchers, also generate voucher code
+                        // For Buy Gift vouchers, also generate voucher code (Shared + Private Charter)
                         console.log('=== VOUCHER CODE GENERATION CHECK ===');
                         console.log('storeData.voucherData.voucher_type:', storeData.voucherData.voucher_type);
                         console.log('storeData.voucherData.book_flight:', storeData.voucherData.book_flight);
                         console.log('Checking if Buy Gift or Gift Voucher...');
                         
-                        if (storeData.voucherData.voucher_type === 'Buy Gift' || storeData.voucherData.voucher_type === 'Gift Voucher' || storeData.voucherData.voucher_type === 'Flight Voucher' || storeData.voucherData.voucher_type === 'Any Day Flight' || storeData.voucherData.voucher_type === 'Weekday Morning' || storeData.voucherData.voucher_type === 'Flexible Weekday' || storeData.voucherData.book_flight === 'Gift Voucher') {
+                        if (
+                            storeData.voucherData.voucher_type === 'Buy Gift' ||
+                            storeData.voucherData.voucher_type === 'Gift Voucher' ||
+                            storeData.voucherData.voucher_type === 'Flight Voucher' ||
+                            storeData.voucherData.book_flight === 'Gift Voucher'
+                        ) {
                             try {
                                 console.log('Generating voucher code for voucher type:', storeData.voucherData.voucher_type);
                                 
                                 // Determine flight category from voucher data
-                                let flightCategory = 'Any Day Flight'; // Default
-                                if (storeData.voucherData.voucher_type_detail) {
-                                    flightCategory = storeData.voucherData.voucher_type_detail;
-                                }
+                                // Use the selected voucher type detail as category (works for Shared and Private Charter)
+                                let flightCategory = storeData.voucherData.voucher_type_detail || 'Any Day Flight';
                                 
                                 // Generate voucher code
                                 const voucherCodeResponse = await axios.post(`${req.protocol}://${req.get('host')}/api/generate-voucher-code`, {
@@ -8914,6 +8917,7 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                                     customer_name: storeData.voucherData.name || 'Unknown Customer',
                                     customer_email: storeData.voucherData.email || '',
                                     location: storeData.voucherData.preferred_location || 'Somerset',
+                                    // Pass through actual experience type (Shared Flight or Private Charter)
                                     experience_type: storeData.voucherData.flight_type || 'Shared Flight',
                                     voucher_type: storeData.voucherData.voucher_type || 'Flight Voucher',
                                     paid_amount: storeData.voucherData.paid || 0,
