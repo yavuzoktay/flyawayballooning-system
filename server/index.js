@@ -4533,7 +4533,14 @@ app.post('/api/createBooking', (req, res) => {
             }
             if (voucherResult.length > 0 && voucherResult[0].status === 'redeemed') {
                 // Redeemed voucher: expires = voucher satın alma tarihi + duration (Private Charter: 18 months, others: 24 months)
-                const durationMonths = (chooseFlightType && chooseFlightType.type === 'Private Charter') ? 18 : 24;
+                let durationMonths = 24;
+                if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
+                    durationMonths = 18;
+                } else if (chooseFlightType && chooseFlightType.type === 'Shared Flight') {
+                    // Shared: Any Day Flight = 24, others = 18
+                    const vt = bookingData?.selectedVoucherType?.title || voucher_type || '';
+                    durationMonths = (vt === 'Any Day Flight') ? 24 : 18;
+                }
                 expiresDate = moment(voucherResult[0].created_at).add(durationMonths, 'months').format('YYYY-MM-DD HH:mm:ss');
                 insertBookingAndPassengers(expiresDate);
             } else {
@@ -4542,7 +4549,13 @@ app.post('/api/createBooking', (req, res) => {
                 if (attempts >= 10) {
                     expiresDate = now.clone().add(36, 'months').format('YYYY-MM-DD HH:mm:ss');
                 } else {
-                    const durationMonths2 = (chooseFlightType && chooseFlightType.type === 'Private Charter') ? 18 : 24;
+                    let durationMonths2 = 24;
+                    if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
+                        durationMonths2 = 18;
+                    } else if (chooseFlightType && chooseFlightType.type === 'Shared Flight') {
+                        const vt2 = bookingData?.selectedVoucherType?.title || voucher_type || '';
+                        durationMonths2 = (vt2 === 'Any Day Flight') ? 24 : 18;
+                    }
                     expiresDate = now.clone().add(durationMonths2, 'months').format('YYYY-MM-DD HH:mm:ss');
                 }
                 insertBookingAndPassengers(expiresDate);
@@ -4554,7 +4567,13 @@ app.post('/api/createBooking', (req, res) => {
         if (attempts >= 10) {
             expiresDate = now.clone().add(36, 'months').format('YYYY-MM-DD HH:mm:ss');
         } else {
-            const durationMonths3 = (chooseFlightType && chooseFlightType.type === 'Private Charter') ? 18 : 24;
+            let durationMonths3 = 24;
+            if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
+                durationMonths3 = 18;
+            } else if (chooseFlightType && chooseFlightType.type === 'Shared Flight') {
+                const vt3 = bookingData?.selectedVoucherType?.title || voucher_type || '';
+                durationMonths3 = (vt3 === 'Any Day Flight') ? 24 : 18;
+            }
             expiresDate = now.clone().add(durationMonths3, 'months').format('YYYY-MM-DD HH:mm:ss');
         }
         insertBookingAndPassengers(expiresDate);
