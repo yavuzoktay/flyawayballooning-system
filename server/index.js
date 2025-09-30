@@ -793,7 +793,8 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                         // Provide expires for both voucher and booking sourced codes
                         expires: row.computed_expires || row.expires || null,
                         redeemed: row.redeemed || null,
-                        final_amount: booking_amount
+                        final_amount: booking_amount,
+                        numberOfPassengers: row.numberOfPassengers || row.pax || null
                     }
                 });
             });
@@ -851,7 +852,8 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                 // Keep response shape consistent with getAllVoucherData fields when possible
                 experience_type: voucher.applicable_experiences || null,
                 voucher_type: voucher.applicable_voucher_types || null,
-                final_amount: booking_amount // No discount applied
+                final_amount: booking_amount, // No discount applied
+                numberOfPassengers: null
             }
         });
     });
