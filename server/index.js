@@ -417,7 +417,7 @@ app.post('/api/generate-voucher-code', async (req, res) => {
             // Ensure the generated code shows in settings as user_generated
             const defaultExpiryDate = (expires_date && expires_date !== '')
                 ? expires_date
-                : dayjs().add(24, 'month').format('YYYY-MM-DD');
+                : dayjs().add((experience_type === 'Private Charter' ? 18 : 24), 'month').format('YYYY-MM-DD');
             const insertUserCodeSql = `
                 INSERT INTO voucher_codes (
                     code, title, valid_from, valid_until, max_uses, current_uses,
@@ -465,7 +465,7 @@ app.post('/api/generate-voucher-code', async (req, res) => {
             try {
                 const defaultExpiryDate = (expires_date && expires_date !== '')
                     ? expires_date
-                    : dayjs().add(24, 'month').format('YYYY-MM-DD');
+                    : dayjs().add((experience_type === 'Private Charter' ? 18 : 24), 'month').format('YYYY-MM-DD');
                 const insertUserCodeSql = `
                     INSERT INTO voucher_codes (
                         code, title, valid_from, valid_until, max_uses, current_uses,
@@ -4532,8 +4532,9 @@ app.post('/api/createBooking', (req, res) => {
                 return res.status(500).json({ success: false, error: 'Database query failed to fetch voucher' });
             }
             if (voucherResult.length > 0 && voucherResult[0].status === 'redeemed') {
-                // Redeemed voucher: expires = voucher satın alma tarihi + 24 ay
-                expiresDate = moment(voucherResult[0].created_at).add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+                // Redeemed voucher: expires = voucher satın alma tarihi + duration (Private Charter: 18 months, others: 24 months)
+                const durationMonths = (chooseFlightType && chooseFlightType.type === 'Private Charter') ? 18 : 24;
+                expiresDate = moment(voucherResult[0].created_at).add(durationMonths, 'months').format('YYYY-MM-DD HH:mm:ss');
                 insertBookingAndPassengers(expiresDate);
             } else {
                 // Diğer durumlar: flight_attempts >= 10 ise 36 ay, yoksa 24 ay
@@ -4541,7 +4542,8 @@ app.post('/api/createBooking', (req, res) => {
                 if (attempts >= 10) {
                     expiresDate = now.clone().add(36, 'months').format('YYYY-MM-DD HH:mm:ss');
                 } else {
-                    expiresDate = now.clone().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+                    const durationMonths2 = (chooseFlightType && chooseFlightType.type === 'Private Charter') ? 18 : 24;
+                    expiresDate = now.clone().add(durationMonths2, 'months').format('YYYY-MM-DD HH:mm:ss');
                 }
                 insertBookingAndPassengers(expiresDate);
             }
@@ -4552,7 +4554,8 @@ app.post('/api/createBooking', (req, res) => {
         if (attempts >= 10) {
             expiresDate = now.clone().add(36, 'months').format('YYYY-MM-DD HH:mm:ss');
         } else {
-            expiresDate = now.clone().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+            const durationMonths3 = (chooseFlightType && chooseFlightType.type === 'Private Charter') ? 18 : 24;
+            expiresDate = now.clone().add(durationMonths3, 'months').format('YYYY-MM-DD HH:mm:ss');
         }
         insertBookingAndPassengers(expiresDate);
     }
@@ -8269,11 +8272,11 @@ async function createBookingFromWebhook(bookingData) {
             }
         }
 
-        // Calculate expires date
+        // Calculate expires date (Private Charter = 18 months, others = 24 months)
         if (chooseFlightType.type === 'Private Charter') {
-            expiresDate = now.add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
-        } else {
             expiresDate = now.add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
+        } else {
+            expiresDate = now.add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
         }
 
         insertBookingAndPassengers(expiresDate);
