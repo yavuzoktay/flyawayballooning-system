@@ -814,7 +814,7 @@ app.post('/api/voucher-codes/validate', (req, res) => {
             max_uses: voucher.max_uses
         });
         
-        // For user generated codes, skip strict location/experience/voucher_type checks
+        // For user generated codes, skip strict validation checks
         if (voucher.source_type === 'user_generated') {
             console.log('User generated voucher code - skipping strict validation checks');
         } else {
@@ -843,18 +843,59 @@ app.post('/api/voucher-codes/validate', (req, res) => {
             }
         }
         
-        // Voucher code is valid (no discount calculation needed)
-        res.json({
-            success: true,
-            message: 'Voucher code is valid',
-            data: {
-                ...voucher,
-                // Keep response shape consistent with getAllVoucherData fields when possible
-                experience_type: voucher.applicable_experiences || null,
-                voucher_type: voucher.applicable_voucher_types || null,
-                final_amount: booking_amount, // No discount applied
-                numberOfPassengers: null
+        // Try to enrich response with voucher details from all_vouchers/all_booking
+        const detailsSql = `
+            SELECT 
+                v.experience_type,
+                v.book_flight,
+                v.voucher_type AS actual_voucher_type,
+                v.paid,
+                v.redeemed,
+                v.offer_code,
+                v.voucher_ref,
+                v.numberOfPassengers,
+                v.created_at,
+                v.expires
+            FROM all_vouchers v
+            WHERE v.voucher_ref = ?
+            ORDER BY v.created_at DESC
+            LIMIT 1
+        `;
+        con.query(detailsSql, [voucher.code], (dErr, dRows) => {
+            if (dErr) {
+                console.warn('Voucher detail lookup failed:', dErr.message);
             }
+            let enriched = null;
+            if (dRows && dRows.length > 0) {
+                const v = dRows[0];
+                enriched = {
+                    experience: v.experience_type || null,
+                    book_flight: v.book_flight || null,
+                    paid: v.paid || 0,
+                    redeemed: v.redeemed || null,
+                    offer_code: v.offer_code || null,
+                    voucher_ref: v.voucher_ref || voucher.code,
+                    numberOfVouchers: v.numberOfPassengers || null,
+                    created: v.created_at || null,
+                    expires: v.expires || null
+                };
+            }
+            
+            // Voucher code is valid (no discount calculation needed)
+            res.json({
+                success: true,
+                message: 'Voucher code is valid',
+                data: {
+                    ...voucher,
+                    // Keep response shape consistent with getAllVoucherData fields when possible
+                    experience_type: voucher.applicable_experiences || enriched?.experience || null,
+                    voucher_type: voucher.applicable_voucher_types || enriched?.actual_voucher_type || null,
+                    final_amount: booking_amount, // No discount applied
+                    numberOfPassengers: enriched?.numberOfVouchers || null,
+                    // Extra detail block for Redeem Voucher UI
+                    detail: enriched
+                }
+            });
         });
     });
 });
