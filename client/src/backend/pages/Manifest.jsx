@@ -1450,6 +1450,12 @@ const Manifest = () => {
 
     const slotKey = (activityId, date, time) => `${activityId}_${date}_${time}`;
 
+    // Try to resolve activity id from various possible shapes on flight objects
+    const getFlightActivityId = (flight) => {
+        if (!flight) return null;
+        return flight.activity_id ?? flight.activityId ?? flight.activityID ?? (flight.activity && (flight.activity.id ?? flight.activity.activity_id)) ?? null;
+    };
+
     const refreshCrewAssignments = async (date) => {
         if (!date) return;
         // Prevent duplicate, rapid calls for the same date
@@ -2050,7 +2056,8 @@ const Manifest = () => {
                                                 
                                                 {/* Crew Selection Dropdown */}
                         {(() => {
-                            const slotKeyValue = slotKey(first.activity_id, (first.flight_date||'').substring(0,10), (first.flight_date||'').substring(11,16));
+                            const activityIdForSlot = getFlightActivityId(first);
+                            const slotKeyValue = slotKey(activityIdForSlot, (first.flight_date||'').substring(0,10), (first.flight_date||'').substring(11,16));
                             const currentCrewId = crewAssignmentsBySlot[slotKeyValue];
                             
                             // Debug logging
@@ -2058,7 +2065,7 @@ const Manifest = () => {
                                 console.log('Dropdown for flight:', first.id, 'slotKey:', slotKeyValue, 'currentCrewId:', currentCrewId, 'all assignments:', crewAssignmentsBySlot);
                                 console.log('Flight data:', { 
                                     id: first.id, 
-                                    activity_id: first.activity_id, 
+                                    activity_id: activityIdForSlot, 
                                     flight_date: first.flight_date,
                                     date_part: (first.flight_date||'').substring(0,10),
                                     time_part: (first.flight_date||'').substring(11,16)
@@ -2070,7 +2077,7 @@ const Manifest = () => {
                                     <Select
                                         native
                                         value={currentCrewId || ''}
-                                        onChange={(e) => handleCrewChange(first.activity_id, first.flight_date, e.target.value)}
+                                        onChange={(e) => handleCrewChange(activityIdForSlot, first.flight_date, e.target.value)}
                                         sx={{ minWidth: 200, mr: 1, background: '#fff' }}
                                     >
                                         <option value="">Crew Selection</option>
