@@ -8436,17 +8436,12 @@ async function createVoucherFromWebhook(voucherData) {
         } = voucherData;
 
         const now = moment().format('YYYY-MM-DD HH:mm:ss');
-        // Expiry months: Private Charter = 18; Shared Flight 'Any Day Flight' = 24; Shared 'Weekday Morning' or 'Flexible Weekday' = 18
-        let expiryMonthsWebhook = 24;
-        if (flight_type === 'Private Charter') {
-            expiryMonthsWebhook = 18;
-        } else if (flight_type === 'Shared Flight') {
-            expiryMonthsWebhook = (actualVoucherType === 'Any Day Flight') ? 24 : 18;
-        }
-        let expiresFinal = expires && expires !== '' ? expires : moment().add(expiryMonthsWebhook, 'months').format('YYYY-MM-DD HH:mm:ss');
-        
         // Determine the actual voucher type based on the input
+        // NOTE: We declare this BEFORE computing expiry to avoid ReferenceError
         let actualVoucherType = '';
+        // Start with a safe default for expiry; will be recalculated after resolving actualVoucherType
+        let expiryMonthsWebhook = (flight_type === 'Private Charter') ? 18 : 24;
+        let expiresFinal = expires && expires !== '' ? expires : moment().add(expiryMonthsWebhook, 'months').format('YYYY-MM-DD HH:mm:ss');
         
         console.log('Webhook voucher data received:', voucherData);
         console.log('voucher_type_detail from webhook:', voucherData.voucher_type_detail);
@@ -8483,6 +8478,16 @@ async function createVoucherFromWebhook(voucherData) {
         }
         
         console.log('Final actualVoucherType from webhook:', actualVoucherType);
+
+        // Recompute expiry months now that actualVoucherType is known (for Shared Flight cases)
+        if (flight_type === 'Private Charter') {
+            expiryMonthsWebhook = 18;
+        } else if (flight_type === 'Shared Flight') {
+            expiryMonthsWebhook = (actualVoucherType === 'Any Day Flight') ? 24 : 18;
+        }
+        if (!expires || expires === '') {
+            expiresFinal = moment().add(expiryMonthsWebhook, 'months').format('YYYY-MM-DD HH:mm:ss');
+        }
 
         // Check for duplicates before inserting (prevent webhook duplicates)
         // More comprehensive duplicate check - use core voucher details instead of voucher_ref
