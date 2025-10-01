@@ -4851,11 +4851,8 @@ app.post('/api/createVoucher', (req, res) => {
     }
 
     const now = moment().format('YYYY-MM-DD HH:mm:ss');
-    // Expiry: Any Day Flight = 24 months, others (Weekday Morning, Flexible Weekday) = 18 months
-    const voucherExpiryMonths = (voucher_type === 'Any Day Flight' || actualVoucherType === 'Any Day Flight') ? 24 : 18;
-    let expiresFinal = expires && expires !== '' ? expires : moment().add(voucherExpiryMonths, 'months').format('YYYY-MM-DD HH:mm:ss');
     
-    // Determine the actual voucher type based on the input
+    // Determine the actual voucher type based on the input (declare first to avoid ReferenceError)
     let actualVoucherType = '';
     
                     // Check if there's a specific voucher type detail in the request
@@ -4874,15 +4871,19 @@ app.post('/api/createVoucher', (req, res) => {
             return res.status(400).json({ success: false, error: 'Missing voucher type detail. Please select a specific voucher type before proceeding.' });
         }
         
-        // Validate that the voucher type detail is one of the valid types
-        const validVoucherTypes = ['Weekday Morning', 'Flexible Weekday', 'Any Day Flight'];
-        if (!validVoucherTypes.includes(actualVoucherType)) {
-            console.error('ERROR: Invalid voucher type detail:', actualVoucherType);
-            console.error('Valid types are:', validVoucherTypes);
-            return res.status(400).json({ success: false, error: `Invalid voucher type detail: ${actualVoucherType}. Valid types are: ${validVoucherTypes.join(', ')}` });
-        }
-        
-        console.log('Final actualVoucherType:', actualVoucherType);
+    // Validate that the voucher type detail is one of the valid types
+    const validVoucherTypes = ['Weekday Morning', 'Flexible Weekday', 'Any Day Flight'];
+    if (!validVoucherTypes.includes(actualVoucherType)) {
+        console.error('ERROR: Invalid voucher type detail:', actualVoucherType);
+        console.error('Valid types are:', validVoucherTypes);
+        return res.status(400).json({ success: false, error: `Invalid voucher type detail: ${actualVoucherType}. Valid types are: ${validVoucherTypes.join(', ')}` });
+    }
+    
+    console.log('Final actualVoucherType:', actualVoucherType);
+
+    // Expiry: Any Day Flight = 24 months, others (Weekday Morning, Flexible Weekday) = 18 months
+    const voucherExpiryMonths = (voucher_type === 'Any Day Flight' || actualVoucherType === 'Any Day Flight') ? 24 : 18;
+    let expiresFinal = expires && expires !== '' ? expires : moment().add(voucherExpiryMonths, 'months').format('YYYY-MM-DD HH:mm:ss');
 
     // First, check for duplicates to prevent multiple vouchers
     const duplicateCheckSql = `SELECT id FROM all_vouchers WHERE name = ? AND email = ? AND phone = ? AND voucher_type = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 MINUTE) LIMIT 1`;
