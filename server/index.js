@@ -1707,6 +1707,7 @@ app.post('/api/private-charter-voucher-types', experiencesUpload.single('private
     const {
         title,
         description,
+        image_text_tag,
         max_passengers,
         validity_months,
         flight_days,
@@ -1730,15 +1731,16 @@ app.post('/api/private-charter-voucher-types', experiencesUpload.single('private
     
     const sql = `
         INSERT INTO private_charter_voucher_types (
-            title, description, image_url, max_passengers,
+            title, description, image_url, image_text_tag, max_passengers,
             validity_months, flight_days, flight_time, features, terms, sort_order, is_active
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     
     const values = [
         title,
         description,
         image_url,
+        image_text_tag || null,
         max_passengers || 8,
         validity_months || 18,
         flight_days || 'Any Day',
@@ -1788,6 +1790,7 @@ app.put('/api/private-charter-voucher-types/:id', experiencesUpload.single('priv
     const {
         title,
         description,
+        image_text_tag,
         max_passengers,
         validity_months,
         flight_days,
@@ -1811,7 +1814,7 @@ app.put('/api/private-charter-voucher-types/:id', experiencesUpload.single('priv
     
     const sql = `
         UPDATE private_charter_voucher_types SET 
-            title = ?, description = ?, image_url = ?, max_passengers = ?, 
+            title = ?, description = ?, image_url = ?, image_text_tag = ?, max_passengers = ?, 
             validity_months = ?, flight_days = ?, flight_time = ?, features = ?, 
             terms = ?, sort_order = ?, is_active = ?
         WHERE id = ?
@@ -1868,6 +1871,7 @@ app.put('/api/private-charter-voucher-types/:id', experiencesUpload.single('priv
         title,
         description,
         image_url,
+        image_text_tag || null,
         max_passengers || 8,
         validity_months || 18,
         flight_days || 'Any Day',
@@ -9598,6 +9602,31 @@ const runDatabaseMigrations = () => {
             });
         } else {
             console.log('✅ image_text_tag column already exists on voucher_types');
+        }
+    });
+
+    // Ensure image_text_tag exists on private_charter_voucher_types
+    const checkPcImageTextTagSql = `
+        SELECT COUNT(*) as cnt
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'private_charter_voucher_types'
+          AND column_name = 'image_text_tag'
+    `;
+    con.query(checkPcImageTextTagSql, (err, rows) => {
+        if (err) {
+            console.error('Error checking image_text_tag column on private_charter_voucher_types:', err);
+        } else if (rows && rows[0] && rows[0].cnt === 0) {
+            const addPcImageTextTag = `ALTER TABLE private_charter_voucher_types ADD COLUMN image_text_tag VARCHAR(255) NULL AFTER image_url`;
+            con.query(addPcImageTextTag, (err2) => {
+                if (err2) {
+                    console.error('Error adding image_text_tag to private_charter_voucher_types:', err2);
+                } else {
+                    console.log('✅ image_text_tag column added to private_charter_voucher_types');
+                }
+            });
+        } else {
+            console.log('✅ image_text_tag column already exists on private_charter_voucher_types');
         }
     });
     

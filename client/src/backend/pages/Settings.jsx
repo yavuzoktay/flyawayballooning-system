@@ -74,6 +74,7 @@ const Settings = () => {
         description: '',
         image_url: '',
         image_file: null,
+        image_text_tag: '',
         max_passengers: 8,
         validity_months: 18,
         flight_days: 'Any Day',
@@ -692,7 +693,11 @@ const Settings = () => {
                         value = value === true ? 'true' : 'false';
                         console.log(`Special handling for is_active - original:`, privateCharterVoucherTypeFormData[key], 'converted to:', value);
                     }
-                    formData.append(key, value);
+                    if (key === 'image_text_tag' && !value) {
+                        // skip empty values to avoid overriding existing data with blank
+                    } else {
+                        formData.append(key, value);
+                    }
                     console.log(`FormData appended - ${key}:`, value, 'Type:', typeof value);
                 }
             });
@@ -4928,6 +4933,18 @@ const Settings = () => {
                                 </div>
                                 
                                 
+                            </div>
+                            
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Image Text Tag</label>
+                                    <input
+                                        type="text"
+                                        value={privateCharterVoucherTypeFormData.image_text_tag}
+                                        onChange={(e) => setPrivateCharterVoucherTypeFormData({ ...privateCharterVoucherTypeFormData, image_text_tag: e.target.value })}
+                                        placeholder="e.g., 5★ on Google, TripAdvisor & Facebook"
+                                    />
+                                </div>
                             </div>
                             
                             <div className="form-row">
