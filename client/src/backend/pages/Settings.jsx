@@ -53,6 +53,7 @@ const Settings = () => {
         description: '',
         image_url: '',
         image_file: null,
+        image_text_tag: '',
         max_passengers: 8,
         validity_months: 18,
         flight_days: 'Monday - Friday',
@@ -575,6 +576,9 @@ const Settings = () => {
             const formData = new FormData();
             formData.append('title', voucherTypeFormData.title);
             formData.append('description', voucherTypeFormData.description);
+            if (voucherTypeFormData.image_text_tag) {
+                formData.append('image_text_tag', voucherTypeFormData.image_text_tag);
+            }
             formData.append('max_passengers', voucherTypeFormData.max_passengers);
             formData.append('validity_months', voucherTypeFormData.validity_months);
             formData.append('flight_days', voucherTypeFormData.flight_days);
@@ -619,6 +623,7 @@ const Settings = () => {
             description: voucherType.description,
             image_url: voucherType.image_url || '',
             image_file: null,
+            image_text_tag: voucherType.image_text_tag || '',
             max_passengers: voucherType.max_passengers || 8,
             validity_months: voucherType.validity_months || 18,
             flight_days: voucherType.flight_days || 'Monday - Friday',
@@ -4741,6 +4746,18 @@ const Settings = () => {
                                     />
                                 </div>
                             </div>
+                        
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label>Image Text Tag</label>
+                                <input
+                                    type="text"
+                                    value={voucherTypeFormData.image_text_tag}
+                                    onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, image_text_tag: e.target.value})}
+                                    placeholder="e.g., 5★ on Google, TripAdvisor & Facebook"
+                                />
+                            </div>
+                        </div>
                             
                             <div className="form-row">
                                 <div className="form-group">

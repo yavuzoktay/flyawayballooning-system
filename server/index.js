@@ -1409,6 +1409,7 @@ app.get('/api/voucher-types', (req, res) => {
             
             return {
                 ...vt,
+                image_text_tag: vt.image_text_tag || null,
                 price_per_person: updatedPrice,
                 // Add the activity pricing fields for reference
                 activity_pricing: {
@@ -1433,6 +1434,7 @@ app.post('/api/voucher-types', experiencesUpload.single('voucher_type_image'), (
     const {
         title,
         description,
+        image_text_tag,
         price_per_person,
         price_unit,
         max_passengers,
@@ -1459,15 +1461,16 @@ app.post('/api/voucher-types', experiencesUpload.single('voucher_type_image'), (
     
     const sql = `
         INSERT INTO voucher_types (
-            title, description, image_url, price_per_person, price_unit, max_passengers,
+            title, description, image_url, image_text_tag, price_per_person, price_unit, max_passengers,
             validity_months, flight_days, flight_time, features, terms, sort_order, is_active
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     
     const values = [
         title,
         description,
         image_url,
+        image_text_tag || null,
         (price_per_person === undefined || price_per_person === '' ? null : price_per_person),
         price_unit || 'pp',
         max_passengers || 8,
@@ -1500,6 +1503,7 @@ app.put('/api/voucher-types/:id', experiencesUpload.single('voucher_type_image')
     const {
         title,
         description,
+        image_text_tag,
         price_per_person,
         price_unit,
         max_passengers,
@@ -1525,7 +1529,7 @@ app.put('/api/voucher-types/:id', experiencesUpload.single('voucher_type_image')
     
     const sql = `
         UPDATE voucher_types SET 
-            title = ?, description = ?, image_url = ?, max_passengers = ?, 
+            title = ?, description = ?, image_url = ?, image_text_tag = ?, max_passengers = ?, 
             validity_months = ?, flight_days = ?, flight_time = ?, features = ?, 
             terms = ?, sort_order = ?, is_active = ?
         WHERE id = ?
@@ -1535,6 +1539,7 @@ app.put('/api/voucher-types/:id', experiencesUpload.single('voucher_type_image')
         title,
         description,
         image_url,
+        image_text_tag || null,
         max_passengers || 8,
         validity_months || 18,
         flight_days || 'Monday - Friday',
@@ -9545,7 +9550,7 @@ const runDatabaseMigrations = () => {
     // Add numberOfPassengers column to all_vouchers table
     const addNumberOfPassengersColumn = `
         ALTER TABLE all_vouchers 
-        ADD COLUMN IF NOT EXISTS numberOfPassengers INT DEFAULT 1 COMMENT 'Number of passengers for this voucher'
+        ADD COLUMN numberOfPassengers INT DEFAULT 1 COMMENT 'Number of passengers for this voucher'
     `;
     
     con.query(addNumberOfPassengersColumn, (err, result) => {
@@ -9568,6 +9573,31 @@ const runDatabaseMigrations = () => {
             console.error('Error updating existing records:', err);
         } else {
             console.log(`✅ Updated ${result.affectedRows} existing records with default numberOfPassengers value`);
+        }
+    });
+    
+    // Ensure image_text_tag exists on voucher_types
+    const checkImageTextTagSql = `
+        SELECT COUNT(*) as cnt
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'voucher_types'
+          AND column_name = 'image_text_tag'
+    `;
+    con.query(checkImageTextTagSql, (err, rows) => {
+        if (err) {
+            console.error('Error checking image_text_tag column:', err);
+        } else if (rows && rows[0] && rows[0].cnt === 0) {
+            const addImageTextTag = `ALTER TABLE voucher_types ADD COLUMN image_text_tag VARCHAR(255) NULL AFTER image_url`;
+            con.query(addImageTextTag, (err2) => {
+                if (err2) {
+                    console.error('Error adding image_text_tag to voucher_types:', err2);
+                } else {
+                    console.log('✅ image_text_tag column added to voucher_types');
+                }
+            });
+        } else {
+            console.log('✅ image_text_tag column already exists on voucher_types');
         }
     });
     
