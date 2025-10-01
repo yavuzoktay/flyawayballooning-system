@@ -751,6 +751,7 @@ const Settings = () => {
             description: privateCharterVoucherType.description,
             image_url: privateCharterVoucherType.image_url || '',
             image_file: null,
+            image_text_tag: privateCharterVoucherType.image_text_tag || '',
             max_passengers: privateCharterVoucherType.max_passengers || 8,
             price_per_person: privateCharterVoucherType.price_per_person || 300,
             price_unit: privateCharterVoucherType.price_unit || 'pp',
