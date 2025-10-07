@@ -3151,10 +3151,21 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
                     return res.json({ received: true });
                 }
                 
-                // Session data temizle (only for non-voucher types)
-                if (storeData.type !== 'voucher') {
-                    delete stripeSessionStore[session_id];
-                    console.log('Session data cleaned up for:', session_id);
+                // Retain session data for a grace period so fallback createBookingFromSession can read it
+                // Automatically clean up after 15 minutes to avoid memory growth
+                if (storeData) {
+                    try {
+                        storeData.cleanupAt = Date.now() + (15 * 60 * 1000);
+                        setTimeout(() => {
+                            if (stripeSessionStore[session_id] && stripeSessionStore[session_id].cleanupAt <= Date.now()) {
+                                delete stripeSessionStore[session_id];
+                                console.log('Session data auto-cleaned after grace period for:', session_id);
+                            }
+                        }, 15 * 60 * 1000);
+                        console.log('Session data retained for 15 minutes for fallback:', session_id);
+                    } catch (e) {
+                        console.warn('Failed to schedule session cleanup:', e);
+                    }
                 }
             } catch (error) {
                 console.error('Error processing webhook:', error);
@@ -8896,6 +8907,15 @@ app.post('/api/createBookingFromSession', async (req, res) => {
         const storeData = stripeSessionStore[session_id];
         if (!storeData) {
             console.error('Session data not found for session_id:', session_id);
+            // Try to fetch directly from Stripe as a fallback (in case server was restarted)
+            try {
+                const session = await stripe.checkout.sessions.retrieve(session_id);
+                if (session && session.metadata && session.metadata.session_id === session_id) {
+                    console.log('Fetched session from Stripe as fallback. However, no booking/voucher payload is available. Returning graceful message.');
+                }
+            } catch (e) {
+                console.warn('Stripe session fetch failed for fallback:', e?.message);
+            }
             return res.status(400).json({ success: false, message: 'Session data not found' });
         }
         
