@@ -44,6 +44,8 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
     useEffect(() => {
         const handleScroll = () => {
             const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
+            // Only load more after the user has actually scrolled
+            if (scrollTop <= 0) return;
             const nearBottom = scrollTop + clientHeight >= scrollHeight - 200;
             if (nearBottom) {
                 setVisibleCount((prev) => (prev < data.length ? Math.min(prev + itemsPerPage, data.length) : prev));
