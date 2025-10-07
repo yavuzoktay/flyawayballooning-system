@@ -2179,6 +2179,7 @@ setBookingDetail(finalVoucherDetail);
                                 )}
                                 {/* Apply client-side filtering for bookings */}
                                 <PaginatedTable
+                                    itemsPerPage={10}
                                     data={filteredData.filter(item => {
                                         // Experience filter
                                         if (filters.experience && filters.experience !== 'Select') {
@@ -2353,6 +2354,7 @@ setBookingDetail(finalVoucherDetail);
                                 )}
                                 {/* Apply client-side filtering for vouchers */}
                                 <PaginatedTable
+                                    itemsPerPage={10}
                                     data={filteredData.filter(item => {
                                         // Voucher Type filter
                                         if (filters.voucherType && item.voucher_type !== filters.voucherType) return false;
@@ -2420,6 +2422,7 @@ setBookingDetail(finalVoucherDetail);
                                     Delete
                                 </Button>
                                 <PaginatedTable
+                                    itemsPerPage={10}
                                     data={filteredDateRequestData}
                                     columns={["name", "number", "flight_type", "email", "location", "date_requested"]}
                                     onNameClick={handleDateRequestNameClick}
