@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 
 const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selectable = false, onSelectionChange, context = 'bookings', onEmailClick, onSmsClick }) => {
     // Infinite scroll: show first itemsPerPage items, then load more as user scrolls
@@ -6,6 +6,7 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
     const [selectedRows, setSelectedRows] = useState([]);
     const [showVoucherModal, setShowVoucherModal] = useState(false);
     const [selectedVoucherData, setSelectedVoucherData] = useState(null);
+    const containerRef = useRef(null);
 
     // Helper to get column id/label
     const getColId = (col) => (typeof col === 'string' ? col : (col?.id || ''));
@@ -40,19 +41,16 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
         setVisibleCount(itemsPerPage);
     }, [data, itemsPerPage]);
 
-    // Infinite scroll handler (window-based)
-    useEffect(() => {
-        const handleScroll = () => {
-            const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
-            // Only load more after the user has actually scrolled
-            if (scrollTop <= 0) return;
-            const nearBottom = scrollTop + clientHeight >= scrollHeight - 200;
-            if (nearBottom) {
-                setVisibleCount((prev) => (prev < data.length ? Math.min(prev + itemsPerPage, data.length) : prev));
-            }
-        };
-        window.addEventListener('scroll', handleScroll, { passive: true });
-        return () => window.removeEventListener('scroll', handleScroll);
+    // Infinite scroll handler on an internal scrollable container
+    const handleContainerScroll = useCallback(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        const { scrollTop, scrollHeight, clientHeight } = el;
+        if (scrollTop <= 0) return;
+        const nearBottom = scrollTop + clientHeight >= scrollHeight - 40;
+        if (nearBottom) {
+            setVisibleCount(prev => (prev < data.length ? Math.min(prev + itemsPerPage, data.length) : prev));
+        }
     }, [data.length, itemsPerPage]);
 
     const getVisibleData = () => {
@@ -317,7 +315,7 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                 </div>
             )}
             
-            <div style={{ width: '100%', overflowX: 'auto' }}>
+            <div ref={containerRef} onScroll={handleContainerScroll} style={{ width: '100%', overflow: 'auto', maxHeight: '70vh' }}>
             <table border="1" style={{ width: "100%", background: "#FFF", marginTop: "10px", borderCollapse: "collapse", tableLayout: "fixed" }}>
                 <colgroup>
                     {selectable && <col style={{ width: '40px', minWidth: '40px', maxWidth: '40px' }} />}
