@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 
 const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selectable = false, onSelectionChange, context = 'bookings', onEmailClick, onSmsClick }) => {
-    const [currentPage, setCurrentPage] = useState(1);
+    // Infinite scroll: show first itemsPerPage items, then load more as user scrolls
+    const [visibleCount, setVisibleCount] = useState(itemsPerPage);
     const [selectedRows, setSelectedRows] = useState([]);
     const [showVoucherModal, setShowVoucherModal] = useState(false);
     const [selectedVoucherData, setSelectedVoucherData] = useState(null);
@@ -34,11 +35,26 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
         return label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
     };
 
-    // Pagination logic
-    const getPaginatedData = () => {
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        const endIndex = startIndex + itemsPerPage;
-        return data.slice(startIndex, endIndex);
+    // Reset visible count when data changes
+    useEffect(() => {
+        setVisibleCount(itemsPerPage);
+    }, [data, itemsPerPage]);
+
+    // Infinite scroll handler (window-based)
+    useEffect(() => {
+        const handleScroll = () => {
+            const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
+            const nearBottom = scrollTop + clientHeight >= scrollHeight - 200;
+            if (nearBottom) {
+                setVisibleCount((prev) => (prev < data.length ? Math.min(prev + itemsPerPage, data.length) : prev));
+            }
+        };
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, [data.length, itemsPerPage]);
+
+    const getVisibleData = () => {
+        return data.slice(0, visibleCount);
     };
 
     // Build header labels
@@ -52,21 +68,21 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
         mainHead.push('Actions');
     }
 
-    const paginatedData = getPaginatedData();
+    const paginatedData = getVisibleData();
 
     // Checkbox logic
-    const isAllSelected = paginatedData.length > 0 && paginatedData.every((row, idx) => selectedRows.includes((currentPage-1)*itemsPerPage+idx));
+    const isAllSelected = paginatedData.length > 0 && paginatedData.every((row, idx) => selectedRows.includes(idx));
     const isIndeterminate = selectedRows.length > 0 && !isAllSelected;
     const handleSelectAll = (e) => {
         if (e.target.checked) {
             setSelectedRows([
                 ...new Set([
                     ...selectedRows,
-                    ...paginatedData.map((_, idx) => (currentPage-1)*itemsPerPage+idx)
+                    ...paginatedData.map((_, idx) => idx)
                 ])
             ]);
         } else {
-            setSelectedRows(selectedRows.filter(idx => idx < (currentPage-1)*itemsPerPage || idx >= (currentPage)*itemsPerPage));
+            setSelectedRows([]);
         }
     };
     const handleRowSelect = (rowIdx) => {
@@ -349,15 +365,14 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                 </thead>
                 <tbody>
                     {paginatedData.map((item, idx) => {
-                        const globalIdx = (currentPage-1)*itemsPerPage+idx;
                         return (
                             <tr key={idx}>
                                 {selectable && (
                                     <td style={{ textAlign: "center" }}>
                                         <input
                                             type="checkbox"
-                                            checked={selectedRows.includes(globalIdx)}
-                                            onChange={() => handleRowSelect(globalIdx)}
+                                            checked={selectedRows.includes(idx)}
+                                            onChange={() => handleRowSelect(idx)}
                                         />
                                     </td>
                                 )}
