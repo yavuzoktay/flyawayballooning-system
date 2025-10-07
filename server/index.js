@@ -8145,9 +8145,10 @@ async function createBookingFromWebhook(bookingData) {
             choose_add_on = choose_add_on.filter(a => a && a.name);
         }
 
-        // Basic validation
-        if (!chooseLocation || !chooseFlightType || !passengerData) {
-            return reject(new Error('Missing required booking information.'));
+        // Basic validation (relaxed to tolerate optional fields)
+        // Previously required passengerData strictly; now handle empty/undefined gracefully
+        if (!chooseLocation || !chooseFlightType || !chooseFlightType.type) {
+            return reject(new Error('Missing required booking information (location/flight type).'));
         }
 
         const passengerName = `${passengerData[0].firstName} ${passengerData[0].lastName}`;
@@ -8188,7 +8189,7 @@ async function createBookingFromWebhook(bookingData) {
                 passengerName,
                 chooseFlightType.type,
                 bookingDateTime,
-                passengerData.length,
+                (Array.isArray(passengerData) ? passengerData.length : 0),
                 chooseLocation,
                 'Confirmed',
                 totalPrice,
@@ -8201,9 +8202,9 @@ async function createBookingFromWebhook(bookingData) {
                 emptyToNull(additionalInfo?.hearAboutUs),
                 emptyToNull(additionalInfo?.reason),
                 emptyToNull(additionalInfo?.prefer),
-                emptyToNull(mainPassenger.weight),
-                emptyToNull(mainPassenger.email),
-                emptyToNull(mainPassenger.phone),
+                emptyToNull((passengerData && passengerData[0]) ? passengerData[0].weight : null),
+                emptyToNull((passengerData && passengerData[0]) ? passengerData[0].email : null),
+                emptyToNull((passengerData && passengerData[0]) ? passengerData[0].phone : null),
                 emptyToNull(choose_add_on_str),
                 emptyToNull(preferred_location),
                 emptyToNull(preferred_time),
@@ -8229,14 +8230,14 @@ async function createBookingFromWebhook(bookingData) {
                 
                 // Now create passenger records
                 if (passengerData && passengerData.length > 0) {
-                    const passengerSql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund) VALUES ?';
+            const passengerSql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund) VALUES ?';
                     const passengerValues = passengerData.map(p => [
                         bookingId,
                         p.firstName || '',
                         p.lastName || '',
-                        p.weight || null,
-                        p.email || null,
-                        p.phone || null,
+                (p.weight === '' ? null : p.weight || null),
+                (p.email === '' ? null : p.email || null),
+                (p.phone === '' ? null : p.phone || null),
                         p.ticketType || chooseFlightType.type,
                         p.weatherRefund ? 1 : 0
                     ]);
