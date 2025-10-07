@@ -597,47 +597,7 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
             </table>
             </div>
 
-            {/* Pagination Controls */}
-            <div style={{ marginTop: "10px", textAlign: "center", display: 'flex', justifyContent: 'center', gap: 6, flexWrap: 'wrap' }}>
-                {(() => {
-                    const totalPages = Math.max(1, Math.ceil(data.length / itemsPerPage));
-                    const pages = [];
-                    const windowSize = 5; // show current +/-2
-                    const start = Math.max(1, currentPage - Math.floor(windowSize/2));
-                    const end = Math.min(totalPages, start + windowSize - 1);
-                    const realStart = Math.max(1, end - windowSize + 1);
-
-                    const makeBtn = (label, page, disabled = false, key = label) => (
-                        <button
-                            key={key}
-                            onClick={() => !disabled && setCurrentPage(page)}
-                            disabled={disabled}
-                            style={{
-                                margin: "0 2px",
-                                padding: "5px 8px",
-                                background: disabled ? '#cccccc' : (currentPage === page ? "#3274b4" : "#A6A6A6"),
-                                color: "#FFF",
-                                border: "none",
-                                cursor: disabled ? 'default' : "pointer",
-                            }}
-                        >
-                            {label}
-                        </button>
-                    );
-
-                    pages.push(makeBtn('«', 1, currentPage === 1, 'first'));
-                    pages.push(makeBtn('‹', Math.max(1, currentPage - 1), currentPage === 1, 'prev'));
-
-                    for (let p = realStart; p <= end; p++) {
-                        pages.push(makeBtn(String(p), p, false, `p-${p}`));
-                    }
-
-                    pages.push(makeBtn('›', Math.min(totalPages, currentPage + 1), currentPage === totalPages, 'next'));
-                    pages.push(makeBtn('»', totalPages, currentPage === totalPages, 'last'));
-
-                    return pages;
-                })()}
-            </div>
+            {/* Infinite scroll: no pagination controls */}
         </>
     );
 };
