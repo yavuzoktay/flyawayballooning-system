@@ -954,9 +954,24 @@ app.post('/api/createRedeemBooking', (req, res) => {
     // Format booking date
     let bookingDateTime = selectedDate;
     if (selectedDate && selectedTime) {
-        const datePart = selectedDate.split(' ')[0] || selectedDate.substring(0, 10);
+        const datePart = typeof selectedDate === 'string' && selectedDate.includes(' ') 
+            ? selectedDate.split(' ')[0] 
+            : (typeof selectedDate === 'string' && selectedDate.length >= 10 
+                ? selectedDate.substring(0, 10) 
+                : selectedDate);
         bookingDateTime = `${datePart} ${selectedTime}`;
+    } else if (selectedDate) {
+        // If no selectedTime, use selectedDate as-is (might already include time)
+        bookingDateTime = selectedDate;
+    } else {
+        // Fallback to current timestamp if no date provided
+        bookingDateTime = now;
     }
+    
+    console.log('=== REDEEM BOOKING DATE FORMAT ===');
+    console.log('selectedDate:', selectedDate);
+    console.log('selectedTime:', selectedTime);
+    console.log('Final bookingDateTime:', bookingDateTime);
 
     // Simple SQL with only essential columns
     const bookingSql = `
@@ -976,17 +991,24 @@ app.post('/api/createRedeemBooking', (req, res) => {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
+    // Use actual passenger count from passengerData array
+    const actualPaxCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
+    console.log('=== REDEEM BOOKING PAX COUNT DEBUG ===');
+    console.log('passengerData.length:', passengerData?.length);
+    console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
+    console.log('actualPaxCount (FINAL):', actualPaxCount);
+    
     const bookingValues = [
         passengerName,
         chooseFlightType.type || 'Shared Flight',
         bookingDateTime,
-        chooseFlightType.passengerCount || 1,
+        actualPaxCount, // Use actual passenger count instead of chooseFlightType.passengerCount
         chooseLocation,
         'Open',
         totalPrice,
         0,
         voucher_code || null,
-        now,
+        now, // created_at
         passengerData[0].email || null,
         passengerData[0].phone || null
     ];
@@ -1009,6 +1031,53 @@ app.post('/api/createRedeemBooking', (req, res) => {
         const bookingId = result.insertId;
         console.log('=== REDEEM BOOKING SUCCESS ===');
         console.log('Booking ID:', bookingId);
+
+        // Update availability if date and time are provided
+        if (selectedDate && selectedTime && req.body.activity_id) {
+            const bookingDate = moment(selectedDate).format('YYYY-MM-DD');
+            const bookingTime = selectedTime;
+            
+            console.log('=== REDEEM BOOKING AVAILABILITY UPDATE ===');
+            console.log('passengerData RECEIVED:', JSON.stringify(passengerData, null, 2));
+            console.log('passengerData type:', typeof passengerData);
+            console.log('passengerData is Array?', Array.isArray(passengerData));
+            console.log('passengerData length:', passengerData?.length);
+            console.log('chooseFlightType:', JSON.stringify(chooseFlightType, null, 2));
+            console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
+            
+            // Use actual passenger count from passengerData array (real passenger count entered by user)
+            const actualPassengerCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
+            
+            console.log('Date:', bookingDate, 'Time:', bookingTime, 'Activity ID:', req.body.activity_id);
+            console.log('Actual Passenger Count (FINAL):', actualPassengerCount);
+            
+            updateSpecificAvailability(bookingDate, bookingTime, req.body.activity_id, actualPassengerCount);
+        } else if (selectedDate && selectedTime && chooseLocation) {
+            // Get activity_id first, then update availability
+            const bookingDate = moment(selectedDate).format('YYYY-MM-DD');
+            const bookingTime = selectedTime;
+            // Use actual passenger count from passengerData array (real passenger count entered by user)
+            const actualPassengerCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
+            
+            const activitySql = `SELECT id FROM activity WHERE location = ? AND status = 'Live' LIMIT 1`;
+            con.query(activitySql, [chooseLocation], (activityErr, activityResult) => {
+                if (activityErr) {
+                    console.error('Error getting activity_id for redeem availability update:', activityErr);
+                } else if (activityResult.length > 0) {
+                    const activityId = activityResult[0].id;
+                    
+                    console.log('=== REDEEM BOOKING AVAILABILITY UPDATE (alt sorgu) ===');
+                    console.log('Date:', bookingDate, 'Time:', bookingTime, 'Activity ID:', activityId);
+                    console.log('passengerData length:', passengerData?.length);
+                    console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
+                    console.log('Actual Passenger Count (FINAL):', actualPassengerCount);
+                    
+                    updateSpecificAvailability(bookingDate, bookingTime, activityId, actualPassengerCount);
+                } else {
+                    console.error('No activity found for location:', chooseLocation);
+                }
+            });
+        }
 
         // Create passenger record
         if (passengerData && passengerData.length > 0) {
@@ -4397,11 +4466,19 @@ app.post('/api/createBooking', (req, res) => {
         }
         console.log('DEBUG choose_add_on:', choose_add_on);
         console.log('DEBUG choose_add_on_str:', choose_add_on_str);
+        
+        // Use actual passenger count from passengerData array
+        const actualPaxCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
+        console.log('=== PAX COUNT DEBUG ===');
+        console.log('passengerData.length:', passengerData?.length);
+        console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
+        console.log('actualPaxCount (FINAL):', actualPaxCount);
+        
         const bookingValues = [
             passengerName,
             chooseFlightType.type,
             bookingDateTime, // <-- burada güncelledik
-            chooseFlightType.passengerCount,
+            actualPaxCount, // Use actual passenger count instead of chooseFlightType.passengerCount
             chooseLocation,
             'Confirmed', // Default status
             totalPrice,
@@ -4461,6 +4538,10 @@ app.post('/api/createBooking', (req, res) => {
                 console.log('chooseFlightType:', chooseFlightType);
                 console.log('chooseLocation:', chooseLocation);
                 console.log('req.body.activity_id:', req.body.activity_id);
+                console.log('passengerData RECEIVED:', JSON.stringify(passengerData, null, 2));
+                console.log('passengerData type:', typeof passengerData);
+                console.log('passengerData is Array?', Array.isArray(passengerData));
+                console.log('passengerData length:', passengerData?.length);
                 
                 let bookingDate = moment(selectedDate).format('YYYY-MM-DD');
                 let bookingTime = null;
@@ -4484,15 +4565,20 @@ app.post('/api/createBooking', (req, res) => {
                 if (bookingTime && req.body.activity_id) {
                     // Use the new specific availability update function
                     console.log('=== REBOOK AVAILABILITY UPDATE ===');
-                    console.log('UPDATE AVAILABILITY PARAMS:', chooseFlightType.passengerCount, bookingDate, bookingTime, req.body.activity_id, chooseFlightType.passengerCount);
+                    // Use actual passenger count from passengerData array (real passenger count entered by user)
+                    const actualPassengerCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
+                    console.log('UPDATE AVAILABILITY PARAMS:', actualPassengerCount, bookingDate, bookingTime, req.body.activity_id);
                     console.log('Request body activity_id:', req.body.activity_id);
-                    console.log('Request body:', req.body);
+                    console.log('passengerData length:', passengerData?.length);
+                    console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
+                    console.log('Actual passenger count (FINAL):', actualPassengerCount);
                     
-                    updateSpecificAvailability(bookingDate, bookingTime, req.body.activity_id, chooseFlightType.passengerCount);
+                    updateSpecificAvailability(bookingDate, bookingTime, req.body.activity_id, actualPassengerCount);
                     console.log('=== END REBOOK AVAILABILITY UPDATE ===');
                 } else if (bookingTime) {
                     // Get activity_id first, then update availability
-                    console.log('UPDATE AVAILABILITY PARAMS (alt sorgu):', chooseFlightType.passengerCount, bookingDate, bookingTime, chooseLocation, chooseFlightType.passengerCount);
+                    const actualPassengerCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
+                    console.log('UPDATE AVAILABILITY PARAMS (alt sorgu):', actualPassengerCount, bookingDate, bookingTime, chooseLocation);
                     
                     const activitySql = `SELECT id FROM activity WHERE location = ? AND status = 'Live' LIMIT 1`;
                     con.query(activitySql, [chooseLocation], (activityErr, activityResult) => {
@@ -4501,8 +4587,10 @@ app.post('/api/createBooking', (req, res) => {
                         } else if (activityResult.length > 0) {
                             const activityId = activityResult[0].id;
                             console.log('Found activity_id for availability update:', activityId);
-                            
-                            updateSpecificAvailability(bookingDate, bookingTime, activityId, chooseFlightType.passengerCount);
+                            console.log('passengerData length:', passengerData?.length);
+                            console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
+                            console.log('Updating availability with passenger count:', actualPassengerCount);
+                            updateSpecificAvailability(bookingDate, bookingTime, activityId, actualPassengerCount);
                         } else {
                             console.error('No activity found for location:', chooseLocation);
                         }
@@ -4863,8 +4951,8 @@ app.post('/api/createVoucher', (req, res) => {
 
     const now = moment().format('YYYY-MM-DD HH:mm:ss');
     
-    // Determine the actual voucher type based on the input (declare first to avoid ReferenceError)
-    let actualVoucherType = '';
+        // Determine the actual voucher type based on the input (declare first to avoid ReferenceError)
+        let actualVoucherType = '';
     
                     // Check if there's a specific voucher type detail in the request
         if (req.body.voucher_type_detail && req.body.voucher_type_detail.trim() !== '') {
@@ -4874,12 +4962,26 @@ app.post('/api/createVoucher', (req, res) => {
             // If the frontend sends the specific voucher type directly
             actualVoucherType = voucher_type;
             console.log('Using voucher_type directly:', actualVoucherType);
+        } else if (voucher_type && typeof voucher_type === 'string') {
+            // Some older flows send voucher_type already as the concrete type
+            actualVoucherType = voucher_type;
+            console.log('Fallback: using voucher_type as actualVoucherType:', actualVoucherType);
         } else {
-            // For Flight Voucher, Gift Voucher, etc., we need to get the actual type from the frontend
-            // This should be sent as voucher_type_detail
-            console.error('ERROR: No voucher_type_detail provided for voucher type:', voucher_type);
-            console.error('This indicates a frontend issue - selectedVoucherType was not set');
-            return res.status(400).json({ success: false, error: 'Missing voucher type detail. Please select a specific voucher type before proceeding.' });
+            // Last-chance mapping from bookingData if present (when invoked via createBookingFromSession)
+            try {
+                const maybeBooking = req.body.bookingData || {};
+                const title = maybeBooking?.selectedVoucherType?.title;
+                if (title === 'Weekday Morning' || title === 'Flexible Weekday' || title === 'Any Day Flight') {
+                    actualVoucherType = title;
+                    console.log('Mapped actualVoucherType from bookingData.selectedVoucherType:', actualVoucherType);
+                }
+            } catch (e) {
+                // ignore
+            }
+            if (!actualVoucherType) {
+                console.error('ERROR: No voucher_type or voucher_type_detail provided.');
+                return res.status(400).json({ success: false, message: 'actualVoucherType is not defined' });
+            }
         }
         
     // Validate that the voucher type detail is one of the valid types
@@ -5594,6 +5696,13 @@ app.get('/api/getBookingDetail', async (req, res) => {
             return res.status(404).json({ success: false, message: 'Booking not found' });
         }
         const booking = bookingRows[0];
+        
+        // DEBUG: Log flight_date to diagnose "Invalid Date" issue
+        console.log('=== GET BOOKING DETAIL DEBUG ===');
+        console.log('Booking ID:', booking_id);
+        console.log('flight_date from DB:', booking.flight_date, 'Type:', typeof booking.flight_date);
+        console.log('time_slot from DB:', booking.time_slot);
+        
         // Ensure preferred fields are always present and not null
         booking.preferred_location = booking.preferred_location || '';
         booking.preferred_time = booking.preferred_time || '';
@@ -6682,8 +6791,8 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
     
     console.log(`Fetching availabilities for activity ${id}`);
     
-    // Single optimized query with JOINs - FIXED to only affect specific time slots
-    const optimizedSql = `
+    // Single optimized query with JOINs - FIXED to use time_slot and SUM(pax)
+const optimizedSql = `
         SELECT 
             aa.*,
             a.location,
@@ -6699,17 +6808,18 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
         LEFT JOIN (
             SELECT 
                 DATE(ab.flight_date) as flight_date,
-                TIME(ab.flight_date) as flight_time,
-                COUNT(*) as total_booked
+                TIME(COALESCE(ab.time_slot, ab.flight_date)) as flight_time,
+                COALESCE(SUM(ab.pax), 0) as total_booked
             FROM all_booking ab 
             WHERE DATE(ab.flight_date) >= CURDATE() - INTERVAL 30 DAY
-            GROUP BY DATE(ab.flight_date), TIME(ab.flight_date)
+            AND ab.activity_id = ?
+            GROUP BY DATE(ab.flight_date), TIME(COALESCE(ab.time_slot, ab.flight_date))
         ) as booking_counts ON DATE(aa.date) = booking_counts.flight_date AND TIME(aa.time) = booking_counts.flight_time
         WHERE aa.activity_id = ? 
         ORDER BY aa.date, aa.time
-    `;
+`;
     
-    con.query(optimizedSql, [id], (err, result) => {
+    con.query(optimizedSql, [id, id], (err, result) => {
         if (err) {
             console.error('Error fetching availabilities:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err });
@@ -7208,14 +7318,22 @@ app.get('/api/getVoucherDetail', async (req, res) => {
 
 app.post("/api/getActivityId", (req, res) => {
     const { location } = req.body;
+    console.log('=== /api/getActivityId called ===');
+    console.log('Location:', location);
+    
     if (!location) {
         return res.status(400).json({ success: false, message: "Eksik bilgi!" });
     }
     const sql = 'SELECT * FROM activity WHERE location = ? AND status = "Live"';
     con.query(sql, [location], (err, activities) => {
         if (err) return res.status(500).json({ success: false, message: "Database error" });
-        if (!activities || activities.length === 0) return res.status(404).json({ success: false, message: "No activities found" });
+        if (!activities || activities.length === 0) {
+            console.log('No activities found for location:', location);
+            return res.status(404).json({ success: false, message: "No activities found" });
+        }
         const activity = activities[0];
+        console.log('Activity found - ID:', activity.id, 'Location:', activity.location);
+        
         // Şimdi availability'leri çek
         const availSql = 'SELECT id, DATE_FORMAT(date, "%Y-%m-%d") as date, time, capacity, available, status FROM activity_availability WHERE activity_id = ? AND status = "Open" AND date >= CURDATE() ORDER BY date, time';
         con.query(availSql, [activity.id], (err2, availabilities) => {
@@ -7225,6 +7343,7 @@ app.post("/api/getActivityId", (req, res) => {
                 ...a,
                 date: moment(a.date, "YYYY-MM-DD").format("YYYY-MM-DD")
             }));
+            console.log('Returning activity ID:', activity.id, 'with', formattedAvail.length, 'availabilities');
             res.json({ success: true, activity, availabilities: formattedAvail });
         });
     });
@@ -7854,7 +7973,7 @@ const updateSpecificAvailability = async (date, time, activityId, passengerCount
         console.log(`Parameters: date=${date}, time=${time}, activityId=${activityId}, passengerCount=${passengerCount}`);
         
         // First, let's check what availability records exist for this date/time/activity
-        const checkSql = `SELECT id, date, time, activity_id, available, capacity, status FROM activity_availability WHERE date = ? AND time = ? AND activity_id = ?`;
+        const checkSql = `SELECT id, date, time, activity_id, available, booked, capacity, status FROM activity_availability WHERE date = ? AND time = ? AND activity_id = ?`;
         
         con.query(checkSql, [date, time, activityId], (checkErr, checkResult) => {
             if (checkErr) {
@@ -7864,7 +7983,7 @@ const updateSpecificAvailability = async (date, time, activityId, passengerCount
             
             console.log(`Found ${checkResult.length} availability records for date=${date}, time=${time}, activityId=${activityId}:`);
             checkResult.forEach((record, index) => {
-                console.log(`  Record ${index + 1}: id=${record.id}, available=${record.available}, capacity=${record.capacity}, status=${record.status}`);
+                console.log(`  Record ${index + 1}: id=${record.id}, available=${record.available}, booked=${record.booked || 0}, capacity=${record.capacity}, status=${record.status}`);
             });
             
             if (checkResult.length === 0) {
@@ -7876,12 +7995,12 @@ const updateSpecificAvailability = async (date, time, activityId, passengerCount
                 console.warn('Multiple availability records found for the same date/time/activity - this might cause issues');
             }
             
-            // Update the specific time slot availability
-            const updateSql = `UPDATE activity_availability SET available = available - ? WHERE date = ? AND time = ? AND activity_id = ? AND available >= ?`;
+            // Update the specific time slot availability AND booked count
+            const updateSql = `UPDATE activity_availability SET available = available - ?, booked = booked + ? WHERE date = ? AND time = ? AND activity_id = ? AND available >= ?`;
             console.log(`Executing SQL: ${updateSql}`);
-            console.log(`SQL Parameters: [${passengerCount}, ${date}, ${time}, ${activityId}, ${passengerCount}]`);
+            console.log(`SQL Parameters: [${passengerCount}, ${passengerCount}, ${date}, ${time}, ${activityId}, ${passengerCount}]`);
             
-            con.query(updateSql, [passengerCount, date, time, activityId, passengerCount], (err, result) => {
+            con.query(updateSql, [passengerCount, passengerCount, date, time, activityId, passengerCount], (err, result) => {
                 if (err) {
                     console.error('Error updating specific availability:', err);
                 } else {
@@ -7892,14 +8011,14 @@ const updateSpecificAvailability = async (date, time, activityId, passengerCount
                     }
                     
                     // Verify the update by checking the new values
-                    const verifySql = `SELECT id, available, capacity, status FROM activity_availability WHERE date = ? AND time = ? AND activity_id = ?`;
+                    const verifySql = `SELECT id, available, booked, capacity, status FROM activity_availability WHERE date = ? AND time = ? AND activity_id = ?`;
                     con.query(verifySql, [date, time, activityId], (verifyErr, verifyResult) => {
                         if (verifyErr) {
                             console.error('Error verifying availability update:', verifyErr);
                         } else {
                             console.log('Verification after update:');
                             verifyResult.forEach((record, index) => {
-                                console.log(`  Record ${index + 1}: id=${record.id}, available=${record.available}, capacity=${record.capacity}, status=${record.status}`);
+                                console.log(`  Record ${index + 1}: id=${record.id}, available=${record.available}, booked=${record.booked}, capacity=${record.capacity}, status=${record.status}`);
                             });
                         }
                     });
@@ -8165,6 +8284,26 @@ async function createBookingFromWebhook(bookingData) {
         const passengerName = `${passengerData[0].firstName} ${passengerData[0].lastName}`;
         const now = moment();
         let expiresDate = null;
+        
+        // DEBUG: Log passenger data
+        console.log('=== CREATE BOOKING FROM WEBHOOK DEBUG ===');
+        console.log('passengerData:', passengerData);
+        console.log('passengerData.length:', Array.isArray(passengerData) ? passengerData.length : 0);
+        console.log('selectedDate:', selectedDate);
+        console.log('selectedTime:', selectedTime);
+        console.log('chooseFlightType:', chooseFlightType);
+        console.log('chooseLocation:', chooseLocation);
+        
+        // Determine actualVoucherType for expiry calculation
+        let actualVoucherType = '';
+        if (bookingData.voucher_type && typeof bookingData.voucher_type === 'string') {
+            actualVoucherType = bookingData.voucher_type;
+        } else if (bookingData.selectedVoucherType && bookingData.selectedVoucherType.title) {
+            actualVoucherType = bookingData.selectedVoucherType.title;
+        } else {
+            actualVoucherType = 'Any Day Flight'; // Safe default
+        }
+        console.log('actualVoucherType for booking expiry:', actualVoucherType);
 
         function insertBookingAndPassengers(expiresDateFinal) {
             const nowDate = moment().format('YYYY-MM-DD HH:mm:ss');
@@ -8196,11 +8335,18 @@ async function createBookingFromWebhook(bookingData) {
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
 
+            // Use actual passenger count from passengerData array
+            const actualPaxCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
+            console.log('=== WEBHOOK PAX COUNT DEBUG ===');
+            console.log('passengerData.length:', passengerData?.length);
+            console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
+            console.log('actualPaxCount (FINAL):', actualPaxCount);
+            
             const bookingValues = [
                 passengerName,
                 chooseFlightType.type,
                 bookingDateTime,
-                (Array.isArray(passengerData) ? passengerData.length : 0),
+                actualPaxCount, // Use actual passenger count with proper fallback
                 chooseLocation,
                 'Confirmed',
                 totalPrice,
@@ -8238,6 +8384,51 @@ async function createBookingFromWebhook(bookingData) {
                 
                 const bookingId = result.insertId;
                 console.log('Webhook booking created successfully, ID:', bookingId);
+                
+                // Update availability if date and time are provided
+                if (selectedDate && selectedTime && bookingData.activity_id) {
+                    const bookingDate = moment(selectedDate).format('YYYY-MM-DD');
+                    const bookingTime = selectedTime;
+                    // Use actual passenger count from passengerData array (real passenger count entered by user)
+                    const actualPassengerCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
+                    
+                    console.log('=== WEBHOOK BOOKING AVAILABILITY UPDATE ===');
+                    console.log('passengerData RECEIVED:', JSON.stringify(passengerData, null, 2));
+                    console.log('passengerData type:', typeof passengerData);
+                    console.log('passengerData is Array?', Array.isArray(passengerData));
+                    console.log('passengerData length:', passengerData?.length);
+                    console.log('chooseFlightType:', JSON.stringify(chooseFlightType, null, 2));
+                    console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
+                    console.log('Date:', bookingDate, 'Time:', bookingTime, 'Activity ID:', bookingData.activity_id);
+                    console.log('Actual Passenger Count (FINAL):', actualPassengerCount);
+                    
+                    updateSpecificAvailability(bookingDate, bookingTime, bookingData.activity_id, actualPassengerCount);
+                } else if (selectedDate && selectedTime && chooseLocation) {
+                    // Get activity_id first, then update availability
+                    const bookingDate = moment(selectedDate).format('YYYY-MM-DD');
+                    const bookingTime = selectedTime;
+                    // Use actual passenger count from passengerData array (real passenger count entered by user)
+                    const actualPassengerCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
+                    
+                    const activitySql = `SELECT id FROM activity WHERE location = ? AND status = 'Live' LIMIT 1`;
+                    con.query(activitySql, [chooseLocation], (activityErr, activityResult) => {
+                        if (activityErr) {
+                            console.error('Error getting activity_id for webhook availability update:', activityErr);
+                        } else if (activityResult.length > 0) {
+                            const activityId = activityResult[0].id;
+                            
+                            console.log('=== WEBHOOK BOOKING AVAILABILITY UPDATE (alt sorgu) ===');
+                            console.log('Date:', bookingDate, 'Time:', bookingTime, 'Activity ID:', activityId);
+                            console.log('passengerData length:', passengerData?.length);
+                            console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
+                            console.log('Actual Passenger Count (FINAL):', actualPassengerCount);
+                            
+                            updateSpecificAvailability(bookingDate, bookingTime, activityId, actualPassengerCount);
+                        } else {
+                            console.error('No activity found for location:', chooseLocation);
+                        }
+                    });
+                }
                 
                 // Now create passenger records
                 if (passengerData && passengerData.length > 0) {
@@ -8345,12 +8536,14 @@ async function createBookingFromWebhook(bookingData) {
             });
             
             // Update availability for the specific time slot after booking creation
-            if (selectedDate && selectedTime && chooseFlightType && chooseFlightType.passengerCount && chooseLocation) {
+            // Remove chooseFlightType.passengerCount check - we'll use passengerData.length instead
+            if (selectedDate && selectedTime && chooseFlightType && chooseLocation) {
                 console.log('=== WEBHOOK AVAILABILITY UPDATE ===');
                 console.log('selectedDate:', selectedDate, 'Type:', typeof selectedDate);
                 console.log('selectedTime:', selectedTime);
                 console.log('chooseFlightType:', chooseFlightType);
                 console.log('chooseLocation:', chooseLocation);
+                console.log('passengerData length:', Array.isArray(passengerData) ? passengerData.length : 0);
                 
                 let bookingDate = selectedDate;
                 let bookingTime = selectedTime;
@@ -8383,7 +8576,10 @@ async function createBookingFromWebhook(bookingData) {
                             console.log('Found activity_id for availability update:', activityId);
                             
                             // Update availability for this specific time slot
-                            updateSpecificAvailability(bookingDate, bookingTime, activityId, chooseFlightType.passengerCount);
+                            // Use actual passenger count from passengerData array
+                            const actualPassengerCount = (Array.isArray(passengerData) ? passengerData.length : 1);
+                            console.log('Updating availability with passenger count:', actualPassengerCount);
+                            updateSpecificAvailability(bookingDate, bookingTime, activityId, actualPassengerCount);
                         } else {
                             console.error('No activity found for location:', chooseLocation);
                         }
@@ -8474,11 +8670,16 @@ async function createVoucherFromWebhook(voucherData) {
             // If the frontend sends the specific voucher type directly
             actualVoucherType = voucher_type;
             console.log('Using voucher_type directly from webhook:', actualVoucherType);
+        } else if (voucherData.selectedVoucherType && voucherData.selectedVoucherType.title) {
+            // Fallback: Try to get from selectedVoucherType object
+            actualVoucherType = voucherData.selectedVoucherType.title.trim();
+            console.log('Using selectedVoucherType.title as fallback:', actualVoucherType);
         } else {
             // For Flight Voucher, Gift Voucher, etc., we need to get the actual type from the frontend
             // This should be sent as voucher_type_detail
             console.error('ERROR: No voucher_type_detail provided for voucher type:', voucher_type);
             console.error('This indicates a frontend issue - selectedVoucherType was not set');
+            console.error('voucherData received:', voucherData);
             return reject(new Error('Missing voucher type detail. Please select a specific voucher type before proceeding.'));
         }
         
@@ -8653,6 +8854,14 @@ app.post('/api/create-checkout-session', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Eksik veri: bookingData veya voucherData gereklidir.' });
         }
         
+        // Debug: Log activity_id in bookingData
+        if (bookingData) {
+            console.log('=== BOOKING DATA DEBUG (create-checkout-session) ===');
+            console.log('bookingData.activity_id:', bookingData.activity_id);
+            console.log('bookingData.chooseLocation:', bookingData.chooseLocation);
+            console.log('bookingData.activitySelect:', bookingData.activitySelect);
+        }
+        
         // Debug: Log numberOfPassengers in voucherData
         if (voucherData) {
             console.log('=== VOUCHER DATA DEBUG (create-checkout-session) ===');
@@ -8678,8 +8887,15 @@ app.post('/api/create-checkout-session', async (req, res) => {
         }
         
         // Environment'a göre URL'leri ayarla
+        // Prefer request origin (or explicit env override) so local/dev/prod return to the same host that initiated checkout
         const isProd = process.env.NODE_ENV === 'production';
-        const baseUrl = isProd ? 'https://flyawayballooning-book.com' : 'http://localhost:3000';
+        const reqOrigin = (req.headers && (req.headers.origin || req.headers.referer)) || '';
+        let derivedOrigin = '';
+        if (reqOrigin) {
+            const match = String(reqOrigin).match(/^https?:\/\/[^/]+/);
+            if (match) derivedOrigin = match[0];
+        }
+        const baseUrl = process.env.CHECKOUT_RETURN_BASE_URL || derivedOrigin || (isProd ? 'https://flyawayballooning-book.com' : 'http://localhost:3000');
         
         console.log('Creating Stripe session with:', { amount, baseUrl, isProd });
         
@@ -8934,21 +9150,53 @@ app.post('/api/createBookingFromSession', async (req, res) => {
         let result;
         let voucherCode = null;
         if (type === 'booking' && storeData.bookingData) {
+            // If another call is already creating, wait briefly for completion instead of returning immediately
             if (storeData.processing) {
-                return res.status(202).json({ success: false, message: 'Booking creation already in progress' });
+                for (let i = 0; i < 15; i++) { // wait up to ~15s
+                    if (!storeData.processing) break;
+                    await new Promise(r => setTimeout(r, 1000));
+                }
+                if (storeData.processed && storeData.bookingData?.booking_id) {
+                    return res.json({ success: true, id: storeData.bookingData.booking_id, message: 'booking already created' });
+                }
+                if (storeData.processing) {
+                    return res.status(202).json({ success: false, message: 'Booking creation already in progress' });
+                }
             }
             if (storeData.processed && storeData.bookingData?.booking_id) {
                 return res.json({ success: true, id: storeData.bookingData.booking_id, message: 'booking already created' });
             }
             console.log('Creating booking from session data');
+            console.log('=== BOOKING DATA BEFORE createBookingFromWebhook ===');
+            console.log('passengerData:', storeData.bookingData.passengerData);
+            console.log('passengerData length:', Array.isArray(storeData.bookingData.passengerData) ? storeData.bookingData.passengerData.length : 0);
+            console.log('selectedDate:', storeData.bookingData.selectedDate);
+            console.log('selectedTime:', storeData.bookingData.selectedTime);
+            console.log('chooseLocation:', storeData.bookingData.chooseLocation);
+            console.log('chooseFlightType:', storeData.bookingData.chooseFlightType);
+            
+            // Ensure voucher_type_detail is present for createBookingFromWebhook
+            try {
+                if (!storeData.bookingData.voucher_type_detail && storeData.bookingData.selectedVoucherType?.title) {
+                    const title = storeData.bookingData.selectedVoucherType.title;
+                    if (title === 'Weekday Morning') storeData.bookingData.voucher_type_detail = 'Weekday Morning';
+                    else if (title === 'Flexible Weekday') storeData.bookingData.voucher_type_detail = 'Flexible Weekday';
+                    else if (title === 'Any Day Flight') storeData.bookingData.voucher_type_detail = 'Any Day Flight';
+                }
+            } catch (mapErr) {
+                console.warn('voucher_type_detail mapping failed:', mapErr?.message);
+            }
             // Acquire a simple in-memory lock
             storeData.processing = true;
-            result = await createBookingFromWebhook(storeData.bookingData);
-            console.log('Booking created successfully, ID:', result);
-            // mark processed and store id to avoid duplicates
-            storeData.processed = true;
-            storeData.processing = false;
-            storeData.bookingData.booking_id = result;
+            try {
+                result = await createBookingFromWebhook(storeData.bookingData);
+                console.log('Booking created successfully, ID:', result);
+                // mark processed and store id to avoid duplicates
+                storeData.processed = true;
+                storeData.bookingData.booking_id = result;
+            } finally {
+                storeData.processing = false;
+            }
             
             // For Book Flight, generate voucher code
             try {
@@ -9075,6 +9323,19 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                         storeData.voucherData.voucher_id = result;
                         storeData.processed = true;
                     } else {
+                        // Ensure voucher_type_detail is present for createVoucherFromWebhook
+                        try {
+                            if (!storeData.voucherData.voucher_type_detail && storeData.voucherData.selectedVoucherType?.title) {
+                                const title = storeData.voucherData.selectedVoucherType.title;
+                                if (title === 'Weekday Morning') storeData.voucherData.voucher_type_detail = 'Weekday Morning';
+                                else if (title === 'Flexible Weekday') storeData.voucherData.voucher_type_detail = 'Flexible Weekday';
+                                else if (title === 'Any Day Flight') storeData.voucherData.voucher_type_detail = 'Any Day Flight';
+                                else storeData.voucherData.voucher_type_detail = title; // For Private Charter types
+                                console.log('Mapped voucher_type_detail from selectedVoucherType:', storeData.voucherData.voucher_type_detail);
+                            }
+                        } catch (mapErr) {
+                            console.warn('voucher_type_detail mapping failed:', mapErr?.message);
+                        }
                         // Create voucher only if not already created
                         result = await createVoucherFromWebhook(storeData.voucherData);
                         console.log('Voucher created successfully, ID:', result);
@@ -9462,9 +9723,9 @@ app.post('/api/activity/:id/updateAvailableCounts', (req, res) => {
         let updatedCount = 0;
         const updatePromises = availabilities.map(availability => {
             return new Promise((resolve) => {
-                // Get actual booking count for this availability
+                // Get actual passenger count for this availability (SUM of pax, not COUNT of bookings)
                 const getBookingCountSql = `
-                    SELECT COUNT(*) as total_booked
+                    SELECT COALESCE(SUM(ab.pax), 0) as total_booked
                     FROM all_booking ab 
                     WHERE ab.activity_id = ? 
                     AND DATE(ab.flight_date) = DATE(?)
@@ -9474,7 +9735,7 @@ app.post('/api/activity/:id/updateAvailableCounts', (req, res) => {
                 
                 con.query(getBookingCountSql, [id, availability.date, availability.location, availability.time], (bookingErr, bookingResult) => {
                     if (bookingErr) {
-                        console.error('Error getting booking count:', bookingErr);
+                        console.error('Error getting passenger count:', bookingErr);
                         resolve(false);
                         return;
                     }
@@ -9487,16 +9748,16 @@ app.post('/api/activity/:id/updateAvailableCounts', (req, res) => {
                     if (newAvailable !== availability.available || newStatus !== availability.status) {
                         const updateSql = `
                             UPDATE activity_availability 
-                            SET available = ?, status = ? 
+                            SET available = ?, booked = ?, status = ? 
                             WHERE id = ?
                         `;
                         
-                        con.query(updateSql, [newAvailable, newStatus, availability.id], (updateErr) => {
+                        con.query(updateSql, [newAvailable, totalBooked, newStatus, availability.id], (updateErr) => {
                             if (updateErr) {
                                 console.error('Error updating availability:', updateErr);
                                 resolve(false);
                             } else {
-                                console.log(`Updated availability ${availability.id}: available=${newAvailable}, status=${newStatus}, total_booked=${totalBooked}`);
+                                console.log(`Updated availability ${availability.id}: available=${newAvailable}, booked=${totalBooked}, status=${newStatus}`);
                                 updatedCount++;
                                 resolve(true);
                             }
@@ -11689,5 +11950,269 @@ app.get('/api/diagnostics/twilio', (req, res) => {
         fromNumberSet: Boolean(process.env.TWILIO_FROM_NUMBER),
         messagingServiceSidSet: Boolean(process.env.TWILIO_MESSAGING_SERVICE_SID),
         statusCallbackSet: Boolean(process.env.TWILIO_STATUS_CALLBACK_URL)
+    });
+});
+
+// FIX REDEEMED VOUCHERS: Update all_vouchers table for bookings that have voucher_code
+app.post('/api/fix-redeemed-vouchers', (req, res) => {
+    console.log('=== FIXING REDEEMED VOUCHERS ===');
+    
+    // Get all bookings that have a voucher_code
+    const selectSql = `
+        SELECT b.id, b.name, b.voucher_code, v.redeemed, v.voucher_ref
+        FROM all_booking b
+        LEFT JOIN all_vouchers v ON b.voucher_code = v.voucher_ref
+        WHERE b.voucher_code IS NOT NULL 
+          AND b.voucher_code != '' 
+          AND (v.redeemed IS NULL OR v.redeemed != 'Yes')
+        LIMIT 100
+    `;
+    
+    con.query(selectSql, (err, bookings) => {
+        if (err) {
+            console.error('Error selecting bookings:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        if (!bookings || bookings.length === 0) {
+            return res.json({ success: true, message: 'No vouchers to fix', updated: 0 });
+        }
+        
+        console.log(`Found ${bookings.length} vouchers to mark as redeemed`);
+        
+        let updated = 0;
+        
+        const updatePromises = bookings.map(booking => {
+            return new Promise((resolve) => {
+                const updateSql = `
+                    UPDATE all_vouchers 
+                    SET redeemed = 'Yes' 
+                    WHERE voucher_ref = ?
+                `;
+                
+                con.query(updateSql, [booking.voucher_code], (updateErr, result) => {
+                    if (updateErr) {
+                        console.error(`Error updating voucher ${booking.voucher_code}:`, updateErr);
+                        resolve(false);
+                    } else {
+                        if (result.affectedRows > 0) {
+                            console.log(`Updated voucher ${booking.voucher_code}: redeemed = 'Yes'`);
+                            updated++;
+                        } else {
+                            console.log(`No voucher found for code ${booking.voucher_code}`);
+                        }
+                        resolve(true);
+                    }
+                });
+            });
+        });
+        
+        Promise.all(updatePromises).then(() => {
+            res.json({
+                success: true,
+                message: `Fixed ${updated} vouchers`,
+                updated,
+                total: bookings.length
+            });
+        });
+    });
+});
+
+// DIAGNOSTICS: Check voucher redemption status
+app.get('/api/check-voucher-status', (req, res) => {
+    const voucherCode = req.query.voucher_code;
+    
+    if (!voucherCode) {
+        return res.status(400).json({ success: false, message: 'voucher_code parameter required' });
+    }
+    
+    const sql = `
+        SELECT v.voucher_ref, v.redeemed, v.name as voucher_name, b.id as booking_id, b.name as booking_name, b.flight_date
+        FROM all_vouchers v
+        LEFT JOIN all_booking b ON b.voucher_code = v.voucher_ref
+        WHERE v.voucher_ref = ?
+    `;
+    
+    con.query(sql, [voucherCode], (err, result) => {
+        if (err) {
+            return res.status(500).json({ success: false, error: err.message });
+        }
+        
+        if (!result || result.length === 0) {
+            return res.json({ success: true, found: false, message: 'Voucher not found in all_vouchers table' });
+        }
+        
+        res.json({ success: true, found: true, voucher: result[0] });
+    });
+});
+
+// DIAGNOSTICS: Check flight_date values
+app.get('/api/check-flight-dates', (req, res) => {
+    const voucherCode = req.query.voucher_code || null;
+    
+    let sql, params;
+    if (voucherCode) {
+        sql = `
+            SELECT id, name, flight_date, time_slot, location, created_at, voucher_code 
+            FROM all_booking 
+            WHERE voucher_code = ?
+            LIMIT 10
+        `;
+        params = [voucherCode];
+    } else {
+        sql = `
+            SELECT id, name, flight_date, time_slot, location, created_at, voucher_code 
+            FROM all_booking 
+            ORDER BY id DESC 
+            LIMIT 10
+        `;
+        params = [];
+    }
+    
+    con.query(sql, params, (err, bookings) => {
+        if (err) {
+            return res.status(500).json({ success: false, error: err.message });
+        }
+        
+        const formatted = bookings.map(b => ({
+            id: b.id,
+            name: b.name,
+            flight_date: b.flight_date,
+            flight_date_type: typeof b.flight_date,
+            time_slot: b.time_slot,
+            location: b.location,
+            voucher_code: b.voucher_code
+        }));
+        
+        res.json({ success: true, bookings: formatted });
+    });
+});
+
+// FIX FLIGHT_DATE: Migrate existing bookings where flight_date is NULL or invalid
+app.post('/api/fix-flight-dates', (req, res) => {
+    console.log('=== FIXING FLIGHT DATES ===');
+    
+    // Get all bookings where flight_date contains invalid format (ISO string mixed with time)
+    const selectSql = `
+        SELECT id, name, flight_date, time_slot, location, created_at 
+        FROM all_booking 
+        WHERE flight_date IS NOT NULL 
+           AND (
+               flight_date LIKE '%T%Z%' 
+               OR flight_date LIKE '%.000Z%'
+               OR flight_date = '' 
+               OR flight_date = '0000-00-00 00:00:00'
+           )
+        LIMIT 100
+    `;
+    
+    con.query(selectSql, (err, bookings) => {
+        if (err) {
+            console.error('Error selecting bookings:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        if (!bookings || bookings.length === 0) {
+            return res.json({ success: true, message: 'No bookings to fix', updated: 0 });
+        }
+        
+        console.log(`Found ${bookings.length} bookings to fix`);
+        
+        let updated = 0;
+        let errors = [];
+        
+        const updatePromises = bookings.map(booking => {
+            return new Promise((resolve) => {
+                let newFlightDate = null;
+                
+                try {
+                    const flightDateStr = booking.flight_date ? booking.flight_date.toString() : '';
+                    
+                    // Case 1: Invalid format like "2025-10-15T22:00:00.000Z 15:00:00"
+                    if (flightDateStr.includes('T') && flightDateStr.includes('Z')) {
+                        // Extract the ISO date part and the time part after the Z
+                        const parts = flightDateStr.split(/\s+/);
+                        
+                        if (parts.length >= 2) {
+                            // Parse the ISO date: "2025-10-15T22:00:00.000Z"
+                            const isoDateMatch = parts[0].match(/(\d{4})-(\d{2})-(\d{2})T/);
+                            const timePart = parts[1]; // "15:00:00"
+                            
+                            if (isoDateMatch && timePart) {
+                                const [_, year, month, day] = isoDateMatch;
+                                newFlightDate = `${year}-${month}-${day} ${timePart}`;
+                            }
+                        } else {
+                            // Just parse the ISO date without time
+                            const isoDateMatch = flightDateStr.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+                            if (isoDateMatch) {
+                                const [_, year, month, day, hour, minute] = isoDateMatch;
+                                newFlightDate = `${year}-${month}-${day} ${hour}:${minute}:00`;
+                            }
+                        }
+                    }
+                    // Case 2: Parse time_slot if flight_date is empty
+                    else if (booking.time_slot) {
+                        const timeSlotStr = booking.time_slot.toString();
+                        
+                        // Try to parse DD/MM/YYYY H:MM AM/PM format
+                        const match = timeSlotStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+                        
+                        if (match) {
+                            const [_, day, month, year, hour, minute, ampm] = match;
+                            let hour24 = parseInt(hour, 10);
+                            
+                            // Convert to 24-hour format if AM/PM is present
+                            if (ampm) {
+                                if (ampm.toUpperCase() === 'PM' && hour24 !== 12) {
+                                    hour24 += 12;
+                                } else if (ampm.toUpperCase() === 'AM' && hour24 === 12) {
+                                    hour24 = 0;
+                                }
+                            }
+                            
+                            // Format as YYYY-MM-DD HH:MM:SS
+                            newFlightDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')} ${String(hour24).padStart(2, '0')}:${minute}:00`;
+                        }
+                    }
+                } catch (parseErr) {
+                    console.error(`Error parsing flight_date for booking ${booking.id}:`, parseErr);
+                    errors.push({ id: booking.id, error: 'Parse error' });
+                    resolve(false);
+                    return;
+                }
+                
+                if (!newFlightDate) {
+                    console.log(`Skipping booking ${booking.id} - could not parse flight_date: ${booking.flight_date}`);
+                    resolve(false);
+                    return;
+                }
+                
+                // Update flight_date
+                const updateSql = `UPDATE all_booking SET flight_date = ? WHERE id = ?`;
+                
+                con.query(updateSql, [newFlightDate, booking.id], (updateErr) => {
+                    if (updateErr) {
+                        console.error(`Error updating booking ${booking.id}:`, updateErr);
+                        errors.push({ id: booking.id, error: updateErr.message });
+                        resolve(false);
+                    } else {
+                        console.log(`Updated booking ${booking.id}: flight_date = ${newFlightDate}`);
+                        updated++;
+                        resolve(true);
+                    }
+                });
+            });
+        });
+        
+        Promise.all(updatePromises).then(() => {
+            res.json({
+                success: true,
+                message: `Fixed ${updated} bookings`,
+                updated,
+                total: bookings.length,
+                errors: errors.length > 0 ? errors : undefined
+            });
+        });
     });
 });
