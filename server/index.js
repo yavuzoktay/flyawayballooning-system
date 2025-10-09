@@ -6809,17 +6809,20 @@ const optimizedSql = `
             SELECT 
                 DATE(ab.flight_date) as flight_date,
                 TIME(COALESCE(ab.time_slot, ab.flight_date)) as flight_time,
+                ab.location as location,
                 COALESCE(SUM(ab.pax), 0) as total_booked
             FROM all_booking ab 
             WHERE DATE(ab.flight_date) >= CURDATE() - INTERVAL 30 DAY
-            AND ab.activity_id = ?
-            GROUP BY DATE(ab.flight_date), TIME(COALESCE(ab.time_slot, ab.flight_date))
-        ) as booking_counts ON DATE(aa.date) = booking_counts.flight_date AND TIME(aa.time) = booking_counts.flight_time
+            GROUP BY DATE(ab.flight_date), TIME(COALESCE(ab.time_slot, ab.flight_date)), ab.location
+        ) as booking_counts 
+            ON DATE(aa.date) = booking_counts.flight_date 
+            AND TIME(aa.time) = booking_counts.flight_time
+            AND a.location = booking_counts.location
         WHERE aa.activity_id = ? 
         ORDER BY aa.date, aa.time
 `;
     
-    con.query(optimizedSql, [id, id], (err, result) => {
+    con.query(optimizedSql, [id], (err, result) => {
         if (err) {
             console.error('Error fetching availabilities:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err });
@@ -9727,13 +9730,12 @@ app.post('/api/activity/:id/updateAvailableCounts', (req, res) => {
                 const getBookingCountSql = `
                     SELECT COALESCE(SUM(ab.pax), 0) as total_booked
                     FROM all_booking ab 
-                    WHERE ab.activity_id = ? 
-                    AND DATE(ab.flight_date) = DATE(?)
+                    WHERE DATE(ab.flight_date) = DATE(?)
                     AND ab.location = ?
-                    AND TIME(ab.time_slot) = TIME(?)
+                    AND TIME(COALESCE(ab.time_slot, ab.flight_date)) = TIME(?)
                 `;
                 
-                con.query(getBookingCountSql, [id, availability.date, availability.location, availability.time], (bookingErr, bookingResult) => {
+                con.query(getBookingCountSql, [availability.date, availability.location, availability.time], (bookingErr, bookingResult) => {
                     if (bookingErr) {
                         console.error('Error getting passenger count:', bookingErr);
                         resolve(false);
