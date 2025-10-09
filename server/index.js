@@ -9782,6 +9782,63 @@ app.post('/api/activity/:id/updateAvailableCounts', (req, res) => {
     });
 });
 
+// Update a single availability row after a booking by recomputing from bookings
+function updateSpecificAvailability(bookingDate, bookingTime, activityId, passengerCount) {
+    try {
+        console.log('updateSpecificAvailability invoked', { bookingDate, bookingTime, activityId, passengerCount });
+        if (!bookingDate || !bookingTime || !activityId) {
+            console.warn('updateSpecificAvailability missing params');
+            return;
+        }
+        // Find the matching availability and its capacity/location
+        const findSlotSql = `
+            SELECT aa.id, aa.capacity, a.location
+            FROM activity_availability aa
+            JOIN activity a ON a.id = aa.activity_id
+            WHERE aa.activity_id = ? AND DATE(aa.date) = DATE(?) AND TIME(aa.time) = TIME(?)
+            LIMIT 1
+        `;
+        con.query(findSlotSql, [activityId, bookingDate, bookingTime], (slotErr, slotRows) => {
+            if (slotErr) {
+                console.error('updateSpecificAvailability: error finding slot', slotErr);
+                return;
+            }
+            if (!slotRows || slotRows.length === 0) {
+                console.warn('updateSpecificAvailability: slot not found', { activityId, bookingDate, bookingTime });
+                return;
+            }
+            const slot = slotRows[0];
+            // Sum pax for this date/time and location; include bookings that may not have activity_id
+            const sumPaxSql = `
+                SELECT COALESCE(SUM(ab.pax), 0) as total_booked
+                FROM all_booking ab
+                WHERE DATE(ab.flight_date) = DATE(?)
+                AND TIME(COALESCE(ab.time_slot, ab.flight_date)) = TIME(?)
+                AND (ab.activity_id = ? OR (ab.activity_id IS NULL AND ab.location = ?))
+            `;
+            con.query(sumPaxSql, [bookingDate, bookingTime, activityId, slot.location], (sumErr, sumRows) => {
+                if (sumErr) {
+                    console.error('updateSpecificAvailability: error summing pax', sumErr);
+                    return;
+                }
+                const totalBooked = (sumRows && sumRows[0] && sumRows[0].total_booked) ? Number(sumRows[0].total_booked) : 0;
+                const newAvailable = Math.max(0, Number(slot.capacity) - totalBooked);
+                const newStatus = totalBooked >= Number(slot.capacity) ? 'Closed' : 'Open';
+                const updateSql = 'UPDATE activity_availability SET available = ?, booked = ?, status = ? WHERE id = ?';
+                con.query(updateSql, [newAvailable, totalBooked, newStatus, slot.id], (updErr) => {
+                    if (updErr) {
+                        console.error('updateSpecificAvailability: error updating slot', updErr);
+                    } else {
+                        console.log('updateSpecificAvailability: updated', { id: slot.id, available: newAvailable, booked: totalBooked, status: newStatus });
+                    }
+                });
+            });
+        });
+    } catch (e) {
+        console.error('updateSpecificAvailability exception', e);
+    }
+}
+
 // Duplicate function removed - using the existing one at line 2291
 
 // Test endpoint for creating a test booking
