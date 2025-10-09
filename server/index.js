@@ -6808,15 +6808,15 @@ const optimizedSql = `
         LEFT JOIN (
             SELECT 
                 DATE(ab.flight_date) as flight_date,
-                TIME(COALESCE(ab.time_slot, ab.flight_date)) as flight_time,
+                TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i') as flight_time_min,
                 ab.location as location,
                 COALESCE(SUM(ab.pax), 0) as total_booked
             FROM all_booking ab 
             WHERE DATE(ab.flight_date) >= CURDATE() - INTERVAL 30 DAY
-            GROUP BY DATE(ab.flight_date), TIME(COALESCE(ab.time_slot, ab.flight_date)), ab.location
+            GROUP BY DATE(ab.flight_date), TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i'), ab.location
         ) as booking_counts 
             ON DATE(aa.date) = booking_counts.flight_date 
-            AND TIME(aa.time) = booking_counts.flight_time
+            AND TIME_FORMAT(TIME(aa.time), '%H:%i') = booking_counts.flight_time_min
             AND a.location = booking_counts.location
         WHERE aa.activity_id = ? 
         ORDER BY aa.date, aa.time
@@ -9732,7 +9732,7 @@ app.post('/api/activity/:id/updateAvailableCounts', (req, res) => {
                     FROM all_booking ab 
                     WHERE DATE(ab.flight_date) = DATE(?)
                     AND ab.location = ?
-                    AND TIME(COALESCE(ab.time_slot, ab.flight_date)) = TIME(?)
+                    AND TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i') = TIME_FORMAT(TIME(?), '%H:%i')
                 `;
                 
                 con.query(getBookingCountSql, [availability.date, availability.location, availability.time], (bookingErr, bookingResult) => {
@@ -9795,7 +9795,7 @@ function updateSpecificAvailability(bookingDate, bookingTime, activityId, passen
             SELECT aa.id, aa.capacity, a.location
             FROM activity_availability aa
             JOIN activity a ON a.id = aa.activity_id
-            WHERE aa.activity_id = ? AND DATE(aa.date) = DATE(?) AND TIME(aa.time) = TIME(?)
+            WHERE aa.activity_id = ? AND DATE(aa.date) = DATE(?) AND TIME_FORMAT(TIME(aa.time), '%H:%i') = TIME_FORMAT(TIME(?), '%H:%i')
             LIMIT 1
         `;
         con.query(findSlotSql, [activityId, bookingDate, bookingTime], (slotErr, slotRows) => {
@@ -9813,7 +9813,7 @@ function updateSpecificAvailability(bookingDate, bookingTime, activityId, passen
                 SELECT COALESCE(SUM(ab.pax), 0) as total_booked
                 FROM all_booking ab
                 WHERE DATE(ab.flight_date) = DATE(?)
-                AND TIME(COALESCE(ab.time_slot, ab.flight_date)) = TIME(?)
+                AND TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i') = TIME_FORMAT(TIME(?), '%H:%i')
                 AND (ab.activity_id = ? OR (ab.activity_id IS NULL AND ab.location = ?))
             `;
             con.query(sumPaxSql, [bookingDate, bookingTime, activityId, slot.location], (sumErr, sumRows) => {
