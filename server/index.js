@@ -940,13 +940,17 @@ app.post('/api/createRedeemBooking', (req, res) => {
         selectedDate,
         selectedTime,
         voucher_code,
-        totalPrice = 0
+        totalPrice = 0,
+        activity_id
     } = req.body;
 
     // Basic validation
     if (!chooseLocation || !chooseFlightType || !passengerData || !passengerData[0]) {
         return res.status(400).json({ success: false, error: 'Missing required booking information' });
     }
+    
+    // Trim voucher code to remove whitespace and tab characters
+    const cleanVoucherCode = voucher_code ? voucher_code.trim() : null;
 
     const passengerName = `${passengerData[0].firstName} ${passengerData[0].lastName}`;
     const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -987,8 +991,9 @@ app.post('/api/createRedeemBooking', (req, res) => {
             voucher_code,
             created_at,
             email,
-            phone
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            phone,
+            activity_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     // Use actual passenger count from passengerData array
@@ -997,6 +1002,8 @@ app.post('/api/createRedeemBooking', (req, res) => {
     console.log('passengerData.length:', passengerData?.length);
     console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
     console.log('actualPaxCount (FINAL):', actualPaxCount);
+    console.log('activity_id:', activity_id);
+    console.log('cleanVoucherCode:', cleanVoucherCode);
     
     const bookingValues = [
         passengerName,
@@ -1007,10 +1014,11 @@ app.post('/api/createRedeemBooking', (req, res) => {
         'Open',
         totalPrice,
         0,
-        voucher_code || null,
+        cleanVoucherCode,
         now, // created_at
         passengerData[0].email || null,
-        passengerData[0].phone || null
+        passengerData[0].phone || null,
+        activity_id || null
     ];
 
     console.log('=== REDEEM BOOKING SQL ===');
@@ -1108,6 +1116,37 @@ app.post('/api/createRedeemBooking', (req, res) => {
             });
         }
 
+        // Save additional info answers if provided
+        if (additionalInfo && typeof additionalInfo === 'object') {
+            console.log('=== SAVING ADDITIONAL INFO ===');
+            console.log('Additional Info:', additionalInfo);
+            
+            // Remove non-answer fields
+            const { notes, __requiredKeys, ...answers } = additionalInfo;
+            
+            // Save each question answer
+            Object.keys(answers).forEach(questionKey => {
+                const answer = answers[questionKey];
+                if (answer !== undefined && answer !== null && answer !== '') {
+                    const answerSql = `
+                        INSERT INTO additional_info_answers (booking_id, question_id, answer)
+                        VALUES (?, ?, ?)
+                    `;
+                    
+                    // Extract question number from key (e.g., "question_14" -> 14)
+                    const questionId = questionKey.replace('question_', '');
+                    
+                    con.query(answerSql, [bookingId, questionId, answer], (answerErr) => {
+                        if (answerErr) {
+                            console.error(`Error saving answer for ${questionKey}:`, answerErr);
+                        } else {
+                            console.log(`Answer saved for question ${questionId}`);
+                        }
+                    });
+                }
+            });
+        }
+
         res.json({ 
             success: true, 
             message: 'Booking created successfully', 
@@ -1124,15 +1163,18 @@ app.post('/api/redeem-voucher', (req, res) => {
         return res.status(400).json({ success: false, message: 'Voucher code is required' });
     }
     
+    // Trim and clean voucher code
+    const cleanVoucherCode = voucher_code.trim().toUpperCase();
+    
     console.log('=== MARKING VOUCHER AS REDEEMED ===');
-    console.log('Voucher Code:', voucher_code);
-    console.log('Voucher Code (uppercase):', voucher_code.toUpperCase());
+    console.log('Original Voucher Code:', voucher_code);
+    console.log('Clean Voucher Code:', cleanVoucherCode);
     console.log('Booking ID:', booking_id);
     
     // First check if voucher exists
     const checkVoucherSql = `SELECT * FROM all_vouchers WHERE voucher_ref = ?`;
     
-    con.query(checkVoucherSql, [voucher_code.toUpperCase()], (checkErr, checkResult) => {
+    con.query(checkVoucherSql, [cleanVoucherCode], (checkErr, checkResult) => {
         if (checkErr) {
             console.error('Error checking voucher existence:', checkErr);
             return res.status(500).json({ success: false, message: 'Database error', error: checkErr.message });
@@ -1148,7 +1190,7 @@ app.post('/api/redeem-voucher', (req, res) => {
                 name: checkResult[0].name
             });
         } else {
-            console.log('No voucher found with code:', voucher_code.toUpperCase());
+            console.log('No voucher found with code:', cleanVoucherCode);
         }
         
         // Update voucher in all_vouchers table
@@ -1161,9 +1203,9 @@ app.post('/api/redeem-voucher', (req, res) => {
         
         console.log('=== EXECUTING UPDATE ===');
         console.log('SQL:', updateVoucherSql);
-        console.log('Parameter:', voucher_code.toUpperCase());
+        console.log('Parameter:', cleanVoucherCode);
         
-        con.query(updateVoucherSql, [voucher_code.toUpperCase()], (err, result) => {
+        con.query(updateVoucherSql, [cleanVoucherCode], (err, result) => {
             if (err) {
                 console.error('=== UPDATE ERROR ===');
                 console.error('Error marking voucher as redeemed:', err);
