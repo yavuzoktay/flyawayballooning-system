@@ -1171,10 +1171,19 @@ app.post('/api/redeem-voucher', (req, res) => {
     console.log('Clean Voucher Code:', cleanVoucherCode);
     console.log('Booking ID:', booking_id);
     
-    // First check if voucher exists (case-insensitive)
-    const checkVoucherSql = `SELECT * FROM all_vouchers WHERE UPPER(voucher_ref) = UPPER(?)`;
+    // Check both all_vouchers (voucher_ref) and all_booking (voucher_code) tables
+    const checkVoucherSql = `
+        SELECT 'all_vouchers' as source, id, voucher_ref as code, redeemed, name 
+        FROM all_vouchers 
+        WHERE UPPER(voucher_ref) = UPPER(?)
+        UNION ALL
+        SELECT 'all_booking' as source, id, voucher_code as code, 'No' as redeemed, name 
+        FROM all_booking 
+        WHERE UPPER(voucher_code) = UPPER(?)
+        LIMIT 1
+    `;
     
-    con.query(checkVoucherSql, [cleanVoucherCode], (checkErr, checkResult) => {
+    con.query(checkVoucherSql, [cleanVoucherCode, cleanVoucherCode], (checkErr, checkResult) => {
         if (checkErr) {
             console.error('Error checking voucher existence:', checkErr);
             return res.status(500).json({ success: false, message: 'Database error', error: checkErr.message });
@@ -1182,31 +1191,44 @@ app.post('/api/redeem-voucher', (req, res) => {
         
         console.log('=== VOUCHER CHECK RESULT ===');
         console.log('Found vouchers:', checkResult.length);
-        if (checkResult.length > 0) {
-            console.log('Voucher details:', {
-                id: checkResult[0].id,
-                voucher_ref: checkResult[0].voucher_ref,
-                current_redeemed_status: checkResult[0].redeemed,
-                name: checkResult[0].name
-            });
-        } else {
+        
+        if (checkResult.length === 0) {
             console.log('No voucher found with code:', cleanVoucherCode);
             return res.status(404).json({ success: false, message: 'Voucher not found' });
         }
         
-        // Check if already redeemed
-        if (checkResult[0].redeemed === 'Yes') {
+        const voucherRecord = checkResult[0];
+        console.log('Voucher details:', {
+            source: voucherRecord.source,
+            id: voucherRecord.id,
+            code: voucherRecord.code,
+            current_redeemed_status: voucherRecord.redeemed,
+            name: voucherRecord.name
+        });
+        
+        // Check if already redeemed (only for all_vouchers)
+        if (voucherRecord.source === 'all_vouchers' && voucherRecord.redeemed === 'Yes') {
             console.log('Voucher already redeemed');
             return res.status(400).json({ success: false, message: 'Voucher already redeemed' });
         }
         
-        // Update voucher in all_vouchers table (case-insensitive)
-        // Some environments may not have updated_at column; avoid referencing it
-        const updateVoucherSql = `
-            UPDATE all_vouchers 
-            SET redeemed = 'Yes'
-            WHERE UPPER(voucher_ref) = UPPER(?)
-        `;
+        // Update voucher based on source
+        let updateVoucherSql;
+        if (voucherRecord.source === 'all_vouchers') {
+            updateVoucherSql = `
+                UPDATE all_vouchers 
+                SET redeemed = 'Yes'
+                WHERE UPPER(voucher_ref) = UPPER(?)
+            `;
+        } else {
+            // For all_booking vouchers, we don't update - they're already marked as used
+            // Just return success
+            console.log('Voucher from all_booking - no need to mark as redeemed');
+            return res.json({ 
+                success: true, 
+                message: 'Voucher successfully redeemed (from booking)' 
+            });
+        }
         
         console.log('=== EXECUTING UPDATE ===');
         console.log('SQL:', updateVoucherSql);
