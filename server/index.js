@@ -6044,7 +6044,37 @@ app.post('/api/addPassenger', (req, res) => {
                 // Still return success for passenger creation
                 return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: false });
             }
-            res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true });
+			// Also recompute availability for this booking's slot
+			const bookingInfoSql = 'SELECT flight_date, time_slot, activity_id, location FROM all_booking WHERE id = ? LIMIT 1';
+			con.query(bookingInfoSql, [booking_id], (infoErr, infoRows) => {
+				if (infoErr) {
+					console.error('Error fetching booking info for availability update after addPassenger:', infoErr);
+					return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, availabilityUpdated: false });
+				}
+				if (!infoRows || infoRows.length === 0) {
+					return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, availabilityUpdated: false });
+				}
+				const row = infoRows[0];
+				const bookingDate = (row.flight_date ? dayjs(row.flight_date).format('YYYY-MM-DD') : null);
+				const bookingTime = (row.time_slot ? dayjs(`2000-01-01 ${row.time_slot}`).format('HH:mm') : (row.flight_date ? dayjs(row.flight_date).format('HH:mm') : null));
+				const activityId = row.activity_id;
+				if (bookingDate && bookingTime && activityId) {
+					updateSpecificAvailability(bookingDate, bookingTime, activityId, 1);
+					return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, availabilityUpdated: true });
+				}
+				if (bookingDate && bookingTime && row.location && !activityId) {
+					const activitySql = 'SELECT id FROM activity WHERE location = ? AND status = "Live" LIMIT 1';
+					con.query(activitySql, [row.location], (actErr, actRows) => {
+						if (!actErr && actRows && actRows.length > 0) {
+							updateSpecificAvailability(bookingDate, bookingTime, actRows[0].id, 1);
+							return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, availabilityUpdated: true });
+						}
+						return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, availabilityUpdated: false });
+					});
+					return; // response will be sent in callback above
+				}
+				return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, availabilityUpdated: false });
+			});
         });
     });
 });
@@ -6078,30 +6108,37 @@ app.delete('/api/deletePassenger', (req, res) => {
                 return res.status(200).json({ success: true, message: 'Passenger deleted but pax count update failed', paxUpdated: false });
             }
             
-            // Also update availability if this was the last passenger (pax becomes 0)
-            const checkPaxSql = 'SELECT pax FROM all_booking WHERE id = ?';
-            con.query(checkPaxSql, [booking_id], (err3, rows) => {
-                if (err3) {
-                    console.error('Error checking pax after deletion:', err3);
-                    // Still return success for passenger deletion
-                    return res.status(200).json({ success: true, message: 'Passenger deleted, pax updated, but availability check failed', paxUpdated: true, availabilityUpdated: false });
-                }
-                
-                const currentPax = rows[0]?.pax || 0;
-                if (currentPax === 0) {
-                    // If no passengers left, we might want to update availability
-                    // This depends on your business logic - you might want to mark the slot as available again
-                    console.log(`Booking ${booking_id} now has 0 passengers - consider updating availability`);
-                }
-                
-                res.status(200).json({ 
-                    success: true, 
-                    message: 'Passenger deleted successfully', 
-                    paxUpdated: true, 
-                    availabilityUpdated: true,
-                    remainingPax: currentPax
-                });
-            });
+		// Recompute availability for this booking's slot
+		const bookingInfoSql = 'SELECT pax, flight_date, time_slot, activity_id, location FROM all_booking WHERE id = ? LIMIT 1';
+		con.query(bookingInfoSql, [booking_id], (infoErr, infoRows) => {
+			if (infoErr) {
+				console.error('Error fetching booking info for availability update after deletePassenger:', infoErr);
+				return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, availabilityUpdated: false });
+			}
+			if (!infoRows || infoRows.length === 0) {
+				return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, availabilityUpdated: false });
+			}
+			const row = infoRows[0];
+			const bookingDate = (row.flight_date ? dayjs(row.flight_date).format('YYYY-MM-DD') : null);
+			const bookingTime = (row.time_slot ? dayjs(`2000-01-01 ${row.time_slot}`).format('HH:mm') : (row.flight_date ? dayjs(row.flight_date).format('HH:mm') : null));
+			const activityId = row.activity_id;
+			if (bookingDate && bookingTime && activityId) {
+				updateSpecificAvailability(bookingDate, bookingTime, activityId, 1);
+				return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, availabilityUpdated: true, remainingPax: row.pax });
+			}
+			if (bookingDate && bookingTime && row.location && !activityId) {
+				const activitySql = 'SELECT id FROM activity WHERE location = ? AND status = "Live" LIMIT 1';
+				con.query(activitySql, [row.location], (actErr, actRows) => {
+					if (!actErr && actRows && actRows.length > 0) {
+						updateSpecificAvailability(bookingDate, bookingTime, actRows[0].id, 1);
+						return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, availabilityUpdated: true, remainingPax: row.pax });
+					}
+					return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, availabilityUpdated: false, remainingPax: row.pax });
+				});
+				return; // response will be sent in callback above
+			}
+			return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, availabilityUpdated: false, remainingPax: row.pax });
+		});
         });
     });
 });
@@ -7969,82 +8006,6 @@ const updateAvailabilityStatus = async () => {
     }
 };
 
-// Function to update availability for a specific time slot
-const updateSpecificAvailability = async (date, time, activityId, passengerCount) => {
-    try {
-        console.log(`=== UPDATE SPECIFIC AVAILABILITY START ===`);
-        console.log(`Parameters: date=${date}, time=${time}, activityId=${activityId}, passengerCount=${passengerCount}`);
-        
-        // First, let's check what availability records exist for this date/time/activity
-        const checkSql = `SELECT id, date, time, activity_id, available, booked, capacity, status FROM activity_availability WHERE date = ? AND time = ? AND activity_id = ?`;
-        
-        con.query(checkSql, [date, time, activityId], (checkErr, checkResult) => {
-            if (checkErr) {
-                console.error('Error checking availability records:', checkErr);
-                return;
-            }
-            
-            console.log(`Found ${checkResult.length} availability records for date=${date}, time=${time}, activityId=${activityId}:`);
-            checkResult.forEach((record, index) => {
-                console.log(`  Record ${index + 1}: id=${record.id}, available=${record.available}, booked=${record.booked || 0}, capacity=${record.capacity}, status=${record.status}`);
-            });
-            
-            if (checkResult.length === 0) {
-                console.error('No availability records found for the specified date/time/activity combination');
-                return;
-            }
-            
-            if (checkResult.length > 1) {
-                console.warn('Multiple availability records found for the same date/time/activity - this might cause issues');
-            }
-            
-            // Update the specific time slot availability AND booked count
-            const updateSql = `UPDATE activity_availability SET available = available - ?, booked = booked + ? WHERE date = ? AND time = ? AND activity_id = ? AND available >= ?`;
-            console.log(`Executing SQL: ${updateSql}`);
-            console.log(`SQL Parameters: [${passengerCount}, ${passengerCount}, ${date}, ${time}, ${activityId}, ${passengerCount}]`);
-            
-            con.query(updateSql, [passengerCount, passengerCount, date, time, activityId, passengerCount], (err, result) => {
-                if (err) {
-                    console.error('Error updating specific availability:', err);
-                } else {
-                    console.log(`Specific availability updated successfully: ${result.affectedRows} rows affected`);
-                    
-                    if (result.affectedRows === 0) {
-                        console.warn('No rows were updated - this might indicate a problem with the WHERE clause');
-                    }
-                    
-                    // Verify the update by checking the new values
-                    const verifySql = `SELECT id, available, booked, capacity, status FROM activity_availability WHERE date = ? AND time = ? AND activity_id = ?`;
-                    con.query(verifySql, [date, time, activityId], (verifyErr, verifyResult) => {
-                        if (verifyErr) {
-                            console.error('Error verifying availability update:', verifyErr);
-                        } else {
-                            console.log('Verification after update:');
-                            verifyResult.forEach((record, index) => {
-                                console.log(`  Record ${index + 1}: id=${record.id}, available=${record.available}, booked=${record.booked}, capacity=${record.capacity}, status=${record.status}`);
-                            });
-                        }
-                    });
-                    
-                    // Update the status for this specific slot only
-                    const statusSql = `UPDATE activity_availability SET status = CASE WHEN available = 0 THEN 'Closed' WHEN available > 0 THEN 'Open' ELSE status END WHERE date = ? AND time = ? AND activity_id = ?`;
-                    
-                    con.query(statusSql, [date, time, activityId], (statusErr, statusResult) => {
-                        if (statusErr) {
-                            console.error('Error updating availability status:', statusErr);
-                        } else {
-                            console.log(`Availability status updated for specific slot: ${statusResult.affectedRows} rows affected`);
-                        }
-                    });
-                }
-            });
-        });
-        
-        console.log(`=== UPDATE SPECIFIC AVAILABILITY END ===`);
-    } catch (error) {
-        console.error('Error in updateSpecificAvailability:', error);
-    }
-};
 
 // Function to check and fix duplicate availability records
 const checkAndFixDuplicateAvailability = async () => {

@@ -41,12 +41,26 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
     const [flightTypes, setFlightTypes] = useState(['Shared']); // Default to Shared
     const [voucherTypes, setVoucherTypes] = useState([]); // Default to empty array
     const [availabilityCount, setAvailabilityCount] = useState(0);
+    // Private charter voucher types
+    const [privateCharterVoucherTypes, setPrivateCharterVoucherTypes] = useState([]);
+    const [privateCharterVoucherTypesLoading, setPrivateCharterVoucherTypesLoading] = useState(false);
 
     useEffect(() => {
         if (open) {
             axios.get('/api/activities').then(res => {
                 if (res.data.success) setActivities(res.data.data);
             });
+            // fetch private charter voucher types for listing (same endpoint used in ActivityList)
+            setPrivateCharterVoucherTypesLoading(true);
+            fetch('/api/private-charter-voucher-types')
+                .then(r => r.ok ? r.json() : Promise.reject())
+                .then(data => {
+                    if (data?.success && Array.isArray(data.data)) {
+                        setPrivateCharterVoucherTypes(data.data);
+                    }
+                })
+                .catch(() => {})
+                .finally(() => setPrivateCharterVoucherTypesLoading(false));
         }
     }, [open]);
 
@@ -285,7 +299,7 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
                             label="Private Flight"
                         />
                     </FormGroup>
-                    <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Voucher Type</div>
+                    <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Shared Flight Voucher Type</div>
                     <FormGroup row sx={{ mb: 2, mt: 1 }}>
                         <FormControlLabel
                             control={
@@ -332,6 +346,33 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
                             }
                             label="Any Day Flight"
                         />
+                    </FormGroup>
+                    <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Private Flight Voucher Type</div>
+                    <FormGroup row sx={{ mb: 2, mt: 1 }}>
+                        {privateCharterVoucherTypesLoading ? (
+                            <Typography variant="body2" sx={{ color: '#856404' }}>Loading voucher types...</Typography>
+                        ) : privateCharterVoucherTypes.length > 0 ? (
+                            privateCharterVoucherTypes.map((vt) => (
+                                <FormControlLabel
+                                    key={vt.id}
+                                    control={
+                                        <Checkbox
+                                            checked={voucherTypes.includes(vt.title)}
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    setVoucherTypes(prev => [...prev, vt.title]);
+                                                } else {
+                                                    setVoucherTypes(prev => prev.filter(type => type !== vt.title));
+                                                }
+                                            }}
+                                        />
+                                    }
+                                    label={vt.title}
+                                />
+                            ))
+                        ) : (
+                            <Typography variant="body2" sx={{ color: '#999' }}>No private charter voucher types configured.</Typography>
+                        )}
                     </FormGroup>
                     <FormControl fullWidth margin="dense">
                         <InputLabel>Visibility</InputLabel>
