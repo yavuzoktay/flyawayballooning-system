@@ -1,12 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 
 const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selectable = false, onSelectionChange, context = 'bookings', onEmailClick, onSmsClick }) => {
-    // Infinite scroll: show first itemsPerPage items, then load more as user scrolls
-    const [visibleCount, setVisibleCount] = useState(itemsPerPage);
+    const [currentPage, setCurrentPage] = useState(1);
     const [selectedRows, setSelectedRows] = useState([]);
     const [showVoucherModal, setShowVoucherModal] = useState(false);
     const [selectedVoucherData, setSelectedVoucherData] = useState(null);
-    const containerRef = useRef(null);
 
     // Helper to get column id/label
     const getColId = (col) => (typeof col === 'string' ? col : (col?.id || ''));
@@ -36,25 +34,11 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
         return label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
     };
 
-    // Reset visible count when data changes
-    useEffect(() => {
-        setVisibleCount(itemsPerPage);
-    }, [data, itemsPerPage]);
-
-    // Infinite scroll handler on an internal scrollable container
-    const handleContainerScroll = useCallback(() => {
-        const el = containerRef.current;
-        if (!el) return;
-        const { scrollTop, scrollHeight, clientHeight } = el;
-        if (scrollTop <= 0) return;
-        const nearBottom = scrollTop + clientHeight >= scrollHeight - 40;
-        if (nearBottom) {
-            setVisibleCount(prev => (prev < data.length ? Math.min(prev + itemsPerPage, data.length) : prev));
-        }
-    }, [data.length, itemsPerPage]);
-
-    const getVisibleData = () => {
-        return data.slice(0, visibleCount);
+    // Pagination logic
+    const getPaginatedData = () => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return data.slice(startIndex, endIndex);
     };
 
     // Build header labels
@@ -68,21 +52,21 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
         mainHead.push('Actions');
     }
 
-    const paginatedData = getVisibleData();
+    const paginatedData = getPaginatedData();
 
     // Checkbox logic
-    const isAllSelected = paginatedData.length > 0 && paginatedData.every((row, idx) => selectedRows.includes(idx));
+    const isAllSelected = paginatedData.length > 0 && paginatedData.every((row, idx) => selectedRows.includes((currentPage-1)*itemsPerPage+idx));
     const isIndeterminate = selectedRows.length > 0 && !isAllSelected;
     const handleSelectAll = (e) => {
         if (e.target.checked) {
             setSelectedRows([
                 ...new Set([
                     ...selectedRows,
-                    ...paginatedData.map((_, idx) => idx)
+                    ...paginatedData.map((_, idx) => (currentPage-1)*itemsPerPage+idx)
                 ])
             ]);
         } else {
-            setSelectedRows([]);
+            setSelectedRows(selectedRows.filter(idx => idx < (currentPage-1)*itemsPerPage || idx >= (currentPage)*itemsPerPage));
         }
     };
     const handleRowSelect = (rowIdx) => {
@@ -315,7 +299,7 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                 </div>
             )}
             
-            <div ref={containerRef} onScroll={handleContainerScroll} style={{ width: '100%', overflow: 'auto', maxHeight: '70vh' }}>
+            <div style={{ width: '100%', overflowX: 'auto' }}>
             <table border="1" style={{ width: "100%", background: "#FFF", marginTop: "10px", borderCollapse: "collapse", tableLayout: "fixed" }}>
                 <colgroup>
                     {selectable && <col style={{ width: '40px', minWidth: '40px', maxWidth: '40px' }} />}
@@ -365,14 +349,15 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                 </thead>
                 <tbody>
                     {paginatedData.map((item, idx) => {
+                        const globalIdx = (currentPage-1)*itemsPerPage+idx;
                         return (
                             <tr key={idx}>
                                 {selectable && (
                                     <td style={{ textAlign: "center" }}>
                                         <input
                                             type="checkbox"
-                                            checked={selectedRows.includes(idx)}
-                                            onChange={() => handleRowSelect(idx)}
+                                            checked={selectedRows.includes(globalIdx)}
+                                            onChange={() => handleRowSelect(globalIdx)}
                                         />
                                     </td>
                                 )}
@@ -597,7 +582,47 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
             </table>
             </div>
 
-            {/* Infinite scroll: no pagination controls */}
+            {/* Pagination Controls */}
+            <div style={{ marginTop: "10px", textAlign: "center", display: 'flex', justifyContent: 'center', gap: 6, flexWrap: 'wrap' }}>
+                {(() => {
+                    const totalPages = Math.max(1, Math.ceil(data.length / itemsPerPage));
+                    const pages = [];
+                    const windowSize = 5; // show current +/-2
+                    const start = Math.max(1, currentPage - Math.floor(windowSize/2));
+                    const end = Math.min(totalPages, start + windowSize - 1);
+                    const realStart = Math.max(1, end - windowSize + 1);
+
+                    const makeBtn = (label, page, disabled = false, key = label) => (
+                        <button
+                            key={key}
+                            onClick={() => !disabled && setCurrentPage(page)}
+                            disabled={disabled}
+                            style={{
+                                margin: "0 2px",
+                                padding: "5px 8px",
+                                background: disabled ? '#cccccc' : (currentPage === page ? "#3274b4" : "#A6A6A6"),
+                                color: "#FFF",
+                                border: "none",
+                                cursor: disabled ? 'default' : "pointer",
+                            }}
+                        >
+                            {label}
+                        </button>
+                    );
+
+                    pages.push(makeBtn('«', 1, currentPage === 1, 'first'));
+                    pages.push(makeBtn('‹', Math.max(1, currentPage - 1), currentPage === 1, 'prev'));
+
+                    for (let p = realStart; p <= end; p++) {
+                        pages.push(makeBtn(String(p), p, false, `p-${p}`));
+                    }
+
+                    pages.push(makeBtn('›', Math.min(totalPages, currentPage + 1), currentPage === totalPages, 'next'));
+                    pages.push(makeBtn('»', totalPages, currentPage === totalPages, 'last'));
+
+                    return pages;
+                })()}
+            </div>
         </>
     );
 };
