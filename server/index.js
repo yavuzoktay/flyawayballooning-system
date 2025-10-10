@@ -992,8 +992,9 @@ app.post('/api/createRedeemBooking', (req, res) => {
             created_at,
             email,
             phone,
-            activity_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            activity_id,
+            redeemed_voucher
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     // Use actual passenger count from passengerData array
@@ -1018,7 +1019,8 @@ app.post('/api/createRedeemBooking', (req, res) => {
         now, // created_at
         passengerData[0].email || null,
         passengerData[0].phone || null,
-        activity_id || null
+        activity_id || null,
+        'Yes' // Redeem Voucher bookings always have redeemed_voucher = Yes
     ];
 
     console.log('=== REDEEM BOOKING SQL ===');
