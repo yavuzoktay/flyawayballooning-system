@@ -1171,8 +1171,8 @@ app.post('/api/redeem-voucher', (req, res) => {
     console.log('Clean Voucher Code:', cleanVoucherCode);
     console.log('Booking ID:', booking_id);
     
-    // First check if voucher exists
-    const checkVoucherSql = `SELECT * FROM all_vouchers WHERE voucher_ref = ?`;
+    // First check if voucher exists (case-insensitive)
+    const checkVoucherSql = `SELECT * FROM all_vouchers WHERE UPPER(voucher_ref) = UPPER(?)`;
     
     con.query(checkVoucherSql, [cleanVoucherCode], (checkErr, checkResult) => {
         if (checkErr) {
@@ -1191,14 +1191,21 @@ app.post('/api/redeem-voucher', (req, res) => {
             });
         } else {
             console.log('No voucher found with code:', cleanVoucherCode);
+            return res.status(404).json({ success: false, message: 'Voucher not found' });
         }
         
-        // Update voucher in all_vouchers table
+        // Check if already redeemed
+        if (checkResult[0].redeemed === 'Yes') {
+            console.log('Voucher already redeemed');
+            return res.status(400).json({ success: false, message: 'Voucher already redeemed' });
+        }
+        
+        // Update voucher in all_vouchers table (case-insensitive)
         // Some environments may not have updated_at column; avoid referencing it
         const updateVoucherSql = `
             UPDATE all_vouchers 
             SET redeemed = 'Yes'
-            WHERE voucher_ref = ?
+            WHERE UPPER(voucher_ref) = UPPER(?)
         `;
         
         console.log('=== EXECUTING UPDATE ===');
