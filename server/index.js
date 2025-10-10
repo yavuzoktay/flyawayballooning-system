@@ -992,8 +992,9 @@ app.post('/api/createRedeemBooking', (req, res) => {
             created_at,
             email,
             phone,
-            activity_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            activity_id,
+            redeemed_voucher
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     // Use actual passenger count from passengerData array
@@ -1018,7 +1019,8 @@ app.post('/api/createRedeemBooking', (req, res) => {
         now, // created_at
         passengerData[0].email || null,
         passengerData[0].phone || null,
-        activity_id || null
+        activity_id || null,
+        'Yes' // Redeem Voucher bookings always have redeemed_voucher = Yes
     ];
 
     console.log('=== REDEEM BOOKING SQL ===');
@@ -1217,7 +1219,7 @@ app.post('/api/redeem-voucher', (req, res) => {
         if (voucherRecord.source === 'all_vouchers') {
             updateVoucherSql = `
                 UPDATE all_vouchers 
-                SET redeemed = 'Yes'
+                SET redeemed = 'Yes', status = 'Used'
                 WHERE UPPER(voucher_ref) = UPPER(?)
             `;
         } else {
@@ -1257,9 +1259,13 @@ app.post('/api/redeem-voucher', (req, res) => {
             
             console.log('=== SUCCESS ===');
             console.log('Voucher marked as redeemed successfully');
-            // Also increment current_uses on voucher_codes table (single use enforcement)
-            const incSql = `UPDATE voucher_codes SET current_uses = COALESCE(current_uses,0) + 1 WHERE code = ?`;
-            con.query(incSql, [voucher_code.toUpperCase()], () => {
+            // Also update status on voucher_codes table and increment current_uses
+            const updateVoucherCodeSql = `
+                UPDATE voucher_codes 
+                SET current_uses = COALESCE(current_uses,0) + 1, status = 'Used'
+                WHERE UPPER(code) = UPPER(?)
+            `;
+            con.query(updateVoucherCodeSql, [cleanVoucherCode], () => {
                 // ignore errors here; primary enforcement is validation
                 res.json({ success: true, message: 'Voucher marked as redeemed' });
             });

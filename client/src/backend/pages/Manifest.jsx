@@ -2584,7 +2584,7 @@ const Manifest = () => {
                                                 {(() => {
                                                     const b = bookingDetail.booking || {};
                                                     const v = bookingDetail.voucher || {};
-                                                    const redeemed = (b.redeemed === true) || (b.voucher_redeemed === 1) || (typeof b.redeemed_at === 'string' && b.redeemed_at) || (v.redeemed === 'Yes' || v.redeemed === true);
+                                                    const redeemed = (b.redeemed === true) || (b.voucher_redeemed === 1) || (typeof b.redeemed_at === 'string' && b.redeemed_at) || (v.redeemed === 'Yes' || v.redeemed === true) || (b.redeemed_voucher === 'Yes');
                                                     return (
                                                         <Typography>
                                                             <b>Redeemed Voucher:</b> {redeemed ? <span style={{ color: 'green', fontWeight: 600 }}>Yes</span> : <span style={{ color: 'red', fontWeight: 600 }}>No</span>} <span style={{ fontWeight: 500 }}>{b.voucher_code || ''}</span>
