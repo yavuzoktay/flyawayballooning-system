@@ -2715,6 +2715,20 @@ setBookingDetail(finalVoucherDetail);
                                                     <IconButton size="small" onClick={() => handleEditClick('paid', bookingDetail.booking.paid)}><EditIcon fontSize="small" /></IconButton>
                                                         </>
                                                     )}</Typography>
+                                                    <Typography><b>Due:</b> {editField === 'due' ? (
+                                                        <>
+                                                    <input value={editValue} onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} style={{marginRight: 8}} />
+                                                            <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                            <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                    <span style={{ color: bookingDetail.booking.due > 0 ? '#d32f2f' : '#666', fontWeight: bookingDetail.booking.due > 0 ? 600 : 400 }}>
+                                                        £{parseFloat(bookingDetail.booking.due || 0).toFixed(2)}
+                                                    </span>
+                                                    <IconButton size="small" onClick={() => handleEditClick('due', bookingDetail.booking.due)}><EditIcon fontSize="small" /></IconButton>
+                                                        </>
+                                                    )}</Typography>
                                                     <Typography><b>Expires:</b> {editField === 'expires' ? (
                                                         <>
                                                             <LocalizationProvider dateAdapter={AdapterDayjs}>
