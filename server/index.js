@@ -963,8 +963,11 @@ app.post('/api/createRedeemBooking', (req, res) => {
         
         con.query(checkVoucherSql, [cleanVoucherCode], (checkErr, checkResult) => {
             if (checkErr) {
-                console.error('Error checking voucher code:', checkErr);
-                return res.status(500).json({ success: false, error: 'Database error while checking voucher code' });
+                // If voucher_codes table doesn't exist or query fails, skip validation and proceed
+                console.warn('Warning: Could not check voucher_codes table (table may not exist):', checkErr.message);
+                console.log('Proceeding with booking creation without voucher_codes validation');
+                createRedeemBookingLogic();
+                return;
             }
             
             if (checkResult.length > 0) {
@@ -990,9 +993,12 @@ app.post('/api/createRedeemBooking', (req, res) => {
                         error: 'This voucher code has reached its maximum number of uses' 
                     });
                 }
+            } else {
+                // Voucher code not found in voucher_codes table, but may exist in all_vouchers
+                console.log('Voucher code not found in voucher_codes table, proceeding with booking');
             }
             
-            // Voucher is valid, proceed with booking creation
+            // Voucher is valid (or not in voucher_codes table), proceed with booking creation
             createRedeemBookingLogic();
         });
         
@@ -1213,7 +1219,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
             `;
             con.query(updateAllVouchersSql, [cleanVoucherCode], (voucherErr, voucherResult) => {
                 if (voucherErr) {
-                    console.error('Error updating all_vouchers:', voucherErr);
+                    console.warn('Warning: Could not update all_vouchers:', voucherErr.message);
                 } else {
                     console.log('all_vouchers update result:', {
                         affectedRows: voucherResult.affectedRows,
@@ -1222,7 +1228,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
                 }
             });
             
-            // Then, update voucher_codes table
+            // Then, update voucher_codes table (if it exists)
             const updateVoucherCodesSql = `
                 UPDATE voucher_codes 
                 SET current_uses = COALESCE(current_uses, 0) + 1, 
@@ -1231,7 +1237,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
             `;
             con.query(updateVoucherCodesSql, [cleanVoucherCode], (codeErr, codeResult) => {
                 if (codeErr) {
-                    console.error('Error updating voucher_codes:', codeErr);
+                    console.warn('Warning: Could not update voucher_codes (table may not exist):', codeErr.message);
                 } else {
                     console.log('voucher_codes update result:', {
                         affectedRows: codeResult.affectedRows,
@@ -1358,8 +1364,15 @@ app.post('/api/redeem-voucher', (req, res) => {
                 SET current_uses = COALESCE(current_uses,0) + 1, status = 'Used'
                 WHERE UPPER(code) = UPPER(?)
             `;
-            con.query(updateVoucherCodeSql, [cleanVoucherCode], () => {
-                // ignore errors here; primary enforcement is validation
+            con.query(updateVoucherCodeSql, [cleanVoucherCode], (codeErr, codeResult) => {
+                if (codeErr) {
+                    console.warn('Warning: Could not update voucher_codes (table may not exist):', codeErr.message);
+                } else if (codeResult.affectedRows > 0) {
+                    console.log('voucher_codes updated successfully');
+                } else {
+                    console.log('No matching voucher found in voucher_codes table');
+                }
+                // Always respond with success even if voucher_codes update fails
                 res.json({ success: true, message: 'Voucher marked as redeemed' });
             });
         });
