@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selectable = false, onSelectionChange, context = 'bookings', onEmailClick, onSmsClick }) => {
-    const [currentPage, setCurrentPage] = useState(1);
+    const [visibleCount, setVisibleCount] = useState(10); // Start with 10 items
     const [selectedRows, setSelectedRows] = useState([]);
     const [showVoucherModal, setShowVoucherModal] = useState(false);
     const [selectedVoucherData, setSelectedVoucherData] = useState(null);
+    const loadingRef = useRef(false);
 
     // Helper to get column id/label
     const getColId = (col) => (typeof col === 'string' ? col : (col?.id || ''));
@@ -34,12 +35,38 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
         return label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
     };
 
-    // Pagination logic
-    const getPaginatedData = () => {
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        const endIndex = startIndex + itemsPerPage;
-        return data.slice(startIndex, endIndex);
-    };
+    // Reset visible count when data changes (filters, tab switch, etc.)
+    useEffect(() => {
+        setVisibleCount(10);
+        loadingRef.current = false;
+    }, [data]);
+
+    // Infinite scroll logic
+    useEffect(() => {
+        const handleScroll = () => {
+            if (loadingRef.current) return;
+            if (visibleCount >= data.length) return;
+
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const scrollHeight = document.documentElement.scrollHeight;
+            const clientHeight = document.documentElement.clientHeight;
+
+            // Load more when user scrolls near bottom (within 200px)
+            if (scrollTop + clientHeight >= scrollHeight - 200) {
+                loadingRef.current = true;
+                setTimeout(() => {
+                    setVisibleCount(prev => Math.min(prev + 10, data.length));
+                    loadingRef.current = false;
+                }, 300);
+            }
+        };
+
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, [visibleCount, data.length]);
+
+    // Get visible data (infinite scroll)
+    const visibleData = data.slice(0, visibleCount);
 
     // Build header labels
     var mainHead = [];
@@ -52,21 +79,19 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
         mainHead.push('Actions');
     }
 
-    const paginatedData = getPaginatedData();
-
-    // Checkbox logic
-    const isAllSelected = paginatedData.length > 0 && paginatedData.every((row, idx) => selectedRows.includes((currentPage-1)*itemsPerPage+idx));
+    // Checkbox logic for infinite scroll
+    const isAllSelected = visibleData.length > 0 && visibleData.every((row, idx) => selectedRows.includes(idx));
     const isIndeterminate = selectedRows.length > 0 && !isAllSelected;
     const handleSelectAll = (e) => {
         if (e.target.checked) {
             setSelectedRows([
                 ...new Set([
                     ...selectedRows,
-                    ...paginatedData.map((_, idx) => (currentPage-1)*itemsPerPage+idx)
+                    ...visibleData.map((_, idx) => idx)
                 ])
             ]);
         } else {
-            setSelectedRows(selectedRows.filter(idx => idx < (currentPage-1)*itemsPerPage || idx >= (currentPage)*itemsPerPage));
+            setSelectedRows(selectedRows.filter(idx => idx >= visibleCount));
         }
     };
     const handleRowSelect = (rowIdx) => {
@@ -348,16 +373,15 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                     </tr>
                 </thead>
                 <tbody>
-                    {paginatedData.map((item, idx) => {
-                        const globalIdx = (currentPage-1)*itemsPerPage+idx;
+                    {visibleData.map((item, idx) => {
                         return (
                             <tr key={idx}>
                                 {selectable && (
                                     <td style={{ textAlign: "center" }}>
                                         <input
                                             type="checkbox"
-                                            checked={selectedRows.includes(globalIdx)}
-                                            onChange={() => handleRowSelect(globalIdx)}
+                                            checked={selectedRows.includes(idx)}
+                                            onChange={() => handleRowSelect(idx)}
                                         />
                                     </td>
                                 )}
@@ -582,46 +606,29 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
             </table>
             </div>
 
-            {/* Pagination Controls */}
-            <div style={{ marginTop: "10px", textAlign: "center", display: 'flex', justifyContent: 'center', gap: 6, flexWrap: 'wrap' }}>
-                {(() => {
-                    const totalPages = Math.max(1, Math.ceil(data.length / itemsPerPage));
-                    const pages = [];
-                    const windowSize = 5; // show current +/-2
-                    const start = Math.max(1, currentPage - Math.floor(windowSize/2));
-                    const end = Math.min(totalPages, start + windowSize - 1);
-                    const realStart = Math.max(1, end - windowSize + 1);
-
-                    const makeBtn = (label, page, disabled = false, key = label) => (
-                        <button
-                            key={key}
-                            onClick={() => !disabled && setCurrentPage(page)}
-                            disabled={disabled}
-                            style={{
-                                margin: "0 2px",
-                                padding: "5px 8px",
-                                background: disabled ? '#cccccc' : (currentPage === page ? "#3274b4" : "#A6A6A6"),
-                                color: "#FFF",
-                                border: "none",
-                                cursor: disabled ? 'default' : "pointer",
-                            }}
-                        >
-                            {label}
-                        </button>
-                    );
-
-                    pages.push(makeBtn('«', 1, currentPage === 1, 'first'));
-                    pages.push(makeBtn('‹', Math.max(1, currentPage - 1), currentPage === 1, 'prev'));
-
-                    for (let p = realStart; p <= end; p++) {
-                        pages.push(makeBtn(String(p), p, false, `p-${p}`));
-                    }
-
-                    pages.push(makeBtn('›', Math.min(totalPages, currentPage + 1), currentPage === totalPages, 'next'));
-                    pages.push(makeBtn('»', totalPages, currentPage === totalPages, 'last'));
-
-                    return pages;
-                })()}
+            {/* Loading indicator and results info */}
+            <div style={{ marginTop: "20px", textAlign: "center", padding: "10px" }}>
+                <div style={{ color: "#666", marginBottom: "10px" }}>
+                    Showing {visibleCount} of {data.length} results
+                </div>
+                {visibleCount < data.length && (
+                    <div style={{ 
+                        color: "#3274b4", 
+                        fontStyle: "italic",
+                        fontSize: "14px"
+                    }}>
+                        Scroll down to load more...
+                    </div>
+                )}
+                {visibleCount >= data.length && data.length > 10 && (
+                    <div style={{ 
+                        color: "#28a745", 
+                        fontWeight: "500",
+                        fontSize: "14px"
+                    }}>
+                        ✓ All results loaded
+                    </div>
+                )}
             </div>
         </>
     );
