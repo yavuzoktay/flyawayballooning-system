@@ -952,27 +952,27 @@ app.post('/api/createRedeemBooking', (req, res) => {
     // Trim voucher code to remove whitespace and tab characters
     const cleanVoucherCode = voucher_code ? voucher_code.trim() : null;
 
-    // Validate voucher code is not already used (check voucher_codes table)
+    // Validate voucher code is not already used (check both voucher_codes and all_vouchers tables)
     if (cleanVoucherCode) {
-        const checkVoucherSql = `
+        // First check voucher_codes table
+        const checkVoucherCodesSql = `
             SELECT code, status, current_uses, max_uses 
             FROM voucher_codes 
             WHERE UPPER(code) = UPPER(?)
             LIMIT 1
         `;
         
-        con.query(checkVoucherSql, [cleanVoucherCode], (checkErr, checkResult) => {
+        con.query(checkVoucherCodesSql, [cleanVoucherCode], (checkErr, checkResult) => {
             if (checkErr) {
-                // If voucher_codes table doesn't exist or query fails, skip validation and proceed
-                console.warn('Warning: Could not check voucher_codes table (table may not exist):', checkErr.message);
-                console.log('Proceeding with booking creation without voucher_codes validation');
-                createRedeemBookingLogic();
+                // If voucher_codes table doesn't exist or query fails, check all_vouchers instead
+                console.warn('Warning: Could not check voucher_codes table:', checkErr.message);
+                checkAllVouchers();
                 return;
             }
             
             if (checkResult.length > 0) {
                 const voucherCode = checkResult[0];
-                console.log('=== VOUCHER CODE VALIDATION ===');
+                console.log('=== VOUCHER CODE VALIDATION (voucher_codes) ===');
                 console.log('Voucher Code:', voucherCode.code);
                 console.log('Status:', voucherCode.status);
                 console.log('Current Uses:', voucherCode.current_uses);
@@ -993,14 +993,94 @@ app.post('/api/createRedeemBooking', (req, res) => {
                         error: 'This voucher code has reached its maximum number of uses' 
                     });
                 }
+                
+                // Voucher is valid, proceed
+                createRedeemBookingLogic();
             } else {
-                // Voucher code not found in voucher_codes table, but may exist in all_vouchers
-                console.log('Voucher code not found in voucher_codes table, proceeding with booking');
+                // Not found in voucher_codes, check all_vouchers table
+                console.log('Voucher code not found in voucher_codes table, checking all_vouchers...');
+                checkAllVouchers();
             }
-            
-            // Voucher is valid (or not in voucher_codes table), proceed with booking creation
-            createRedeemBookingLogic();
         });
+        
+        // Function to check all_vouchers table
+        function checkAllVouchers() {
+            const checkAllVouchersSql = `
+                SELECT voucher_ref, redeemed, status, name
+                FROM all_vouchers 
+                WHERE UPPER(voucher_ref) = UPPER(?)
+                LIMIT 1
+            `;
+            
+            con.query(checkAllVouchersSql, [cleanVoucherCode], (voucherErr, voucherResult) => {
+                if (voucherErr) {
+                    console.warn('Warning: Could not check all_vouchers table:', voucherErr.message);
+                    // Can't validate, proceed with booking (risky but allows operation)
+                    createRedeemBookingLogic();
+                    return;
+                }
+                
+                if (voucherResult.length > 0) {
+                    const voucher = voucherResult[0];
+                    console.log('=== VOUCHER CODE VALIDATION (all_vouchers) ===');
+                    console.log('Voucher Code:', voucher.voucher_ref);
+                    console.log('Redeemed:', voucher.redeemed);
+                    console.log('Status:', voucher.status);
+                    console.log('Name:', voucher.name);
+                    
+                    // Check if already redeemed
+                    if (voucher.redeemed === 'Yes' || voucher.status === 'Used') {
+                        return res.status(400).json({ 
+                            success: false, 
+                            error: 'This voucher has already been redeemed and cannot be used again' 
+                        });
+                    }
+                    
+                    // Voucher is valid, proceed
+                    createRedeemBookingLogic();
+                } else {
+                    // Not found in either table - check all_booking for voucher_code
+                    console.log('Voucher not found in all_vouchers, checking all_booking...');
+                    checkAllBooking();
+                }
+            });
+        }
+        
+        // Function to check all_booking table for previously used voucher codes
+        function checkAllBooking() {
+            const checkBookingSql = `
+                SELECT voucher_code, name, redeemed_voucher, created_at
+                FROM all_booking 
+                WHERE UPPER(voucher_code) = UPPER(?)
+                AND redeemed_voucher = 'Yes'
+                LIMIT 1
+            `;
+            
+            con.query(checkBookingSql, [cleanVoucherCode], (bookingErr, bookingResult) => {
+                if (bookingErr) {
+                    console.warn('Warning: Could not check all_booking table:', bookingErr.message);
+                    // Can't validate, proceed with booking
+                    createRedeemBookingLogic();
+                    return;
+                }
+                
+                if (bookingResult.length > 0) {
+                    console.log('=== VOUCHER CODE ALREADY USED (all_booking) ===');
+                    console.log('Voucher Code:', bookingResult[0].voucher_code);
+                    console.log('Previously used by:', bookingResult[0].name);
+                    console.log('Used on:', bookingResult[0].created_at);
+                    
+                    return res.status(400).json({ 
+                        success: false, 
+                        error: 'This voucher code has already been used for a booking and cannot be redeemed again' 
+                    });
+                }
+                
+                // Voucher code not found anywhere, proceed with booking
+                console.log('Voucher code not found in any table, proceeding with new booking');
+                createRedeemBookingLogic();
+            });
+        }
         
         return; // Exit here and continue in callback
     }
