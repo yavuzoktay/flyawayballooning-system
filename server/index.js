@@ -1113,52 +1113,83 @@ app.post('/api/createRedeemBooking', (req, res) => {
     console.log('selectedDate:', selectedDate);
     console.log('selectedTime:', selectedTime);
     console.log('Final bookingDateTime:', bookingDateTime);
-
-    // Simple SQL with only essential columns
-    const bookingSql = `
-        INSERT INTO all_booking (
-            name,
-            flight_type, 
-            flight_date, 
-            pax, 
-            location, 
-            status, 
-            paid, 
-            due,
-            voucher_code,
-            created_at,
-            email,
-            phone,
-            activity_id,
-            redeemed_voucher
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-
-    // Use actual passenger count from passengerData array
-    const actualPaxCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
-    console.log('=== REDEEM BOOKING PAX COUNT DEBUG ===');
-    console.log('passengerData.length:', passengerData?.length);
-    console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
-    console.log('actualPaxCount (FINAL):', actualPaxCount);
-    console.log('activity_id:', activity_id);
-    console.log('cleanVoucherCode:', cleanVoucherCode);
     
-    const bookingValues = [
-        passengerName,
-        chooseFlightType.type || 'Shared Flight',
-        bookingDateTime,
-        actualPaxCount, // Use actual passenger count instead of chooseFlightType.passengerCount
-        chooseLocation,
-        'Open',
-        totalPrice,
-        0,
-        cleanVoucherCode,
-        now, // created_at
-        passengerData[0].email || null,
-        passengerData[0].phone || null,
-        activity_id || null,
-        'Yes' // Redeem Voucher bookings always have redeemed_voucher = Yes
-    ];
+    // Get the original voucher price from voucher_codes table
+    if (cleanVoucherCode) {
+        const getVoucherPriceSql = `
+            SELECT paid_amount 
+            FROM voucher_codes 
+            WHERE UPPER(code) = UPPER(?)
+            LIMIT 1
+        `;
+        
+        con.query(getVoucherPriceSql, [cleanVoucherCode], (priceErr, priceResult) => {
+            let voucherOriginalPrice = totalPrice || 0;
+            
+            if (!priceErr && priceResult.length > 0 && priceResult[0].paid_amount) {
+                voucherOriginalPrice = priceResult[0].paid_amount;
+                console.log('✅ Found original voucher price:', voucherOriginalPrice);
+            } else {
+                console.log('⚠️ Could not find voucher price, using totalPrice:', voucherOriginalPrice);
+            }
+            
+            // Continue with booking creation using the original voucher price
+            createBookingWithPrice(voucherOriginalPrice);
+        });
+    } else {
+        // No voucher code, use totalPrice
+        createBookingWithPrice(totalPrice || 0);
+    }
+    
+    function createBookingWithPrice(paidAmount) {
+        console.log('=== CREATING BOOKING WITH PAID AMOUNT:', paidAmount, '===');
+
+        // Simple SQL with only essential columns
+        const bookingSql = `
+            INSERT INTO all_booking (
+                name,
+                flight_type, 
+                flight_date, 
+                pax, 
+                location, 
+                status, 
+                paid, 
+                due,
+                voucher_code,
+                created_at,
+                email,
+                phone,
+                activity_id,
+                redeemed_voucher
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+
+        // Use actual passenger count from passengerData array
+        const actualPaxCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
+        console.log('=== REDEEM BOOKING PAX COUNT DEBUG ===');
+        console.log('passengerData.length:', passengerData?.length);
+        console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
+        console.log('actualPaxCount (FINAL):', actualPaxCount);
+        console.log('activity_id:', activity_id);
+        console.log('cleanVoucherCode:', cleanVoucherCode);
+        console.log('paidAmount (original voucher price):', paidAmount);
+        
+        const bookingValues = [
+            passengerName,
+            chooseFlightType.type || 'Shared Flight',
+            bookingDateTime,
+            actualPaxCount, // Use actual passenger count instead of chooseFlightType.passengerCount
+            chooseLocation,
+            'Open',
+            paidAmount, // Use original voucher price instead of totalPrice
+            0,
+            cleanVoucherCode,
+            now, // created_at
+            passengerData[0].email || null,
+            passengerData[0].phone || null,
+            activity_id || null,
+            'Yes' // Redeem Voucher bookings always have redeemed_voucher = Yes
+        ];
 
     console.log('=== REDEEM BOOKING SQL ===');
     console.log('SQL:', bookingSql);
@@ -1334,7 +1365,8 @@ app.post('/api/createRedeemBooking', (req, res) => {
             bookingId: bookingId 
         });
     });
-    }
+    } // end of createBookingWithPrice
+    } // end of createRedeemBookingLogic
 });
 
 // Mark voucher as redeemed
