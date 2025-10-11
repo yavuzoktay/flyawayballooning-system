@@ -1052,7 +1052,6 @@ app.post('/api/createRedeemBooking', (req, res) => {
                 SELECT voucher_code, name, redeemed_voucher, created_at
                 FROM all_booking 
                 WHERE UPPER(voucher_code) = UPPER(?)
-                AND redeemed_voucher = 'Yes'
                 LIMIT 1
             `;
             
@@ -1065,11 +1064,16 @@ app.post('/api/createRedeemBooking', (req, res) => {
                 }
                 
                 if (bookingResult.length > 0) {
-                    console.log('=== VOUCHER CODE ALREADY USED (all_booking) ===');
-                    console.log('Voucher Code:', bookingResult[0].voucher_code);
-                    console.log('Previously used by:', bookingResult[0].name);
-                    console.log('Used on:', bookingResult[0].created_at);
+                    const booking = bookingResult[0];
+                    console.log('=== VOUCHER CODE FOUND IN ALL_BOOKING ===');
+                    console.log('Voucher Code:', booking.voucher_code);
+                    console.log('Previously used by:', booking.name);
+                    console.log('Used on:', booking.created_at);
+                    console.log('Redeemed Voucher Status:', booking.redeemed_voucher);
                     
+                    // If this voucher code exists in all_booking, it means it was already used for a booking
+                    // Regardless of redeemed_voucher status, we should not allow it to be used again
+                    // because each voucher code should only create ONE booking
                     return res.status(400).json({ 
                         success: false, 
                         error: 'This voucher code has already been used for a booking and cannot be redeemed again' 
