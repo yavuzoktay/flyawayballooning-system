@@ -2410,10 +2410,20 @@ const Manifest = () => {
   <>
     <input value={editValue} onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} style={{marginRight: 8}} />
     <Button size="small" onClick={async () => {
-      // Split paid equally among passengers
+      // Split total (paid + due) equally among passengers
       const paid = parseFloat(editValue) || 0;
+      const due = parseFloat(bookingDetail.booking.due) || 0;
+      const totalAmount = paid + due;
       const n = bookingDetail.passengers.length;
-      const perPassenger = n > 0 ? parseFloat((paid / n).toFixed(2)) : 0;
+      const perPassenger = n > 0 ? parseFloat((totalAmount / n).toFixed(2)) : 0;
+      
+      console.log('=== UPDATING PASSENGER PRICES (MANIFEST) ===');
+      console.log('New Paid:', paid);
+      console.log('Current Due:', due);
+      console.log('Total Amount:', totalAmount);
+      console.log('Passengers:', n);
+      console.log('Per Passenger:', perPassenger);
+      
       // Update all passengers in backend
       await Promise.all(bookingDetail.passengers.map((p, idx) =>
         axios.patch('/api/updatePassengerField', {
@@ -2449,7 +2459,47 @@ const Manifest = () => {
                                         <Typography><b>Due:</b> {editField === 'due' ? (
   <>
     <input value={editValue} onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} style={{marginRight: 8}} />
-    <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+    <Button size="small" onClick={async () => {
+      // When due changes, recalculate passenger prices with new total
+      const newDue = parseFloat(editValue) || 0;
+      const paid = parseFloat(bookingDetail.booking.paid) || 0;
+      const totalAmount = paid + newDue;
+      const n = bookingDetail.passengers.length;
+      const perPassenger = n > 0 ? parseFloat((totalAmount / n).toFixed(2)) : 0;
+      
+      console.log('=== UPDATING DUE AND PASSENGER PRICES ===');
+      console.log('Current Paid:', paid);
+      console.log('New Due:', newDue);
+      console.log('Total Amount:', totalAmount);
+      console.log('Passengers:', n);
+      console.log('Per Passenger:', perPassenger);
+      
+      // Update all passengers in backend
+      await Promise.all(bookingDetail.passengers.map((p) =>
+        axios.patch('/api/updatePassengerField', {
+          passenger_id: p.id,
+          field: 'price',
+          value: perPassenger
+        })
+      ));
+      
+      // Update due in backend
+      await axios.patch('/api/updateBookingField', {
+        booking_id: bookingDetail.booking.id,
+        field: 'due',
+        value: newDue
+      });
+      
+      // Update UI
+      setBookingDetail(prev => ({
+        ...prev,
+        booking: { ...prev.booking, due: newDue },
+        passengers: prev.passengers.map(p => ({ ...p, price: perPassenger }))
+      }));
+      setEditPassengerPrices(bookingDetail.passengers.map(() => perPassenger));
+      setEditField(null);
+      setEditValue('');
+    }} disabled={savingEdit}>Save</Button>
     <Button size="small" onClick={handleEditCancel}>Cancel</Button>
   </>
 ) : (
