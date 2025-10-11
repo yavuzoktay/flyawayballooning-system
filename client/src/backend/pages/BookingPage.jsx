@@ -742,21 +742,16 @@ setBookingDetail(finalVoucherDetail);
         if (detailDialogOpen && selectedBookingId) {
             setLoadingDetail(true);
             setDetailError(null);
-            axios.get(`/api/getBookingDetail?booking_id=${selectedBookingId}`)
-                .then(async res => {
-                    setBookingDetail(res.data);
-                    // Ayrıca booking history'yi çek
+            
+            // Use fetchPassengers instead of direct axios call to ensure price recalculation
+            fetchPassengers(selectedBookingId)
+                .then(async () => {
+                    // Also fetch booking history
                     const historyRes = await axios.get(`/api/getBookingHistory?booking_id=${selectedBookingId}`);
                     setBookingHistory(historyRes.data.history || []);
-                    
-                    // Set additional information from the booking detail response
-                    if (res.data.additional_information) {
-                        setAdditionalInformation(res.data.additional_information);
-                    } else {
-                        setAdditionalInformation(null);
-                    }
                 })
                 .catch(err => {
+                    console.error('Error loading booking details:', err);
                     setDetailError('Detaylar alınamadı');
                 })
                 .finally(() => setLoadingDetail(false));
@@ -958,12 +953,33 @@ setBookingDetail(finalVoucherDetail);
                 // Refetch to get updated data
                 const updatedRes = await axios.get(`/api/getBookingDetail?booking_id=${bookingId}`);
                 setBookingDetail(updatedRes.data);
+                
+                // Set additional information
+                if (updatedRes.data.additional_information) {
+                    setAdditionalInformation(updatedRes.data.additional_information);
+                } else {
+                    setAdditionalInformation(null);
+                }
             } else {
                 console.log('✅ Passenger prices are correct');
                 setBookingDetail(res.data);
+                
+                // Set additional information
+                if (res.data.additional_information) {
+                    setAdditionalInformation(res.data.additional_information);
+                } else {
+                    setAdditionalInformation(null);
+                }
             }
         } else {
             setBookingDetail(res.data);
+            
+            // Set additional information
+            if (res.data.additional_information) {
+                setAdditionalInformation(res.data.additional_information);
+            } else {
+                setAdditionalInformation(null);
+            }
         }
     };
 
