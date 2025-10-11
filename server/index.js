@@ -6378,53 +6378,91 @@ app.post('/api/addPassenger', (req, res) => {
     if (!booking_id || !first_name || !last_name) {
         return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
-    // passenger tablosunda email, phone, ticket_type, weight varsa ekle
-    const sql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone, ticket_type) VALUES (?, ?, ?, ?, ?, ?, ?)';
-    const values = [booking_id, first_name, last_name, weight || null, email || null, phone || null, ticket_type || null];
-    con.query(sql, values, (err, result) => {
-        if (err) {
-            console.error('Error adding passenger:', err);
-            return res.status(500).json({ success: false, message: 'Database error' });
+    
+    // First, get current booking details to calculate price per passenger
+    const getBookingSql = 'SELECT paid, pax, due FROM all_booking WHERE id = ? LIMIT 1';
+    con.query(getBookingSql, [booking_id], (getErr, bookingRows) => {
+        if (getErr) {
+            console.error('Error fetching booking details:', getErr);
+            return res.status(500).json({ success: false, message: 'Database error fetching booking' });
         }
-        // After insert, recompute pax for this booking from passenger table to keep counts in sync
-        const updatePaxSql = `UPDATE all_booking SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?) WHERE id = ?`;
-        con.query(updatePaxSql, [booking_id, booking_id], (err2) => {
-            if (err2) {
-                console.error('Error updating pax after addPassenger:', err2);
-                // Still return success for passenger creation
-                return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: false });
+        
+        if (!bookingRows || bookingRows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Booking not found' });
+        }
+        
+        const currentPaid = parseFloat(bookingRows[0].paid) || 0;
+        const currentPax = parseInt(bookingRows[0].pax) || 1;
+        const currentDue = parseFloat(bookingRows[0].due) || 0;
+        const pricePerPassenger = currentPax > 0 ? (currentPaid / currentPax) : 0;
+        
+        console.log('=== ADD PASSENGER - PRICE CALCULATION ===');
+        console.log('Booking ID:', booking_id);
+        console.log('Current Paid:', currentPaid);
+        console.log('Current Pax:', currentPax);
+        console.log('Current Due:', currentDue);
+        console.log('Price Per Passenger:', pricePerPassenger);
+        console.log('New Due will be:', currentDue + pricePerPassenger);
+        
+        // passenger tablosunda email, phone, ticket_type, weight varsa ekle
+        const sql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone, ticket_type) VALUES (?, ?, ?, ?, ?, ?, ?)';
+        const values = [booking_id, first_name, last_name, weight || null, email || null, phone || null, ticket_type || null];
+        con.query(sql, values, (err, result) => {
+            if (err) {
+                console.error('Error adding passenger:', err);
+                return res.status(500).json({ success: false, message: 'Database error' });
             }
-			// Also recompute availability for this booking's slot
-			const bookingInfoSql = 'SELECT flight_date, time_slot, activity_id, location FROM all_booking WHERE id = ? LIMIT 1';
-			con.query(bookingInfoSql, [booking_id], (infoErr, infoRows) => {
-				if (infoErr) {
-					console.error('Error fetching booking info for availability update after addPassenger:', infoErr);
-					return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, availabilityUpdated: false });
-				}
-				if (!infoRows || infoRows.length === 0) {
-					return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, availabilityUpdated: false });
-				}
-				const row = infoRows[0];
-				const bookingDate = (row.flight_date ? dayjs(row.flight_date).format('YYYY-MM-DD') : null);
-				const bookingTime = (row.time_slot ? dayjs(`2000-01-01 ${row.time_slot}`).format('HH:mm') : (row.flight_date ? dayjs(row.flight_date).format('HH:mm') : null));
-				const activityId = row.activity_id;
-				if (bookingDate && bookingTime && activityId) {
-					updateSpecificAvailability(bookingDate, bookingTime, activityId, 1);
-					return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, availabilityUpdated: true });
-				}
-				if (bookingDate && bookingTime && row.location && !activityId) {
-					const activitySql = 'SELECT id FROM activity WHERE location = ? AND status = "Live" LIMIT 1';
-					con.query(activitySql, [row.location], (actErr, actRows) => {
-						if (!actErr && actRows && actRows.length > 0) {
-							updateSpecificAvailability(bookingDate, bookingTime, actRows[0].id, 1);
-							return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, availabilityUpdated: true });
-						}
-						return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, availabilityUpdated: false });
-					});
-					return; // response will be sent in callback above
-				}
-				return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, availabilityUpdated: false });
-			});
+            
+            // After insert, update pax count and add to due amount
+            // New due = old due + price_per_passenger (for the newly added passenger)
+            const updateBookingSql = `
+                UPDATE all_booking 
+                SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
+                    due = COALESCE(due, 0) + ?
+                WHERE id = ?
+            `;
+            con.query(updateBookingSql, [booking_id, pricePerPassenger, booking_id], (err2, updateResult) => {
+                if (err2) {
+                    console.error('Error updating pax and due after addPassenger:', err2);
+                    // Still return success for passenger creation
+                    return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: false, dueUpdated: false });
+                }
+                
+                console.log('✅ Updated booking - Added to due:', pricePerPassenger);
+                console.log('✅ Pax updated, rows affected:', updateResult.affectedRows);
+                
+                // Also recompute availability for this booking's slot
+                const bookingInfoSql = 'SELECT flight_date, time_slot, activity_id, location FROM all_booking WHERE id = ? LIMIT 1';
+                con.query(bookingInfoSql, [booking_id], (infoErr, infoRows) => {
+                    if (infoErr) {
+                        console.error('Error fetching booking info for availability update after addPassenger:', infoErr);
+                        return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: false });
+                    }
+                    if (!infoRows || infoRows.length === 0) {
+                        return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: false });
+                    }
+                    const row = infoRows[0];
+                    const bookingDate = (row.flight_date ? dayjs(row.flight_date).format('YYYY-MM-DD') : null);
+                    const bookingTime = (row.time_slot ? dayjs(`2000-01-01 ${row.time_slot}`).format('HH:mm') : (row.flight_date ? dayjs(row.flight_date).format('HH:mm') : null));
+                    const activityId = row.activity_id;
+                    if (bookingDate && bookingTime && activityId) {
+                        updateSpecificAvailability(bookingDate, bookingTime, activityId, 1);
+                        return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: true, newDue: currentDue + pricePerPassenger });
+                    }
+                    if (bookingDate && bookingTime && row.location && !activityId) {
+                        const activitySql = 'SELECT id FROM activity WHERE location = ? AND status = "Live" LIMIT 1';
+                        con.query(activitySql, [row.location], (actErr, actRows) => {
+                            if (!actErr && actRows && actRows.length > 0) {
+                                updateSpecificAvailability(bookingDate, bookingTime, actRows[0].id, 1);
+                                return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: true, newDue: currentDue + pricePerPassenger });
+                            }
+                            return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: false, newDue: currentDue + pricePerPassenger });
+                        });
+                        return; // response will be sent in callback above
+                    }
+                    return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: false, newDue: currentDue + pricePerPassenger });
+                });
+            });
         });
     });
 });
@@ -6437,58 +6475,97 @@ app.delete('/api/deletePassenger', (req, res) => {
         return res.status(400).json({ success: false, message: 'passenger_id and booking_id are required' });
     }
     
-    // First, delete the passenger
-    const deletePassengerSql = 'DELETE FROM passenger WHERE id = ? AND booking_id = ?';
-    con.query(deletePassengerSql, [passenger_id, booking_id], (err, result) => {
-        if (err) {
-            console.error('Error deleting passenger:', err);
-            return res.status(500).json({ success: false, message: 'Database error while deleting passenger' });
+    // First, get current booking details to calculate price per passenger (before deletion)
+    const getBookingSql = 'SELECT paid, pax, due FROM all_booking WHERE id = ? LIMIT 1';
+    con.query(getBookingSql, [booking_id], (getErr, bookingRows) => {
+        if (getErr) {
+            console.error('Error fetching booking details:', getErr);
+            return res.status(500).json({ success: false, message: 'Database error fetching booking' });
         }
         
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ success: false, message: 'Passenger not found or does not belong to this booking' });
+        if (!bookingRows || bookingRows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Booking not found' });
         }
         
-        // After deletion, recompute pax for this booking from passenger table to keep counts in sync
-        const updatePaxSql = `UPDATE all_booking SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?) WHERE id = ?`;
-        con.query(updatePaxSql, [booking_id, booking_id], (err2) => {
-            if (err2) {
-                console.error('Error updating pax after deletePassenger:', err2);
-                // Still return success for passenger deletion
-                return res.status(200).json({ success: true, message: 'Passenger deleted but pax count update failed', paxUpdated: false });
+        const currentPaid = parseFloat(bookingRows[0].paid) || 0;
+        const currentPax = parseInt(bookingRows[0].pax) || 1;
+        const currentDue = parseFloat(bookingRows[0].due) || 0;
+        const pricePerPassenger = currentPax > 0 ? (currentPaid / currentPax) : 0;
+        
+        console.log('=== DELETE PASSENGER - PRICE CALCULATION ===');
+        console.log('Booking ID:', booking_id);
+        console.log('Current Paid:', currentPaid);
+        console.log('Current Pax:', currentPax);
+        console.log('Current Due:', currentDue);
+        console.log('Price Per Passenger:', pricePerPassenger);
+        
+        // Delete the passenger
+        const deletePassengerSql = 'DELETE FROM passenger WHERE id = ? AND booking_id = ?';
+        con.query(deletePassengerSql, [passenger_id, booking_id], (err, result) => {
+            if (err) {
+                console.error('Error deleting passenger:', err);
+                return res.status(500).json({ success: false, message: 'Database error while deleting passenger' });
             }
             
-		// Recompute availability for this booking's slot
-		const bookingInfoSql = 'SELECT pax, flight_date, time_slot, activity_id, location FROM all_booking WHERE id = ? LIMIT 1';
-		con.query(bookingInfoSql, [booking_id], (infoErr, infoRows) => {
-			if (infoErr) {
-				console.error('Error fetching booking info for availability update after deletePassenger:', infoErr);
-				return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, availabilityUpdated: false });
-			}
-			if (!infoRows || infoRows.length === 0) {
-				return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, availabilityUpdated: false });
-			}
-			const row = infoRows[0];
-			const bookingDate = (row.flight_date ? dayjs(row.flight_date).format('YYYY-MM-DD') : null);
-			const bookingTime = (row.time_slot ? dayjs(`2000-01-01 ${row.time_slot}`).format('HH:mm') : (row.flight_date ? dayjs(row.flight_date).format('HH:mm') : null));
-			const activityId = row.activity_id;
-			if (bookingDate && bookingTime && activityId) {
-				updateSpecificAvailability(bookingDate, bookingTime, activityId, 1);
-				return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, availabilityUpdated: true, remainingPax: row.pax });
-			}
-			if (bookingDate && bookingTime && row.location && !activityId) {
-				const activitySql = 'SELECT id FROM activity WHERE location = ? AND status = "Live" LIMIT 1';
-				con.query(activitySql, [row.location], (actErr, actRows) => {
-					if (!actErr && actRows && actRows.length > 0) {
-						updateSpecificAvailability(bookingDate, bookingTime, actRows[0].id, 1);
-						return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, availabilityUpdated: true, remainingPax: row.pax });
-					}
-					return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, availabilityUpdated: false, remainingPax: row.pax });
-				});
-				return; // response will be sent in callback above
-			}
-			return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, availabilityUpdated: false, remainingPax: row.pax });
-		});
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ success: false, message: 'Passenger not found or does not belong to this booking' });
+            }
+            
+            // After deletion, update pax count and subtract from due amount (if due > 0)
+            // Only subtract if there was due amount (meaning extra guests were added)
+            const newDue = Math.max(0, currentDue - pricePerPassenger);
+            
+            console.log('New Due after deletion:', newDue);
+            
+            const updateBookingSql = `
+                UPDATE all_booking 
+                SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
+                    due = ?
+                WHERE id = ?
+            `;
+            con.query(updateBookingSql, [booking_id, newDue, booking_id], (err2) => {
+                if (err2) {
+                    console.error('Error updating pax and due after deletePassenger:', err2);
+                    // Still return success for passenger deletion
+                    return res.status(200).json({ success: true, message: 'Passenger deleted but pax/due update failed', paxUpdated: false, dueUpdated: false });
+                }
+                
+                console.log('✅ Updated booking - Subtracted from due:', pricePerPassenger);
+                console.log('✅ New due:', newDue);
+            
+                
+                // Recompute availability for this booking's slot
+                const bookingInfoSql = 'SELECT pax, flight_date, time_slot, activity_id, location FROM all_booking WHERE id = ? LIMIT 1';
+                con.query(bookingInfoSql, [booking_id], (infoErr, infoRows) => {
+                    if (infoErr) {
+                        console.error('Error fetching booking info for availability update after deletePassenger:', infoErr);
+                        return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, dueUpdated: true, availabilityUpdated: false, newDue: newDue });
+                    }
+                    if (!infoRows || infoRows.length === 0) {
+                        return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, dueUpdated: true, availabilityUpdated: false, newDue: newDue });
+                    }
+                    const row = infoRows[0];
+                    const bookingDate = (row.flight_date ? dayjs(row.flight_date).format('YYYY-MM-DD') : null);
+                    const bookingTime = (row.time_slot ? dayjs(`2000-01-01 ${row.time_slot}`).format('HH:mm') : (row.flight_date ? dayjs(row.flight_date).format('HH:mm') : null));
+                    const activityId = row.activity_id;
+                    if (bookingDate && bookingTime && activityId) {
+                        updateSpecificAvailability(bookingDate, bookingTime, activityId, 1);
+                        return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, dueUpdated: true, availabilityUpdated: true, remainingPax: row.pax, newDue: newDue });
+                    }
+                    if (bookingDate && bookingTime && row.location && !activityId) {
+                        const activitySql = 'SELECT id FROM activity WHERE location = ? AND status = "Live" LIMIT 1';
+                        con.query(activitySql, [row.location], (actErr, actRows) => {
+                            if (!actErr && actRows && actRows.length > 0) {
+                                updateSpecificAvailability(bookingDate, bookingTime, actRows[0].id, 1);
+                                return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, dueUpdated: true, availabilityUpdated: true, remainingPax: row.pax, newDue: newDue });
+                            }
+                            return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, dueUpdated: true, availabilityUpdated: false, remainingPax: row.pax, newDue: newDue });
+                        });
+                        return; // response will be sent in callback above
+                    }
+                    return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, dueUpdated: true, availabilityUpdated: false, remainingPax: row.pax, newDue: newDue });
+                });
+            });
         });
     });
 });
