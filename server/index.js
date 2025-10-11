@@ -956,7 +956,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
     if (cleanVoucherCode) {
         // First check voucher_codes table
         const checkVoucherCodesSql = `
-            SELECT code, status, current_uses, max_uses 
+            SELECT code, is_active, current_uses, max_uses 
             FROM voucher_codes 
             WHERE UPPER(code) = UPPER(?)
             LIMIT 1
@@ -974,12 +974,12 @@ app.post('/api/createRedeemBooking', (req, res) => {
                 const voucherCode = checkResult[0];
                 console.log('=== VOUCHER CODE VALIDATION (voucher_codes) ===');
                 console.log('Voucher Code:', voucherCode.code);
-                console.log('Status:', voucherCode.status);
+                console.log('Is Active:', voucherCode.is_active);
                 console.log('Current Uses:', voucherCode.current_uses);
                 console.log('Max Uses:', voucherCode.max_uses);
                 
-                // Check if already used
-                if (voucherCode.status === 'Used') {
+                // Check if inactive (already used)
+                if (voucherCode.is_active === 0 || voucherCode.is_active === false) {
                     return res.status(400).json({ 
                         success: false, 
                         error: 'This voucher code has already been used and cannot be redeemed again' 
@@ -1312,16 +1312,17 @@ app.post('/api/createRedeemBooking', (req, res) => {
             const updateVoucherCodesSql = `
                 UPDATE voucher_codes 
                 SET current_uses = COALESCE(current_uses, 0) + 1, 
-                    status = 'Used'
+                    is_active = 0
                 WHERE UPPER(code) = UPPER(?)
             `;
             con.query(updateVoucherCodesSql, [cleanVoucherCode], (codeErr, codeResult) => {
                 if (codeErr) {
-                    console.warn('Warning: Could not update voucher_codes (table may not exist):', codeErr.message);
+                    console.warn('Warning: Could not update voucher_codes:', codeErr.message);
                 } else {
-                    console.log('voucher_codes update result:', {
+                    console.log('✅ voucher_codes update result:', {
                         affectedRows: codeResult.affectedRows,
-                        changedRows: codeResult.changedRows
+                        changedRows: codeResult.changedRows,
+                        message: 'Voucher code marked as inactive'
                     });
                 }
             });
@@ -1438,17 +1439,18 @@ app.post('/api/redeem-voucher', (req, res) => {
             
             console.log('=== SUCCESS ===');
             console.log('Voucher marked as redeemed successfully');
-            // Also update status on voucher_codes table and increment current_uses
+            // Also update voucher_codes table to mark as inactive and increment current_uses
             const updateVoucherCodeSql = `
                 UPDATE voucher_codes 
-                SET current_uses = COALESCE(current_uses,0) + 1, status = 'Used'
+                SET current_uses = COALESCE(current_uses,0) + 1, 
+                    is_active = 0
                 WHERE UPPER(code) = UPPER(?)
             `;
             con.query(updateVoucherCodeSql, [cleanVoucherCode], (codeErr, codeResult) => {
                 if (codeErr) {
-                    console.warn('Warning: Could not update voucher_codes (table may not exist):', codeErr.message);
+                    console.warn('Warning: Could not update voucher_codes:', codeErr.message);
                 } else if (codeResult.affectedRows > 0) {
-                    console.log('voucher_codes updated successfully');
+                    console.log('✅ voucher_codes updated successfully - marked as inactive');
                 } else {
                     console.log('No matching voucher found in voucher_codes table');
                 }
