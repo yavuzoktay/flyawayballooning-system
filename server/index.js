@@ -952,8 +952,59 @@ app.post('/api/createRedeemBooking', (req, res) => {
     // Trim voucher code to remove whitespace and tab characters
     const cleanVoucherCode = voucher_code ? voucher_code.trim() : null;
 
-    const passengerName = `${passengerData[0].firstName} ${passengerData[0].lastName}`;
-    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    // Validate voucher code is not already used (check voucher_codes table)
+    if (cleanVoucherCode) {
+        const checkVoucherSql = `
+            SELECT code, status, current_uses, max_uses 
+            FROM voucher_codes 
+            WHERE UPPER(code) = UPPER(?)
+            LIMIT 1
+        `;
+        
+        con.query(checkVoucherSql, [cleanVoucherCode], (checkErr, checkResult) => {
+            if (checkErr) {
+                console.error('Error checking voucher code:', checkErr);
+                return res.status(500).json({ success: false, error: 'Database error while checking voucher code' });
+            }
+            
+            if (checkResult.length > 0) {
+                const voucherCode = checkResult[0];
+                console.log('=== VOUCHER CODE VALIDATION ===');
+                console.log('Voucher Code:', voucherCode.code);
+                console.log('Status:', voucherCode.status);
+                console.log('Current Uses:', voucherCode.current_uses);
+                console.log('Max Uses:', voucherCode.max_uses);
+                
+                // Check if already used
+                if (voucherCode.status === 'Used') {
+                    return res.status(400).json({ 
+                        success: false, 
+                        error: 'This voucher code has already been used and cannot be redeemed again' 
+                    });
+                }
+                
+                // Check if max uses reached
+                if (voucherCode.max_uses && voucherCode.current_uses >= voucherCode.max_uses) {
+                    return res.status(400).json({ 
+                        success: false, 
+                        error: 'This voucher code has reached its maximum number of uses' 
+                    });
+                }
+            }
+            
+            // Voucher is valid, proceed with booking creation
+            createRedeemBookingLogic();
+        });
+        
+        return; // Exit here and continue in callback
+    }
+    
+    // If no voucher code, proceed directly
+    createRedeemBookingLogic();
+    
+    function createRedeemBookingLogic() {
+        const passengerName = `${passengerData[0].firstName} ${passengerData[0].lastName}`;
+        const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
     
     // Format booking date
     let bookingDateTime = selectedDate;
@@ -1149,12 +1200,54 @@ app.post('/api/createRedeemBooking', (req, res) => {
             });
         }
 
+        // Update voucher_codes table to mark as Used
+        if (cleanVoucherCode) {
+            console.log('=== UPDATING VOUCHER_CODES TABLE ===');
+            console.log('Voucher Code:', cleanVoucherCode);
+            
+            // First, mark in all_vouchers table if exists
+            const updateAllVouchersSql = `
+                UPDATE all_vouchers 
+                SET redeemed = 'Yes', status = 'Used'
+                WHERE UPPER(voucher_ref) = UPPER(?)
+            `;
+            con.query(updateAllVouchersSql, [cleanVoucherCode], (voucherErr, voucherResult) => {
+                if (voucherErr) {
+                    console.error('Error updating all_vouchers:', voucherErr);
+                } else {
+                    console.log('all_vouchers update result:', {
+                        affectedRows: voucherResult.affectedRows,
+                        changedRows: voucherResult.changedRows
+                    });
+                }
+            });
+            
+            // Then, update voucher_codes table
+            const updateVoucherCodesSql = `
+                UPDATE voucher_codes 
+                SET current_uses = COALESCE(current_uses, 0) + 1, 
+                    status = 'Used'
+                WHERE UPPER(code) = UPPER(?)
+            `;
+            con.query(updateVoucherCodesSql, [cleanVoucherCode], (codeErr, codeResult) => {
+                if (codeErr) {
+                    console.error('Error updating voucher_codes:', codeErr);
+                } else {
+                    console.log('voucher_codes update result:', {
+                        affectedRows: codeResult.affectedRows,
+                        changedRows: codeResult.changedRows
+                    });
+                }
+            });
+        }
+
         res.json({ 
             success: true, 
             message: 'Booking created successfully', 
             bookingId: bookingId 
         });
     });
+    }
 });
 
 // Mark voucher as redeemed
