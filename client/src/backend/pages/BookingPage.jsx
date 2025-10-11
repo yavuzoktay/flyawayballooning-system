@@ -916,7 +916,55 @@ setBookingDetail(finalVoucherDetail);
     // Passenger listesini güncelleyen fonksiyon
     const fetchPassengers = async (bookingId) => {
         const res = await axios.get(`/api/getBookingDetail?booking_id=${bookingId}`);
-        setBookingDetail(res.data);
+        
+        // Recalculate passenger prices based on paid + due
+        const booking = res.data.booking;
+        const passengers = res.data.passengers || [];
+        
+        if (booking && passengers.length > 0) {
+            const paid = parseFloat(booking.paid) || 0;
+            const due = parseFloat(booking.due) || 0;
+            const totalAmount = paid + due;
+            const n = passengers.length;
+            const correctPricePerPassenger = n > 0 ? parseFloat((totalAmount / n).toFixed(2)) : 0;
+            
+            console.log('=== FETCH PASSENGERS - CHECKING PRICES ===');
+            console.log('Paid:', paid);
+            console.log('Due:', due);
+            console.log('Total Amount:', totalAmount);
+            console.log('Number of Passengers:', n);
+            console.log('Correct Price Per Passenger:', correctPricePerPassenger);
+            
+            // Check if any passenger has incorrect price
+            const needsUpdate = passengers.some(p => {
+                const currentPrice = parseFloat(p.price) || 0;
+                return Math.abs(currentPrice - correctPricePerPassenger) > 0.01; // Allow 1 cent difference for rounding
+            });
+            
+            if (needsUpdate) {
+                console.log('⚠️ Passenger prices are incorrect, updating...');
+                
+                // Update all passenger prices
+                await Promise.all(passengers.map((p) =>
+                    axios.patch('/api/updatePassengerField', {
+                        passenger_id: p.id,
+                        field: 'price',
+                        value: correctPricePerPassenger
+                    })
+                ));
+                
+                console.log('✅ All passenger prices updated to:', correctPricePerPassenger);
+                
+                // Refetch to get updated data
+                const updatedRes = await axios.get(`/api/getBookingDetail?booking_id=${bookingId}`);
+                setBookingDetail(updatedRes.data);
+            } else {
+                console.log('✅ Passenger prices are correct');
+                setBookingDetail(res.data);
+            }
+        } else {
+            setBookingDetail(res.data);
+        }
     };
 
     // Delete passenger function
