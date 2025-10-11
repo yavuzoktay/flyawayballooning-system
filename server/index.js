@@ -4916,6 +4916,55 @@ app.post('/api/createBooking', (req, res) => {
                     // Availability is already updated by updateSpecificAvailability function
                     // No need to call updateAvailabilityStatus() here
                     
+                    // If activitySelect is 'Redeem Voucher' and voucher_code exists, mark it as redeemed
+                    if (activitySelect === 'Redeem Voucher' && voucher_code) {
+                        const cleanVoucherCode = voucher_code.trim();
+                        console.log('🔄 Marking voucher as redeemed after Stripe payment:', cleanVoucherCode);
+                        
+                        // Update all_vouchers table
+                        const updateAllVouchersSql = `
+                            UPDATE all_vouchers 
+                            SET redeemed = 'Yes', status = 'Used'
+                            WHERE UPPER(voucher_ref) = UPPER(?)
+                        `;
+                        con.query(updateAllVouchersSql, [cleanVoucherCode], (voucherErr, voucherResult) => {
+                            if (voucherErr) {
+                                console.warn('Warning: Could not update all_vouchers:', voucherErr.message);
+                            } else {
+                                console.log('✅ all_vouchers updated successfully');
+                            }
+                        });
+                        
+                        // Update voucher_codes table
+                        const updateVoucherCodesSql = `
+                            UPDATE voucher_codes 
+                            SET current_uses = COALESCE(current_uses, 0) + 1, 
+                                is_active = 0
+                            WHERE UPPER(code) = UPPER(?)
+                        `;
+                        con.query(updateVoucherCodesSql, [cleanVoucherCode], (codeErr, codeResult) => {
+                            if (codeErr) {
+                                console.warn('Warning: Could not update voucher_codes:', codeErr.message);
+                            } else {
+                                console.log('✅ voucher_codes updated successfully - marked as inactive');
+                            }
+                        });
+                        
+                        // Update redeemed_voucher column in all_booking
+                        const updateBookingSql = `
+                            UPDATE all_booking 
+                            SET redeemed_voucher = 'Yes'
+                            WHERE id = ?
+                        `;
+                        con.query(updateBookingSql, [bookingId], (bookingErr, bookingResult) => {
+                            if (bookingErr) {
+                                console.warn('Warning: Could not update redeemed_voucher in all_booking:', bookingErr.message);
+                            } else {
+                                console.log('✅ all_booking.redeemed_voucher updated to Yes');
+                            }
+                        });
+                    }
+                    
                     res.status(201).json({ success: true, message: 'Booking created successfully!', bookingId: bookingId, created_at: createdAt });
                 });
             }
