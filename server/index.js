@@ -9257,13 +9257,27 @@ async function createVoucherFromWebhook(voucherData) {
                 
                 for (let i = 0; i < passengerCount; i++) {
                     const voucherPromise = new Promise((resolveVoucher, rejectVoucher) => {
-                        con.query(insertSql, values, (err, result) => {
+                        // Generate unique voucher code for each voucher
+                        const generateVoucherCode = () => {
+                            const prefix = 'GAT';
+                            const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+                            return `${prefix}${randomPart}`;
+                        };
+                        
+                        const uniqueVoucherCode = generateVoucherCode();
+                        console.log(`🎁 Generating voucher code ${i + 1}: ${uniqueVoucherCode}`);
+                        
+                        // Update values array with unique voucher code
+                        const updatedValues = [...values];
+                        updatedValues[10] = uniqueVoucherCode; // voucher_ref is at index 10
+                        
+                        con.query(insertSql, updatedValues, (err, result) => {
                             if (err) {
                                 console.error(`Webhook voucher ${i + 1} insertion error:`, err);
                                 return rejectVoucher(err);
                             }
-                            console.log(`Webhook gift voucher ${i + 1} created successfully, ID:`, result.insertId);
-                            resolveVoucher(result.insertId);
+                            console.log(`Webhook gift voucher ${i + 1} created successfully, ID: ${result.insertId}, Code: ${uniqueVoucherCode}`);
+                            resolveVoucher({ id: result.insertId, code: uniqueVoucherCode });
                         });
                     });
                     voucherPromises.push(voucherPromise);
@@ -9310,12 +9324,26 @@ async function createVoucherFromWebhook(voucherData) {
                     });
             } else {
                 // Single voucher creation (original logic)
-            con.query(insertSql, values, (err, result) => {
+                // Generate voucher code for single voucher
+                const generateVoucherCode = () => {
+                    const prefix = 'GAT';
+                    const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+                    return `${prefix}${randomPart}`;
+                };
+                
+                const uniqueVoucherCode = generateVoucherCode();
+                console.log(`🎁 Generating single voucher code: ${uniqueVoucherCode}`);
+                
+                // Update values array with unique voucher code
+                const updatedValues = [...values];
+                updatedValues[10] = uniqueVoucherCode; // voucher_ref is at index 10
+                
+                con.query(insertSql, updatedValues, (err, result) => {
                 if (err) {
                     console.error('Webhook voucher insertion error:', err);
                     return reject(err);
                 }
-                console.log('Webhook voucher created successfully, ID:', result.insertId);
+                    console.log(`Webhook voucher created successfully, ID: ${result.insertId}, Code: ${uniqueVoucherCode}`);
                 
                 // Store additional information answers if available
                 if (additionalInfo && typeof additionalInfo === 'object') {
