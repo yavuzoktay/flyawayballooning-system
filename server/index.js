@@ -9238,13 +9238,14 @@ async function createVoucherFromWebhook(voucherData) {
                                    voucher_type === 'Buy Gift' || 
                                    voucher_type === 'Buy Gift Voucher';
             
-            console.log('🎁 Webhook voucher type check:', {
-                book_flight: book_flight,
-                voucher_type: voucher_type,
-                numberOfPassengers: numberOfPassengers,
-                passengerCount: passengerCount,
-                isBuyGiftVoucher: isBuyGiftVoucher
-            });
+        console.log('🎁 Webhook voucher type check:', {
+            book_flight: book_flight,
+            voucher_type: voucher_type,
+            numberOfPassengers: numberOfPassengers,
+            passengerCount: passengerCount,
+            isBuyGiftVoucher: isBuyGiftVoucher,
+            voucherData: voucherData // Log the entire voucherData object
+        });
             
             if (isBuyGiftVoucher && passengerCount > 1) {
                 console.log(`🎁 Creating ${passengerCount} gift vouchers for Buy Gift Voucher`);
@@ -9978,7 +9979,8 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                                     book_flight: storeData.voucherData.book_flight,
                                     voucher_type: storeData.voucherData.voucher_type,
                                     passengerCount: passengerCount,
-                                    isBuyGiftVoucher: isBuyGiftVoucher
+                                    isBuyGiftVoucher: isBuyGiftVoucher,
+                                    storeData: storeData.voucherData // Log the entire voucherData object
                                 });
                                 
                                 if (isBuyGiftVoucher && passengerCount > 1) {
