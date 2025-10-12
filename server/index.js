@@ -9232,7 +9232,16 @@ async function createVoucherFromWebhook(voucherData) {
             
             // For Buy Gift Voucher, create multiple vouchers based on passenger count
             const passengerCount = Number.parseInt(numberOfPassengers, 10) || 1;
-            const isBuyGiftVoucher = voucher_type === 'Buy Gift' || voucher_type === 'Buy Gift Voucher';
+            const isBuyGiftVoucher = voucher_type === 'Gift Voucher' || 
+                                   voucher_type === 'Buy Gift' || 
+                                   voucher_type === 'Buy Gift Voucher';
+            
+            console.log('🎁 Webhook voucher type check:', {
+                voucher_type: voucher_type,
+                numberOfPassengers: numberOfPassengers,
+                passengerCount: passengerCount,
+                isBuyGiftVoucher: isBuyGiftVoucher
+            });
             
             if (isBuyGiftVoucher && passengerCount > 1) {
                 console.log(`🎁 Creating ${passengerCount} gift vouchers for Buy Gift Voucher`);
@@ -9958,7 +9967,16 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                                 
                                 // For Buy Gift Voucher, generate multiple voucher codes based on passenger count
                                 const passengerCount = Number.parseInt(storeData.voucherData.numberOfPassengers, 10) || 1;
-                                const isBuyGiftVoucher = storeData.voucherData.voucher_type === 'Buy Gift' || storeData.voucherData.voucher_type === 'Buy Gift Voucher';
+                                const isBuyGiftVoucher = storeData.voucherData.book_flight === 'Gift Voucher' || 
+                                                       storeData.voucherData.voucher_type === 'Buy Gift' || 
+                                                       storeData.voucherData.voucher_type === 'Buy Gift Voucher';
+                                
+                                console.log('🎁 Voucher type check:', {
+                                    book_flight: storeData.voucherData.book_flight,
+                                    voucher_type: storeData.voucherData.voucher_type,
+                                    passengerCount: passengerCount,
+                                    isBuyGiftVoucher: isBuyGiftVoucher
+                                });
                                 
                                 if (isBuyGiftVoucher && passengerCount > 1) {
                                     console.log(`🎁 Generating ${passengerCount} voucher codes for Buy Gift Voucher`);
