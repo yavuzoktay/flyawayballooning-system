@@ -9217,39 +9217,106 @@ async function createVoucherFromWebhook(voucherData) {
                 }))) : null
             ];
             
-            con.query(insertSql, values, (err, result) => {
-                if (err) {
-                    console.error('Webhook voucher insertion error:', err);
-                    return reject(err);
-                }
-                console.log('Webhook voucher created successfully, ID:', result.insertId);
+            // For Buy Gift Voucher, create multiple vouchers based on passenger count
+            const passengerCount = Number.parseInt(numberOfPassengers, 10) || 1;
+            const isBuyGiftVoucher = voucher_type === 'Buy Gift' || voucher_type === 'Buy Gift Voucher';
+            
+            if (isBuyGiftVoucher && passengerCount > 1) {
+                console.log(`🎁 Creating ${passengerCount} gift vouchers for Buy Gift Voucher`);
                 
-                // Store additional information answers if available
-                if (additionalInfo && typeof additionalInfo === 'object') {
-                    const additionalInfoAnswers = [];
-                    
-                    // Process additionalInfo object to extract question answers
-                    Object.keys(additionalInfo).forEach(key => {
-                        if (key.startsWith('question_') && additionalInfo[key]) {
-                            const questionId = key.replace('question_', '');
-                            additionalInfoAnswers.push([result.insertId, questionId, additionalInfo[key]]);
-                        }
+                // Create multiple vouchers
+                const voucherPromises = [];
+                const createdVoucherIds = [];
+                
+                for (let i = 0; i < passengerCount; i++) {
+                    const voucherPromise = new Promise((resolveVoucher, rejectVoucher) => {
+                        con.query(insertSql, values, (err, result) => {
+                            if (err) {
+                                console.error(`Webhook voucher ${i + 1} insertion error:`, err);
+                                return rejectVoucher(err);
+                            }
+                            console.log(`Webhook gift voucher ${i + 1} created successfully, ID:`, result.insertId);
+                            resolveVoucher(result.insertId);
+                        });
                     });
+                    voucherPromises.push(voucherPromise);
+                }
+                
+                // Wait for all vouchers to be created
+                Promise.all(voucherPromises)
+                    .then((voucherIds) => {
+                        console.log(`🎁 Successfully created ${voucherIds.length} gift vouchers:`, voucherIds);
+                        
+                        // Store additional information answers for all vouchers
+                        if (additionalInfo && typeof additionalInfo === 'object') {
+                            const additionalInfoAnswers = [];
+                            
+                            // Process additionalInfo object to extract question answers
+                            Object.keys(additionalInfo).forEach(key => {
+                                if (key.startsWith('question_') && additionalInfo[key]) {
+                                    const questionId = key.replace('question_', '');
+                                    // Add answers for each voucher
+                                    voucherIds.forEach(voucherId => {
+                                        additionalInfoAnswers.push([voucherId, questionId, additionalInfo[key]]);
+                                    });
+                                }
+                            });
+                            
+                            if (additionalInfoAnswers.length > 0) {
+                                const additionalInfoSql = 'INSERT INTO additional_information_answers (booking_id, question_id, answer) VALUES ?';
+                                con.query(additionalInfoSql, [additionalInfoAnswers], (additionalInfoErr) => {
+                                    if (additionalInfoErr) {
+                                        console.error('Error storing additional information answers for webhook vouchers:', additionalInfoErr);
+                                    } else {
+                                        console.log('Additional information answers stored successfully for all webhook vouchers');
+                                    }
+                                });
+                            }
+                        }
+                        
+                        // Return the first voucher ID for compatibility
+                        resolve(voucherIds[0]);
+                    })
+                    .catch((error) => {
+                        console.error('Error creating multiple gift vouchers:', error);
+                        reject(error);
+                    });
+            } else {
+                // Single voucher creation (original logic)
+                con.query(insertSql, values, (err, result) => {
+                    if (err) {
+                        console.error('Webhook voucher insertion error:', err);
+                        return reject(err);
+                    }
+                    console.log('Webhook voucher created successfully, ID:', result.insertId);
                     
-                    if (additionalInfoAnswers.length > 0) {
-                        const additionalInfoSql = 'INSERT INTO additional_information_answers (booking_id, question_id, answer) VALUES ?';
-                        con.query(additionalInfoSql, [additionalInfoAnswers], (additionalInfoErr) => {
-                            if (additionalInfoErr) {
-                                console.error('Error storing additional information answers for webhook voucher:', additionalInfoErr);
-                            } else {
-                                console.log('Additional information answers stored successfully for webhook voucher');
+                    // Store additional information answers if available
+                    if (additionalInfo && typeof additionalInfo === 'object') {
+                        const additionalInfoAnswers = [];
+                        
+                        // Process additionalInfo object to extract question answers
+                        Object.keys(additionalInfo).forEach(key => {
+                            if (key.startsWith('question_') && additionalInfo[key]) {
+                                const questionId = key.replace('question_', '');
+                                additionalInfoAnswers.push([result.insertId, questionId, additionalInfo[key]]);
                             }
                         });
+                        
+                        if (additionalInfoAnswers.length > 0) {
+                            const additionalInfoSql = 'INSERT INTO additional_information_answers (booking_id, question_id, answer) VALUES ?';
+                            con.query(additionalInfoSql, [additionalInfoAnswers], (additionalInfoErr) => {
+                                if (additionalInfoErr) {
+                                    console.error('Error storing additional information answers for webhook voucher:', additionalInfoErr);
+                                } else {
+                                    console.log('Additional information answers stored successfully for webhook voucher');
+                                }
+                            });
+                        }
                     }
-                }
-                
-                resolve(result.insertId);
-            });
+                    
+                    resolve(result.insertId);
+                });
+            }
         });
     });
 }
@@ -9876,27 +9943,71 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                                 // Use the selected voucher type detail as category (works for Shared and Private Charter)
                                 let flightCategory = storeData.voucherData.voucher_type_detail || 'Any Day Flight';
                                 
-                                // Generate voucher code
-                                const voucherCodeResponse = await axios.post(`${req.protocol}://${req.get('host')}/api/generate-voucher-code`, {
-                                    flight_category: flightCategory,
-                                    customer_name: storeData.voucherData.name || 'Unknown Customer',
-                                    customer_email: storeData.voucherData.email || '',
-                                    location: storeData.voucherData.preferred_location || 'Somerset',
-                                    // Pass through actual experience type (Shared Flight or Private Charter)
-                                    experience_type: storeData.voucherData.flight_type || 'Shared Flight',
-                                    voucher_type: storeData.voucherData.voucher_type || 'Flight Voucher',
-                                    paid_amount: storeData.voucherData.paid || 0,
-                                    expires_date: storeData.voucherData.expires || null
-                                });
+                                // For Buy Gift Voucher, generate multiple voucher codes based on passenger count
+                                const passengerCount = Number.parseInt(storeData.voucherData.numberOfPassengers, 10) || 1;
+                                const isBuyGiftVoucher = storeData.voucherData.voucher_type === 'Buy Gift' || storeData.voucherData.voucher_type === 'Buy Gift Voucher';
                                 
-                                if (voucherCodeResponse.data.success) {
-                                    console.log('Voucher code generated successfully for', storeData.voucherData.voucher_type, ':', voucherCodeResponse.data.voucher_code);
-                                    voucherCode = voucherCodeResponse.data.voucher_code;
+                                if (isBuyGiftVoucher && passengerCount > 1) {
+                                    console.log(`🎁 Generating ${passengerCount} voucher codes for Buy Gift Voucher`);
                                     
-                                    // Store the voucher code in the session data to prevent regeneration
-                                    storeData.voucherData.generated_voucher_code = voucherCode;
+                                    const voucherCodes = [];
+                                    
+                                    // Generate multiple voucher codes
+                                    for (let i = 0; i < passengerCount; i++) {
+                                        try {
+                                            const voucherCodeResponse = await axios.post(`${req.protocol}://${req.get('host')}/api/generate-voucher-code`, {
+                                                flight_category: flightCategory,
+                                                customer_name: storeData.voucherData.name || 'Unknown Customer',
+                                                customer_email: storeData.voucherData.email || '',
+                                                location: storeData.voucherData.preferred_location || 'Somerset',
+                                                experience_type: storeData.voucherData.flight_type || 'Shared Flight',
+                                                voucher_type: storeData.voucherData.voucher_type || 'Flight Voucher',
+                                                paid_amount: storeData.voucherData.paid || 0,
+                                                expires_date: storeData.voucherData.expires || null
+                                            });
+                                            
+                                            if (voucherCodeResponse.data.success) {
+                                                voucherCodes.push(voucherCodeResponse.data.voucher_code);
+                                                console.log(`🎁 Voucher code ${i + 1} generated:`, voucherCodeResponse.data.voucher_code);
+                                            } else {
+                                                console.error(`Failed to generate voucher code ${i + 1}:`, voucherCodeResponse.data.message);
+                                            }
+                                        } catch (codeError) {
+                                            console.error(`Error generating voucher code ${i + 1}:`, codeError);
+                                        }
+                                    }
+                                    
+                                    if (voucherCodes.length > 0) {
+                                        console.log(`🎁 Successfully generated ${voucherCodes.length} voucher codes:`, voucherCodes);
+                                        voucherCode = voucherCodes.join(', '); // Join multiple codes with comma
+                                        
+                                        // Store the voucher codes in the session data
+                                        storeData.voucherData.generated_voucher_code = voucherCode;
+                                        storeData.voucherData.generated_voucher_codes = voucherCodes; // Store as array too
+                                    }
                                 } else {
-                                    console.error('Failed to generate voucher code for', storeData.voucherData.voucher_type, ':', voucherCodeResponse.data.message);
+                                    // Single voucher code generation (original logic)
+                                    const voucherCodeResponse = await axios.post(`${req.protocol}://${req.get('host')}/api/generate-voucher-code`, {
+                                        flight_category: flightCategory,
+                                        customer_name: storeData.voucherData.name || 'Unknown Customer',
+                                        customer_email: storeData.voucherData.email || '',
+                                        location: storeData.voucherData.preferred_location || 'Somerset',
+                                        // Pass through actual experience type (Shared Flight or Private Charter)
+                                        experience_type: storeData.voucherData.flight_type || 'Shared Flight',
+                                        voucher_type: storeData.voucherData.voucher_type || 'Flight Voucher',
+                                        paid_amount: storeData.voucherData.paid || 0,
+                                        expires_date: storeData.voucherData.expires || null
+                                    });
+                                    
+                                    if (voucherCodeResponse.data.success) {
+                                        console.log('Voucher code generated successfully for', storeData.voucherData.voucher_type, ':', voucherCodeResponse.data.voucher_code);
+                                        voucherCode = voucherCodeResponse.data.voucher_code;
+                                        
+                                        // Store the voucher code in the session data to prevent regeneration
+                                        storeData.voucherData.generated_voucher_code = voucherCode;
+                                    } else {
+                                        console.error('Failed to generate voucher code for', storeData.voucherData.voucher_type, ':', voucherCodeResponse.data.message);
+                                    }
                                 }
                             } catch (voucherCodeError) {
                                 console.error('Error generating voucher code for', storeData.voucherData.voucher_type, ':', voucherCodeError);
