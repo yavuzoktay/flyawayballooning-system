@@ -9534,6 +9534,7 @@ app.post('/api/holdAvailability', (req, res) => {
     });
     
     console.log(`🔒 Hold created for ${seats} seat(s) at ${date} ${time} (session: ${sessionId}, expires in 5 min)`);
+    console.log(`🔒 Hold details:`, { activity_id, date, time, seats, sessionId, holdKey });
     
     res.json({ 
         success: true, 
