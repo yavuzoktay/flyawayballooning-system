@@ -10053,6 +10053,7 @@ app.post('/api/createBookingFromSession', async (req, res) => {
             id: result, 
             message: `${type} created successfully`,
             voucher_code: finalVoucherCode,
+            voucher_codes: storeData.voucherData?.generated_voucher_codes || null, // Array of multiple voucher codes
             customer_name: storeData.voucherData?.name || storeData.bookingData?.passengerData?.[0]?.firstName + ' ' + storeData.bookingData?.passengerData?.[0]?.lastName || null,
             customer_email: storeData.voucherData?.email || storeData.bookingData?.passengerData?.[0]?.email || null,
             paid_amount: storeData.voucherData?.paid || storeData.bookingData?.totalPrice || null,
@@ -10063,6 +10064,62 @@ app.post('/api/createBookingFromSession', async (req, res) => {
         console.error('Error creating from session:', error);
         res.status(500).json({ success: false, message: error.message });
     }
+});
+
+// Get multiple voucher codes for a purchaser (for admin panel)
+app.get('/api/voucher-codes/:purchaserId', (req, res) => {
+    const { purchaserId } = req.params;
+    
+    if (!purchaserId) {
+        return res.status(400).json({ success: false, message: 'Purchaser ID is required' });
+    }
+    
+    // Get all vouchers for this purchaser (same name, email, paid amount, created within 1 minute)
+    const sql = `
+        SELECT v1.*, v2.voucher_ref as related_voucher_ref
+        FROM all_vouchers v1
+        LEFT JOIN all_vouchers v2 ON v1.name = v2.name 
+            AND v1.email = v2.email 
+            AND v1.paid = v2.paid 
+            AND ABS(TIMESTAMPDIFF(SECOND, v1.created_at, v2.created_at)) <= 60
+            AND v1.id != v2.id
+        WHERE v1.id = ?
+        ORDER BY v1.created_at ASC
+    `;
+    
+    con.query(sql, [purchaserId], (err, result) => {
+        if (err) {
+            console.error('Error fetching voucher codes:', err);
+            return res.status(500).json({ success: false, message: 'Database error' });
+        }
+        
+        if (!result || result.length === 0) {
+            return res.status(404).json({ success: false, message: 'Voucher not found' });
+        }
+        
+        // Group vouchers by purchaser (same name, email, paid amount, created within 1 minute)
+        const purchaserVouchers = result.filter(v => 
+            v.name === result[0].name && 
+            v.email === result[0].email && 
+            v.paid === result[0].paid &&
+            Math.abs(new Date(v.created_at) - new Date(result[0].created_at)) <= 60000 // 1 minute
+        );
+        
+        const voucherCodes = purchaserVouchers.map(v => v.voucher_ref).filter(ref => ref && ref !== '-');
+        
+        res.json({
+            success: true,
+            data: {
+                voucherCodes: voucherCodes,
+                count: voucherCodes.length,
+                vouchers: purchaserVouchers.map(v => ({
+                    id: v.id,
+                    voucher_ref: v.voucher_ref,
+                    created_at: v.created_at
+                }))
+            }
+        });
+    });
 });
 
 // Fix journey_types data endpoint
