@@ -9056,6 +9056,7 @@ async function createVoucherFromWebhook(voucherData) {
             weight = '',
             flight_type = '',
             voucher_type = '',
+            book_flight = '', // Add book_flight field
             email = '',
             phone = '',
             mobile = '',
@@ -9232,11 +9233,13 @@ async function createVoucherFromWebhook(voucherData) {
             
             // For Buy Gift Voucher, create multiple vouchers based on passenger count
             const passengerCount = Number.parseInt(numberOfPassengers, 10) || 1;
-            const isBuyGiftVoucher = voucher_type === 'Gift Voucher' || 
+            const isBuyGiftVoucher = book_flight === 'Gift Voucher' || 
+                                   voucher_type === 'Gift Voucher' ||
                                    voucher_type === 'Buy Gift' || 
                                    voucher_type === 'Buy Gift Voucher';
             
             console.log('🎁 Webhook voucher type check:', {
+                book_flight: book_flight,
                 voucher_type: voucher_type,
                 numberOfPassengers: numberOfPassengers,
                 passengerCount: passengerCount,
