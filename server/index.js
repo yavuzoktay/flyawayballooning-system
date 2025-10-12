@@ -7443,9 +7443,23 @@ app.get('/api/availabilities/filter', (req, res) => {
             const day = String(dateObj.getDate()).padStart(2, '0');
             const localDateString = `${year}-${month}-${day}`;
             
+            // Calculate held seats for this slot
+            const holdKey = `${row.activity_id}_${localDateString}_${row.time}`;
+            let heldSeats = 0;
+            const now = Date.now();
+            
+            for (const [key, hold] of availabilityHolds.entries()) {
+                if (key.startsWith(holdKey) && now <= hold.expiresAt) {
+                    heldSeats += hold.seats;
+                }
+            }
+            
             return {
                 ...row,
-                date: localDateString
+                date: localDateString,
+                available: Math.max(0, row.available - heldSeats),
+                actualAvailable: row.available,
+                heldSeats: heldSeats
             };
         });
         
@@ -7462,6 +7476,8 @@ app.get('/api/availabilities/filter', (req, res) => {
                 date: r.date, 
                 status: r.status,
                 available: r.available,
+                actualAvailable: r.actualAvailable,
+                heldSeats: r.heldSeats,
                 capacity: r.capacity,
                 flight_types: r.flight_types, 
                 voucher_types: r.voucher_types
