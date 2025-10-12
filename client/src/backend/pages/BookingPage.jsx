@@ -2749,6 +2749,7 @@ setBookingDetail(finalVoucherDetail);
                                                     <IconButton size="small" onClick={() => handleEditClick('name', bookingDetail.booking.name)}><EditIcon fontSize="small" /></IconButton>
                                                 </>
                                             )}</Typography>
+                                            <Typography><b>Booking ID:</b> {bookingDetail.booking.id || '-'}</Typography>
                                             <Typography><b>Booking Created:</b> {bookingDetail.booking.created_at ? dayjs(bookingDetail.booking.created_at).format('DD/MM/YYYY') : '-'}</Typography>
                                             <Typography><b>Phone:</b> {editField === 'phone' ? (
                                                 <>
