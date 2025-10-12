@@ -47,6 +47,21 @@ app.use((req, res, next) => {
     next();
 });
 
+// Availability Hold System
+// Store holds in memory (in production, use Redis or database)
+const availabilityHolds = new Map();
+
+// Clean up expired holds every minute
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, hold] of availabilityHolds.entries()) {
+        if (now > hold.expiresAt) {
+            console.log(`🔄 Cleaning up expired hold for ${key}`);
+            availabilityHolds.delete(key);
+        }
+    }
+}, 60000); // Check every minute
+
 // Stripe configuration - environment-based keys
 const isProduction = process.env.NODE_ENV === 'production';
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -9445,7 +9460,7 @@ app.get('/api/locationPricing/:location', (req, res) => {
     });
 });
 
-// Get a single availability by activity, date and time
+// Get a single availability by activity, date and time (with hold consideration)
 app.get('/api/availabilityBySlot', (req, res) => {
     const { activity_id, date, time } = req.query;
     if (!activity_id || !date || !time) {
@@ -9455,7 +9470,97 @@ app.get('/api/availabilityBySlot', (req, res) => {
     con.query(sql, [activity_id, date, time], (err, rows) => {
         if (err) return res.status(500).json({ success: false, message: 'Database error' });
         if (!rows || rows.length === 0) return res.json({ success: true, data: null });
-        return res.json({ success: true, data: rows[0] });
+        
+        // Calculate held seats for this slot
+        const holdKey = `${activity_id}_${date}_${time}`;
+        let heldSeats = 0;
+        const now = Date.now();
+        
+        for (const [key, hold] of availabilityHolds.entries()) {
+            if (key.startsWith(holdKey) && now <= hold.expiresAt) {
+                heldSeats += hold.seats;
+            }
+        }
+        
+        // Return availability minus held seats
+        const availabilityData = {
+            ...rows[0],
+            available: Math.max(0, rows[0].available - heldSeats),
+            actualAvailable: rows[0].available,
+            heldSeats: heldSeats
+        };
+        
+        return res.json({ success: true, data: availabilityData });
+    });
+});
+
+// Hold availability for a specific slot
+app.post('/api/holdAvailability', (req, res) => {
+    const { activity_id, date, time, seats, sessionId } = req.body;
+    
+    if (!activity_id || !date || !time || !seats || !sessionId) {
+        return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+    
+    // Create unique hold key
+    const holdKey = `${activity_id}_${date}_${time}_${sessionId}`;
+    const expiresAt = Date.now() + (5 * 60 * 1000); // 5 minutes
+    
+    // Store the hold
+    availabilityHolds.set(holdKey, {
+        activity_id,
+        date,
+        time,
+        seats: parseInt(seats),
+        sessionId,
+        expiresAt,
+        createdAt: Date.now()
+    });
+    
+    console.log(`🔒 Hold created for ${seats} seat(s) at ${date} ${time} (session: ${sessionId}, expires in 5 min)`);
+    
+    res.json({ 
+        success: true, 
+        message: 'Availability held',
+        holdKey,
+        expiresAt,
+        expiresIn: 300 // seconds
+    });
+});
+
+// Release availability hold
+app.post('/api/releaseHold', (req, res) => {
+    const { sessionId, activity_id, date, time } = req.body;
+    
+    if (!sessionId) {
+        return res.status(400).json({ success: false, message: 'sessionId is required' });
+    }
+    
+    let released = false;
+    
+    // If specific slot provided, release only that hold
+    if (activity_id && date && time) {
+        const holdKey = `${activity_id}_${date}_${time}_${sessionId}`;
+        if (availabilityHolds.has(holdKey)) {
+            availabilityHolds.delete(holdKey);
+            console.log(`🔓 Hold released for ${date} ${time} (session: ${sessionId})`);
+            released = true;
+        }
+    } else {
+        // Release all holds for this session
+        for (const [key, hold] of availabilityHolds.entries()) {
+            if (hold.sessionId === sessionId) {
+                availabilityHolds.delete(key);
+                console.log(`🔓 Hold released for ${hold.date} ${hold.time} (session: ${sessionId})`);
+                released = true;
+            }
+        }
+    }
+    
+    res.json({ 
+        success: true, 
+        message: released ? 'Hold(s) released' : 'No holds found',
+        released
     });
 });
 
