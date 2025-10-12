@@ -4121,6 +4121,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
                   AND ABS(TIMESTAMPDIFF(SECOND, v2.created_at, v.created_at)) <= 60
                   AND v2.voucher_ref IS NOT NULL 
                   AND v2.voucher_ref != '-'
+                  AND v2.book_flight = 'Gift Voucher'
                 ORDER BY v2.created_at ASC) as all_voucher_codes
         FROM all_vouchers v
         LEFT JOIN all_booking b ON v.voucher_ref = b.voucher_code
@@ -6561,7 +6562,7 @@ app.delete('/api/deletePassenger', (req, res) => {
                 console.log('✅ Updated booking - Subtracted from due:', pricePerPassenger);
                 console.log('✅ New due:', newDue);
             
-                
+            
 		// Recompute availability for this booking's slot
 		const bookingInfoSql = 'SELECT pax, flight_date, time_slot, activity_id, location FROM all_booking WHERE id = ? LIMIT 1';
 		con.query(bookingInfoSql, [booking_id], (infoErr, infoRows) => {
@@ -9197,7 +9198,7 @@ async function createVoucherFromWebhook(voucherData) {
                 emptyToNull(name),
                 emptyToNull(weight),
                 emptyToNull(flight_type), // This will go to experience_type column
-                emptyToNull(voucher_type), // This will go to book_flight column
+                emptyToNull(book_flight), // This will go to book_flight column
                 emptyToNull(actualVoucherType), // This will go to voucher_type column (actual voucher type)
                 emptyToNull(email),
                 emptyToNull(phone),
