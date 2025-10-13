@@ -3820,9 +3820,24 @@ app.get("/api/getfilteredBookings", (req, res) => {
     });
 });
 
+// In-memory cache for getAllBookingData to prevent duplicate rapid calls
+const __getAllBookingDataCache = {
+    lastKey: null,
+    lastAt: 0,
+    lastResponse: null
+};
+
 // Get all booking data
 app.get('/api/getAllBookingData', (req, res) => {
     console.log('GET /api/getAllBookingData called with filters:', req.query);
+    
+    // Debounce duplicate calls within 500ms for the same filters
+    const cacheKey = JSON.stringify(req.query || {});
+    const nowTs = Date.now();
+    if (__getAllBookingDataCache.lastKey === cacheKey && (nowTs - __getAllBookingDataCache.lastAt) < 500 && __getAllBookingDataCache.lastResponse) {
+        console.log('Responding from cache to avoid duplicate query');
+        return res.json(__getAllBookingDataCache.lastResponse);
+    }
     
     // Build WHERE clause based on filters
     let whereClause = '';
@@ -3867,6 +3882,7 @@ app.get('/api/getAllBookingData', (req, res) => {
         whereClause = 'WHERE ' + whereClause.substring(5);
     }
     
+    // Optimized query with better indexing hints
     const sql = `
         SELECT 
             ab.*, 
@@ -3884,6 +3900,7 @@ app.get('/api/getAllBookingData', (req, res) => {
             ON vcu_map.id = vcu.voucher_code_id
         ${whereClause}
         ORDER BY ab.created_at DESC
+        LIMIT 1000
     `;
     
     console.log('SQL Query:', sql);
@@ -3903,19 +3920,21 @@ app.get('/api/getAllBookingData', (req, res) => {
             return r;
         });
         
-        // Fetch additional information for each booking
+        // Fetch additional information for all bookings in batch queries (optimized)
         try {
-            for (let i = 0; i < enriched.length; i++) {
-                const booking = enriched[i];
-                
-                // Get additional information answers
-                const [answersRows] = await new Promise((resolve, reject) => {
+            // Get all booking IDs
+            const bookingIds = enriched.map(b => b.id);
+            
+            if (bookingIds.length > 0) {
+                // Batch fetch all additional information answers for all bookings
+                const [allAnswersRows] = await new Promise((resolve, reject) => {
                     const answersSql = `
                         SELECT 
                             aia.id,
                             aia.question_id,
                             aia.answer,
                             aia.created_at,
+                            aia.booking_id,
                             aiq.question_text,
                             aiq.question_type,
                             aiq.options,
@@ -3923,16 +3942,16 @@ app.get('/api/getAllBookingData', (req, res) => {
                             aiq.category
                         FROM additional_information_answers aia
                         JOIN additional_information_questions aiq ON aia.question_id = aiq.id
-                        WHERE aia.booking_id = ?
-                        ORDER BY aiq.sort_order, aiq.id
+                        WHERE aia.booking_id IN (${bookingIds.map(() => '?').join(',')})
+                        ORDER BY aia.booking_id, aiq.sort_order, aiq.id
                     `;
-                    con.query(answersSql, [booking.id], (err, rows) => {
+                    con.query(answersSql, bookingIds, (err, rows) => {
                         if (err) reject(err);
                         else resolve([rows]);
                     });
                 });
                 
-                // Also get all available questions for this journey type to show what questions exist
+                // Batch fetch all available questions (only once, not per booking)
                 const [questionsRows] = await new Promise((resolve, reject) => {
                     const questionsSql = `
                         SELECT 
@@ -3948,22 +3967,27 @@ app.get('/api/getAllBookingData', (req, res) => {
                         WHERE is_active = 1 
                         ORDER BY sort_order, id
                     `;
-                    console.log('Fetching questions with SQL:', questionsSql);
                     con.query(questionsSql, (err, rows) => {
                         if (err) {
                             console.error('Error fetching questions:', err);
                             reject(err);
                         } else {
-                            console.log('Questions fetched successfully:', rows);
-                            console.log('Questions count:', rows ? rows.length : 0);
                             resolve([rows]);
                         }
                     });
                 });
                 
-                // Format additional information
-                const additionalInfo = {
-                                    questions: questionsRows.map(question => {
+                // Group answers by booking_id
+                const answersByBooking = {};
+                allAnswersRows.forEach(answer => {
+                    if (!answersByBooking[answer.booking_id]) {
+                        answersByBooking[answer.booking_id] = [];
+                    }
+                    answersByBooking[answer.booking_id].push(answer);
+                });
+                
+                // Format questions once
+                const formattedQuestions = questionsRows.map(question => {
                     try {
                         let parsedOptions = [];
                         let parsedJourneyTypes = [];
@@ -4015,39 +4039,46 @@ app.get('/api/getAllBookingData', (req, res) => {
                             sort_order: question.sort_order
                         };
                     }
-                }),
-                    answers: answersRows.map(answer => ({
-                        question_id: answer.question_id,
-                        question_text: answer.question_text,
-                        question_type: answer.question_type,
-                        answer: answer.answer,
-                        options: answer.options ? JSON.parse(answer.options) : [],
-                        help_text: answer.help_text,
-                        category: answer.category,
-                        created_at: answer.created_at
-                    })),
-                    legacy: {
-                        additional_notes: booking.additional_notes,
-                        hear_about_us: booking.hear_about_us,
-                        ballooning_reason: booking.ballooning_reason,
-                        prefer: booking.prefer
-                    },
-                    additional_information_json: (() => {
-                        if (!booking.additional_information_json) return null;
-                        if (typeof booking.additional_information_json === 'string') {
-                            try {
-                                return JSON.parse(booking.additional_information_json);
-                            } catch (e) {
-                                console.warn('Failed to parse additional_information_json:', e);
-                                return null;
-                            }
-                        }
-                        return booking.additional_information_json;
-                    })()
-                };
+                });
                 
-                // Add additional information to the booking object
-                enriched[i].additional_information = additionalInfo;
+                // Add additional information to each booking object
+                enriched.forEach((booking, index) => {
+                    const bookingAnswers = answersByBooking[booking.id] || [];
+                    
+                    const additionalInfo = {
+                        questions: formattedQuestions,
+                        answers: bookingAnswers.map(answer => ({
+                            question_id: answer.question_id,
+                            question_text: answer.question_text,
+                            question_type: answer.question_type,
+                            answer: answer.answer,
+                            options: answer.options ? JSON.parse(answer.options) : [],
+                            help_text: answer.help_text,
+                            category: answer.category,
+                            created_at: answer.created_at
+                        })),
+                        legacy: {
+                            additional_notes: booking.additional_notes,
+                            hear_about_us: booking.hear_about_us,
+                            ballooning_reason: booking.ballooning_reason,
+                            prefer: booking.prefer
+                        },
+                        additional_information_json: (() => {
+                            if (!booking.additional_information_json) return null;
+                            if (typeof booking.additional_information_json === 'string') {
+                                try {
+                                    return JSON.parse(booking.additional_information_json);
+                                } catch (e) {
+                                    console.warn('Failed to parse additional_information_json:', e);
+                                    return null;
+                                }
+                            }
+                            return booking.additional_information_json;
+                        })()
+                    };
+                    
+                    enriched[index].additional_information = additionalInfo;
+                });
             }
         } catch (error) {
             console.error('Error fetching additional information:', error);
@@ -4067,9 +4098,23 @@ app.get('/api/getAllBookingData', (req, res) => {
             } : null
         });
         
-        res.json({ success: true, data: enriched });
+        const response = { success: true, data: enriched };
+        
+        // Cache the response
+        __getAllBookingDataCache.lastKey = cacheKey;
+        __getAllBookingDataCache.lastAt = nowTs;
+        __getAllBookingDataCache.lastResponse = response;
+        
+        res.json(response);
     });
 });
+
+// In-memory short cache to avoid duplicate rapid calls for the same key
+const __getAllVoucherDataCache = {
+    lastKey: null,
+    lastAt: 0,
+    lastResponse: null
+};
 
 // Get All Voucher Data (with booking and passenger info)
 app.get('/api/getAllVoucherData', (req, res) => {
@@ -4078,6 +4123,14 @@ app.get('/api/getAllVoucherData', (req, res) => {
     // Optional filters: vc_code or voucher_ref
     const { vc_code, voucher_ref } = req.query || {};
     console.log('Request query:', req.query);
+
+    // Debounce duplicate calls within 800ms for the same key
+    const cacheKey = JSON.stringify({ vc_code: vc_code || null, voucher_ref: voucher_ref || null });
+    const nowTs = Date.now();
+    if (__getAllVoucherDataCache.lastKey === cacheKey && (nowTs - __getAllVoucherDataCache.lastAt) < 800 && __getAllVoucherDataCache.lastResponse) {
+        console.log('Responding from short cache to avoid duplicate query');
+        return res.json(__getAllVoucherDataCache.lastResponse);
+    }
     
     // Get vouchers with booking info; optionally filter by code
     // For multiple vouchers (Buy Gift), we need to group by purchaser and show all voucher codes
@@ -4112,16 +4165,17 @@ app.get('/api/getAllVoucherData', (req, res) => {
                    'weather_refund', p.weather_refund,
                    'price', p.price
                )) FROM passenger p WHERE p.booking_id = b.id) as passenger_details,
-               -- Get all voucher codes for the same purchaser (same name, email, paid amount, created within 1 minute)
-               (SELECT GROUP_CONCAT(v2.voucher_ref SEPARATOR ', ') 
-                FROM all_vouchers v2 
-                WHERE v2.name = v.name 
-                  AND v2.email = v.email 
-                  AND v2.paid = v.paid 
-                  AND ABS(TIMESTAMPDIFF(SECOND, v2.created_at, v.created_at)) <= 60
-                  AND v2.voucher_ref IS NOT NULL 
+               -- Get all voucher codes for the same purchaser/contact (same paid amount, created within a short window)
+               (SELECT GROUP_CONCAT(v2.voucher_ref SEPARATOR ', ')
+                FROM all_vouchers v2
+                WHERE v2.paid = v.paid
+                  AND (
+                        (v2.name = v.name AND v2.email = v.email)
+                     OR (v2.purchaser_name = v.purchaser_name AND v2.purchaser_email = v.purchaser_email)
+                  )
+                  AND ABS(TIMESTAMPDIFF(SECOND, v2.created_at, v.created_at)) <= 300
+                  AND v2.voucher_ref IS NOT NULL
                   AND v2.voucher_ref != '-'
-                  AND v2.book_flight = 'Gift Voucher'
                 ORDER BY v2.created_at ASC) as all_voucher_codes
         FROM all_vouchers v
         LEFT JOIN all_booking b ON v.voucher_ref = b.voucher_code
@@ -4135,7 +4189,8 @@ app.get('/api/getAllVoucherData', (req, res) => {
     con.query(voucher, params, async (err, result) => {
         if (err) {
             console.error("Error occurred:", err);
-            res.status(500).send({ success: false, error: "Database query failed" });
+            const payload = { success: false, error: "Database query failed" };
+            res.status(500).send(payload);
             return;
         }
         
@@ -4429,6 +4484,11 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     }
                 }
 
+                const numFromCodes = (row.all_voucher_codes && typeof row.all_voucher_codes === 'string')
+                    ? row.all_voucher_codes.split(',').map(s => s.trim()).filter(Boolean).length
+                    : null;
+                const computedVoucherCount = numFromCodes || Number.parseInt(row.numberOfPassengers, 10) || Number.parseInt(row.passenger_count, 10) || 1;
+
                 return {
                     ...row,
                     voucher_ref,
@@ -4447,9 +4507,12 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     redeemed: row.redeemed ?? '',
                     paid: row.paid ?? '',
                     offer_code: row.offer_code ?? '',
-                    voucher_ref: voucher_ref ?? '',
                     // Use all_voucher_codes if available (for multiple vouchers), otherwise use single voucher_ref
-                    vc_code: row.all_voucher_codes || voucher_ref || '',
+                    voucher_ref: (row.all_voucher_codes || voucher_ref || ''),
+                    vc_code: (row.all_voucher_codes || voucher_ref || ''),
+                    // Expose voucher_code with the same combined value for client compatibility
+                    voucher_code: (row.all_voucher_codes || voucher_ref || ''),
+                    all_voucher_codes: (row.all_voucher_codes || voucher_ref || ''),
                     created_at: row.created_at ? moment(row.created_at).format('DD/MM/YYYY HH:mm') : '',
                     booking_email: row.booking_email ?? '',
                     booking_phone: row.booking_phone ?? '',
@@ -4457,6 +4520,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     passenger_info: row.passenger_info ?? '',
                     passenger_count: row.passenger_count ?? 0,
                     passenger_details: passengerDetails, // Add parsed passenger details
+                    numberOfVouchers: computedVoucherCount,
                     flight_attempts: row.flight_attempts ?? 0,
                     additional_information: additionalInfo,
                     additional_information_json: row.additional_information_json || null,
@@ -4467,10 +4531,14 @@ app.get('/api/getAllVoucherData', (req, res) => {
             }));
             
             // Returning enriched voucher data
-            
-            res.json({ success: true, data: enriched });
+            const responsePayload = { success: true, data: enriched };
+            __getAllVoucherDataCache.lastKey = cacheKey;
+            __getAllVoucherDataCache.lastAt = Date.now();
+            __getAllVoucherDataCache.lastResponse = responsePayload;
+            res.json(responsePayload);
         } else {
-            res.json({ success: true, data: [] });
+            const payload = { success: true, data: [] };
+            res.json(payload);
         }
     });
 });
@@ -9081,6 +9149,17 @@ async function createVoucherFromWebhook(voucherData) {
             passengerData = []
         } = voucherData;
 
+        // If paid wasn't provided on webhook payload, try pulling from stored session (Stripe total)
+        try {
+            if ((!paid || Number(paid) === 0) && voucherData && voucherData.session_id && stripeSessionStore[voucherData.session_id]) {
+                const guess = stripeSessionStore[voucherData.session_id]?.totalPrice || stripeSessionStore[voucherData.session_id]?.voucherData?.paid;
+                if (Number(guess) > 0) {
+                    console.log('Webhook paid corrected from session store:', guess);
+                    voucherData.paid = Number(guess);
+                }
+            }
+        } catch (e) { /* ignore */ }
+
         const now = moment().format('YYYY-MM-DD HH:mm:ss');
         // Determine the actual voucher type based on the input
         // NOTE: We declare this BEFORE computing expiry to avoid ReferenceError
@@ -9234,7 +9313,9 @@ async function createVoucherFromWebhook(voucherData) {
             
             // For Buy Gift Voucher, create multiple vouchers based on passenger count
             const passengerCount = Number.parseInt(numberOfPassengers, 10) || 1;
-            const isBuyGiftVoucher = book_flight === 'Gift Voucher' || 
+            // Treat any voucher flow with passengerCount > 1 as Buy Gift to ensure multiple codes
+            const isBuyGiftVoucher = (passengerCount > 1) ||
+                                   book_flight === 'Gift Voucher' || 
                                    voucher_type === 'Gift Voucher' ||
                                    voucher_type === 'Buy Gift' || 
                                    voucher_type === 'Buy Gift Voucher';
@@ -9477,7 +9558,9 @@ app.post('/api/create-checkout-session', async (req, res) => {
             // Ensure additional_information_json is populated for webhook persistence
             additional_information_json: voucherData.additional_information_json || voucherData.additionalInfo || null,
             // Backward-compat: include choose_add_on as add_to_booking_items if only one is present
-            add_to_booking_items: voucherData.add_to_booking_items || voucherData.choose_add_on || null
+            add_to_booking_items: voucherData.add_to_booking_items || voucherData.choose_add_on || null,
+            // Persist the amount paid from checkout into voucherData so webhook creation stores it
+            paid: Number(totalPrice) || 0
         } : null;
         stripeSessionStore[session_id] = {
             type: type || (voucherData ? 'voucher' : 'booking'),
@@ -10000,7 +10083,9 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                                 
                                 // For Buy Gift Voucher, generate multiple voucher codes based on passenger count
                                 const passengerCount = Number.parseInt(storeData.voucherData.numberOfPassengers, 10) || 1;
-                                const isBuyGiftVoucher = storeData.voucherData.book_flight === 'Gift Voucher' || 
+                                // If passengerCount > 1, always generate multiple codes regardless of labels
+                                const isBuyGiftVoucher = (passengerCount > 1) ||
+                                                       storeData.voucherData.book_flight === 'Gift Voucher' || 
                                                        storeData.voucherData.voucher_type === 'Buy Gift' || 
                                                        storeData.voucherData.voucher_type === 'Buy Gift Voucher';
                                 
@@ -10045,10 +10130,63 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                                     if (voucherCodes.length > 0) {
                                         console.log(`🎁 Successfully generated ${voucherCodes.length} voucher codes:`, voucherCodes);
                                         voucherCode = voucherCodes.join(', '); // Join multiple codes with comma
-                                        
+
                                         // Store the voucher codes in the session data
                                         storeData.voucherData.generated_voucher_code = voucherCode;
                                         storeData.voucherData.generated_voucher_codes = voucherCodes; // Store as array too
+
+                                        // Persist codes into recent all_vouchers rows that belong to this purchase
+                                        try {
+                                            const findSql = `
+                                                SELECT id
+                                                FROM all_vouchers
+                                                WHERE (name = ? AND email = ?) OR (purchaser_name = ? AND purchaser_email = ?)
+                                                  AND paid = ?
+                                                  AND created_at > DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+                                                  AND (voucher_ref IS NULL OR voucher_ref = '' OR voucher_ref = '-')
+                                                ORDER BY created_at ASC
+                                                LIMIT ?
+                                            `;
+                                            const findParams = [
+                                                storeData.voucherData.name || '',
+                                                storeData.voucherData.email || '',
+                                                storeData.voucherData.purchaser_name || storeData.voucherData.name || '',
+                                                storeData.voucherData.purchaser_email || storeData.voucherData.email || '',
+                                                storeData.voucherData.paid || 0,
+                                                voucherCodes.length
+                                            ];
+                                            const rows = await new Promise((resolve, reject) => {
+                                                con.query(findSql, findParams, (err, result) => err ? reject(err) : resolve(result));
+                                            });
+                                            console.log('🔗 Matching voucher rows to update with codes:', rows);
+                                            // Update one-by-one to maintain order
+                                            for (let i = 0; i < rows.length && i < voucherCodes.length; i++) {
+                                                const updateSql = 'UPDATE all_vouchers SET voucher_ref = ? WHERE id = ?';
+                                                await new Promise((resolve) => {
+                                                    con.query(updateSql, [voucherCodes[i], rows[i].id], (err) => {
+                                                        if (err) console.error('Error updating voucher_ref:', err, rows[i]);
+                                                        else console.log('✅ voucher_ref updated:', voucherCodes[i], '-> id', rows[i].id);
+                                                        resolve();
+                                                    });
+                                                });
+                                            }
+
+                                            // Safety: ensure PAID is set correctly on those vouchers
+                                            const paidAmount = Number(storeData.voucherData.paid || totalPrice || 0);
+                                            if (paidAmount > 0 && rows && rows.length) {
+                                                const ids = rows.map(r => r.id);
+                                                const updatePaidSql = `UPDATE all_vouchers SET paid = ? WHERE id IN (${ids.map(()=>'?').join(',')})`;
+                                                await new Promise((resolve) => {
+                                                    con.query(updatePaidSql, [paidAmount, ...ids], (err) => {
+                                                        if (err) console.error('Error updating paid for vouchers:', err);
+                                                        else console.log('✅ paid updated for vouchers:', ids, 'amount:', paidAmount);
+                                                        resolve();
+                                                    });
+                                                });
+                                            }
+                                        } catch (persistErr) {
+                                            console.error('Error persisting generated voucher codes to all_vouchers:', persistErr);
+                                        }
                                     }
                                 } else {
                                     // Single voucher code generation (original logic)
@@ -10070,6 +10208,53 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                                     
                                     // Store the voucher code in the session data to prevent regeneration
                                     storeData.voucherData.generated_voucher_code = voucherCode;
+
+                                    // Persist single code into the most recent matching voucher
+                                    try {
+                                        const findSql = `
+                                            SELECT id
+                                            FROM all_vouchers
+                                            WHERE (name = ? AND email = ?) OR (purchaser_name = ? AND purchaser_email = ?)
+                                              AND paid = ?
+                                              AND created_at > DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+                                              AND (voucher_ref IS NULL OR voucher_ref = '' OR voucher_ref = '-')
+                                            ORDER BY created_at ASC
+                                            LIMIT 1
+                                        `;
+                                        const findParams = [
+                                            storeData.voucherData.name || '',
+                                            storeData.voucherData.email || '',
+                                            storeData.voucherData.purchaser_name || storeData.voucherData.name || '',
+                                            storeData.voucherData.purchaser_email || storeData.voucherData.email || '',
+                                            storeData.voucherData.paid || 0
+                                        ];
+                                        const rows = await new Promise((resolve, reject) => {
+                                            con.query(findSql, findParams, (err, result) => err ? reject(err) : resolve(result));
+                                        });
+                                        if (rows && rows.length > 0) {
+                                            const updateSql = 'UPDATE all_vouchers SET voucher_ref = ? WHERE id = ?';
+                                            await new Promise((resolve) => {
+                                                con.query(updateSql, [voucherCode, rows[0].id], (err) => {
+                                                    if (err) console.error('Error updating single voucher_ref:', err, rows[0]);
+                                                    else console.log('✅ voucher_ref updated (single):', voucherCode, '-> id', rows[0].id);
+                                                    resolve();
+                                                });
+                                            });
+                                            // Ensure paid is set correctly
+                                            const paidAmount = Number(storeData.voucherData.paid || totalPrice || 0);
+                                            if (paidAmount > 0) {
+                                                await new Promise((resolve) => {
+                                                    con.query('UPDATE all_vouchers SET paid = ? WHERE id = ?', [paidAmount, rows[0].id], (err) => {
+                                                        if (err) console.error('Error updating paid (single):', err);
+                                                        else console.log('✅ paid updated (single):', paidAmount, '-> id', rows[0].id);
+                                                        resolve();
+                                                    });
+                                                });
+                                            }
+                                        }
+                                    } catch (persistErr) {
+                                        console.error('Error persisting single generated voucher code to all_vouchers:', persistErr);
+                                    }
                                 } else {
                                     console.error('Failed to generate voucher code for', storeData.voucherData.voucher_type, ':', voucherCodeResponse.data.message);
                                     }

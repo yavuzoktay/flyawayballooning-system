@@ -1,7 +1,7 @@
 {
   "files": {
     "main.css": "./static/css/main.ff0b37a1.css",
-    "main.js": "./static/js/main.08028f1a.js",
+    "main.js": "./static/js/main.c5c4c025.js",
     "static/js/685.bb24799d.chunk.js": "./static/js/685.bb24799d.chunk.js",
     "static/media/Gilroy-LightItalic.eot": "./static/media/Gilroy-LightItalic.ae87dbac3f9ff1bb1a92.eot",
     "static/media/Gilroy-LightItalic_1.eot": "./static/media/Gilroy-LightItalic_1.ae87dbac3f9ff1bb1a92.eot",
@@ -127,6 +127,6 @@
   },
   "entrypoints": [
     "static/css/main.ff0b37a1.css",
-    "static/js/main.08028f1a.js"
+    "static/js/main.c5c4c025.js"
   ]
 }
