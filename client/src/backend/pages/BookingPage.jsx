@@ -85,6 +85,7 @@ const BookingPage = () => {
     const [editPassengerFirstName, setEditPassengerFirstName] = useState("");
     const [editPassengerLastName, setEditPassengerLastName] = useState("");
     const [editPassengerWeight, setEditPassengerWeight] = useState("");
+    const [editPassengerPrice, setEditPassengerPrice] = useState("");
     const [savingPassengerEdit, setSavingPassengerEdit] = useState(false);
 
     // Add to component state:
@@ -95,8 +96,12 @@ const BookingPage = () => {
 
 
 
-    // Add state for passenger price editing
-    const [editPassengerPrice, setEditPassengerPrice] = useState("");
+    // Loading states
+    const [loadingBookings, setLoadingBookings] = useState(false);
+    const [loadingVouchers, setLoadingVouchers] = useState(false);
+    
+    // Debounce timer for filters
+    const [filterDebounceTimer, setFilterDebounceTimer] = useState(null);
 
     // Add state for tracking passenger prices in edit mode
     const [editPassengerPrices, setEditPassengerPrices] = useState([]);
@@ -449,10 +454,18 @@ Fly Away Ballooning Team`;
         }
     }, [activeTab, filteredBookingData, filteredVoucherData, filteredDateRequestData]);
     
-    // Filters değiştiğinde sadece bookings tab için API çağrısı yap
+    // Filters değiştiğinde sadece bookings tab için API çağrısı yap (debounced)
     useEffect(() => {
+        // Clear existing timer
+        if (filterDebounceTimer) {
+            clearTimeout(filterDebounceTimer);
+        }
+        
         if (activeTab === "bookings") {
-            (async () => {
+            setLoadingBookings(true);
+            
+            // Debounce the API call by 300ms
+            const timer = setTimeout(async () => {
                 try {
                     const response = await axios.get(`/api/getAllBookingData`, { params: filters });
                     const bookingData = response.data.data || [];
@@ -466,15 +479,27 @@ Fly Away Ballooning Team`;
                         setFilteredData(bookingData);
                     }
                 } catch (err) {
+                    console.error('Error fetching booking data:', err);
                     setBooking([]);
                     setFilteredBookingData([]);
                     if (activeTab === "bookings") {
                         setFilteredData([]);
                     }
+                } finally {
+                    setLoadingBookings(false);
                 }
-            })();
+            }, 300);
+            
+            setFilterDebounceTimer(timer);
         }
-    }, [filters]);
+        
+        // Cleanup function
+        return () => {
+            if (filterDebounceTimer) {
+                clearTimeout(filterDebounceTimer);
+            }
+        };
+    }, [filters, activeTab]);
 
     // filteredData'yı voucher tablosu için backend key'lerine göre map'le
     useEffect(() => {
@@ -604,6 +629,12 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
     finalVoucherDetail.voucher.mobile = voucherItem.mobile || finalVoucherDetail.voucher.mobile;
     finalVoucherDetail.voucher.weight = voucherItem.weight || finalVoucherDetail.voucher.weight;
     finalVoucherDetail.voucher.expires = voucherItem.expires || finalVoucherDetail.voucher.expires;
+    // Ensure voucher code fields and counts are populated from getAllVoucherData result
+    finalVoucherDetail.voucher.voucher_ref = voucherItem.voucher_ref || finalVoucherDetail.voucher.voucher_ref;
+    finalVoucherDetail.voucher.vc_code = voucherItem.vc_code || finalVoucherDetail.voucher.vc_code;
+    finalVoucherDetail.voucher.voucher_code = voucherItem.voucher_code || finalVoucherDetail.voucher.voucher_code;
+    finalVoucherDetail.voucher.all_voucher_codes = voucherItem.all_voucher_codes || finalVoucherDetail.voucher.all_voucher_codes;
+    finalVoucherDetail.voucher.numberOfVouchers = voucherItem.numberOfVouchers || finalVoucherDetail.voucher.numberOfVouchers || voucherItem.numberOfPassengers || finalVoucherDetail.voucher.numberOfPassengers;
     // Use paid information from getAllVoucherData instead of voucher detail API
     finalVoucherDetail.voucher.paid = voucherItem.paid || finalVoucherDetail.voucher.paid;
     
@@ -2251,74 +2282,82 @@ setBookingDetail(finalVoucherDetail);
                                     </div>
                                 )}
                                 {/* Apply client-side filtering for bookings */}
-                                <PaginatedTable
-                                    itemsPerPage={10}
-                                    data={filteredData.filter(item => {
-                                        // Experience filter
-                                        if (filters.experience && filters.experience !== 'Select') {
-                                            if (filters.experience === 'Private' && !item.flight_type?.toLowerCase().includes('private')) return false;
-                                            if (filters.experience === 'Shared' && !item.flight_type?.toLowerCase().includes('shared')) return false;
-                                        }
-                                        // Status filter
-                                        if (filters.status && item.status !== filters.status) return false;
-                                        // Location filter
-                                        if (filters.location && item.location !== filters.location) return false;
-                                        // Voucher Type filter
-                                        if (filters.voucherType && item.voucher_type !== filters.voucherType) return false;
-                                        // Search filter (case-insensitive, partial match)
-                                        if (filters.search && filters.search.trim() !== "") {
-                                            const search = filters.search.trim().toLowerCase();
-                                            const name = (item.name || "").toLowerCase();
-                                            const email = (item.email || "").toLowerCase();
-                                            const phone = (item.phone || "").toLowerCase();
-                                            const location = (item.location || "").toLowerCase();
-                                            const flightType = (item.flight_type || "").toLowerCase();
-                                            const status = (item.status || "").toLowerCase();
-                                            const voucherType = (item.voucher_type || "").toLowerCase();
-                                            if (!name.includes(search) && !email.includes(search) && !phone.includes(search) && !location.includes(search) && !flightType.includes(search) && !status.includes(search) && !voucherType.includes(search)) {
-                                                return false;
+                                {loadingBookings ? (
+                                    <div style={{ textAlign: 'center', padding: '40px' }}>
+                                        <Typography variant="h6" color="primary">
+                                            Loading bookings...
+                                        </Typography>
+                                    </div>
+                                ) : (
+                                    <PaginatedTable
+                                        itemsPerPage={10}
+                                        data={filteredData.filter(item => {
+                                            // Experience filter
+                                            if (filters.experience && filters.experience !== 'Select') {
+                                                if (filters.experience === 'Private' && !item.flight_type?.toLowerCase().includes('private')) return false;
+                                                if (filters.experience === 'Shared' && !item.flight_type?.toLowerCase().includes('shared')) return false;
                                             }
-                                        }
-                                        return true;
-                                    }).map(item => ({
-                                        id: item.id || '', // Ensure id is always present
-                                        created_at: item.created_at ? dayjs(item.created_at).format('DD/MM/YYYY') : '',
-                                        name: (Array.isArray(item.passengers) && item.passengers.length > 0
-                                            ? `${item.passengers[0]?.first_name || ''} ${item.passengers[0]?.last_name || ''}`.trim() || item.name || ''
-                                            : item.name || ''),
-                                        email: item.email || '',
-                                        flight_type: item.flight_type || '',
-                                        voucher_type: item.voucher_type || '',
-                                        location: item.location || '',
-                                        flight_date: (item.status === 'Cancelled') ? '-' : (item.flight_date_display || item.flight_date || ''),
-                                        pax: item.pax || '',
-                                        status: item.status ? item.status.charAt(0).toUpperCase() + item.status.slice(1).toLowerCase() : '',
-                                        paid: item.paid || '',
-                                        due: item.due || '',
-                                        voucher_code: item.voucher_code || '',
-                                        flight_attempts: item.flight_attempts || '',
-                                        expires: item.expires || ''
-                                    }))}
-                                    columns={[
-                                        "created_at",
-                                        "name",
-                                        "flight_type",
-                                        "voucher_type",
-                                        "location",
-                                        "flight_date",
-                                        "pax",
-                                        "status",
-                                        "paid",
-                                        "due",
-                                        "voucher_code",
-                                        "flight_attempts",
-                                        "expires"
-                                    ]}
-                                    onNameClick={handleNameClick}
-                                    onSmsClick={handleSmsClick}
-                                    onEmailClick={handleEmailClick}
-                                    context="bookings"
-                                />
+                                            // Status filter
+                                            if (filters.status && item.status !== filters.status) return false;
+                                            // Location filter
+                                            if (filters.location && item.location !== filters.location) return false;
+                                            // Voucher Type filter
+                                            if (filters.voucherType && item.voucher_type !== filters.voucherType) return false;
+                                            // Search filter (case-insensitive, partial match)
+                                            if (filters.search && filters.search.trim() !== "") {
+                                                const search = filters.search.trim().toLowerCase();
+                                                const name = (item.name || "").toLowerCase();
+                                                const email = (item.email || "").toLowerCase();
+                                                const phone = (item.phone || "").toLowerCase();
+                                                const location = (item.location || "").toLowerCase();
+                                                const flightType = (item.flight_type || "").toLowerCase();
+                                                const status = (item.status || "").toLowerCase();
+                                                const voucherType = (item.voucher_type || "").toLowerCase();
+                                                if (!name.includes(search) && !email.includes(search) && !phone.includes(search) && !location.includes(search) && !flightType.includes(search) && !status.includes(search) && !voucherType.includes(search)) {
+                                                    return false;
+                                                }
+                                            }
+                                            return true;
+                                        }).map(item => ({
+                                            id: item.id || '', // Ensure id is always present
+                                            created_at: item.created_at ? dayjs(item.created_at).format('DD/MM/YYYY') : '',
+                                            name: (Array.isArray(item.passengers) && item.passengers.length > 0
+                                                ? `${item.passengers[0]?.first_name || ''} ${item.passengers[0]?.last_name || ''}`.trim() || item.name || ''
+                                                : item.name || ''),
+                                            email: item.email || '',
+                                            flight_type: item.flight_type || '',
+                                            voucher_type: item.voucher_type || '',
+                                            location: item.location || '',
+                                            flight_date: (item.status === 'Cancelled') ? '-' : (item.flight_date_display || item.flight_date || ''),
+                                            pax: item.pax || '',
+                                            status: item.status ? item.status.charAt(0).toUpperCase() + item.status.slice(1).toLowerCase() : '',
+                                            paid: item.paid || '',
+                                            due: item.due || '',
+                                            voucher_code: item.voucher_code || '',
+                                            flight_attempts: item.flight_attempts || '',
+                                            expires: item.expires || ''
+                                        }))}
+                                        columns={[
+                                            "created_at",
+                                            "name",
+                                            "flight_type",
+                                            "voucher_type",
+                                            "location",
+                                            "flight_date",
+                                            "pax",
+                                            "status",
+                                            "paid",
+                                            "due",
+                                            "voucher_code",
+                                            "flight_attempts",
+                                            "expires"
+                                        ]}
+                                        onNameClick={handleNameClick}
+                                        onSmsClick={handleSmsClick}
+                                        onEmailClick={handleEmailClick}
+                                        context="bookings"
+                                    />
+                                )}
                             </>
                         )}
                         {activeTab === "vouchers" && (
@@ -2942,13 +2981,14 @@ setBookingDetail(finalVoucherDetail);
                                                                 <Typography><b>Redeemed:</b> {v.redeemed || '-'}</Typography>
                                                                 <Typography><b>Offer Code:</b> {v.offer_code || '-'}</Typography>
                                                                 <Typography><b>Voucher Ref:</b> {v.voucher_ref || '-'}</Typography>
-                                                                {/* Show number of vouchers/passengers for voucher details (from API's numberOfPassengers) */}
+                                                                {/* Number of Vouchers should come from API's numberOfVouchers; fallback to passengers/pax */}
                                                                 <Typography>
                                                                     <b>Number of Vouchers:</b>{' '}
                                                                     {(() => {
+                                                                        const fromApi = v.numberOfVouchers;
                                                                         const fromVoucher = v.numberOfPassengers;
                                                                         const fromRelatedBooking = bookingDetail.booking?.pax || bookingDetail.booking?.passenger_count;
-                                                                        return fromVoucher || fromRelatedBooking || 1;
+                                                                        return fromApi || fromVoucher || fromRelatedBooking || 1;
                                                                     })()}
                                                                 </Typography>
                                                                 <Typography><b>Created:</b> {v.created_at ? (
