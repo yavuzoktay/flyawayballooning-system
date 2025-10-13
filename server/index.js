@@ -134,7 +134,7 @@ app.post('/api/generate-voucher-code', async (req, res) => {
         experience_type,
         voucher_type,
         paid_amount,
-        expires_date
+        expires_date 
     } = req.body;
 
     try {
