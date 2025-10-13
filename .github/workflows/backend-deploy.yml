@@ -63,7 +63,7 @@ jobs:
         run: |
           aws s3 cp backend-deploy.zip s3://flyawayballooning-backend/backend-deploy.zip
       
-      - name: Deploy to EC2 instances (matrix via SSH_HOSTS)
+      - name: Deploy to EC2 instances
         env:
           SSH_HOSTS: ${{ secrets.SSH_HOSTS }}
           SSH_HOST_SINGLE: ${{ secrets.SSH_HOST }}
@@ -71,6 +71,11 @@ jobs:
           set -e
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > deploy_key
           chmod 600 deploy_key
+          
+          # Debug: Check if secrets are available
+          echo "SSH_HOSTS: ${SSH_HOSTS:-'NOT_SET'}"
+          echo "SSH_HOST_SINGLE: ${SSH_HOST_SINGLE:-'NOT_SET'}"
+          
           # Fallbacks when SSH_HOSTS is not provided: use SSH_HOST (single), otherwise default to previous host
           if [ -z "$SSH_HOSTS" ]; then
             if [ -n "$SSH_HOST_SINGLE" ]; then
@@ -81,8 +86,16 @@ jobs:
               echo "WARNING: SSH_HOSTS and SSH_HOST are empty. Falling back to 34.205.25.8"
             fi
           fi
+          
+          echo "Final SSH_HOSTS: $SSH_HOSTS"
+          
           for HOST in $(echo "$SSH_HOSTS" | tr ',' ' '); do
             echo "Deploying to $HOST ..."
+            # Test SSH connection first
+            ssh -i deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=10 ec2-user@$HOST 'echo "SSH connection successful"' || {
+              echo "ERROR: SSH connection failed to $HOST"
+              exit 1
+            }
             ssh -i deploy_key -o StrictHostKeyChecking=no ec2-user@$HOST '
               set -e
               echo "Starting deployment process on $(hostname)..."
