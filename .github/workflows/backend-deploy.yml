@@ -90,13 +90,24 @@ jobs:
           echo "Final SSH_HOSTS: $SSH_HOSTS"
           
           for HOST in $(echo "$SSH_HOSTS" | tr ',' ' '); do
-            echo "Deploying to $HOST ..."
-            # Test SSH connection first
-            ssh -i deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=10 ec2-user@$HOST 'echo "SSH connection successful"' || {
-              echo "ERROR: SSH connection failed to $HOST"
+            echo "=== Deploying to $HOST ==="
+            
+            # Test SSH connection first with detailed error info
+            echo "Testing SSH connection to $HOST..."
+            ssh -i deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o LogLevel=DEBUG2 ec2-user@$HOST 'echo "SSH connection successful"' 2>&1 || {
+              echo "❌ ERROR: SSH connection failed to $HOST"
+              echo "Possible causes:"
+              echo "1. EC2 instance is not running"
+              echo "2. Security Group doesn't allow SSH (port 22)"
+              echo "3. SSH key is incorrect"
+              echo "4. EC2 instance IP has changed"
               exit 1
             }
-            ssh -i deploy_key -o StrictHostKeyChecking=no ec2-user@$HOST '
+            
+            echo "✅ SSH connection successful, starting deployment..."
+            
+            # Run deployment with detailed error handling
+            ssh -i deploy_key -o StrictHostKeyChecking=no -o LogLevel=DEBUG2 ec2-user@$HOST '
               set -e
               echo "Starting deployment process on $(hostname)..."
               cd ~/flyawayballooning-system-backend
@@ -153,10 +164,38 @@ jobs:
               sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u ec2-user --hp /home/ec2-user || true
               
               echo "Restarting Nginx..."
-              sudo systemctl restart nginx
+              sudo systemctl restart nginx || {
+                echo "❌ ERROR: Failed to restart Nginx"
+                echo "Nginx status:"
+                sudo systemctl status nginx
+                exit 1
+              }
               
-              echo "Deployment completed successfully on $(hostname)!"
+              echo "Waiting for server to start..."
+              sleep 5
+              
+              echo "Checking server status..."
+              if curl -s http://localhost:3002/api/health > /dev/null; then
+                echo "✅ Backend server is responding"
+                echo "Health check response:"
+                curl -s http://localhost:3002/api/health
+              else
+                echo "❌ Backend server is not responding"
+                echo "Checking PM2 status:"
+                pm2 status
+                echo "Checking PM2 logs:"
+                pm2 logs flyawayballooning-server --lines 20
+                echo "Checking if port 3002 is listening:"
+                netstat -tlnp | grep 3002 || echo "Port 3002 not listening"
+                exit 1
+              fi
+              
+              echo "✅ Deployment completed successfully on $(hostname)!"
               echo "Current client/build contents:"
               ls -la /home/ec2-user/flyawayballooning-system-backend/client/build/
-            '
+            ' || {
+              echo "❌ ERROR: Deployment failed on $HOST"
+              echo "Check the logs above for specific error details"
+              exit 1
+            }
           done
