@@ -667,7 +667,9 @@ const Manifest = () => {
     }, [detailDialogOpen, selectedBookingId]);
 
     const handleAddGuestClick = () => {
-        setGuestType(bookingDetail?.booking?.flight_type || 'Shared Flight');
+        // For vouchers, use voucher.flight_type; for bookings, use booking.flight_type
+        const flightType = bookingDetail?.booking?.flight_type || bookingDetail?.voucher?.flight_type || 'Shared Flight';
+        setGuestType(flightType);
         setGuestCount(0);
         setGuestForms([]);
         setAddGuestDialogOpen(true);
@@ -2818,73 +2820,101 @@ const Manifest = () => {
                                         {/* Additional Information Section */}
                                         {additionalInformation && (
                                             <Box>
-                                                                                                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Additional Information & Notes</Typography>
+                                                <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Additional Information & Notes</Typography>
                                                 {additionalInfoLoading ? (
                                                     <Typography>Loading additional information...</Typography>
                                                 ) : (
-                                                                                                            <Box>
-                                                            {/* Booking Notes - Always show if available */}
-                                                            {bookingDetail.booking?.additional_notes && (
-                                                                <Box sx={{ mb: 2, p: 2, background: '#e3f2fd', borderRadius: 1, border: '1px solid #2196f3' }}>
-                                                                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>Booking Notes:</Typography>
-                                                                    <Typography>{bookingDetail.booking.additional_notes}</Typography>
-                                                                </Box>
-                                                            )}
-                                                            
-                                                            {/* Show all available questions with their answers (or "Not answered") - Only this section */}
-                                                            {additionalInformation.questions && additionalInformation.questions.length > 0 && (
+                                                    <Box>
+                                                        {(() => {
+                                                            const notesFromBooking = bookingDetail.booking?.additional_notes;
+                                                            const notesFromAdditional = additionalInformation?.additional_information_json?.notes;
+                                                            const notesFromLegacy = additionalInformation?.legacy?.additional_notes;
+                                                            const notesFromVoucherRecord = bookingDetail?.voucher?.additional_notes;
+                                                            let notesFromVoucherJson = null;
+                                                            if (bookingDetail?.voucher?.additional_information_json) {
+                                                                try {
+                                                                    const voucherJson = typeof bookingDetail.voucher.additional_information_json === 'string'
+                                                                        ? JSON.parse(bookingDetail.voucher.additional_information_json)
+                                                                        : bookingDetail.voucher.additional_information_json;
+                                                                    notesFromVoucherJson = voucherJson?.notes || null;
+                                                                } catch (e) {
+                                                                    console.warn('Failed to parse voucher additional_information_json while extracting notes (manifest):', e);
+                                                                }
+                                                            }
+                                                            const resolvedNotes = notesFromAdditional || notesFromLegacy || notesFromVoucherJson || notesFromVoucherRecord || null;
+                                                            const shouldShowBookingNotes = notesFromBooking && notesFromBooking !== resolvedNotes;
+                                                            return (
                                                                 <>
-                                                                    {additionalInformation.questions.map((question, index) => {
-                                                                        // Find answer from multiple sources to avoid duplication
-                                                                        let answer = null;
-                                                                        
-                                                                        // First try to find in answers array
-                                                                        const answerFromAnswers = additionalInformation.answers?.find(a => a.question_id === question.id);
-                                                                        if (answerFromAnswers) {
-                                                                            answer = answerFromAnswers.answer;
-                                                                        }
-                                                                        
-                                                                        // If not found in answers, try JSON data
-                                                                        if (!answer && additionalInformation.additional_information_json) {
-                                                                            const jsonKey = `question_${question.id}`;
-                                                                            if (additionalInformation.additional_information_json[jsonKey]) {
-                                                                                answer = additionalInformation.additional_information_json[jsonKey];
-                                                                            }
-                                                                        }
-                                                                        
-                                                                        // If still not found, try legacy fields for specific questions
-                                                                        if (!answer && additionalInformation.legacy) {
-                                                                            if (question.question_text.toLowerCase().includes('hear about us') && additionalInformation.legacy.hear_about_us) {
-                                                                                answer = additionalInformation.legacy.hear_about_us;
-                                                                            } else if (question.question_text.toLowerCase().includes('ballooning') && additionalInformation.legacy.ballooning_reason) {
-                                                                                answer = additionalInformation.legacy.ballooning_reason;
-                                                                            }
-                                                                        }
-                                                                        
-                                                                        return (
-                                                                            <Box key={index} sx={{ mb: 2, p: 2, background: '#f0f8ff', borderRadius: 1, border: '1px solid #e0e0e0' }}>
-                                                                                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>
-                                                                                    {question.question_text}:
-                                                                                </Typography>
-                                                                                <Typography sx={{ color: answer ? '#333' : '#999', fontStyle: answer ? 'normal' : 'italic' }}>
-                                                                                    {answer ? answer : 'Not answered'}
-                                                                                </Typography>
-                                                                                {question.help_text && (
-                                                                                    <Typography variant="caption" sx={{ color: '#666', mt: 1, display: 'block' }}>
-                                                                                        {question.help_text}
-                                                                                    </Typography>
-                                                                                )}
-
-                                                                            </Box>
-                                                                        );
-                                                                    })}
+                                                                    {resolvedNotes && (
+                                                                        <Box sx={{ mb: 2, p: 2, background: '#f5faff', borderRadius: 1, border: '1px solid #b3d4ff' }}>
+                                                                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>Additional Notes</Typography>
+                                                                            <Typography>{resolvedNotes}</Typography>
+                                                                        </Box>
+                                                                    )}
+                                                                    {shouldShowBookingNotes && (
+                                                                        <Box sx={{ mb: 2, p: 2, background: '#e3f2fd', borderRadius: 1, border: '1px solid #2196f3' }}>
+                                                                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>Booking Notes:</Typography>
+                                                                            <Typography>{notesFromBooking}</Typography>
+                                                                        </Box>
+                                                                    )}
                                                                 </>
-                                                            )}
-                                                            
-                                                            {/* Show message if no questions available */}
-                                                            {(!additionalInformation.questions || additionalInformation.questions.length === 0) && (
-                                                                <Typography sx={{ fontStyle: 'italic', color: '#666' }}>No additional information questions available</Typography>
-                                                            )}
+                                                            );
+                                                        })()}
+
+                                                        {/* Show all available questions with their answers (or "Not answered") - Only this section */}
+                                                        {additionalInformation.questions && additionalInformation.questions.length > 0 && (
+                                                            <>
+                                                                {additionalInformation.questions.map((question, index) => {
+                                                                    // Find answer from multiple sources to avoid duplication
+                                                                    let answer = null;
+                                                                    
+                                                                    // First try to find in answers array
+                                                                    const answerFromAnswers = additionalInformation.answers?.find(a => a.question_id === question.id);
+                                                                    if (answerFromAnswers) {
+                                                                        answer = answerFromAnswers.answer;
+                                                                    }
+                                                                    
+                                                                    // If not found in answers, try JSON data
+                                                                    if (!answer && additionalInformation.additional_information_json) {
+                                                                        const jsonKey = `question_${question.id}`;
+                                                                        if (additionalInformation.additional_information_json[jsonKey]) {
+                                                                            answer = additionalInformation.additional_information_json[jsonKey];
+                                                                        }
+                                                                    }
+                                                                    
+                                                                    // If still not found, try legacy fields for specific questions
+                                                                    if (!answer && additionalInformation.legacy) {
+                                                                        if (question.question_text.toLowerCase().includes('hear about us') && additionalInformation.legacy.hear_about_us) {
+                                                                            answer = additionalInformation.legacy.hear_about_us;
+                                                                        } else if (question.question_text.toLowerCase().includes('ballooning') && additionalInformation.legacy.ballooning_reason) {
+                                                                            answer = additionalInformation.legacy.ballooning_reason;
+                                                                        }
+                                                                    }
+                                                                    
+                                                                    return (
+                                                                        <Box key={index} sx={{ mb: 2, p: 2, background: '#f0f8ff', borderRadius: 1, border: '1px solid #e0e0e0' }}>
+                                                                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>
+                                                                                {question.question_text}:
+                                                                            </Typography>
+                                                                            <Typography sx={{ color: answer ? '#333' : '#999', fontStyle: answer ? 'normal' : 'italic' }}>
+                                                                                {answer ? answer : 'Not answered'}
+                                                                            </Typography>
+                                                                            {question.help_text && (
+                                                                                <Typography variant="caption" sx={{ color: '#666', mt: 1, display: 'block' }}>
+                                                                                    {question.help_text}
+                                                                                </Typography>
+                                                                            )}
+
+                                                                        </Box>
+                                                                    );
+                                                                })}
+                                                            </>
+                                                        )}
+                                                        
+                                                        {/* Show message if no questions available */}
+                                                        {(!additionalInformation.questions || additionalInformation.questions.length === 0) && (
+                                                            <Typography sx={{ fontStyle: 'italic', color: '#666' }}>No additional information questions available</Typography>
+                                                        )}
                                                     </Box>
                                                 )}
                                             </Box>

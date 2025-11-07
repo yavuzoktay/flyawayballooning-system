@@ -107,9 +107,12 @@ const BookingPage = () => {
     const [editPassengerPrices, setEditPassengerPrices] = useState([]);
 
     // Add state for voucher passenger editing
-    const [editVoucherPassengerName, setEditVoucherPassengerName] = useState("");
+    const [editingVoucherPassenger, setEditingVoucherPassenger] = useState(null); // { voucher_id, passenger_index }
+    const [editVoucherPassengerFirstName, setEditVoucherPassengerFirstName] = useState("");
+    const [editVoucherPassengerLastName, setEditVoucherPassengerLastName] = useState("");
     const [editVoucherPassengerWeight, setEditVoucherPassengerWeight] = useState("");
     const [editVoucherPassengerPrice, setEditVoucherPassengerPrice] = useState("");
+    const [savingVoucherPassengerEdit, setSavingVoucherPassengerEdit] = useState(false);
 
     // Add to component state:
     const [selectedDateRequestIds, setSelectedDateRequestIds] = useState([]);
@@ -854,7 +857,9 @@ setBookingDetail(finalVoucherDetail);
 
     // Add Guest butonuna tıklanınca
     const handleAddGuestClick = () => {
-        setGuestType(bookingDetail.booking.flight_type || 'Shared Flight');
+        // For vouchers, use voucher.flight_type; for bookings, use booking.flight_type
+        const flightType = bookingDetail.booking?.flight_type || bookingDetail.voucher?.flight_type || 'Shared Flight';
+        setGuestType(flightType);
         setGuestCount(0);
         setGuestForms(Array.from({ length: guestCount }, (_, i) => ({ firstName: '', lastName: '', email: '', phone: '', ticketType: guestType, weight: '' })));
         setAddGuestDialogOpen(true);
@@ -876,63 +881,133 @@ setBookingDetail(finalVoucherDetail);
 
     // Add Guest kaydetme fonksiyonunu güncelle
     const handleSaveGuests = async () => {
-        if (!selectedBookingId) return;
+        console.log('=== handleSaveGuests CALLED ===');
+        console.log('selectedBookingId:', selectedBookingId);
+        console.log('activeTab:', activeTab);
+        console.log('bookingDetail:', bookingDetail);
+        console.log('guestForms:', guestForms);
+        
+        if (!selectedBookingId && !bookingDetail?.voucher?.id) {
+            alert('No booking or voucher selected');
+            return;
+        }
         
         try {
-            // Add each guest and collect updated pax counts
-            let lastUpdatedPax = null;
-            for (const g of guestForms) {
-                const response = await axios.post('/api/addPassenger', {
-                    booking_id: selectedBookingId,
-                    first_name: g.firstName,
-                    last_name: g.lastName,
-                    email: g.email,
-                    phone: g.phone,
-                    ticket_type: g.ticketType,
-                    weight: g.weight
-                });
-                lastUpdatedPax = response.data.updatedPax;
+            // Check if this is a voucher or booking
+            const isVoucher = activeTab === 'vouchers';
+            const voucherId = bookingDetail?.voucher?.id;
+            
+            console.log('isVoucher:', isVoucher);
+            console.log('voucherId:', voucherId);
+            
+            if (isVoucher && voucherId) {
+                console.log('=== ADDING GUESTS TO VOUCHER ===');
+                // Handle voucher guest addition
+                
+                if (guestForms.length === 0) {
+                    alert('Please add at least one guest');
+                    return;
+                }
+                
+                // Add each guest to voucher
+                for (const g of guestForms) {
+                    if (!g.firstName || !g.lastName) {
+                        alert('Please fill in first name and last name for all guests');
+                        return;
+                    }
+                    
+                    console.log('Adding guest:', { firstName: g.firstName, lastName: g.lastName, weight: g.weight });
+                    
+                    const response = await axios.post('/api/addVoucherPassenger', {
+                        voucher_id: voucherId,
+                        first_name: g.firstName,
+                        last_name: g.lastName,
+                        weight: g.weight || null,
+                        price: null // Will be calculated by backend
+                    });
+                    
+                    console.log('API Response:', response.data);
+                    
+                    // Update local state immediately with the new passenger
+                    if (response.data.success && response.data.passengerDetails) {
+                        setBookingDetail(prev => {
+                            const updated = {
+                                ...prev,
+                                voucher: {
+                                    ...prev.voucher,
+                                    passenger_details: response.data.passengerDetails,
+                                    paid: response.data.passengerDetails.reduce((sum, p) => {
+                                        const pPrice = parseFloat(p.price) || 0;
+                                        return sum + pPrice;
+                                    }, 0)
+                                }
+                            };
+                            console.log('Updated bookingDetail:', updated);
+                            return updated;
+                        });
+                    }
+                }
+                
+                setAddGuestDialogOpen(false);
+                setGuestCount(0);
+                setGuestForms([]);
+            } else {
+                // Handle booking guest addition (existing logic)
+                // Add each guest and collect updated pax counts
+                let lastUpdatedPax = null;
+                for (const g of guestForms) {
+                    const response = await axios.post('/api/addPassenger', {
+                        booking_id: selectedBookingId,
+                        first_name: g.firstName,
+                        last_name: g.lastName,
+                        email: g.email,
+                        phone: g.phone,
+                        ticket_type: g.ticketType,
+                        weight: g.weight
+                    });
+                    lastUpdatedPax = response.data.updatedPax;
+                }
+                
+                // Fetch updated passengers
+                const res = await axios.get(`/api/getBookingDetail?booking_id=${selectedBookingId}`);
+                const updatedPassengers = res.data.passengers || [];
+                
+                // Recalculate prices - Include both paid and due
+                const paid = parseFloat(res.data.booking?.paid) || 0;
+                const due = parseFloat(res.data.booking?.due) || 0;
+                const totalAmount = paid + due;
+                const n = updatedPassengers.length;
+                const perPassenger = n > 0 ? parseFloat((totalAmount / n).toFixed(2)) : 0;
+                
+                console.log('=== RECALCULATING PASSENGER PRICES ===');
+                console.log('Paid:', paid);
+                console.log('Due:', due);
+                console.log('Total Amount:', totalAmount);
+                console.log('Number of Passengers:', n);
+                console.log('Price Per Passenger:', perPassenger);
+                
+                // Update all passenger prices in backend
+                await Promise.all(updatedPassengers.map((p) =>
+                    axios.patch('/api/updatePassengerField', {
+                        passenger_id: p.id,
+                        field: 'price',
+                        value: perPassenger
+                    })
+                ));
+                
+                // Update the booking table with new pax count (use fresh count from fetched passengers)
+                const updatedPax = n;
+                setBooking(prev => prev.map(b => 
+                    b.id === selectedBookingId ? { ...b, pax: updatedPax } : b
+                ));
+                setFilteredData(prev => prev.map(b => 
+                    b.id === selectedBookingId ? { ...b, pax: updatedPax } : b
+                ));
+                
+                // Refetch passengers to update dialog UI
+                await fetchPassengers(selectedBookingId);
+                setAddGuestDialogOpen(false);
             }
-            
-            // Fetch updated passengers
-            const res = await axios.get(`/api/getBookingDetail?booking_id=${selectedBookingId}`);
-            const updatedPassengers = res.data.passengers || [];
-            
-            // Recalculate prices - Include both paid and due
-            const paid = parseFloat(res.data.booking?.paid) || 0;
-            const due = parseFloat(res.data.booking?.due) || 0;
-            const totalAmount = paid + due;
-            const n = updatedPassengers.length;
-            const perPassenger = n > 0 ? parseFloat((totalAmount / n).toFixed(2)) : 0;
-            
-            console.log('=== RECALCULATING PASSENGER PRICES ===');
-            console.log('Paid:', paid);
-            console.log('Due:', due);
-            console.log('Total Amount:', totalAmount);
-            console.log('Number of Passengers:', n);
-            console.log('Price Per Passenger:', perPassenger);
-            
-            // Update all passenger prices in backend
-            await Promise.all(updatedPassengers.map((p) =>
-                axios.patch('/api/updatePassengerField', {
-                    passenger_id: p.id,
-                    field: 'price',
-                    value: perPassenger
-                })
-            ));
-            
-            // Update the booking table with new pax count (use fresh count from fetched passengers)
-            const updatedPax = n;
-            setBooking(prev => prev.map(b => 
-                b.id === selectedBookingId ? { ...b, pax: updatedPax } : b
-            ));
-            setFilteredData(prev => prev.map(b => 
-                b.id === selectedBookingId ? { ...b, pax: updatedPax } : b
-            ));
-            
-            // Refetch passengers to update dialog UI
-            await fetchPassengers(selectedBookingId);
-            setAddGuestDialogOpen(false);
         } catch (error) {
             console.error('Error adding guests:', error);
             alert('Failed to add guests. Please try again.');
@@ -1069,86 +1144,6 @@ setBookingDetail(finalVoucherDetail);
     const handleEditCancel = () => {
         setEditField(null);
         setEditValue('');
-        // Reset voucher passenger edit fields
-        setEditVoucherPassengerName('');
-        setEditVoucherPassengerWeight('');
-        setEditVoucherPassengerPrice('');
-    };
-
-    // Handle voucher passenger edit click
-    const handleEditVoucherPassengerClick = (voucher) => {
-        setEditField('voucher_passenger');
-        setEditVoucherPassengerName(voucher.name || '');
-        setEditVoucherPassengerWeight(voucher.weight || '');
-        setEditVoucherPassengerPrice(voucher.paid || '');
-    };
-
-    // Handle voucher passenger save
-    const handleEditVoucherPassengerSave = async () => {
-        if (!editField || editField !== 'voucher_passenger') return;
-        setSavingEdit(true);
-        
-        try {
-            const voucher = bookingDetail?.voucher;
-            if (!voucher) {
-                alert('Voucher information not found');
-                setSavingEdit(false);
-                return;
-            }
-
-            // Update voucher fields
-            const updates = [];
-            
-            if (editVoucherPassengerName !== voucher.name) {
-                updates.push({ field: 'name', value: editVoucherPassengerName });
-            }
-            if (editVoucherPassengerWeight !== voucher.weight) {
-                updates.push({ field: 'weight', value: editVoucherPassengerWeight });
-            }
-            if (editVoucherPassengerPrice !== voucher.paid) {
-                updates.push({ field: 'paid', value: editVoucherPassengerPrice });
-            }
-
-            if (updates.length === 0) {
-                alert('No changes to save');
-                setSavingEdit(false);
-                return;
-            }
-
-            // Update each field
-            for (const update of updates) {
-                await axios.patch('/api/updateVoucherField', {
-                    voucher_id: voucher.id,
-                    field: update.field,
-                    value: update.value
-                });
-            }
-
-            // Update local state
-            setBookingDetail(prev => ({
-                ...prev,
-                voucher: {
-                    ...prev.voucher,
-                    name: editVoucherPassengerName,
-                    weight: editVoucherPassengerWeight,
-                    paid: editVoucherPassengerPrice
-                }
-            }));
-
-            // Reset edit state
-            setEditField(null);
-            setEditVoucherPassengerName('');
-            setEditVoucherPassengerWeight('');
-            setEditVoucherPassengerPrice('');
-
-            alert('Passenger details updated successfully!');
-            
-        } catch (error) {
-            console.error('Error updating voucher passenger details:', error);
-            alert('Failed to update passenger details');
-        } finally {
-            setSavingEdit(false);
-        }
     };
 
     const handleEditSave = async () => {
@@ -1844,7 +1839,112 @@ setBookingDetail(finalVoucherDetail);
         }
     };
 
+    // Voucher passenger edit handlers
+    const handleEditVoucherPassengerClick = (p, passengerIndex, voucherId) => {
+        setEditVoucherPassengerFirstName(p.first_name || "");
+        setEditVoucherPassengerLastName(p.last_name || "");
+        setEditVoucherPassengerWeight(p.weight || "");
+        setEditVoucherPassengerPrice(p.price || "");
+        setEditingVoucherPassenger({ voucher_id: voucherId, passenger_index: passengerIndex });
+    };
 
+    const handleCancelVoucherPassengerEdit = () => {
+        setEditingVoucherPassenger(null);
+        setEditVoucherPassengerFirstName("");
+        setEditVoucherPassengerLastName("");
+        setEditVoucherPassengerWeight("");
+        setEditVoucherPassengerPrice("");
+    };
+
+    const handleSaveVoucherPassengerEdit = async (p, passengerIndex, voucherId) => {
+        setSavingVoucherPassengerEdit(true);
+        try {
+            // Collect all updates
+            const updates = [];
+            if (editVoucherPassengerFirstName !== (p.first_name || "")) {
+                updates.push({ field: 'first_name', value: editVoucherPassengerFirstName });
+            }
+            if (editVoucherPassengerLastName !== (p.last_name || "")) {
+                updates.push({ field: 'last_name', value: editVoucherPassengerLastName });
+            }
+            if (editVoucherPassengerWeight !== (p.weight || "")) {
+                updates.push({ field: 'weight', value: editVoucherPassengerWeight });
+            }
+            if (editVoucherPassengerPrice !== (p.price || "")) {
+                updates.push({ field: 'price', value: editVoucherPassengerPrice });
+            }
+
+            // Update each field that has changed
+            let lastResponse = null;
+            for (const update of updates) {
+                const response = await axios.patch('/api/updateVoucherPassengerField', {
+                    voucher_id: voucherId,
+                    passenger_index: passengerIndex,
+                    field: update.field,
+                    value: update.value
+                });
+                lastResponse = response;
+            }
+
+            // Update local state immediately with the updated passenger details from the last response
+            if (lastResponse?.data?.passengerDetails) {
+                setBookingDetail(prev => {
+                    const updatedVoucher = {
+                        ...prev.voucher,
+                        passenger_details: lastResponse.data.passengerDetails
+                    };
+                    return {
+                        ...prev,
+                        voucher: updatedVoucher
+                    };
+                });
+            } else {
+                // Fallback: Update state optimistically
+                setBookingDetail(prev => {
+                    const currentPassengers = Array.isArray(prev.voucher?.passenger_details) 
+                        ? [...prev.voucher.passenger_details] 
+                        : [];
+                    
+                    if (currentPassengers[passengerIndex]) {
+                        currentPassengers[passengerIndex] = {
+                            ...currentPassengers[passengerIndex],
+                            first_name: editVoucherPassengerFirstName !== (p.first_name || "") 
+                                ? editVoucherPassengerFirstName 
+                                : currentPassengers[passengerIndex].first_name,
+                            last_name: editVoucherPassengerLastName !== (p.last_name || "") 
+                                ? editVoucherPassengerLastName 
+                                : currentPassengers[passengerIndex].last_name,
+                            weight: editVoucherPassengerWeight !== (p.weight || "") 
+                                ? editVoucherPassengerWeight 
+                                : currentPassengers[passengerIndex].weight,
+                            price: editVoucherPassengerPrice !== (p.price || "") 
+                                ? editVoucherPassengerPrice 
+                                : currentPassengers[passengerIndex].price
+                        };
+                    }
+                    
+                    return {
+                        ...prev,
+                        voucher: {
+                            ...prev.voucher,
+                            passenger_details: currentPassengers
+                        }
+                    };
+                });
+            }
+            
+            setEditingVoucherPassenger(null);
+            setEditVoucherPassengerFirstName("");
+            setEditVoucherPassengerLastName("");
+            setEditVoucherPassengerWeight("");
+            setEditVoucherPassengerPrice("");
+        } catch (err) {
+            console.error('Error updating voucher passenger:', err);
+            alert('Failed to update voucher passenger details');
+        } finally {
+            setSavingVoucherPassengerEdit(false);
+        }
+    };
 
     // Add these handlers:
     const handleEditNoteClick = (id, text) => {
@@ -2631,7 +2731,7 @@ setBookingDetail(finalVoucherDetail);
                                 <Grid container spacing={2}>
                                     {/* Personal Details */}
                                     <Grid item xs={12} md={4}>
-                                        <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
+                                        <Box sx={{ background: '#fff', borderRadius: 2, p: 1.5, mb: 0.75, boxShadow: 1 }}>
                                             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
                                                 {(() => {
                                                     const v = bookingDetail.voucher || {};
@@ -3083,15 +3183,51 @@ setBookingDetail(finalVoucherDetail);
                                                             if (passengers.length === 0) {
                                                                 return <Typography sx={{ color: '#888' }}>No passengers found</Typography>;
                                                             }
+                                                            const voucherId = v.id;
+                                                            if (!voucherId) {
+                                                                return <Typography sx={{ color: '#888' }}>Voucher ID not available</Typography>;
+                                                            }
                                                             return (
                                                                 <Box>
                                                                     {passengers.map((p, i) => {
-                                                                        const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim() || '-';
-                                                                        const weight = (p.weight !== undefined && p.weight !== null && p.weight !== '') ? p.weight : '-';
-                                                                        const price = (p.price !== undefined && p.price !== null && p.price !== '') ? p.price : '-';
+                                                                        const isEditing = editingVoucherPassenger?.voucher_id === voucherId && editingVoucherPassenger?.passenger_index === i;
                                                                         return (
-                                                                            <Typography key={`${p.id || i}-${fullName}-${i}`}>
-                                                                                {`Passenger ${i + 1}: ${fullName} (${weight}kg £${price})`}
+                                                                            <Typography key={`${p.id || i}-${p.first_name || ''}-${p.last_name || ''}-${i}`}>
+                                                                                Passenger {i + 1}: {isEditing ? (
+                                                                                    <>
+                                                                                        <input
+                                                                                            value={editVoucherPassengerFirstName}
+                                                                                            onChange={e => setEditVoucherPassengerFirstName(e.target.value)}
+                                                                                            placeholder="First Name"
+                                                                                            style={{ marginRight: 4, width: 90 }}
+                                                                                        />
+                                                                                        <input
+                                                                                            value={editVoucherPassengerLastName}
+                                                                                            onChange={e => setEditVoucherPassengerLastName(e.target.value)}
+                                                                                            placeholder="Last Name"
+                                                                                            style={{ marginRight: 4, width: 90 }}
+                                                                                        />
+                                                                                        <input
+                                                                                            value={editVoucherPassengerWeight}
+                                                                                            onChange={e => setEditVoucherPassengerWeight(e.target.value.replace(/[^0-9.]/g, ''))}
+                                                                                            placeholder="Weight (kg)"
+                                                                                            style={{ marginRight: 4, width: 70 }}
+                                                                                        />
+                                                                                        <input
+                                                                                            value={editVoucherPassengerPrice}
+                                                                                            onChange={e => setEditVoucherPassengerPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+                                                                                            placeholder="Price (£)"
+                                                                                            style={{ marginRight: 4, width: 70 }}
+                                                                                        />
+                                                                                        <Button size="small" onClick={() => handleSaveVoucherPassengerEdit(p, i, voucherId)} disabled={savingVoucherPassengerEdit}>Save</Button>
+                                                                                        <Button size="small" onClick={handleCancelVoucherPassengerEdit} disabled={savingVoucherPassengerEdit}>Cancel</Button>
+                                                                                    </>
+                                                                                ) : (
+                                                                                    <>
+                                                                                        {p.first_name || '-'} {p.last_name || '-'}{p.weight ? ` (${p.weight}kg${p.price ? ' £' + p.price : ''})` : ''}
+                                                                                        <IconButton size="small" onClick={() => handleEditVoucherPassengerClick(p, i, voucherId)}><EditIcon fontSize="small" /></IconButton>
+                                                                                    </>
+                                                                                )}
                                                                             </Typography>
                                                                         );
                                                                     })}
@@ -3184,6 +3320,28 @@ setBookingDetail(finalVoucherDetail);
                                                 )}
                                                     </Box>
                                                 );
+                                            })()}
+                                            {/* Recipient Details (Gift Voucher) above Notes */}
+                                            {(() => {
+                                                const v = bookingDetail.voucher || {};
+                                                const hasRecipientData = v.recipient_name || v.recipient_email || v.recipient_phone || v.recipient_gift_date;
+                                                if (activeTab === 'vouchers' && v.book_flight === 'Gift Voucher' && hasRecipientData) {
+                                                    return (
+                                                        <>
+                                                            <Divider sx={{ my: 2 }} />
+                                                            <Box>
+                                                                <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Recipient Details</Typography>
+                                                                <Box sx={{ mb: 2, background: '#f7f7f7', p: 2, borderRadius: 2 }}>
+                                                                    <Typography><b>Name:</b> {v.recipient_name || '-'}</Typography>
+                                                                    <Typography><b>Email:</b> {v.recipient_email || '-'}</Typography>
+                                                                    <Typography><b>Phone:</b> {v.recipient_phone || '-'}</Typography>
+                                                                    <Typography><b>Gift Date:</b> {v.recipient_gift_date ? dayjs(v.recipient_gift_date).format('DD/MM/YYYY') : '-'}</Typography>
+                                                                </Box>
+                                                            </Box>
+                                                        </>
+                                                    );
+                                                }
+                                                return null;
                                             })()}
                                             <Divider sx={{ my: 2 }} />
                                             {/* Notes */}
@@ -3284,14 +3442,42 @@ setBookingDetail(finalVoucherDetail);
                                                         <Typography>Loading additional information...</Typography>
                                                     ) : (
                                                         <Box>
-                                                            {/* Booking Notes - Always show if available */}
-                                                            {bookingDetail.booking?.additional_notes && (
-                                                                <Box sx={{ mb: 2, p: 2, background: '#e3f2fd', borderRadius: 1, border: '1px solid #2196f3' }}>
-                                                                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>Booking Notes:</Typography>
-                                                                    <Typography>{bookingDetail.booking.additional_notes}</Typography>
-                                                                </Box>
-                                                            )}
-                                                            
+                                                            {(() => {
+                                                                const notesFromBooking = bookingDetail.booking?.additional_notes;
+                                                                const notesFromAdditional = additionalInformation?.additional_information_json?.notes;
+                                                                const notesFromLegacy = additionalInformation?.legacy?.additional_notes;
+                                                                const notesFromVoucherRecord = activeTab === 'vouchers' ? bookingDetail?.voucher?.additional_notes : null;
+                                                                let notesFromVoucherJson = null;
+                                                                if (activeTab === 'vouchers' && bookingDetail?.voucher?.additional_information_json) {
+                                                                    try {
+                                                                        const voucherJson = typeof bookingDetail.voucher.additional_information_json === 'string'
+                                                                            ? JSON.parse(bookingDetail.voucher.additional_information_json)
+                                                                            : bookingDetail.voucher.additional_information_json;
+                                                                        notesFromVoucherJson = voucherJson?.notes || null;
+                                                                    } catch (e) {
+                                                                        console.warn('Failed to parse voucher additional_information_json while extracting notes:', e);
+                                                                    }
+                                                                }
+                                                                const resolvedNotes = notesFromAdditional || notesFromLegacy || notesFromVoucherJson || notesFromVoucherRecord || null;
+                                                                const shouldShowBookingNotes = notesFromBooking && notesFromBooking !== resolvedNotes;
+                                                                return (
+                                                                    <>
+                                                                        {resolvedNotes && (
+                                                                            <Box sx={{ mb: 2, p: 2, background: '#f5faff', borderRadius: 1, border: '1px solid #b3d4ff' }}>
+                                                                                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>Additional Notes</Typography>
+                                                                                <Typography>{resolvedNotes}</Typography>
+                                                                            </Box>
+                                                                        )}
+                                                                        {shouldShowBookingNotes && (
+                                                                            <Box sx={{ mb: 2, p: 2, background: '#e3f2fd', borderRadius: 1, border: '1px solid #2196f3' }}>
+                                                                                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>Booking Notes:</Typography>
+                                                                                <Typography>{notesFromBooking}</Typography>
+                                                                            </Box>
+                                                                        )}
+                                                                    </>
+                                                                );
+                                                            })()}
+
                                                             {/* Show all available questions with their answers (or "Not answered") - Only this section */}
                                                             {(() => {
                                                                 // Use additionalInformation if available, otherwise try to get from voucher data
@@ -3560,23 +3746,9 @@ setBookingDetail(finalVoucherDetail);
                                             </Box>
                                             )}
                                         </Box>
+                                        {/* Recipient Details moved to main column above Notes for Gift Vouchers */}
                                     </Grid>
-                                    {/* Recipient Details - Only show if there's meaningful data */}
-                                    {(() => {
-                                        const v = bookingDetail.voucher || {};
-                                        const hasRecipientData = v.recipient_name || v.recipient_email || v.recipient_phone || v.recipient_gift_date;
-                                        return hasRecipientData ? (
-                                            <Grid item xs={12} md={4}>
-                                                <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
-                                                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Recipient Details</Typography>
-                                                    <Typography><b>Name:</b> {v.recipient_name || '-'}</Typography>
-                                                    <Typography><b>Email:</b> {v.recipient_email || '-'}</Typography>
-                                                    <Typography><b>Phone:</b> {v.recipient_phone || '-'}</Typography>
-                                                    <Typography><b>Gift Date:</b> {v.recipient_gift_date ? dayjs(v.recipient_gift_date).format('DD/MM/YYYY') : '-'}</Typography>
-                                                </Box>
-                                            </Grid>
-                                        ) : null;
-                                    })()}
+                                    {/* Recipient Details was moved under Purchaser Information above for Gift Vouchers */}
                                     
                                     {/* Preferences - Only show if there's meaningful data */}
                                     {(() => {

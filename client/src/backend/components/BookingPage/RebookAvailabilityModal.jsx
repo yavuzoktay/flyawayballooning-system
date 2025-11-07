@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, CircularProgress, FormControl, InputLabel, Select, MenuItem, Box, Checkbox, FormControlLabel, FormGroup, IconButton } from '@mui/material';
 import dayjs from 'dayjs';
 import axios from 'axios';
@@ -23,6 +23,12 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
     // Yeni: Modalda flight type seçici için state
     const [selectedFlightTypes, setSelectedFlightTypes] = useState([]);
     const [selectedVoucherTypes, setSelectedVoucherTypes] = useState([]);
+
+    const isFlightVoucherDetails = useMemo(() => {
+        const bookFlight = (bookingDetail?.voucher?.book_flight || '').toLowerCase();
+        const voucherType = (bookingDetail?.voucher?.voucher_type || '').toLowerCase();
+        return Boolean(bookingDetail?.voucher) && !bookFlight.includes('gift') && voucherType.includes('flight');
+    }, [bookingDetail]);
 
     // availableDates state'i
     const [availableDates, setAvailableDates] = useState([]);
@@ -59,75 +65,77 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
 
     // Set default values after activities are loaded
     useEffect(() => {
-        if (activities.length > 0 && open && bookingDetail?.booking) {
-            const existingLocation = bookingDetail.booking.location;
-            const existingActivity = activities.find(a => a.location === existingLocation);
-            
-            if (existingLocation) {
-                setSelectedLocation(existingLocation);
-            }
-            if (existingActivity) {
-                setSelectedActivity(existingActivity.activity_name);
-            }
-            
-            // Set default flight types based on existing booking
-            const existingFlightType = bookingDetail.booking.flight_type || '';
-            if (existingFlightType.toLowerCase().includes('private')) {
-                setSelectedFlightTypes(['private']);
-            } else if (existingFlightType.toLowerCase().includes('shared')) {
-                setSelectedFlightTypes(['shared']);
-            } else {
-                // Default to both if no specific type
-                setSelectedFlightTypes(['private', 'shared']);
-            }
-            
-            // Set default voucher types based on existing booking
-            const existingVoucherType = bookingDetail.booking?.voucher_type || '';
-            if (existingVoucherType) {
-                // Map existing voucher type to modal options
-                const voucherTypeMap = {
-                    'Weekday Morning': 'weekday morning',
-                    'Flexible Weekday': 'flexible weekday',
-                    'Any Day Flight': 'any day flight'
-                };
-                
-                const mappedType = voucherTypeMap[existingVoucherType];
-                if (mappedType) {
-                    setSelectedVoucherTypes([mappedType]);
-                } else {
-                    // If no exact match, try to find partial matches
-                    const lowerVoucherType = existingVoucherType.toLowerCase();
-                    if (lowerVoucherType.includes('weekday morning') || lowerVoucherType.includes('morning')) {
-                        setSelectedVoucherTypes(['weekday morning']);
-                    } else if (lowerVoucherType.includes('flexible weekday') || lowerVoucherType.includes('flexible')) {
-                        setSelectedVoucherTypes(['flexible weekday']);
-                    } else if (lowerVoucherType.includes('any day') || lowerVoucherType.includes('any day flight')) {
-                        setSelectedVoucherTypes(['any day flight']);
-                    } else {
-                        // Fallback to all types if no match found
-                        setSelectedVoucherTypes(['weekday morning', 'flexible weekday', 'any day flight']);
-                    }
-                }
-            } else {
-                // Default to all voucher types if no existing voucher type
-                setSelectedVoucherTypes(['weekday morning', 'flexible weekday', 'any day flight']);
-            }
-        } else if (activities.length > 0 && open && !bookingDetail?.booking) {
-            // Fallback to props if no booking detail
-            if (location) {
-                setSelectedLocation(location);
-            }
-            if (location && activities.length > 0) {
-                const found = activities.find(a => a.location === location);
-                if (found) {
-                    setSelectedActivity(found.activity_name);
-                }
-            }
-            // Default flight types
-            setSelectedFlightTypes(['private', 'shared']);
-            // Default voucher types
-            setSelectedVoucherTypes(['weekday morning', 'flexible weekday', 'any day flight']);
+        if (!(open && activities.length > 0)) {
+            return;
         }
+
+        const booking = bookingDetail?.booking || {};
+        const voucher = bookingDetail?.voucher || {};
+
+        let locationToUse = booking.location || voucher.location || location || '';
+        if (!locationToUse && activities.length > 0) {
+            locationToUse = activities[0].location;
+        }
+        if (locationToUse) {
+            setSelectedLocation(locationToUse);
+        }
+
+        let existingActivity = null;
+        if (locationToUse) {
+            const fromBooking = booking.activity || booking.activity_name;
+            if (fromBooking) {
+                existingActivity = activities.find(a => a.location === locationToUse && a.activity_name === fromBooking);
+            }
+            if (!existingActivity) {
+                existingActivity = activities.find(a => a.location === locationToUse);
+            }
+        }
+        if (!existingActivity && activities.length > 0) {
+            existingActivity = activities[0];
+        }
+        if (existingActivity) {
+            setSelectedActivity(existingActivity.activity_name);
+            if (existingActivity.location && existingActivity.location !== locationToUse) {
+                setSelectedLocation(existingActivity.location);
+            }
+        }
+
+        const flightSource = [
+            booking.flight_type,
+            booking.experience,
+            voucher.experience_type,
+            voucher.flight_type
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        const flightDefaults = [];
+        if (flightSource.includes('private')) flightDefaults.push('private');
+        if (flightSource.includes('shared')) flightDefaults.push('shared');
+        if (flightDefaults.length === 0) {
+            flightDefaults.push('private', 'shared');
+        }
+        setSelectedFlightTypes(Array.from(new Set(flightDefaults)));
+
+        const voucherSource = [
+            booking.voucher_type,
+            booking.book_flight,
+            voucher.book_flight,
+            voucher.voucher_type
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        const voucherDefaults = [];
+        if (voucherSource.includes('weekday morning') || (voucherSource.includes('weekday') && voucherSource.includes('morning'))) {
+            voucherDefaults.push('weekday morning');
+        }
+        if (voucherSource.includes('flexible weekday') || voucherSource.includes('flexible')) {
+            voucherDefaults.push('flexible weekday');
+        }
+        if (voucherSource.includes('any day flight') || voucherSource.includes('any day')) {
+            voucherDefaults.push('any day flight');
+        }
+        if (voucherDefaults.length === 0) {
+            voucherDefaults.push('weekday morning', 'flexible weekday', 'any day flight');
+        }
+        setSelectedVoucherTypes(Array.from(new Set(voucherDefaults)));
     }, [activities, open, bookingDetail, location]);
 
     // Set calendar to current booking date when modal opens
@@ -395,7 +403,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-            <DialogTitle>Rebook - Select New Activity, Location, Date & Time</DialogTitle>
+            <DialogTitle>Rebook - Select New Options & Time</DialogTitle>
             <DialogContent>
                 {loadingActivities ? (
                     <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
@@ -403,151 +411,123 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                     </Box>
                 ) : (
                     <>
-                        {/* Activity and Location Selection */}
-                        <Box sx={{ mb: 3 }}>
-                            <Typography variant="h6" sx={{ mb: 2 }}>Select Activity and Location:</Typography>
-                            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                                <FormControl fullWidth>
-                                    <InputLabel>Activity</InputLabel>
-                                    <Select
-                                        value={selectedActivity}
-                                        onChange={(e) => {
-                                            const activityName = e.target.value;
-                                            setSelectedActivity(activityName);
-                                            const activity = activities.find(a => a.activity_name === activityName);
-                                            if (activity) {
-                                                setSelectedLocation(activity.location);
-                                                setCurrentMonth(dayjs().startOf('month'));
-                                            }
-                                        }}
-                                        label="Activity"
-                                    >
-                                        {activities.map((activity) => (
-                                            <MenuItem key={activity.id} value={activity.activity_name}>
-                                                {activity.activity_name} - {activity.location}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                                <FormControl fullWidth>
-                                    <InputLabel>Location</InputLabel>
-                                    <Select
-                                        value={selectedLocation}
-                                        onChange={(e) => setSelectedLocation(e.target.value)}
-                                        label="Location"
-                                        disabled={selectedActivity === ''}
-                                    >
-                                        {selectedActivity ? 
-                                            activities
-                                                .filter(a => a.activity_name === selectedActivity)
-                                                .map((activity) => (
-                                                    <MenuItem key={activity.id} value={activity.location}>
-                                                        {activity.location}
-                                                    </MenuItem>
-                                                ))
-                                            : 
-                                            locations.map((loc) => (
-                                                <MenuItem key={loc.location} value={loc.location}>
-                                                    {loc.location}
-                                                </MenuItem>
-                                            ))
-                                        }
-                                    </Select>
-                                </FormControl>
-                            </Box>
-                        </Box>
-
-                        {/* Date and Time Selection */}
-                        {selectedActivity && selectedLocation && (
+                        {isFlightVoucherDetails && (
                             <>
                                 {/* Flight Type Selector */}
                                 <Box sx={{ mb: 3 }}>
                                     <Typography variant="h6" sx={{ mb: 2 }}>Flight Type:</Typography>
                                     <FormGroup row>
-                                        <FormControlLabel
-                                            control={
-                                                <Checkbox
-                                                    checked={selectedFlightTypes.includes('private')}
-                                                    onChange={(e) => {
-                                                        if (e.target.checked) {
-                                                            setSelectedFlightTypes(prev => [...prev, 'private']);
-                                                        } else {
-                                                            setSelectedFlightTypes(prev => prev.filter(t => t !== 'private'));
-                                                        }
-                                                    }}
-                                                />
-                                            }
-                                            label="Private"
-                                        />
-                                        <FormControlLabel
-                                            control={
-                                                <Checkbox
-                                                    checked={selectedFlightTypes.includes('shared')}
-                                                    onChange={(e) => {
-                                                        if (e.target.checked) {
-                                                            setSelectedFlightTypes(prev => [...prev, 'shared']);
-                                                        } else {
-                                                            setSelectedFlightTypes(prev => prev.filter(t => t !== 'shared'));
-                                                        }
-                                                    }}
-                                                />
-                                            }
-                                            label="Shared"
-                                        />
+                                        <FormControlLabel control={<Checkbox checked={selectedFlightTypes.includes('private')} onChange={(e) => { if (e.target.checked) setSelectedFlightTypes(prev => [...prev, 'private']); else setSelectedFlightTypes(prev => prev.filter(t => t !== 'private')); }} />} label="Private" />
+                                        <FormControlLabel control={<Checkbox checked={selectedFlightTypes.includes('shared')} onChange={(e) => { if (e.target.checked) setSelectedFlightTypes(prev => [...prev, 'shared']); else setSelectedFlightTypes(prev => prev.filter(t => t !== 'shared')); }} />} label="Shared" />
                                     </FormGroup>
                                 </Box>
-
                                 {/* Voucher Type Selector */}
                                 <Box sx={{ mb: 3 }}>
                                     <Typography variant="h6" sx={{ mb: 2 }}>Voucher Type:</Typography>
                                     <FormGroup row>
-                                        <FormControlLabel
-                                            control={
-                                                <Checkbox
-                                                    checked={selectedVoucherTypes.includes('weekday morning')}
-                                                    onChange={(e) => {
-                                                        if (e.target.checked) {
-                                                            setSelectedVoucherTypes(prev => [...prev, 'weekday morning']);
-                                                        } else {
-                                                            setSelectedVoucherTypes(prev => prev.filter(t => t !== 'weekday morning'));
-                                                        }
-                                                    }}
-                                                />
-                                            }
-                                            label="Weekday Morning"
-                                        />
-                                        <FormControlLabel
-                                            control={
-                                                <Checkbox
-                                                    checked={selectedVoucherTypes.includes('flexible weekday')}
-                                                    onChange={(e) => {
-                                                        if (e.target.checked) {
-                                                            setSelectedVoucherTypes(prev => [...prev, 'flexible weekday']);
-                                                        } else {
-                                                            setSelectedVoucherTypes(prev => prev.filter(t => t !== 'flexible weekday'));
-                                                        }
-                                                    }}
-                                                />
-                                            }
-                                            label="Flexible Weekday"
-                                        />
-                                        <FormControlLabel
-                                            control={
-                                                <Checkbox
-                                                    checked={selectedVoucherTypes.includes('any day flight')}
-                                                    onChange={(e) => {
-                                                        if (e.target.checked) {
-                                                            setSelectedVoucherTypes(prev => [...prev, 'any day flight']);
-                                                        } else {
-                                                            setSelectedVoucherTypes(prev => prev.filter(t => t !== 'any day flight'));
-                                                        }
-                                                    }}
-                                                />
-                                            }
-                                            label="Any Day Flight"
-                                        />
+                                        <FormControlLabel control={<Checkbox checked={selectedVoucherTypes.includes('weekday morning')} onChange={(e) => { if (e.target.checked) setSelectedVoucherTypes(prev => [...prev, 'weekday morning']); else setSelectedVoucherTypes(prev => prev.filter(t => t !== 'weekday morning')); }} />} label="Weekday Morning" />
+                                        <FormControlLabel control={<Checkbox checked={selectedVoucherTypes.includes('flexible weekday')} onChange={(e) => { if (e.target.checked) setSelectedVoucherTypes(prev => [...prev, 'flexible weekday']); else setSelectedVoucherTypes(prev => prev.filter(t => t !== 'flexible weekday')); }} />} label="Flexible Weekday" />
+                                        <FormControlLabel control={<Checkbox checked={selectedVoucherTypes.includes('any day flight')} onChange={(e) => { if (e.target.checked) setSelectedVoucherTypes(prev => [...prev, 'any day flight']); else setSelectedVoucherTypes(prev => prev.filter(t => t !== 'any day flight')); }} />} label="Any Day Flight" />
                                     </FormGroup>
                                 </Box>
+                            </>
+                        )}
+
+                        {/* Date and Time Selection */}
+                        {((selectedActivity && selectedLocation) || isFlightVoucherDetails) && (
+                            <>
+                                {/* Flight Type Selector */}
+                                {!isFlightVoucherDetails && (
+                                    <Box sx={{ mb: 3 }}>
+                                        <Typography variant="h6" sx={{ mb: 2 }}>Flight Type:</Typography>
+                                        <FormGroup row>
+                                            <FormControlLabel
+                                                control={
+                                                    <Checkbox
+                                                        checked={selectedFlightTypes.includes('private')}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setSelectedFlightTypes(prev => [...prev, 'private']);
+                                                            } else {
+                                                                setSelectedFlightTypes(prev => prev.filter(t => t !== 'private'));
+                                                            }
+                                                        }}
+                                                    />
+                                                }
+                                                label="Private"
+                                            />
+                                            <FormControlLabel
+                                                control={
+                                                    <Checkbox
+                                                        checked={selectedFlightTypes.includes('shared')}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setSelectedFlightTypes(prev => [...prev, 'shared']);
+                                                            } else {
+                                                                setSelectedFlightTypes(prev => prev.filter(t => t !== 'shared'));
+                                                            }
+                                                        }}
+                                                    />
+                                                }
+                                                label="Shared"
+                                            />
+                                        </FormGroup>
+                                    </Box>
+                                )}
+
+                                {/* Voucher Type Selector */}
+                                {!isFlightVoucherDetails && (
+                                    <Box sx={{ mb: 3 }}>
+                                        <Typography variant="h6" sx={{ mb: 2 }}>Voucher Type:</Typography>
+                                        <FormGroup row>
+                                            <FormControlLabel
+                                                control={
+                                                    <Checkbox
+                                                        checked={selectedVoucherTypes.includes('weekday morning')}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setSelectedVoucherTypes(prev => [...prev, 'weekday morning']);
+                                                            } else {
+                                                                setSelectedVoucherTypes(prev => prev.filter(t => t !== 'weekday morning'));
+                                                            }
+                                                        }}
+                                                    />
+                                                }
+                                                label="Weekday Morning"
+                                            />
+                                            <FormControlLabel
+                                                control={
+                                                    <Checkbox
+                                                        checked={selectedVoucherTypes.includes('flexible weekday')}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setSelectedVoucherTypes(prev => [...prev, 'flexible weekday']);
+                                                            } else {
+                                                                setSelectedVoucherTypes(prev => prev.filter(t => t !== 'flexible weekday'));
+                                                            }
+                                                        }}
+                                                    />
+                                                }
+                                                label="Flexible Weekday"
+                                            />
+                                            <FormControlLabel
+                                                control={
+                                                    <Checkbox
+                                                        checked={selectedVoucherTypes.includes('any day flight')}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setSelectedVoucherTypes(prev => [...prev, 'any day flight']);
+                                                            } else {
+                                                                setSelectedVoucherTypes(prev => prev.filter(t => t !== 'any day flight'));
+                                                            }
+                                                        }}
+                                                    />
+                                                }
+                                                label="Any Day Flight"
+                                            />
+                                        </FormGroup>
+                                    </Box>
+                                )}
                                 {loading ? (
                                     <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
                                         <CircularProgress />
