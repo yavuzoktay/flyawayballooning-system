@@ -49,7 +49,13 @@ const Header = () => {
     <AppBar position="sticky">
       <Container maxWidth="xl">
         <Toolbar>
-          <Grid container alignItems="center" justifyContent="center">
+          <Grid container alignItems="center" justifyContent="space-between">
+            {/* Left/Right spacer on mobile, right-aligned logo on desktop */}
+            {!isMobile && (
+              <Grid item>
+                <img src={process.env.PUBLIC_URL + '/FAB_Logo_DarkBlue.png'} alt="Fly Away Ballooning" style={{ height: 36, objectFit: 'contain' }} />
+              </Grid>
+            )}
             {/* Right: Menu Items */}
             {isMobile ? (
               <Grid item>
@@ -66,7 +72,7 @@ const Header = () => {
                           onClick={() => handleMenuClick(item.label, item.path)}
                           selected={activeMenuItem === item.label}
                         >
-                          <ListItemText primary={item.label} />
+                          <ListItemText primary={item.label} sx={{ color: '#000' }} />
                         </ListItem>
                       ))}
                     </List>
@@ -83,6 +89,7 @@ const Header = () => {
                         onClick={() => handleMenuClick(item.label, item.path)}
                         sx={{
                           fontWeight: location.pathname === item.path ? 'bold' : 'normal',
+                          color: '#000',
                         }}
                       >
                         {item.label}
@@ -90,6 +97,11 @@ const Header = () => {
                     ))}
                   </Box>
                 </div>
+              </Grid>
+            )}
+            {isMobile && (
+              <Grid item>
+                <img src={process.env.PUBLIC_URL + '/FAB_Logo_DarkBlue.png'} alt="Fly Away Ballooning" style={{ height: 28, objectFit: 'contain' }} />
               </Grid>
             )}
           </Grid>
