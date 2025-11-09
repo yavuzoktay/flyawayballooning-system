@@ -285,7 +285,17 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
     const buildDayCells = () => {
         const cells = [];
         // Create a 6-week grid (42 cells)
-        const firstCellDate = startOfMonth.startOf('week');
+        // Start from Monday (day 1) instead of Sunday (day 0)
+        // Get the first day of the month
+        const firstDayOfMonth = startOfMonth.day(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+        
+        // Calculate how many days to go back to reach Monday
+        // If firstDayOfMonth is 0 (Sunday), go back 6 days
+        // If firstDayOfMonth is 1 (Monday), go back 0 days
+        // If firstDayOfMonth is 2 (Tuesday), go back 1 day, etc.
+        const daysToGoBack = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
+        const firstCellDate = startOfMonth.subtract(daysToGoBack, 'day');
+        
         for (let i = 0; i < 42; i++) {
             const d = firstCellDate.add(i, 'day');
             const inCurrentMonth = d.isSame(currentMonth, 'month');
