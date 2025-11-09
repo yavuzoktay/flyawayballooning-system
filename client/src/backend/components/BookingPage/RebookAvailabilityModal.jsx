@@ -138,18 +138,25 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         setSelectedVoucherTypes(Array.from(new Set(voucherDefaults)));
     }, [activities, open, bookingDetail, location]);
 
-    // Set calendar to current booking date when modal opens
+    // Set calendar to current month (not booking date) when modal opens
     useEffect(() => {
-        if (open && bookingDetail?.booking?.flight_date && selectedActivity && selectedLocation) {
-            const bookingDate = dayjs(bookingDetail.booking.flight_date);
-            console.log('Setting calendar to booking date:', bookingDate.format('YYYY-MM-DD HH:mm'));
-            setCurrentMonth(bookingDate.startOf('month'));
-            setSelectedDate(bookingDate.toDate());
+        if (open && selectedActivity && selectedLocation) {
+            // Always start with current month, not the old booking date
+            const today = dayjs();
+            console.log('Setting calendar to current month:', today.format('YYYY-MM-DD'));
+            setCurrentMonth(today.startOf('month'));
             
-            // Extract time from flight_date if available
-            const timeString = bookingDate.format('HH:mm');
-            if (timeString && timeString !== '00:00') {
-                setSelectedTime(timeString);
+            // If there's a booking date, just select it but don't change the month
+            if (bookingDetail?.booking?.flight_date) {
+                const bookingDate = dayjs(bookingDetail.booking.flight_date);
+                console.log('Booking date (for reference):', bookingDate.format('YYYY-MM-DD HH:mm'));
+                setSelectedDate(bookingDate.toDate());
+                
+                // Extract time from flight_date if available
+                const timeString = bookingDate.format('HH:mm');
+                if (timeString && timeString !== '00:00') {
+                    setSelectedTime(timeString);
+                }
             }
         }
     }, [open, bookingDetail, selectedActivity, selectedLocation]);
@@ -161,7 +168,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
 
     // Debug: Track currentMonth changes
     useEffect(() => {
-        console.log('currentMonth changed:', currentMonth.format('YYYY-MM'));
+        console.log('🗓️ currentMonth changed:', currentMonth.format('YYYY-MM'), '(should be', dayjs().format('YYYY-MM'), 'for current month)');
     }, [currentMonth]);
 
     // Fetch availabilities (sadece activity/location değişince)
@@ -193,8 +200,9 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                 const voucherTypes = ['weekday morning', 'flexible weekday', 'any day flight'];
                                 setSelectedVoucherTypes(voucherTypes);
                             }
-                            const firstDate = data?.[0]?.date;
-                            if (firstDate) setCurrentMonth(dayjs(firstDate).startOf('month'));
+                            // Don't set currentMonth from availability data - let it stay at current month
+                            // const firstDate = data?.[0]?.date;
+                            // if (firstDate) setCurrentMonth(dayjs(firstDate).startOf('month'));
                         } else {
                             setAvailabilities([]);
                         }
