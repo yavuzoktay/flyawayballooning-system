@@ -194,6 +194,19 @@ const Settings = () => {
     const [showEditResourceForm, setShowEditResourceForm] = useState(false);
     const [selectedResource, setSelectedResource] = useState(null);
     
+    // Email Templates state
+    const [emailTemplates, setEmailTemplates] = useState([]);
+    const [emailTemplatesExpanded, setEmailTemplatesExpanded] = useState(false);
+    const [showEmailTemplateForm, setShowEmailTemplateForm] = useState(false);
+    const [showEditEmailTemplateForm, setShowEditEmailTemplateForm] = useState(false);
+    const [selectedEmailTemplate, setSelectedEmailTemplate] = useState(null);
+    const [emailTemplateFormData, setEmailTemplateFormData] = useState({
+        name: '',
+        subject: '',
+        category: 'User Defined Message',
+        sms_enabled: false
+    });
+    
     // Collapsible sections state
     const [voucherCodesExpanded, setVoucherCodesExpanded] = useState(false);
     const [experiencesExpanded, setExperiencesExpanded] = useState(false);
@@ -257,6 +270,7 @@ const Settings = () => {
         fetchPassengerTerms();
         fetchResources();
         fetchResourceGroups();
+        fetchEmailTemplates();
     }, []);
 
     const fetchVoucherCodes = async () => {
@@ -407,6 +421,18 @@ const Settings = () => {
             { id: 1, name: 'Balloon 210', used_by: 'Somerset Private +8 more', sort_order: 1, color: '#0ea5e9' },
             { id: 2, name: 'Balloon 105', used_by: 'Somerset Private +5 more', sort_order: 1, color: '#f97316' }
         ]);
+    };
+
+    const fetchEmailTemplates = async () => {
+        try {
+            const response = await axios.get('/api/email-templates');
+            if (response.data?.success) {
+                setEmailTemplates(response.data.data);
+            }
+        } catch (error) {
+            console.error('Error fetching email templates:', error);
+            setEmailTemplates([]);
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -3933,6 +3959,159 @@ const Settings = () => {
                 )}
             </div>
 
+            {/* Email Templates Section */}
+            <div className="settings-card" style={{ marginBottom: '24px' }}>
+                <div 
+                    className="card-header"
+                    onClick={() => setEmailTemplatesExpanded(!emailTemplatesExpanded)}
+                    style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        padding: '20px',
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                    }}
+                >
+                    <div>
+                        <h2 style={{ margin: 0, color: '#1f2937' }}>Email Templates</h2>
+                        <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
+                            Message Templates are any communication—via email or text message— sent to a customer or participant from your dashboard.
+                        </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button 
+                            className="btn btn-primary"
+                            onClick={(e) => { e.stopPropagation(); setShowEmailTemplateForm(true); }}
+                            style={{ margin: 0 }}
+                        >
+                            <Plus size={20} />
+                            New Template
+                        </button>
+                        {emailTemplatesExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+                    </div>
+                </div>
+
+                {emailTemplatesExpanded && (
+                    <div style={{ padding: '20px', background: '#f9fafb', borderRadius: '0 0 12px 12px' }}>
+                        {emailTemplates.length === 0 ? (
+                            <div style={{ 
+                                textAlign: 'center', 
+                                padding: '40px 20px', 
+                                color: '#6b7280',
+                                background: '#fff',
+                                borderRadius: '8px',
+                                border: '1px dashed #d1d5db'
+                            }}>
+                                <p style={{ margin: 0, fontSize: '15px' }}>No email templates yet. Create your first template!</p>
+                            </div>
+                        ) : (
+                            <div style={{ overflowX: 'auto', background: '#fff', borderRadius: '8px', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                                            <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>NAME</th>
+                                            <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>SUBJECT</th>
+                                            <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>CATEGORY</th>
+                                            <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>EDITED</th>
+                                            <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>SMS ENABLED</th>
+                                            <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ACTIONS</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {emailTemplates.map((template) => (
+                                            <tr key={template.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                                                <td style={{ padding: '16px' }}>
+                                                    <span style={{ fontWeight: 500, color: '#1f2937' }}>{template.name}</span>
+                                                </td>
+                                                <td style={{ padding: '16px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <span style={{ color: '#d32f2f', fontSize: '16px' }}>🎈</span>
+                                                        <span style={{ color: '#475569' }}>{template.subject}</span>
+                                                    </div>
+                                                </td>
+                                                <td style={{ padding: '16px' }}>
+                                                    <span style={{ color: '#475569' }}>{template.category}</span>
+                                                </td>
+                                                <td style={{ padding: '16px', textAlign: 'center' }}>
+                                                    <div style={{ 
+                                                        width: '24px', 
+                                                        height: '24px', 
+                                                        borderRadius: '50%', 
+                                                        border: '2px solid #d1d5db',
+                                                        margin: '0 auto',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center'
+                                                    }}>
+                                                        {template.edited ? <CheckCircle size={16} color="#10b981" /> : null}
+                                                    </div>
+                                                </td>
+                                                <td style={{ padding: '16px', textAlign: 'center' }}>
+                                                    <div style={{ 
+                                                        width: '24px', 
+                                                        height: '24px', 
+                                                        borderRadius: '50%', 
+                                                        border: '2px solid #d1d5db',
+                                                        margin: '0 auto',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center'
+                                                    }}>
+                                                        {template.sms_enabled ? <CheckCircle size={16} color="#10b981" /> : null}
+                                                    </div>
+                                                </td>
+                                                <td style={{ padding: '16px' }}>
+                                                    <div className="action-buttons" style={{ justifyContent: 'center' }}>
+                                                        <button
+                                                            className="action-btn edit"
+                                                            title="Edit"
+                                                            onClick={() => {
+                                                                setSelectedEmailTemplate(template);
+                                                                setEmailTemplateFormData({
+                                                                    name: template.name,
+                                                                    subject: template.subject,
+                                                                    category: template.category,
+                                                                    sms_enabled: template.sms_enabled || false
+                                                                });
+                                                                setShowEditEmailTemplateForm(true);
+                                                            }}
+                                                        >
+                                                            <Edit size={16} />
+                                                        </button>
+                                                        <button
+                                                            className="action-btn delete"
+                                                            title="Delete"
+                                                            onClick={async () => {
+                                                                if (window.confirm(`Are you sure you want to delete "${template.name}"?`)) {
+                                                                    try {
+                                                                        await axios.delete(`/api/email-templates/${template.id}`);
+                                                                        fetchEmailTemplates();
+                                                                        alert('Template deleted successfully');
+                                                                    } catch (error) {
+                                                                        alert('Error deleting template: ' + (error.response?.data?.message || error.message));
+                                                                    }
+                                                                }
+                                                            }}
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
             {/* Create Resource Group Modal */}
             {showResourceGroupForm && (
                 <div className="modal-overlay">
@@ -6036,6 +6215,247 @@ const Settings = () => {
                                 Close
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Create Email Template Modal */}
+            {showEmailTemplateForm && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h3>Create New Email Template</h3>
+                            <button 
+                                className="close-btn"
+                                onClick={() => {
+                                    setShowEmailTemplateForm(false);
+                                    setEmailTemplateFormData({
+                                        name: '',
+                                        subject: '',
+                                        category: 'User Defined Message',
+                                        sms_enabled: false
+                                    });
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <form onSubmit={async (e) => {
+                            e.preventDefault();
+                            try {
+                                const response = await axios.post('/api/email-templates', emailTemplateFormData);
+                                if (response.data?.success) {
+                                    fetchEmailTemplates();
+                                    setShowEmailTemplateForm(false);
+                                    setEmailTemplateFormData({
+                                        name: '',
+                                        subject: '',
+                                        category: 'User Defined Message',
+                                        sms_enabled: false
+                                    });
+                                    alert('Email template created successfully!');
+                                }
+                            } catch (error) {
+                                alert('Error creating template: ' + (error.response?.data?.message || error.message));
+                            }
+                        }}>
+                            <div className="modal-body">
+                                <div className="form-group">
+                                    <label>Template Name *</label>
+                                    <input
+                                        type="text"
+                                        value={emailTemplateFormData.name}
+                                        onChange={(e) => setEmailTemplateFormData({ ...emailTemplateFormData, name: e.target.value })}
+                                        placeholder="Enter template name"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Subject *</label>
+                                    <input
+                                        type="text"
+                                        value={emailTemplateFormData.subject}
+                                        onChange={(e) => setEmailTemplateFormData({ ...emailTemplateFormData, subject: e.target.value })}
+                                        placeholder="Enter email subject"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Category *</label>
+                                    <select
+                                        value={emailTemplateFormData.category}
+                                        onChange={(e) => setEmailTemplateFormData({ ...emailTemplateFormData, category: e.target.value })}
+                                        required
+                                    >
+                                        <option value="User Defined Message">User Defined Message</option>
+                                        <option value="Confirmation">Confirmation</option>
+                                        <option value="Rebook">Rebook</option>
+                                        <option value="Cancellation">Cancellation</option>
+                                        <option value="Event Followup">Event Followup</option>
+                                        <option value="Event Reminder">Event Reminder</option>
+                                        <option value="Payment Request">Payment Request</option>
+                                        <option value="Refund">Refund</option>
+                                        <option value="Abandon Cart">Abandon Cart</option>
+                                    </select>
+                                </div>
+
+                                <div className="form-group">
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={emailTemplateFormData.sms_enabled}
+                                            onChange={(e) => setEmailTemplateFormData({ ...emailTemplateFormData, sms_enabled: e.target.checked })}
+                                        />
+                                        Enable SMS for this template
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div className="form-actions">
+                                <button 
+                                    type="button" 
+                                    className="btn btn-secondary"
+                                    onClick={() => {
+                                        setShowEmailTemplateForm(false);
+                                        setEmailTemplateFormData({
+                                            name: '',
+                                            subject: '',
+                                            category: 'User Defined Message',
+                                            sms_enabled: false
+                                        });
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn btn-primary">
+                                    Create Template
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Email Template Modal */}
+            {showEditEmailTemplateForm && selectedEmailTemplate && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h3>Edit Email Template</h3>
+                            <button 
+                                className="close-btn"
+                                onClick={() => {
+                                    setShowEditEmailTemplateForm(false);
+                                    setSelectedEmailTemplate(null);
+                                    setEmailTemplateFormData({
+                                        name: '',
+                                        subject: '',
+                                        category: 'User Defined Message',
+                                        sms_enabled: false
+                                    });
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <form onSubmit={async (e) => {
+                            e.preventDefault();
+                            try {
+                                const response = await axios.put(`/api/email-templates/${selectedEmailTemplate.id}`, emailTemplateFormData);
+                                if (response.data?.success) {
+                                    fetchEmailTemplates();
+                                    setShowEditEmailTemplateForm(false);
+                                    setSelectedEmailTemplate(null);
+                                    setEmailTemplateFormData({
+                                        name: '',
+                                        subject: '',
+                                        category: 'User Defined Message',
+                                        sms_enabled: false
+                                    });
+                                    alert('Email template updated successfully!');
+                                }
+                            } catch (error) {
+                                alert('Error updating template: ' + (error.response?.data?.message || error.message));
+                            }
+                        }}>
+                            <div className="modal-body">
+                                <div className="form-group">
+                                    <label>Template Name *</label>
+                                    <input
+                                        type="text"
+                                        value={emailTemplateFormData.name}
+                                        onChange={(e) => setEmailTemplateFormData({ ...emailTemplateFormData, name: e.target.value })}
+                                        placeholder="Enter template name"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Subject *</label>
+                                    <input
+                                        type="text"
+                                        value={emailTemplateFormData.subject}
+                                        onChange={(e) => setEmailTemplateFormData({ ...emailTemplateFormData, subject: e.target.value })}
+                                        placeholder="Enter email subject"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Category *</label>
+                                    <select
+                                        value={emailTemplateFormData.category}
+                                        onChange={(e) => setEmailTemplateFormData({ ...emailTemplateFormData, category: e.target.value })}
+                                        required
+                                    >
+                                        <option value="User Defined Message">User Defined Message</option>
+                                        <option value="Confirmation">Confirmation</option>
+                                        <option value="Rebook">Rebook</option>
+                                        <option value="Cancellation">Cancellation</option>
+                                        <option value="Event Followup">Event Followup</option>
+                                        <option value="Event Reminder">Event Reminder</option>
+                                        <option value="Payment Request">Payment Request</option>
+                                        <option value="Refund">Refund</option>
+                                        <option value="Abandon Cart">Abandon Cart</option>
+                                    </select>
+                                </div>
+
+                                <div className="form-group">
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={emailTemplateFormData.sms_enabled}
+                                            onChange={(e) => setEmailTemplateFormData({ ...emailTemplateFormData, sms_enabled: e.target.checked })}
+                                        />
+                                        Enable SMS for this template
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div className="form-actions">
+                                <button 
+                                    type="button" 
+                                    className="btn btn-secondary"
+                                    onClick={() => {
+                                        setShowEditEmailTemplateForm(false);
+                                        setSelectedEmailTemplate(null);
+                                        setEmailTemplateFormData({
+                                            name: '',
+                                            subject: '',
+                                            category: 'User Defined Message',
+                                            sms_enabled: false
+                                        });
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn btn-primary">
+                                    Update Template
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

@@ -8817,6 +8817,72 @@ const checkAndFixDuplicateAvailability = async () => {
     }
 };
 
+// ===========================
+// EMAIL TEMPLATES ENDPOINTS
+// ===========================
+
+// Get all email templates
+app.get('/api/email-templates', async (req, res) => {
+    try {
+        const [templates] = await pool.query(
+            'SELECT * FROM email_templates ORDER BY created_at DESC'
+        );
+        res.json({ success: true, data: templates });
+    } catch (error) {
+        console.error('Error fetching email templates:', error);
+        res.status(500).json({ success: false, message: 'Error fetching email templates' });
+    }
+});
+
+// Create new email template
+app.post('/api/email-templates', async (req, res) => {
+    try {
+        const { name, subject, category, sms_enabled } = req.body;
+        
+        const [result] = await pool.query(
+            'INSERT INTO email_templates (name, subject, category, sms_enabled, edited, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())',
+            [name, subject, category, sms_enabled ? 1 : 0, 0]
+        );
+        
+        res.json({ success: true, id: result.insertId });
+    } catch (error) {
+        console.error('Error creating email template:', error);
+        res.status(500).json({ success: false, message: 'Error creating email template' });
+    }
+});
+
+// Update email template
+app.put('/api/email-templates/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, subject, category, sms_enabled } = req.body;
+        
+        await pool.query(
+            'UPDATE email_templates SET name = ?, subject = ?, category = ?, sms_enabled = ?, edited = 1, updated_at = NOW() WHERE id = ?',
+            [name, subject, category, sms_enabled ? 1 : 0, id]
+        );
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating email template:', error);
+        res.status(500).json({ success: false, message: 'Error updating email template' });
+    }
+});
+
+// Delete email template
+app.delete('/api/email-templates/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        await pool.query('DELETE FROM email_templates WHERE id = ?', [id]);
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting email template:', error);
+        res.status(500).json({ success: false, message: 'Error deleting email template' });
+    }
+});
+
 // Serve React frontend from client/build (exclude /api routes)
 app.use(express.static(path.join(__dirname, '../client/build')));
 
