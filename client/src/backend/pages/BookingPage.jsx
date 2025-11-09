@@ -134,6 +134,7 @@ const BookingPage = () => {
     const [emailLogs, setEmailLogs] = useState([]);
     const [emailLogsLoading, setEmailLogsLoading] = useState(false);
     const [emailLogsPollId, setEmailLogsPollId] = useState(null);
+    const [emailTemplates, setEmailTemplates] = useState([]);
 
     // SMS state
     const [smsModalOpen, setSmsModalOpen] = useState(false);
@@ -244,11 +245,37 @@ const BookingPage = () => {
         setSendingEmail(false);
     };
 
-    const handleEmailTemplateChange = (template) => {
+    // Fetch email templates from database
+    const fetchEmailTemplates = async () => {
+        try {
+            const response = await axios.get('/api/email-templates');
+            if (response.data?.success) {
+                setEmailTemplates(response.data.data || []);
+            }
+        } catch (error) {
+            console.error('Error fetching email templates:', error);
+        }
+    };
+
+    // Load email templates on mount
+    useEffect(() => {
+        fetchEmailTemplates();
+    }, []);
+
+    const handleEmailTemplateChange = (templateValue) => {
         let subject = '';
         let message = '';
 
-        switch (template) {
+        // Check if it's a database template (numeric ID)
+        const dbTemplate = emailTemplates.find(t => t.id.toString() === templateValue.toString());
+        
+        if (dbTemplate) {
+            // Use template from database
+            subject = dbTemplate.subject || '';
+            message = dbTemplate.body || '';
+        } else {
+            // Use hardcoded templates (legacy)
+            switch (templateValue) {
             case 'confirmation':
                 subject = `Booking Confirmation - ${selectedBookingForEmail?.name}`;
                 message = `Dear ${selectedBookingForEmail?.name},
@@ -299,10 +326,10 @@ We will contact you shortly to arrange a new date that works for you.
 
 Best regards,
 Fly Away Ballooning Team`;
-                break;
-            case 'to_be_updated':
-                subject = `Flight update`;
-                message = `Dear ${selectedBookingForEmail?.name || 'Customer'},
+                    break;
+                case 'to_be_updated':
+                    subject = `Flight update`;
+                    message = `Dear ${selectedBookingForEmail?.name || 'Customer'},
 
 We know that you're waiting to hear from us regarding your flight on ${selectedBookingForEmail?.flight_date ? dayjs(selectedBookingForEmail.flight_date).format('MMMM D, YYYY [at] h:mm A') : '[Date TBD]'}.
 
@@ -316,13 +343,14 @@ Fly Away Ballooning Team`;
             default:
                 subject = `Regarding your Fly Away Ballooning booking - ${selectedBookingForEmail?.name}`;
                 message = '';
+            }
         }
 
         setEmailForm(prev => ({
             ...prev,
             subject,
             message,
-            template
+            template: templateValue
         }));
     };
 
@@ -1711,17 +1739,20 @@ setBookingDetail(finalVoucherDetail);
         // Set selected booking for email
         setSelectedBookingForEmail(booking);
         
-        // Pre-fill email form with "To Be Updated" template
+        // Find first template or use "To Be Updated" as fallback
+        const firstTemplate = emailTemplates.length > 0 ? emailTemplates[0].id : 'to_be_updated';
+        
+        // Pre-fill email form with first template
         setEmailForm({
             to: booking.email || '',
             subject: '',
             message: '',
-            template: 'to_be_updated'
+            template: firstTemplate
         });
         
         // Trigger template change to populate subject and message
         setTimeout(() => {
-            handleEmailTemplateChange('to_be_updated');
+            handleEmailTemplateChange(firstTemplate);
         }, 0);
         
         // Open email modal
@@ -3887,11 +3918,23 @@ setBookingDetail(finalVoucherDetail);
                                         onChange={(e) => handleEmailTemplateChange(e.target.value)}
                                         displayEmpty
                                     >
-                                        <MenuItem value="to_be_updated">To Be Updated</MenuItem>
-                                        <MenuItem value="custom">Custom Message</MenuItem>
-                                        <MenuItem value="confirmation">Booking Confirmation</MenuItem>
-                                        <MenuItem value="reminder">Flight Reminder</MenuItem>
-                                        <MenuItem value="reschedule">Flight Rescheduling</MenuItem>
+                                        {/* Database templates */}
+                                        {emailTemplates.map((template) => (
+                                            <MenuItem key={template.id} value={template.id}>
+                                                {template.name}
+                                            </MenuItem>
+                                        ))}
+                                        
+                                        {/* Legacy hardcoded templates (fallback) */}
+                                        {emailTemplates.length === 0 && (
+                                            <>
+                                                <MenuItem value="to_be_updated">To Be Updated</MenuItem>
+                                                <MenuItem value="custom">Custom Message</MenuItem>
+                                                <MenuItem value="confirmation">Booking Confirmation</MenuItem>
+                                                <MenuItem value="reminder">Flight Reminder</MenuItem>
+                                                <MenuItem value="reschedule">Flight Rescheduling</MenuItem>
+                                            </>
+                                        )}
                                     </Select>
                                 </FormControl>
                             </Grid>
