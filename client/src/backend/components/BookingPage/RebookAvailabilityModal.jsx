@@ -417,7 +417,9 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                             : isCurrentBookingDate 
                                 ? '#fff'  // Mevcut booking tarihi için beyaz yazı
                                 : '#fff',  // Tüm tıklanabilir tarihler beyaz yazı
-                        display: inCurrentMonth ? 'flex' : 'none',
+                        display: 'flex',  // Always flex for Grid - use opacity for visibility
+                        opacity: !inCurrentMonth ? 0 : (isSelectable ? 1 : 0.6),  // Hide other months, dim unselectable dates
+                        pointerEvents: inCurrentMonth && isSelectable ? 'auto' : 'none',  // Disable interaction for hidden/unselectable dates
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -425,11 +427,9 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                         cursor: isSelectable ? 'pointer' : 'default',
                         userSelect: 'none',
                         fontSize: 14,
-                        pointerEvents: isSelectable ? 'auto' : 'none',
                         zIndex: 1,
                         position: 'relative',
-                        transition: 'all 0.2s ease',
-                        opacity: isSelectable ? 1 : 0.6
+                        transition: 'all 0.2s ease'
                     }}
                 >
                     <div>{d.date()}</div>
