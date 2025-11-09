@@ -203,6 +203,7 @@ const Settings = () => {
     const [emailTemplateFormData, setEmailTemplateFormData] = useState({
         name: '',
         subject: '',
+        body: '',
         category: 'User Defined Message',
         sms_enabled: false
     });
@@ -4071,14 +4072,15 @@ const Settings = () => {
                                                             className="action-btn edit"
                                                             title="Edit"
                                                             onClick={() => {
-                                                                setSelectedEmailTemplate(template);
-                                                                setEmailTemplateFormData({
-                                                                    name: template.name,
-                                                                    subject: template.subject,
-                                                                    category: template.category,
-                                                                    sms_enabled: template.sms_enabled || false
-                                                                });
-                                                                setShowEditEmailTemplateForm(true);
+                                                setSelectedEmailTemplate(template);
+                                                setEmailTemplateFormData({
+                                                    name: template.name,
+                                                    subject: template.subject,
+                                                    body: template.body || '',
+                                                    category: template.category,
+                                                    sms_enabled: template.sms_enabled || false
+                                                });
+                                                setShowEditEmailTemplateForm(true);
                                                             }}
                                                         >
                                                             <Edit size={16} />
@@ -6222,9 +6224,9 @@ const Settings = () => {
             {/* Create Email Template Modal */}
             {showEmailTemplateForm && (
                 <div className="modal-overlay">
-                    <div className="modal-content">
+                    <div className="modal-content" style={{ maxWidth: '1200px', width: '95%', maxHeight: '90vh', overflow: 'auto' }}>
                         <div className="modal-header">
-                            <h3>Create New Email Template</h3>
+                            <h3 style={{ margin: 0, fontSize: '24px', fontWeight: 600 }}>Message Template</h3>
                             <button 
                                 className="close-btn"
                                 onClick={() => {
@@ -6232,6 +6234,7 @@ const Settings = () => {
                                     setEmailTemplateFormData({
                                         name: '',
                                         subject: '',
+                                        body: '',
                                         category: 'User Defined Message',
                                         sms_enabled: false
                                     });
@@ -6250,6 +6253,7 @@ const Settings = () => {
                                     setEmailTemplateFormData({
                                         name: '',
                                         subject: '',
+                                        body: '',
                                         category: 'User Defined Message',
                                         sms_enabled: false
                                     });
@@ -6259,61 +6263,183 @@ const Settings = () => {
                                 alert('Error creating template: ' + (error.response?.data?.message || error.message));
                             }
                         }}>
-                            <div className="modal-body">
-                                <div className="form-group">
-                                    <label>Template Name *</label>
-                                    <input
-                                        type="text"
-                                        value={emailTemplateFormData.name}
-                                        onChange={(e) => setEmailTemplateFormData({ ...emailTemplateFormData, name: e.target.value })}
-                                        placeholder="Enter template name"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label>Subject *</label>
-                                    <input
-                                        type="text"
-                                        value={emailTemplateFormData.subject}
-                                        onChange={(e) => setEmailTemplateFormData({ ...emailTemplateFormData, subject: e.target.value })}
-                                        placeholder="Enter email subject"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label>Category *</label>
-                                    <select
-                                        value={emailTemplateFormData.category}
-                                        onChange={(e) => setEmailTemplateFormData({ ...emailTemplateFormData, category: e.target.value })}
-                                        required
-                                    >
-                                        <option value="User Defined Message">User Defined Message</option>
-                                        <option value="Confirmation">Confirmation</option>
-                                        <option value="Rebook">Rebook</option>
-                                        <option value="Cancellation">Cancellation</option>
-                                        <option value="Event Followup">Event Followup</option>
-                                        <option value="Event Reminder">Event Reminder</option>
-                                        <option value="Payment Request">Payment Request</option>
-                                        <option value="Refund">Refund</option>
-                                        <option value="Abandon Cart">Abandon Cart</option>
-                                    </select>
-                                </div>
-
-                                <div className="form-group">
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div className="modal-body" style={{ display: 'flex', gap: '24px', padding: '24px' }}>
+                                {/* Left Column - Form */}
+                                <div style={{ flex: '0 0 350px' }}>
+                                    <div className="form-group" style={{ marginBottom: '20px' }}>
+                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>Name</label>
                                         <input
-                                            type="checkbox"
-                                            checked={emailTemplateFormData.sms_enabled}
-                                            onChange={(e) => setEmailTemplateFormData({ ...emailTemplateFormData, sms_enabled: e.target.checked })}
+                                            type="text"
+                                            value={emailTemplateFormData.name}
+                                            onChange={(e) => setEmailTemplateFormData({ ...emailTemplateFormData, name: e.target.value })}
+                                            placeholder="test"
+                                            required
+                                            style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px' }}
                                         />
-                                        Enable SMS for this template
-                                    </label>
+                                        <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>
+                                            This will help you identify this message when choosing from your list of messages. Not visible to the recipient.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Right Column - Email Preview */}
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    {/* Email Preview Container */}
+                                    <div style={{ 
+                                        border: '1px solid #e5e7eb',
+                                        borderRadius: '8px',
+                                        backgroundColor: '#f9fafb',
+                                        overflow: 'hidden'
+                                    }}>
+                                        {/* Email Header */}
+                                        <div style={{ 
+                                            padding: '16px',
+                                            borderBottom: '1px solid #e5e7eb',
+                                            backgroundColor: '#fff'
+                                        }}>
+                                            <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+                                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#ef4444' }}></div>
+                                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#fbbf24' }}></div>
+                                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#10b981' }}></div>
+                                            </div>
+                                            <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>
+                                                From "Hugo Hall" &lt;info@flyawayballooning.com&gt;
+                                            </div>
+                                            <div style={{ fontSize: '11px', color: '#9ca3af' }}>
+                                                Sent at Nov 09, 2025 4:00pm
+                                            </div>
+                                        </div>
+
+                                        {/* Email Subject */}
+                                        <div style={{ padding: '16px', backgroundColor: '#fff', borderBottom: '1px solid #e5e7eb' }}>
+                                            <input
+                                                type="text"
+                                                value={emailTemplateFormData.subject}
+                                                onChange={(e) => setEmailTemplateFormData({ ...emailTemplateFormData, subject: e.target.value })}
+                                                placeholder="Enter subject..."
+                                                required
+                                                style={{ 
+                                                    width: '100%',
+                                                    border: 'none',
+                                                    outline: 'none',
+                                                    fontSize: '16px',
+                                                    fontWeight: 500,
+                                                    padding: '4px 0',
+                                                    color: '#111827'
+                                                }}
+                                            />
+                                            <div style={{ 
+                                                display: 'flex',
+                                                gap: '8px',
+                                                marginTop: '8px',
+                                                alignItems: 'center'
+                                            }}>
+                                                <span style={{ 
+                                                    width: '20px',
+                                                    height: '20px',
+                                                    borderRadius: '50%',
+                                                    backgroundColor: '#10b981',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    color: '#fff',
+                                                    fontSize: '12px'
+                                                }}>✓</span>
+                                                <span style={{ 
+                                                    width: '20px',
+                                                    height: '20px',
+                                                    borderRadius: '50%',
+                                                    backgroundColor: '#10b981',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    color: '#fff',
+                                                    fontSize: '12px'
+                                                }}>W</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Email Body */}
+                                        <div style={{ padding: '0' }}>
+                                            <div style={{ 
+                                                fontSize: '11px',
+                                                color: '#6b7280',
+                                                padding: '12px 16px',
+                                                borderBottom: '1px solid #e5e7eb',
+                                                backgroundColor: '#fefce8'
+                                            }}>
+                                                If you are unable to see this message, <a href="#" style={{ color: '#2563eb' }}>click here to view in browser</a>
+                                            </div>
+
+                                            {/* Balloon Image */}
+                                            <div style={{ 
+                                                width: '100%',
+                                                height: '250px',
+                                                backgroundImage: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center'
+                                            }}>
+                                                <span style={{ fontSize: '80px' }}>🎈</span>
+                                            </div>
+
+                                            {/* Editable Content Area */}
+                                            <div style={{ 
+                                                padding: '24px',
+                                                backgroundColor: '#fff',
+                                                minHeight: '200px'
+                                            }}>
+                                                <textarea
+                                                    value={emailTemplateFormData.body}
+                                                    onChange={(e) => setEmailTemplateFormData({ ...emailTemplateFormData, body: e.target.value })}
+                                                    placeholder="Enter your message here..."
+                                                    style={{ 
+                                                        width: '100%',
+                                                        minHeight: '150px',
+                                                        border: 'none',
+                                                        outline: 'none',
+                                                        resize: 'vertical',
+                                                        fontSize: '14px',
+                                                        lineHeight: '1.6',
+                                                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                                                        color: '#374151'
+                                                    }}
+                                                />
+                                            </div>
+
+                                            {/* Email Footer */}
+                                            <div style={{ 
+                                                padding: '24px',
+                                                backgroundColor: '#f9fafb',
+                                                borderTop: '1px solid #e5e7eb',
+                                                textAlign: 'center'
+                                            }}>
+                                                <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '16px' }}>
+                                                    <span style={{ fontSize: '20px', color: '#374151' }}>📘</span>
+                                                    <span style={{ fontSize: '20px', color: '#374151' }}>📷</span>
+                                                    <span style={{ fontSize: '20px', color: '#374151' }}>✈️</span>
+                                                    <span style={{ fontSize: '20px', color: '#374151' }}>▶️</span>
+                                                    <span style={{ fontSize: '20px', color: '#374151' }}>🌐</span>
+                                                </div>
+                                                <p style={{ fontSize: '12px', color: '#6b7280', margin: '8px 0' }}>
+                                                    You are receiving this email because you provided your email while booking with Fly Away Ballooning.
+                                                </p>
+                                                <p style={{ fontSize: '11px', color: '#9ca3af', margin: '8px 0' }}>
+                                                    Unsubscribe from Marketing Emails
+                                                </p>
+                                                <p style={{ fontSize: '11px', color: '#9ca3af', margin: '16px 0 0 0' }}>
+                                                    Powered by <strong>Tripworks</strong>. We help tour operators grow.
+                                                </p>
+                                                <p style={{ fontSize: '10px', color: '#d1d5db', margin: '4px 0 0 0' }}>
+                                                    © 2025 Tripworks, Inc. All rights reserved.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="form-actions">
+                            <div className="form-actions" style={{ borderTop: '1px solid #e5e7eb', padding: '16px 24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                                 <button 
                                     type="button" 
                                     className="btn btn-secondary"
@@ -6322,14 +6448,16 @@ const Settings = () => {
                                         setEmailTemplateFormData({
                                             name: '',
                                             subject: '',
+                                            body: '',
                                             category: 'User Defined Message',
                                             sms_enabled: false
                                         });
                                     }}
+                                    style={{ padding: '8px 20px' }}
                                 >
                                     Cancel
                                 </button>
-                                <button type="submit" className="btn btn-primary">
+                                <button type="submit" className="btn btn-primary" style={{ padding: '8px 20px' }}>
                                     Create Template
                                 </button>
                             </div>

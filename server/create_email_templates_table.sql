@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS email_templates (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     subject VARCHAR(500) NOT NULL,
+    body TEXT,
     category VARCHAR(100) DEFAULT 'User Defined Message',
     sms_enabled TINYINT(1) DEFAULT 0,
     edited TINYINT(1) DEFAULT 0,

@@ -8837,11 +8837,11 @@ app.get('/api/email-templates', async (req, res) => {
 // Create new email template
 app.post('/api/email-templates', async (req, res) => {
     try {
-        const { name, subject, category, sms_enabled } = req.body;
+        const { name, subject, body, category, sms_enabled } = req.body;
         
         const [result] = await pool.query(
-            'INSERT INTO email_templates (name, subject, category, sms_enabled, edited, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())',
-            [name, subject, category, sms_enabled ? 1 : 0, 0]
+            'INSERT INTO email_templates (name, subject, body, category, sms_enabled, edited, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())',
+            [name, subject, body || '', category, sms_enabled ? 1 : 0, 0]
         );
         
         res.json({ success: true, id: result.insertId });
@@ -8855,11 +8855,11 @@ app.post('/api/email-templates', async (req, res) => {
 app.put('/api/email-templates/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, subject, category, sms_enabled } = req.body;
+        const { name, subject, body, category, sms_enabled } = req.body;
         
         await pool.query(
-            'UPDATE email_templates SET name = ?, subject = ?, category = ?, sms_enabled = ?, edited = 1, updated_at = NOW() WHERE id = ?',
-            [name, subject, category, sms_enabled ? 1 : 0, id]
+            'UPDATE email_templates SET name = ?, subject = ?, body = ?, category = ?, sms_enabled = ?, edited = 1, updated_at = NOW() WHERE id = ?',
+            [name, subject, body || '', category, sms_enabled ? 1 : 0, id]
         );
         
         res.json({ success: true });
