@@ -399,7 +399,6 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                         }
                     }}
                     style={{
-                        width: 'calc((100% - 4px * 6) / 7)',
                         aspectRatio: '1 / 1',
                         borderRadius: 10,
                         background: isSelected 
@@ -587,9 +586,9 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                     <div key={w} style={{ textAlign: 'center', fontWeight: 700, color: '#64748b', fontSize: 12 }}>{w}</div>
                                                 ))}
                                             </Box>
-                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+                                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
                                                 {buildDayCells()}
-                                            </div>
+                                            </Box>
                                         </Box>
 
                                         {selectedDate && (
