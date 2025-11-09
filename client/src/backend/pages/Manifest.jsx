@@ -87,7 +87,8 @@ const Manifest = () => {
     const [emailForm, setEmailForm] = useState({
         to: '',
         subject: '',
-        message: ''
+        message: '',
+        template: 'custom'
     });
     const [sendingEmail, setSendingEmail] = useState(false);
     const [emailLogs, setEmailLogs] = useState([]);
@@ -197,6 +198,88 @@ const Manifest = () => {
                 console.error('Error fetching email logs:', err);
             }
         })();
+    };
+
+    const handleEmailTemplateChange = (template) => {
+        let subject = '';
+        let message = '';
+
+        switch (template) {
+            case 'confirmation':
+                subject = `Booking Confirmation - ${selectedBookingForEmail?.name}`;
+                message = `Dear ${selectedBookingForEmail?.name},
+
+Thank you for booking with Fly Away Ballooning! Your booking has been confirmed.
+
+Booking Details:
+- Experience: ${selectedBookingForEmail?.flight_type}
+- Location: ${selectedBookingForEmail?.location}
+- Passengers: ${selectedBookingForEmail?.pax}
+- Flight Date: ${selectedBookingForEmail?.flight_date || 'To be scheduled'}
+- Booking ID: ${selectedBookingForEmail?.id}
+
+We will contact you soon with more details about your flight.
+
+Best regards,
+Fly Away Ballooning Team`;
+                break;
+            case 'reminder':
+                subject = `Flight Reminder - ${selectedBookingForEmail?.name}`;
+                message = `Dear ${selectedBookingForEmail?.name},
+
+This is a reminder about your upcoming balloon flight with Fly Away Ballooning.
+
+Flight Details:
+- Date: ${selectedBookingForEmail?.flight_date || 'To be confirmed'}
+- Experience: ${selectedBookingForEmail?.flight_type}
+- Location: ${selectedBookingForEmail?.location}
+- Passengers: ${selectedBookingForEmail?.pax}
+
+Please ensure you arrive 30 minutes before your scheduled flight time.
+
+Best regards,
+Fly Away Ballooning Team`;
+                break;
+            case 'reschedule':
+                subject = `Flight Rescheduling - ${selectedBookingForEmail?.name}`;
+                message = `Dear ${selectedBookingForEmail?.name},
+
+We need to reschedule your balloon flight due to weather conditions.
+
+Current Booking:
+- Experience: ${selectedBookingForEmail?.flight_type}
+- Location: ${selectedBookingForEmail?.location}
+- Passengers: ${selectedBookingForEmail?.pax}
+
+We will contact you shortly to arrange a new date that works for you.
+
+Best regards,
+Fly Away Ballooning Team`;
+                break;
+            case 'to_be_updated':
+                subject = `Flight update`;
+                message = `Dear ${selectedBookingForEmail?.name || 'Customer'},
+
+We know that you're waiting to hear from us regarding your flight on ${selectedBookingForEmail?.flight_date ? dayjs(selectedBookingForEmail.flight_date).format('MMMM D, YYYY [at] h:mm A') : '[Date TBD]'}.
+
+We're really sorry for the delay and we will be in touch with you as soon as possible.
+
+Thank you for your patience and understanding.
+
+Best regards,
+Fly Away Ballooning Team`;
+                break;
+            default:
+                subject = `Regarding your Fly Away Ballooning booking - ${selectedBookingForEmail?.name}`;
+                message = '';
+        }
+
+        setEmailForm(prev => ({
+            ...prev,
+            subject,
+            message,
+            template
+        }));
     };
 
     const handleSendEmail = async () => {
@@ -1030,41 +1113,25 @@ const Manifest = () => {
         if (!bookingDetail?.booking) return;
         
         const booking = bookingDetail.booking;
-        const passengers = bookingDetail.passengers || [];
-        const email = booking.email || '';
         
-        // Prepare email subject and body
-        const subject = `Booking Confirmation - ${booking.name || 'N/A'} - ID: ${booking.id}`;
-        const body = `
-Dear ${booking.name || 'Customer'},
-
-Here are your booking details:
-
-Booking ID: ${booking.id}
-Activity: ${booking.activity || 'N/A'}
-Flight Date: ${booking.flight_date || 'N/A'}
-Location: ${booking.location || 'N/A'}
-Status: ${booking.status || 'N/A'}
-Number of Passengers: ${passengers.length}
-
-Passengers:
-${passengers.map((p, i) => `${i + 1}. ${p.first_name || ''} ${p.last_name || ''} - ${p.weight || 'N/A'}kg - £${p.price || '0'}`).join('\n')}
-
-Total Paid: £${booking.paid || '0'}
-Amount Due: £${booking.due || '0'}
-
-Phone: ${booking.phone || 'N/A'}
-Email: ${email}
-
-Thank you for choosing Fly Away Ballooning!
-
-Best regards,
-Fly Away Ballooning Team
-        `.trim();
+        // Set selected booking for email
+        setSelectedBookingForEmail(booking);
         
-        // Open email client
-        const mailtoLink = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        window.location.href = mailtoLink;
+        // Pre-fill email form with "To Be Updated" template
+        setEmailForm({
+            to: booking.email || '',
+            subject: '',
+            message: '',
+            template: 'to_be_updated'
+        });
+        
+        // Trigger template change to populate subject and message
+        setTimeout(() => {
+            handleEmailTemplateChange('to_be_updated');
+        }, 0);
+        
+        // Open email modal
+        setEmailModalOpen(true);
     };
 
     const handleRebook = () => {
@@ -2862,11 +2929,11 @@ Fly Away Ballooning Team
                                         {/* Additional Information Section */}
                                         {additionalInformation && (
                                             <Box>
-                                                <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Additional Information & Notes</Typography>
+                                                                                                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Additional Information & Notes</Typography>
                                                 {additionalInfoLoading ? (
                                                     <Typography>Loading additional information...</Typography>
                                                 ) : (
-                                                    <Box>
+                                                                                                            <Box>
                                                         {(() => {
                                                             const notesFromBooking = bookingDetail.booking?.additional_notes;
                                                             const notesFromAdditional = additionalInformation?.additional_information_json?.notes;
@@ -2894,69 +2961,69 @@ Fly Away Ballooning Team
                                                                         </Box>
                                                                     )}
                                                                     {shouldShowBookingNotes && (
-                                                                        <Box sx={{ mb: 2, p: 2, background: '#e3f2fd', borderRadius: 1, border: '1px solid #2196f3' }}>
-                                                                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>Booking Notes:</Typography>
+                                                                <Box sx={{ mb: 2, p: 2, background: '#e3f2fd', borderRadius: 1, border: '1px solid #2196f3' }}>
+                                                                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>Booking Notes:</Typography>
                                                                             <Typography>{notesFromBooking}</Typography>
-                                                                        </Box>
-                                                                    )}
+                                                                </Box>
+                                                            )}
                                                                 </>
                                                             );
                                                         })()}
-
-                                                        {/* Show all available questions with their answers (or "Not answered") - Only this section */}
-                                                        {additionalInformation.questions && additionalInformation.questions.length > 0 && (
-                                                            <>
-                                                                {additionalInformation.questions.map((question, index) => {
-                                                                    // Find answer from multiple sources to avoid duplication
-                                                                    let answer = null;
-                                                                    
-                                                                    // First try to find in answers array
-                                                                    const answerFromAnswers = additionalInformation.answers?.find(a => a.question_id === question.id);
-                                                                    if (answerFromAnswers) {
-                                                                        answer = answerFromAnswers.answer;
-                                                                    }
-                                                                    
-                                                                    // If not found in answers, try JSON data
-                                                                    if (!answer && additionalInformation.additional_information_json) {
-                                                                        const jsonKey = `question_${question.id}`;
-                                                                        if (additionalInformation.additional_information_json[jsonKey]) {
-                                                                            answer = additionalInformation.additional_information_json[jsonKey];
+                                                            
+                                                            {/* Show all available questions with their answers (or "Not answered") - Only this section */}
+                                                            {additionalInformation.questions && additionalInformation.questions.length > 0 && (
+                                                                <>
+                                                                    {additionalInformation.questions.map((question, index) => {
+                                                                        // Find answer from multiple sources to avoid duplication
+                                                                        let answer = null;
+                                                                        
+                                                                        // First try to find in answers array
+                                                                        const answerFromAnswers = additionalInformation.answers?.find(a => a.question_id === question.id);
+                                                                        if (answerFromAnswers) {
+                                                                            answer = answerFromAnswers.answer;
                                                                         }
-                                                                    }
-                                                                    
-                                                                    // If still not found, try legacy fields for specific questions
-                                                                    if (!answer && additionalInformation.legacy) {
-                                                                        if (question.question_text.toLowerCase().includes('hear about us') && additionalInformation.legacy.hear_about_us) {
-                                                                            answer = additionalInformation.legacy.hear_about_us;
-                                                                        } else if (question.question_text.toLowerCase().includes('ballooning') && additionalInformation.legacy.ballooning_reason) {
-                                                                            answer = additionalInformation.legacy.ballooning_reason;
+                                                                        
+                                                                        // If not found in answers, try JSON data
+                                                                        if (!answer && additionalInformation.additional_information_json) {
+                                                                            const jsonKey = `question_${question.id}`;
+                                                                            if (additionalInformation.additional_information_json[jsonKey]) {
+                                                                                answer = additionalInformation.additional_information_json[jsonKey];
+                                                                            }
                                                                         }
-                                                                    }
-                                                                    
-                                                                    return (
-                                                                        <Box key={index} sx={{ mb: 2, p: 2, background: '#f0f8ff', borderRadius: 1, border: '1px solid #e0e0e0' }}>
-                                                                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>
-                                                                                {question.question_text}:
-                                                                            </Typography>
-                                                                            <Typography sx={{ color: answer ? '#333' : '#999', fontStyle: answer ? 'normal' : 'italic' }}>
-                                                                                {answer ? answer : 'Not answered'}
-                                                                            </Typography>
-                                                                            {question.help_text && (
-                                                                                <Typography variant="caption" sx={{ color: '#666', mt: 1, display: 'block' }}>
-                                                                                    {question.help_text}
+                                                                        
+                                                                        // If still not found, try legacy fields for specific questions
+                                                                        if (!answer && additionalInformation.legacy) {
+                                                                            if (question.question_text.toLowerCase().includes('hear about us') && additionalInformation.legacy.hear_about_us) {
+                                                                                answer = additionalInformation.legacy.hear_about_us;
+                                                                            } else if (question.question_text.toLowerCase().includes('ballooning') && additionalInformation.legacy.ballooning_reason) {
+                                                                                answer = additionalInformation.legacy.ballooning_reason;
+                                                                            }
+                                                                        }
+                                                                        
+                                                                        return (
+                                                                            <Box key={index} sx={{ mb: 2, p: 2, background: '#f0f8ff', borderRadius: 1, border: '1px solid #e0e0e0' }}>
+                                                                                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>
+                                                                                    {question.question_text}:
                                                                                 </Typography>
-                                                                            )}
+                                                                                <Typography sx={{ color: answer ? '#333' : '#999', fontStyle: answer ? 'normal' : 'italic' }}>
+                                                                                    {answer ? answer : 'Not answered'}
+                                                                                </Typography>
+                                                                                {question.help_text && (
+                                                                                    <Typography variant="caption" sx={{ color: '#666', mt: 1, display: 'block' }}>
+                                                                                        {question.help_text}
+                                                                                    </Typography>
+                                                                                )}
 
-                                                                        </Box>
-                                                                    );
-                                                                })}
-                                                            </>
-                                                        )}
-                                                        
-                                                        {/* Show message if no questions available */}
-                                                        {(!additionalInformation.questions || additionalInformation.questions.length === 0) && (
-                                                            <Typography sx={{ fontStyle: 'italic', color: '#666' }}>No additional information questions available</Typography>
-                                                        )}
+                                                                            </Box>
+                                                                        );
+                                                                    })}
+                                                                </>
+                                                            )}
+                                                            
+                                                            {/* Show message if no questions available */}
+                                                            {(!additionalInformation.questions || additionalInformation.questions.length === 0) && (
+                                                                <Typography sx={{ fontStyle: 'italic', color: '#666' }}>No additional information questions available</Typography>
+                                                            )}
                                                     </Box>
                                                 )}
                                             </Box>
@@ -3197,47 +3264,148 @@ Fly Away Ballooning Team
                 maxWidth="md"
                 fullWidth
             >
-                <DialogTitle>
-                    Send Email to Customer
+                <DialogTitle sx={{ color: '#1976d2', fontWeight: 600, fontSize: 24 }}>
+                    Send a Message
                     {selectedBookingForEmail && (
-                        <Typography variant="subtitle2" color="textSecondary">
+                        <Typography variant="subtitle2" color="textSecondary" sx={{ mt: 0.5 }}>
                             Booking: {selectedBookingForEmail.name} ({selectedBookingForEmail.id})
                         </Typography>
                     )}
                 </DialogTitle>
                 <DialogContent>
-                    <Grid container spacing={2}>
+                    <Grid container spacing={2} sx={{ mt: 1 }}>
                         <Grid item xs={12}>
-                            <TextField
-                                fullWidth
-                                label="To"
-                                value={emailForm.to}
-                                onChange={(e) => setEmailForm(prev => ({ ...prev, to: e.target.value }))}
-                                margin="normal"
-                            />
+                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
+                                Choose a template:
+                            </Typography>
+                            <FormControl fullWidth size="small">
+                                <Select
+                                    value={emailForm.template}
+                                    onChange={(e) => handleEmailTemplateChange(e.target.value)}
+                                    displayEmpty
+                                >
+                                    <MenuItem value="to_be_updated">To Be Updated</MenuItem>
+                                    <MenuItem value="custom">Custom Message</MenuItem>
+                                    <MenuItem value="confirmation">Booking Confirmation</MenuItem>
+                                    <MenuItem value="reminder">Flight Reminder</MenuItem>
+                                    <MenuItem value="reschedule">Flight Rescheduling</MenuItem>
+                                </Select>
+                            </FormControl>
                         </Grid>
                         <Grid item xs={12}>
+                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
+                                Add an optional, personalized note
+                            </Typography>
                             <TextField
                                 fullWidth
-                                label="Subject"
-                                value={emailForm.subject}
-                                onChange={(e) => setEmailForm(prev => ({ ...prev, subject: e.target.value }))}
-                                margin="normal"
-                            />
-                        </Grid>
-                        <Grid item xs={12}>
-                            <TextField
-                                fullWidth
-                                label="Message"
-                                multiline
-                                rows={4}
+                                placeholder="Nice to speak with you today!"
                                 value={emailForm.message}
                                 onChange={(e) => setEmailForm(prev => ({ ...prev, message: e.target.value }))}
-                                margin="normal"
+                                multiline
+                                rows={6}
+                                variant="outlined"
+                                sx={{ 
+                                    '& .MuiOutlinedInput-root': {
+                                        borderRadius: 2
+                                    }
+                                }}
                             />
                         </Grid>
+                        {/* Email Template Preview */}
                         <Grid item xs={12}>
-                            <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>Email History</Typography>
+                            <Box sx={{ 
+                                border: '1px solid #e0e0e0', 
+                                borderRadius: 2, 
+                                p: 3,
+                                backgroundColor: '#f9f9f9',
+                                position: 'relative'
+                            }}>
+                                {/* Email Header */}
+                                <Box sx={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: 1,
+                                    mb: 2,
+                                    pb: 2,
+                                    borderBottom: '1px solid #e0e0e0'
+                                }}>
+                                    <Box sx={{ 
+                                        width: 12, 
+                                        height: 12, 
+                                        borderRadius: '50%', 
+                                        backgroundColor: '#ff5f57' 
+                                    }} />
+                                    <Box sx={{ 
+                                        width: 12, 
+                                        height: 12, 
+                                        borderRadius: '50%', 
+                                        backgroundColor: '#ffbd2e' 
+                                    }} />
+                                    <Box sx={{ 
+                                        width: 12, 
+                                        height: 12, 
+                                        borderRadius: '50%', 
+                                        backgroundColor: '#28ca42' 
+                                    }} />
+                                </Box>
+                                
+                                {/* Email From */}
+                                <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 0.5 }}>
+                                    From "Fly Away Ballooning" &lt;bookings@tripworks.com&gt;
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: '#999', display: 'block', mb: 2 }}>
+                                    {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                                </Typography>
+                                
+                                {/* Email Subject */}
+                                <Typography sx={{ 
+                                    color: '#d32f2f', 
+                                    fontWeight: 600, 
+                                    mb: 2,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1
+                                }}>
+                                    <span style={{ fontSize: 20 }}>🎈</span> {emailForm.subject || 'Flight update'}
+                                </Typography>
+                                
+                                {/* Email Body Preview */}
+                                <Box sx={{ 
+                                    backgroundColor: '#fff', 
+                                    p: 3, 
+                                    borderRadius: 2,
+                                    minHeight: 200
+                                }}>
+                                    {/* Flight Image Placeholder */}
+                                    <Box sx={{ 
+                                        width: '100%', 
+                                        height: 200, 
+                                        backgroundColor: '#e3f2fd',
+                                        borderRadius: 2,
+                                        mb: 3,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        backgroundImage: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                                    }}>
+                                        <Typography sx={{ color: '#fff', fontSize: 48 }}>🎈</Typography>
+                                    </Box>
+                                    
+                                    <Typography sx={{ whiteSpace: 'pre-line', lineHeight: 1.6, color: '#333' }}>
+                                        {emailForm.message || `Dear ${selectedBookingForEmail?.name || 'Customer'},\n\nWe know that you're waiting to hear from us regarding your flight on ${selectedBookingForEmail?.flight_date ? dayjs(selectedBookingForEmail.flight_date).format('MMMM D, YYYY [at] h:mm A') : '[Date TBD]'}.\n\nWe're really sorry for the delay and we will be in touch with you as soon as possible.\n\nThank you for your patience and understanding.\n\nBest regards,\nFly Away Ballooning Team`}
+                                    </Typography>
+                                </Box>
+                            </Box>
+                        </Grid>
+                        {/* Hidden fields for backend */}
+                        <input type="hidden" value={emailForm.to} />
+                        <input type="hidden" value={emailForm.subject} />
+                        {/* Email Logs */}
+                        <Grid item xs={12}>
+                            <Divider sx={{ my: 2 }} />
+                            <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
+                                Sent Emails
+                            </Typography>
                             {emailLogs.length === 0 ? (
                                 <Typography variant="body2">No emails sent yet.</Typography>
                             ) : (
@@ -3265,16 +3433,26 @@ Fly Away Ballooning Team
                         </Grid>
                     </Grid>
                 </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setEmailModalOpen(false)}>
-                        Cancel
-                    </Button>
+                <DialogActions sx={{ p: 3, justifyContent: 'flex-end' }}>
                     <Button 
                         onClick={handleSendEmail}
                         variant="contained"
+                        startIcon={<span>✈️</span>}
+                        sx={{ 
+                            backgroundColor: '#1976d2',
+                            px: 4,
+                            py: 1.5,
+                            borderRadius: 2,
+                            fontWeight: 600,
+                            textTransform: 'none',
+                            fontSize: 16,
+                            '&:hover': {
+                                backgroundColor: '#1565c0'
+                            }
+                        }}
                         disabled={sendingEmail || !emailForm.to || !emailForm.subject || !emailForm.message}
                     >
-                        {sendingEmail ? 'Sending...' : 'Send Email'}
+                        {sendingEmail ? 'Sending...' : 'Send'}
                     </Button>
                 </DialogActions>
             </Dialog>

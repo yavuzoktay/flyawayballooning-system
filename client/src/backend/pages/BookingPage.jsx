@@ -300,6 +300,19 @@ We will contact you shortly to arrange a new date that works for you.
 Best regards,
 Fly Away Ballooning Team`;
                 break;
+            case 'to_be_updated':
+                subject = `Flight update`;
+                message = `Dear ${selectedBookingForEmail?.name || 'Customer'},
+
+We know that you're waiting to hear from us regarding your flight on ${selectedBookingForEmail?.flight_date ? dayjs(selectedBookingForEmail.flight_date).format('MMMM D, YYYY [at] h:mm A') : '[Date TBD]'}.
+
+We're really sorry for the delay and we will be in touch with you as soon as possible.
+
+Thank you for your patience and understanding.
+
+Best regards,
+Fly Away Ballooning Team`;
+                break;
             default:
                 subject = `Regarding your Fly Away Ballooning booking - ${selectedBookingForEmail?.name}`;
                 message = '';
@@ -1694,41 +1707,25 @@ setBookingDetail(finalVoucherDetail);
         if (!bookingDetail?.booking) return;
         
         const booking = bookingDetail.booking;
-        const passengers = bookingDetail.passengers || [];
-        const email = booking.email || '';
         
-        // Prepare email subject and body
-        const subject = `Booking Confirmation - ${booking.name || 'N/A'} - ID: ${booking.id}`;
-        const body = `
-Dear ${booking.name || 'Customer'},
-
-Here are your booking details:
-
-Booking ID: ${booking.id}
-Activity: ${booking.activity || 'N/A'}
-Flight Date: ${booking.flight_date || 'N/A'}
-Location: ${booking.location || 'N/A'}
-Status: ${booking.status || 'N/A'}
-Number of Passengers: ${passengers.length}
-
-Passengers:
-${passengers.map((p, i) => `${i + 1}. ${p.first_name || ''} ${p.last_name || ''} - ${p.weight || 'N/A'}kg - £${p.price || '0'}`).join('\n')}
-
-Total Paid: £${booking.paid || '0'}
-Amount Due: £${booking.due || '0'}
-
-Phone: ${booking.phone || 'N/A'}
-Email: ${email}
-
-Thank you for choosing Fly Away Ballooning!
-
-Best regards,
-Fly Away Ballooning Team
-        `.trim();
+        // Set selected booking for email
+        setSelectedBookingForEmail(booking);
         
-        // Open email client
-        const mailtoLink = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        window.location.href = mailtoLink;
+        // Pre-fill email form with "To Be Updated" template
+        setEmailForm({
+            to: booking.email || '',
+            subject: '',
+            message: '',
+            template: 'to_be_updated'
+        });
+        
+        // Trigger template change to populate subject and message
+        setTimeout(() => {
+            handleEmailTemplateChange('to_be_updated');
+        }, 0);
+        
+        // Open email modal
+        setEmailModalOpen(true);
     };
 
     const handleRebook = () => {
@@ -3870,10 +3867,10 @@ Fly Away Ballooning Team
                     maxWidth="md"
                     fullWidth
                 >
-                    <DialogTitle>
-                        Send Email to Customer
+                    <DialogTitle sx={{ color: '#1976d2', fontWeight: 600, fontSize: 24 }}>
+                        Send a Message
                         {selectedBookingForEmail && (
-                            <Typography variant="subtitle2" color="textSecondary">
+                            <Typography variant="subtitle2" color="textSecondary" sx={{ mt: 0.5 }}>
                                 Booking: {selectedBookingForEmail.name} ({selectedBookingForEmail.id})
                             </Typography>
                         )}
@@ -3881,13 +3878,16 @@ Fly Away Ballooning Team
                     <DialogContent>
                         <Grid container spacing={2} sx={{ mt: 1 }}>
                             <Grid item xs={12}>
+                                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
+                                    Choose a template:
+                                </Typography>
                                 <FormControl fullWidth size="small">
-                                    <InputLabel>Email Template</InputLabel>
                                     <Select
                                         value={emailForm.template}
                                         onChange={(e) => handleEmailTemplateChange(e.target.value)}
-                                        label="Email Template"
+                                        displayEmpty
                                     >
+                                        <MenuItem value="to_be_updated">To Be Updated</MenuItem>
                                         <MenuItem value="custom">Custom Message</MenuItem>
                                         <MenuItem value="confirmation">Booking Confirmation</MenuItem>
                                         <MenuItem value="reminder">Flight Reminder</MenuItem>
@@ -3896,36 +3896,113 @@ Fly Away Ballooning Team
                                 </FormControl>
                             </Grid>
                             <Grid item xs={12}>
+                                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
+                                    Add an optional, personalized note
+                                </Typography>
                                 <TextField
                                     fullWidth
-                                    label="To Email"
-                                    value={emailForm.to}
-                                    onChange={(e) => setEmailForm(prev => ({ ...prev, to: e.target.value }))}
-                                    size="small"
-                                    required
-                                />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <TextField
-                                    fullWidth
-                                    label="Subject"
-                                    value={emailForm.subject}
-                                    onChange={(e) => setEmailForm(prev => ({ ...prev, subject: e.target.value }))}
-                                    size="small"
-                                    required
-                                />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <TextField
-                                    fullWidth
-                                    label="Message"
+                                    placeholder="Nice to speak with you today!"
                                     value={emailForm.message}
                                     onChange={(e) => setEmailForm(prev => ({ ...prev, message: e.target.value }))}
                                     multiline
-                                    rows={10}
-                                    required
+                                    rows={6}
+                                    variant="outlined"
+                                    sx={{ 
+                                        '& .MuiOutlinedInput-root': {
+                                            borderRadius: 2
+                                        }
+                                    }}
                                 />
                             </Grid>
+                            {/* Email Template Preview */}
+                            <Grid item xs={12}>
+                                <Box sx={{ 
+                                    border: '1px solid #e0e0e0', 
+                                    borderRadius: 2, 
+                                    p: 3,
+                                    backgroundColor: '#f9f9f9',
+                                    position: 'relative'
+                                }}>
+                                    {/* Email Header */}
+                                    <Box sx={{ 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        gap: 1,
+                                        mb: 2,
+                                        pb: 2,
+                                        borderBottom: '1px solid #e0e0e0'
+                                    }}>
+                                        <Box sx={{ 
+                                            width: 12, 
+                                            height: 12, 
+                                            borderRadius: '50%', 
+                                            backgroundColor: '#ff5f57' 
+                                        }} />
+                                        <Box sx={{ 
+                                            width: 12, 
+                                            height: 12, 
+                                            borderRadius: '50%', 
+                                            backgroundColor: '#ffbd2e' 
+                                        }} />
+                                        <Box sx={{ 
+                                            width: 12, 
+                                            height: 12, 
+                                            borderRadius: '50%', 
+                                            backgroundColor: '#28ca42' 
+                                        }} />
+                                    </Box>
+                                    
+                                    {/* Email From */}
+                                    <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 0.5 }}>
+                                        From "Fly Away Ballooning" &lt;bookings@tripworks.com&gt;
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ color: '#999', display: 'block', mb: 2 }}>
+                                        {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                                    </Typography>
+                                    
+                                    {/* Email Subject */}
+                                    <Typography sx={{ 
+                                        color: '#d32f2f', 
+                                        fontWeight: 600, 
+                                        mb: 2,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 1
+                                    }}>
+                                        <span style={{ fontSize: 20 }}>🎈</span> {emailForm.subject || 'Flight update'}
+                                    </Typography>
+                                    
+                                    {/* Email Body Preview */}
+                                    <Box sx={{ 
+                                        backgroundColor: '#fff', 
+                                        p: 3, 
+                                        borderRadius: 2,
+                                        minHeight: 200
+                                    }}>
+                                        {/* Flight Image Placeholder */}
+                                        <Box sx={{ 
+                                            width: '100%', 
+                                            height: 200, 
+                                            backgroundColor: '#e3f2fd',
+                                            borderRadius: 2,
+                                            mb: 3,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            backgroundImage: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                                        }}>
+                                            <Typography sx={{ color: '#fff', fontSize: 48 }}>🎈</Typography>
+                                        </Box>
+                                        
+                                        <Typography sx={{ whiteSpace: 'pre-line', lineHeight: 1.6, color: '#333' }}>
+                                            {emailForm.message || `Dear ${selectedBookingForEmail?.name || 'Customer'},\n\nWe know that you're waiting to hear from us regarding your flight on ${selectedBookingForEmail?.flight_date ? dayjs(selectedBookingForEmail.flight_date).format('MMMM D, YYYY [at] h:mm A') : '[Date TBD]'}.\n\nWe're really sorry for the delay and we will be in touch with you as soon as possible.\n\nThank you for your patience and understanding.\n\nBest regards,\nFly Away Ballooning Team`}
+                                        </Typography>
+                                    </Box>
+                                </Box>
+                            </Grid>
+                            {/* Hidden fields for backend */}
+                            <input type="hidden" value={emailForm.to} />
+                            <input type="hidden" value={emailForm.subject} />
                             {/* Email Logs */}
                             <Grid item xs={12}>
                                 <Divider sx={{ my: 2 }} />
@@ -3973,16 +4050,26 @@ Fly Away Ballooning Team
                             </Grid>
                         </Grid>
                     </DialogContent>
-                    <DialogActions>
-                        <Button onClick={() => setEmailModalOpen(false)}>
-                            Cancel
-                        </Button>
+                    <DialogActions sx={{ p: 3, justifyContent: 'flex-end' }}>
                         <Button 
                             onClick={handleSendEmail}
                             variant="contained"
+                            startIcon={<span>✈️</span>}
+                            sx={{ 
+                                backgroundColor: '#1976d2',
+                                px: 4,
+                                py: 1.5,
+                                borderRadius: 2,
+                                fontWeight: 600,
+                                textTransform: 'none',
+                                fontSize: 16,
+                                '&:hover': {
+                                    backgroundColor: '#1565c0'
+                                }
+                            }}
                             disabled={sendingEmail || !emailForm.to || !emailForm.subject || !emailForm.message}
                         >
-                            {sendingEmail ? 'Sending...' : 'Send Email'}
+                            {sendingEmail ? 'Sending...' : 'Send'}
                         </Button>
                     </DialogActions>
                 </Dialog>
