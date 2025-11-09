@@ -587,7 +587,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                     <div key={w} style={{ textAlign: 'center', fontWeight: 700, color: '#64748b', fontSize: 12 }}>{w}</div>
                                                 ))}
                                             </Box>
-                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
                                                 {buildDayCells()}
                                             </div>
                                         </Box>
