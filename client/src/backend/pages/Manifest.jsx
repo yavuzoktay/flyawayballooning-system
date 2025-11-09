@@ -1026,6 +1026,47 @@ const Manifest = () => {
         }
     };
 
+    const handleEmailBooking = () => {
+        if (!bookingDetail?.booking) return;
+        
+        const booking = bookingDetail.booking;
+        const passengers = bookingDetail.passengers || [];
+        const email = booking.email || '';
+        
+        // Prepare email subject and body
+        const subject = `Booking Confirmation - ${booking.name || 'N/A'} - ID: ${booking.id}`;
+        const body = `
+Dear ${booking.name || 'Customer'},
+
+Here are your booking details:
+
+Booking ID: ${booking.id}
+Activity: ${booking.activity || 'N/A'}
+Flight Date: ${booking.flight_date || 'N/A'}
+Location: ${booking.location || 'N/A'}
+Status: ${booking.status || 'N/A'}
+Number of Passengers: ${passengers.length}
+
+Passengers:
+${passengers.map((p, i) => `${i + 1}. ${p.first_name || ''} ${p.last_name || ''} - ${p.weight || 'N/A'}kg - £${p.price || '0'}`).join('\n')}
+
+Total Paid: £${booking.paid || '0'}
+Amount Due: £${booking.due || '0'}
+
+Phone: ${booking.phone || 'N/A'}
+Email: ${email}
+
+Thank you for choosing Fly Away Ballooning!
+
+Best regards,
+Fly Away Ballooning Team
+        `.trim();
+        
+        // Open email client
+        const mailtoLink = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.location.href = mailtoLink;
+    };
+
     const handleRebook = () => {
         setRebookModalOpen(true);
     };
@@ -2724,7 +2765,8 @@ const Manifest = () => {
                                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 140 }}>
                                                 <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleRebook}>Redeem</Button>
                                                 <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleAddGuestClick}>Add Guest</Button>
-                                                <Button variant="contained" color="info" sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d' }} onClick={handleCancelFlight}>Cancel Flight</Button>
+                                                <Button variant="contained" color="info" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d' }} onClick={handleCancelFlight}>Cancel Flight</Button>
+                                                <Button variant="contained" color="success" sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#28a745' }} onClick={handleEmailBooking}>Email</Button>
                                             </Box>
                                         </Box>
                                         <Divider sx={{ my: 2 }} />
