@@ -330,6 +330,12 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
             const inCurrentMonth = d.isSame(currentMonth, 'month');
             const isPast = d.isBefore(dayjs(), 'day');
             const isSelected = selectedDate && dayjs(selectedDate).isSame(d, 'day');
+            
+            // Debug first few dates to verify alignment
+            if (i < 10) {
+                console.log(`Cell ${i}: ${d.format('YYYY-MM-DD (ddd)')}, day of week: ${d.day()}`);
+            }
+            
             if (isSelected) {
                 console.log('Date is selected:', d.format('YYYY-MM-DD'), 'selectedDate:', selectedDate ? dayjs(selectedDate).format('YYYY-MM-DD') : 'null');
             }
