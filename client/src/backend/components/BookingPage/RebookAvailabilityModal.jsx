@@ -285,16 +285,37 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
     const buildDayCells = () => {
         const cells = [];
         // Create a 6-week grid (42 cells)
-        // Start from Monday (day 1) instead of Sunday (day 0)
-        // Get the first day of the month
-        const firstDayOfMonth = startOfMonth.day(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+        // Calendar headers: Mon, Tue, Wed, Thu, Fri, Sat, Sun
+        // We need to find the Monday of the week containing the 1st of the month
         
-        // Calculate how many days to go back to reach Monday
-        // If firstDayOfMonth is 0 (Sunday), go back 6 days
-        // If firstDayOfMonth is 1 (Monday), go back 0 days
-        // If firstDayOfMonth is 2 (Tuesday), go back 1 day, etc.
-        const daysToGoBack = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
-        const firstCellDate = startOfMonth.subtract(daysToGoBack, 'day');
+        // Get day of week for 1st of month (0=Sunday, 1=Monday, ..., 6=Saturday)
+        const firstDayOfMonth = startOfMonth.day();
+        
+        // Calculate offset to previous Monday
+        // Monday (1): 0 days back
+        // Tuesday (2): 1 day back  
+        // Wednesday (3): 2 days back
+        // Thursday (4): 3 days back
+        // Friday (5): 4 days back
+        // Saturday (6): 5 days back
+        // Sunday (0): 6 days back
+        let daysBack;
+        if (firstDayOfMonth === 0) {
+            daysBack = 6; // Sunday -> go back to Monday
+        } else {
+            daysBack = firstDayOfMonth - 1; // Other days -> go back to Monday
+        }
+        
+        const firstCellDate = startOfMonth.subtract(daysBack, 'day');
+        
+        console.log('Calendar Debug:', {
+            month: currentMonth.format('MMMM YYYY'),
+            firstDayOfMonth: firstDayOfMonth,
+            firstDayName: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][firstDayOfMonth],
+            daysBack,
+            firstCellDate: firstCellDate.format('YYYY-MM-DD (ddd)'),
+            shouldStartWith: 'Monday'
+        });
         
         for (let i = 0; i < 42; i++) {
             const d = firstCellDate.add(i, 'day');
