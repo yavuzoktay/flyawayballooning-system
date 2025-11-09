@@ -953,60 +953,60 @@ setBookingDetail(finalVoucherDetail);
                 setGuestForms([]);
             } else {
                 // Handle booking guest addition (existing logic)
-                // Add each guest and collect updated pax counts
-                let lastUpdatedPax = null;
-                for (const g of guestForms) {
-                    const response = await axios.post('/api/addPassenger', {
-                        booking_id: selectedBookingId,
-                        first_name: g.firstName,
-                        last_name: g.lastName,
-                        email: g.email,
-                        phone: g.phone,
-                        ticket_type: g.ticketType,
-                        weight: g.weight
-                    });
-                    lastUpdatedPax = response.data.updatedPax;
-                }
-                
-                // Fetch updated passengers
-                const res = await axios.get(`/api/getBookingDetail?booking_id=${selectedBookingId}`);
-                const updatedPassengers = res.data.passengers || [];
-                
-                // Recalculate prices - Include both paid and due
-                const paid = parseFloat(res.data.booking?.paid) || 0;
-                const due = parseFloat(res.data.booking?.due) || 0;
-                const totalAmount = paid + due;
-                const n = updatedPassengers.length;
-                const perPassenger = n > 0 ? parseFloat((totalAmount / n).toFixed(2)) : 0;
-                
-                console.log('=== RECALCULATING PASSENGER PRICES ===');
-                console.log('Paid:', paid);
-                console.log('Due:', due);
-                console.log('Total Amount:', totalAmount);
-                console.log('Number of Passengers:', n);
-                console.log('Price Per Passenger:', perPassenger);
-                
-                // Update all passenger prices in backend
-                await Promise.all(updatedPassengers.map((p) =>
-                    axios.patch('/api/updatePassengerField', {
-                        passenger_id: p.id,
-                        field: 'price',
-                        value: perPassenger
-                    })
-                ));
-                
-                // Update the booking table with new pax count (use fresh count from fetched passengers)
-                const updatedPax = n;
-                setBooking(prev => prev.map(b => 
-                    b.id === selectedBookingId ? { ...b, pax: updatedPax } : b
-                ));
-                setFilteredData(prev => prev.map(b => 
-                    b.id === selectedBookingId ? { ...b, pax: updatedPax } : b
-                ));
-                
-                // Refetch passengers to update dialog UI
-                await fetchPassengers(selectedBookingId);
-                setAddGuestDialogOpen(false);
+            // Add each guest and collect updated pax counts
+            let lastUpdatedPax = null;
+            for (const g of guestForms) {
+                const response = await axios.post('/api/addPassenger', {
+                    booking_id: selectedBookingId,
+                    first_name: g.firstName,
+                    last_name: g.lastName,
+                    email: g.email,
+                    phone: g.phone,
+                    ticket_type: g.ticketType,
+                    weight: g.weight
+                });
+                lastUpdatedPax = response.data.updatedPax;
+            }
+            
+            // Fetch updated passengers
+            const res = await axios.get(`/api/getBookingDetail?booking_id=${selectedBookingId}`);
+            const updatedPassengers = res.data.passengers || [];
+            
+            // Recalculate prices - Include both paid and due
+            const paid = parseFloat(res.data.booking?.paid) || 0;
+            const due = parseFloat(res.data.booking?.due) || 0;
+            const totalAmount = paid + due;
+            const n = updatedPassengers.length;
+            const perPassenger = n > 0 ? parseFloat((totalAmount / n).toFixed(2)) : 0;
+            
+            console.log('=== RECALCULATING PASSENGER PRICES ===');
+            console.log('Paid:', paid);
+            console.log('Due:', due);
+            console.log('Total Amount:', totalAmount);
+            console.log('Number of Passengers:', n);
+            console.log('Price Per Passenger:', perPassenger);
+            
+            // Update all passenger prices in backend
+            await Promise.all(updatedPassengers.map((p) =>
+                axios.patch('/api/updatePassengerField', {
+                    passenger_id: p.id,
+                    field: 'price',
+                    value: perPassenger
+                })
+            ));
+            
+            // Update the booking table with new pax count (use fresh count from fetched passengers)
+            const updatedPax = n;
+            setBooking(prev => prev.map(b => 
+                b.id === selectedBookingId ? { ...b, pax: updatedPax } : b
+            ));
+            setFilteredData(prev => prev.map(b => 
+                b.id === selectedBookingId ? { ...b, pax: updatedPax } : b
+            ));
+            
+            // Refetch passengers to update dialog UI
+            await fetchPassengers(selectedBookingId);
+            setAddGuestDialogOpen(false);
             }
         } catch (error) {
             console.error('Error adding guests:', error);
@@ -1688,6 +1688,47 @@ setBookingDetail(finalVoucherDetail);
             console.error('Cancel Flight Error:', err);
             alert('Cancel operation failed! Error: ' + err.message);
         }
+    };
+
+    const handleEmailBooking = () => {
+        if (!bookingDetail?.booking) return;
+        
+        const booking = bookingDetail.booking;
+        const passengers = bookingDetail.passengers || [];
+        const email = booking.email || '';
+        
+        // Prepare email subject and body
+        const subject = `Booking Confirmation - ${booking.name || 'N/A'} - ID: ${booking.id}`;
+        const body = `
+Dear ${booking.name || 'Customer'},
+
+Here are your booking details:
+
+Booking ID: ${booking.id}
+Activity: ${booking.activity || 'N/A'}
+Flight Date: ${booking.flight_date || 'N/A'}
+Location: ${booking.location || 'N/A'}
+Status: ${booking.status || 'N/A'}
+Number of Passengers: ${passengers.length}
+
+Passengers:
+${passengers.map((p, i) => `${i + 1}. ${p.first_name || ''} ${p.last_name || ''} - ${p.weight || 'N/A'}kg - £${p.price || '0'}`).join('\n')}
+
+Total Paid: £${booking.paid || '0'}
+Amount Due: £${booking.due || '0'}
+
+Phone: ${booking.phone || 'N/A'}
+Email: ${email}
+
+Thank you for choosing Fly Away Ballooning!
+
+Best regards,
+Fly Away Ballooning Team
+        `.trim();
+        
+        // Open email client
+        const mailtoLink = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.location.href = mailtoLink;
     };
 
     const handleRebook = () => {
@@ -3142,7 +3183,8 @@ setBookingDetail(finalVoucherDetail);
                                                         );
                                                     })()}
                                                     <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleAddGuestClick}>Add Guest</Button>
-                                                    <Button variant="contained" color="info" sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d' }} onClick={handleCancelFlight}>Cancel Flight</Button>
+                                                    <Button variant="contained" color="info" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d' }} onClick={handleCancelFlight}>Cancel Flight</Button>
+                                                    <Button variant="contained" color="success" sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#28a745' }} onClick={handleEmailBooking}>Email</Button>
                                                 </Box>
                                             </Box>
                                             <Divider sx={{ my: 2 }} />
@@ -3469,15 +3511,15 @@ setBookingDetail(finalVoucherDetail);
                                                                             </Box>
                                                                         )}
                                                                         {shouldShowBookingNotes && (
-                                                                            <Box sx={{ mb: 2, p: 2, background: '#e3f2fd', borderRadius: 1, border: '1px solid #2196f3' }}>
-                                                                                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>Booking Notes:</Typography>
+                                                                <Box sx={{ mb: 2, p: 2, background: '#e3f2fd', borderRadius: 1, border: '1px solid #2196f3' }}>
+                                                                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>Booking Notes:</Typography>
                                                                                 <Typography>{notesFromBooking}</Typography>
-                                                                            </Box>
-                                                                        )}
+                                                                </Box>
+                                                            )}
                                                                     </>
                                                                 );
                                                             })()}
-
+                                                            
                                                             {/* Show all available questions with their answers (or "Not answered") - Only this section */}
                                                             {(() => {
                                                                 // Use additionalInformation if available, otherwise try to get from voucher data
