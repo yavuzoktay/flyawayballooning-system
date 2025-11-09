@@ -95,6 +95,7 @@ const Manifest = () => {
     const [sendingEmail, setSendingEmail] = useState(false);
     const [emailLogs, setEmailLogs] = useState([]);
     const [emailLogsPollId, setEmailLogsPollId] = useState(null);
+    const [emailTemplates, setEmailTemplates] = useState([]);
 
     // SMS state
     const [smsModalOpen, setSmsModalOpen] = useState(false);
@@ -202,14 +203,40 @@ const Manifest = () => {
         })();
     };
 
-    const handleEmailTemplateChange = (template) => {
+    // Fetch email templates from database
+    const fetchEmailTemplates = async () => {
+        try {
+            const response = await axios.get('/api/email-templates');
+            if (response.data?.success) {
+                setEmailTemplates(response.data.data || []);
+            }
+        } catch (error) {
+            console.error('Error fetching email templates:', error);
+        }
+    };
+
+    // Load email templates on mount
+    useEffect(() => {
+        fetchEmailTemplates();
+    }, []);
+
+    const handleEmailTemplateChange = (templateValue) => {
         let subject = '';
         let message = '';
 
-        switch (template) {
-            case 'confirmation':
-                subject = `Booking Confirmation - ${selectedBookingForEmail?.name}`;
-                message = `Dear ${selectedBookingForEmail?.name},
+        // Check if it's a database template (numeric ID)
+        const dbTemplate = emailTemplates.find(t => t.id.toString() === templateValue.toString());
+        
+        if (dbTemplate) {
+            // Use template from database
+            subject = dbTemplate.subject || '';
+            message = dbTemplate.body || '';
+        } else {
+            // Use hardcoded templates (legacy)
+            switch (templateValue) {
+                case 'confirmation':
+                    subject = `Booking Confirmation - ${selectedBookingForEmail?.name}`;
+                    message = `Dear ${selectedBookingForEmail?.name},
 
 Thank you for booking with Fly Away Ballooning! Your booking has been confirmed.
 
@@ -224,10 +251,10 @@ We will contact you soon with more details about your flight.
 
 Best regards,
 Fly Away Ballooning Team`;
-                break;
-            case 'reminder':
-                subject = `Flight Reminder - ${selectedBookingForEmail?.name}`;
-                message = `Dear ${selectedBookingForEmail?.name},
+                    break;
+                case 'reminder':
+                    subject = `Flight Reminder - ${selectedBookingForEmail?.name}`;
+                    message = `Dear ${selectedBookingForEmail?.name},
 
 This is a reminder about your upcoming balloon flight with Fly Away Ballooning.
 
@@ -241,10 +268,10 @@ Please ensure you arrive 30 minutes before your scheduled flight time.
 
 Best regards,
 Fly Away Ballooning Team`;
-                break;
-            case 'reschedule':
-                subject = `Flight Rescheduling - ${selectedBookingForEmail?.name}`;
-                message = `Dear ${selectedBookingForEmail?.name},
+                    break;
+                case 'reschedule':
+                    subject = `Flight Rescheduling - ${selectedBookingForEmail?.name}`;
+                    message = `Dear ${selectedBookingForEmail?.name},
 
 We need to reschedule your balloon flight due to weather conditions.
 
@@ -257,10 +284,10 @@ We will contact you shortly to arrange a new date that works for you.
 
 Best regards,
 Fly Away Ballooning Team`;
-                break;
-            case 'to_be_updated':
-                subject = `Flight update`;
-                message = `Dear ${selectedBookingForEmail?.name || 'Customer'},
+                    break;
+                case 'to_be_updated':
+                    subject = `Flight update`;
+                    message = `Dear ${selectedBookingForEmail?.name || 'Customer'},
 
 We know that you're waiting to hear from us regarding your flight on ${selectedBookingForEmail?.flight_date ? dayjs(selectedBookingForEmail.flight_date).format('MMMM D, YYYY [at] h:mm A') : '[Date TBD]'}.
 
@@ -270,17 +297,18 @@ Thank you for your patience and understanding.
 
 Best regards,
 Fly Away Ballooning Team`;
-                break;
-            default:
-                subject = `Regarding your Fly Away Ballooning booking - ${selectedBookingForEmail?.name}`;
-                message = '';
+                    break;
+                default:
+                    subject = `Regarding your Fly Away Ballooning booking - ${selectedBookingForEmail?.name}`;
+                    message = '';
+            }
         }
 
         setEmailForm(prev => ({
             ...prev,
             subject,
             message,
-            template
+            template: templateValue
         }));
     };
 
@@ -1119,17 +1147,20 @@ Fly Away Ballooning Team`;
         // Set selected booking for email
         setSelectedBookingForEmail(booking);
         
-        // Pre-fill email form with "To Be Updated" template
+        // Find first template or use "To Be Updated" as fallback
+        const firstTemplate = emailTemplates.length > 0 ? emailTemplates[0].id : 'to_be_updated';
+        
+        // Pre-fill email form with first template
         setEmailForm({
             to: booking.email || '',
             subject: '',
             message: '',
-            template: 'to_be_updated'
+            template: firstTemplate
         });
         
         // Trigger template change to populate subject and message
         setTimeout(() => {
-            handleEmailTemplateChange('to_be_updated');
+            handleEmailTemplateChange(firstTemplate);
         }, 0);
         
         // Open email modal
@@ -3286,11 +3317,23 @@ Fly Away Ballooning Team`;
                                     onChange={(e) => handleEmailTemplateChange(e.target.value)}
                                     displayEmpty
                                 >
-                                    <MenuItem value="to_be_updated">To Be Updated</MenuItem>
-                                    <MenuItem value="custom">Custom Message</MenuItem>
-                                    <MenuItem value="confirmation">Booking Confirmation</MenuItem>
-                                    <MenuItem value="reminder">Flight Reminder</MenuItem>
-                                    <MenuItem value="reschedule">Flight Rescheduling</MenuItem>
+                                    {/* Database templates */}
+                                    {emailTemplates.map((template) => (
+                                        <MenuItem key={template.id} value={template.id}>
+                                            {template.name}
+                                        </MenuItem>
+                                    ))}
+                                    
+                                    {/* Legacy hardcoded templates (fallback) */}
+                                    {emailTemplates.length === 0 && (
+                                        <>
+                                            <MenuItem value="to_be_updated">To Be Updated</MenuItem>
+                                            <MenuItem value="custom">Custom Message</MenuItem>
+                                            <MenuItem value="confirmation">Booking Confirmation</MenuItem>
+                                            <MenuItem value="reminder">Flight Reminder</MenuItem>
+                                            <MenuItem value="reschedule">Flight Rescheduling</MenuItem>
+                                        </>
+                                    )}
                                 </Select>
                             </FormControl>
                         </Grid>

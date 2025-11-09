@@ -32,3 +32,2739 @@ Emitted 'error' event on Server instance at:
 }
 
 Node.js v22.14.0
+2025-11-09T16:30:19.803Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:30:19.814Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "deedwdwq",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:30:19.818Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:30:19.819Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "dss",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:30:19.820Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "dddd",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:30:19.822Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:30:19.823Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "deedwdwq",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:30:19.824Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:30:19.825Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "dss",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:30:19.875Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:30:19.889Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:30:19.896Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:30:19.900Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:30:19.901Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Facebook",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:30:19.906Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Facebook",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:30:19.908Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Facebook",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:30:19.917Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:30:19.922Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:30:19.924Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:30:19.972Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:30:19.990Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:30:19.992Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:30:20.019Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:30:20.022Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:30:20.024Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:30:20.025Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:30:20.026Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:30:20.028Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:30:20.029Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:30:20.062Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:30:20.101Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:30:20.111Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:30:20.127Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday ",
+    "question_13": "Facebook",
+    "question_14": "No",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:30:20.128Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday ",
+    "question_13": "Facebook",
+    "question_14": "No",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:30:20.139Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday ",
+    "question_13": "Facebook",
+    "question_14": "No",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:30:20.141Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Please read",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:30:20.149Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Please read",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:30:20.150Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday surprise. ",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:30:20.154Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday surprise. ",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:30:20.157Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday surprise. ",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:30:20.187Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:46:15.026Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "dddd",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:46:15.028Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "deedwdwq",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:46:15.030Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "deedwdwq",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:46:15.031Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:46:15.032Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:46:15.032Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:46:15.033Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "dss",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:46:15.034Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "dss",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:46:15.039Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:46:15.041Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:46:15.106Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:46:15.112Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:46:15.129Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:46:15.141Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Facebook",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:46:15.173Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Facebook",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:46:15.176Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Facebook",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:46:15.186Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:46:15.190Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:46:15.194Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:46:15.197Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:46:15.205Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:46:15.211Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:46:15.212Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:46:15.221Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:46:15.256Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:46:15.262Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:46:15.263Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:46:15.274Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:46:15.276Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:46:15.280Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:46:15.287Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:46:15.294Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:46:15.295Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday ",
+    "question_13": "Facebook",
+    "question_14": "No",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:46:15.303Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday ",
+    "question_13": "Facebook",
+    "question_14": "No",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:46:15.335Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday ",
+    "question_13": "Facebook",
+    "question_14": "No",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:46:15.346Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Please read",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:46:15.376Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Please read",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:46:15.378Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday surprise. ",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:46:15.380Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday surprise. ",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:46:15.383Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday surprise. ",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:46:15.384Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:47:18.661Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "dss",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:47:18.665Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "dss",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:47:18.668Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:47:18.669Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "dddd",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:47:18.672Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "deedwdwq",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:47:18.675Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "deedwdwq",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:47:18.676Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:47:18.677Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:47:18.679Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:47:18.680Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:47:18.743Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:47:18.745Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:47:18.747Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:47:18.750Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Facebook",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:47:18.756Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Facebook",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:47:18.759Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Facebook",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:47:18.761Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:47:18.762Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:47:18.763Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:47:18.764Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:47:18.823Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:47:18.826Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:47:18.828Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:47:18.830Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:47:18.837Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:47:18.840Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:47:18.844Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:47:18.845Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:47:18.846Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:47:18.847Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:47:18.906Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:47:18.911Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:47:18.913Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday ",
+    "question_13": "Facebook",
+    "question_14": "No",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:47:18.916Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday ",
+    "question_13": "Facebook",
+    "question_14": "No",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:47:18.919Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday ",
+    "question_13": "Facebook",
+    "question_14": "No",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:47:18.920Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Please read",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:47:18.924Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Please read",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:47:18.926Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday surprise. ",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:47:18.927Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday surprise. ",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:47:18.928Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday surprise. ",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:47:18.987Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:48:49.794Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:48:49.796Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "dss",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:48:49.798Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "dss",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:48:49.800Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:48:49.802Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "dddd",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:48:49.805Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "deedwdwq",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:48:49.807Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "deedwdwq",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:48:49.809Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:48:49.811Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:48:49.812Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:48:49.875Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:48:49.876Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:48:49.879Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:48:49.880Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Facebook",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:48:49.881Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Facebook",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:48:49.884Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Facebook",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:48:49.891Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:48:49.891Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:48:49.892Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:48:49.893Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:48:49.954Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:48:49.957Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:48:49.960Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:48:49.961Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:48:49.962Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:48:49.964Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:48:49.971Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:48:49.972Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:48:49.973Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:48:49.974Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:48:50.035Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:48:50.039Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-09T16:48:50.042Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday ",
+    "question_13": "Facebook",
+    "question_14": "No",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:48:50.043Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday ",
+    "question_13": "Facebook",
+    "question_14": "No",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:48:50.044Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday ",
+    "question_13": "Facebook",
+    "question_14": "No",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:48:50.045Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Please read",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:48:50.051Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Please read",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:48:50.052Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday surprise. ",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:48:50.053Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday surprise. ",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:48:50.057Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday surprise. ",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-09T16:48:50.114Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
