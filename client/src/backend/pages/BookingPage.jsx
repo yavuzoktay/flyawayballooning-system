@@ -209,6 +209,9 @@ const BookingPage = () => {
     }, [emailModalOpen]);
 
     const handleSendEmail = async () => {
+        console.log('🔍 Current emailForm state:', emailForm);
+        console.log('🔍 Personal note:', personalNote);
+        
         // Validate only essential fields
         if (!emailForm.to) {
             alert('Recipient email is required');
@@ -225,6 +228,14 @@ const BookingPage = () => {
         const finalMessage = personalNote 
             ? `${personalNote}\n\n${emailForm.message}` 
             : emailForm.message;
+
+        console.log('📧 Sending email with data:', {
+            to: emailForm.to,
+            subject: emailForm.subject,
+            messageLength: finalMessage?.length || 0,
+            message: finalMessage?.substring(0, 100) + '...',
+            template: emailForm.template
+        });
 
         setSendingEmail(true);
         try {
