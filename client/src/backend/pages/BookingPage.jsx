@@ -1785,24 +1785,40 @@ setBookingDetail(finalVoucherDetail);
         // Set selected booking for email
         setSelectedBookingForEmail(booking);
         
-        // Find first template or use "To Be Updated" as fallback
-        const firstTemplate = emailTemplates.length > 0 ? emailTemplates[0].id : 'to_be_updated';
+        console.log('📧 Opening email modal...');
+        console.log('📚 Available emailTemplates:', emailTemplates);
         
-        // Pre-fill email form with first template
-        setEmailForm({
-            to: booking.email || '',
-            subject: '',
-            message: '',
-            template: firstTemplate
-        });
+        // Find first template or use "To Be Updated" as fallback
+        const firstTemplate = emailTemplates.length > 0 ? emailTemplates[0] : null;
+        
+        console.log('🎯 Selected first template:', firstTemplate);
+        
+        // Pre-fill email form with first template INCLUDING body
+        if (firstTemplate) {
+            setEmailForm({
+                to: booking.email || '',
+                subject: firstTemplate.subject || '',
+                message: firstTemplate.body || '',
+                template: firstTemplate.id
+            });
+            console.log('✅ Email form populated with template body:', {
+                subject: firstTemplate.subject,
+                bodyLength: firstTemplate.body?.length || 0,
+                templateId: firstTemplate.id
+            });
+        } else {
+            // Fallback if no templates
+            setEmailForm({
+                to: booking.email || '',
+                subject: '',
+                message: '',
+                template: 'to_be_updated'
+            });
+            console.log('⚠️ No templates available, using empty form');
+        }
         
         // Clear personal note
         setPersonalNote('');
-        
-        // Trigger template change to populate subject and message
-        setTimeout(() => {
-            handleEmailTemplateChange(firstTemplate);
-        }, 0);
         
         // Open email modal
         setEmailModalOpen(true);
