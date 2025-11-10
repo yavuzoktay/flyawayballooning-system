@@ -221,6 +221,22 @@ const Manifest = () => {
         fetchEmailTemplates();
     }, []);
 
+    // Auto-populate email form when template changes
+    useEffect(() => {
+        if (emailForm.template && emailTemplates.length > 0 && !emailForm.message) {
+            console.log('🔄 Template set but message empty, populating from template');
+            const dbTemplate = emailTemplates.find(t => t.id.toString() === emailForm.template.toString());
+            if (dbTemplate && dbTemplate.body) {
+                console.log('✨ Auto-setting message from template:', dbTemplate.name);
+                setEmailForm(prev => ({
+                    ...prev,
+                    subject: dbTemplate.subject || prev.subject,
+                    message: dbTemplate.body || ''
+                }));
+            }
+        }
+    }, [emailForm.template, emailTemplates, emailForm.message]);
+
     const handleEmailTemplateChange = (templateValue) => {
         let subject = '';
         let message = '';
