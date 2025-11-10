@@ -3512,7 +3512,7 @@ Fly Away Ballooning Team`;
                                 backgroundColor: '#1565c0'
                             }
                         }}
-                        disabled={sendingEmail || !emailForm.to || !emailForm.subject || !emailForm.message}
+                        disabled={sendingEmail || !emailForm.to || !emailForm.subject}
                     >
                         {sendingEmail ? 'Sending...' : 'Send'}
                     </Button>

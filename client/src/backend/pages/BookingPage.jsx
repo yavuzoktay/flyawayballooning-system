@@ -276,19 +276,16 @@ const BookingPage = () => {
     }, []);
 
     const handleEmailTemplateChange = (templateValue) => {
-        console.log('🎯 Template changed:', templateValue);
         let subject = '';
         let message = '';
 
         // Check if it's a database template (numeric ID)
         const dbTemplate = emailTemplates.find(t => t.id.toString() === templateValue.toString());
-        console.log('📧 Found DB template:', dbTemplate);
         
         if (dbTemplate) {
             // Use template from database
             subject = dbTemplate.subject || '';
             message = dbTemplate.body || '';
-            console.log('✅ Using DB template - Subject:', subject, 'Message length:', message.length);
         } else {
             // Use hardcoded templates (legacy)
             switch (templateValue) {
@@ -362,14 +359,12 @@ Fly Away Ballooning Team`;
             }
         }
 
-        console.log('📝 Setting emailForm - Subject:', subject, 'Message:', message.substring(0, 50) + '...');
         setEmailForm(prev => ({
             ...prev,
             subject,
             message,
             template: templateValue
         }));
-        console.log('✨ Email form updated');
     };
 
     // Fetch data
@@ -4131,7 +4126,7 @@ setBookingDetail(finalVoucherDetail);
                                     backgroundColor: '#1565c0'
                                 }
                             }}
-                            disabled={sendingEmail || !emailForm.to || !emailForm.subject || !emailForm.message}
+                            disabled={sendingEmail || !emailForm.to || !emailForm.subject}
                         >
                             {sendingEmail ? 'Sending...' : 'Send'}
                         </Button>
