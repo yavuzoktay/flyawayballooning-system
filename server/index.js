@@ -12799,7 +12799,7 @@ app.post('/api/sendBookingEmail', async (req, res) => {
         const emailContent = {
             to: to,
             from: {
-                email: process.env.SENDGRID_FROM_EMAIL || 'booking@flyawayballooning.com',
+                email: process.env.SENDGRID_FROM_EMAIL || 'bookings@tripworks.com',
                 name: 'Fly Away Ballooning'
             },
             subject: subject,
