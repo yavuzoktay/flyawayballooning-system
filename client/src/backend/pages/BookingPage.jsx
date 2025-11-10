@@ -288,16 +288,21 @@ const BookingPage = () => {
     }, []);
 
     const handleEmailTemplateChange = (templateValue) => {
+        console.log('🎯 handleEmailTemplateChange called with:', templateValue);
+        console.log('📚 Available templates:', emailTemplates);
+        
         let subject = '';
         let message = '';
 
         // Check if it's a database template (numeric ID)
         const dbTemplate = emailTemplates.find(t => t.id.toString() === templateValue.toString());
+        console.log('🔍 Found template:', dbTemplate);
         
         if (dbTemplate) {
             // Use template from database
             subject = dbTemplate.subject || '';
             message = dbTemplate.body || '';
+            console.log('✅ Template data - Subject:', subject, 'Body length:', message.length, 'Body:', message);
         } else {
             // Use hardcoded templates (legacy)
             switch (templateValue) {
