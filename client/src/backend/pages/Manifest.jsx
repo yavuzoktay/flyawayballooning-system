@@ -92,6 +92,7 @@ const Manifest = () => {
         message: '',
         template: 'custom'
     });
+    const [personalNote, setPersonalNote] = useState('');
     const [sendingEmail, setSendingEmail] = useState(false);
     const [emailLogs, setEmailLogs] = useState([]);
     const [emailLogsPollId, setEmailLogsPollId] = useState(null);
@@ -318,20 +319,27 @@ Fly Away Ballooning Team`;
             return;
         }
         
+        // Combine template message with optional personal note
+        const finalMessage = personalNote 
+            ? `${personalNote}\n\n${emailForm.message}` 
+            : emailForm.message;
+        
         setSendingEmail(true);
         try {
             const response = await axios.post('/api/sendBookingEmail', {
                 bookingId: selectedBookingForEmail?.id,
                 to: emailForm.to,
                 subject: emailForm.subject,
-                message: emailForm.message,
-                template: 'custom',
+                message: finalMessage,
+                template: emailForm.template,
                 bookingData: selectedBookingForEmail
             });
             
             if (response.data?.success) {
                 alert('Email sent successfully!');
                 setEmailModalOpen(false);
+                setEmailForm({ to: '', subject: '', message: '', template: 'custom' });
+                setPersonalNote('');
                 // Refresh email logs by booking id for sync
                 if (selectedBookingForEmail?.id) {
                     try {
@@ -1157,6 +1165,9 @@ Fly Away Ballooning Team`;
             message: '',
             template: firstTemplate
         });
+        
+        // Clear personal note
+        setPersonalNote('');
         
         // Trigger template change to populate subject and message
         setTimeout(() => {
@@ -3344,8 +3355,8 @@ Fly Away Ballooning Team`;
                             <TextField
                                 fullWidth
                                 placeholder="Nice to speak with you today!"
-                                value={emailForm.message}
-                                onChange={(e) => setEmailForm(prev => ({ ...prev, message: e.target.value }))}
+                                value={personalNote}
+                                onChange={(e) => setPersonalNote(e.target.value)}
                                 multiline
                                 rows={6}
                                 variant="outlined"
