@@ -12795,6 +12795,24 @@ app.post('/api/sendBookingEmail', async (req, res) => {
             });
         }
 
+        const containsHtml = typeof message === 'string' && /<\/?[a-z][\s\S]*>/i.test(message);
+        const sanitizeComments = (html) =>
+            html ? html.replace(/<!--[\s\S]*?-->/g, '') : html;
+        const normalizeHtml = (html) => sanitizeComments(html || '');
+        const convertHtmlToText = (html) =>
+            sanitizeComments(html || '')
+                .replace(/<\s*br\s*\/?>/gi, '\n')
+                .replace(/<\/p>/gi, '\n\n')
+                .replace(/<\/div>/gi, '\n')
+                .replace(/<\/li>/gi, '\n')
+                .replace(/<li>/gi, '• ')
+                .replace(/<[^>]+>/g, '')
+                .replace(/\n{3,}/g, '\n\n')
+                .trim();
+
+        const htmlBody = containsHtml ? normalizeHtml(message) : (message || '').replace(/\n/g, '<br>');
+        const textBody = containsHtml ? convertHtmlToText(message) : message;
+
         // Prepare email content
         const emailContent = {
             to: to,
@@ -12803,8 +12821,8 @@ app.post('/api/sendBookingEmail', async (req, res) => {
                 name: 'Fly Away Ballooning'
             },
             subject: subject,
-            text: message,
-            html: message.replace(/\n/g, '<br>'),
+            text: textBody,
+            html: htmlBody,
             // Add custom tracking
             custom_args: {
                 booking_id: bookingId?.toString() || 'unknown',
