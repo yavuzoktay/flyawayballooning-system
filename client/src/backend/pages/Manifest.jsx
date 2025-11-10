@@ -314,18 +314,19 @@ Fly Away Ballooning Team`;
     };
 
     const handleSendEmail = async () => {
-        // Validate only essential fields (message comes from template, personalNote is optional)
-        if (!emailForm.to || !emailForm.subject) {
-            alert('Please fill in recipient email and subject');
+        // Validate only essential fields
+        if (!emailForm.to) {
+            alert('Recipient email is required');
             return;
         }
 
-        if (!emailForm.message) {
-            alert('Please select a template or enter a message');
+        if (!emailForm.subject) {
+            alert('Subject is required. Please select a template.');
             return;
         }
         
         // Combine template message with optional personal note
+        // If message is empty, backend will validate
         const finalMessage = personalNote 
             ? `${personalNote}\n\n${emailForm.message}` 
             : emailForm.message;
