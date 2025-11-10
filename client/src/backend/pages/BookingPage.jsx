@@ -1,5 +1,5 @@
 import axios from "axios";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import PaginatedTable from "../components/BookingPage/PaginatedTable";
 import { Container, FormControl, InputLabel, MenuItem, OutlinedInput, Select, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Grid, Typography, Box, Divider, IconButton, Table, TableHead, TableRow, TableCell, TableBody } from "@mui/material";
 import dayjs from 'dayjs';
@@ -8,6 +8,11 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import RebookAvailabilityModal from '../components/BookingPage/RebookAvailabilityModal';
+import {
+    getDefaultEmailTemplateContent,
+    applyPersonalNote,
+    getPreviewHtml
+} from '../utils/emailTemplateUtils';
 
 const BookingPage = () => {
     const [activeTab, setActiveTab] = useState("bookings");
@@ -223,15 +228,31 @@ const BookingPage = () => {
             return;
         }
 
-        // Combine template message with optional personal note
-        // If message is empty, backend will validate
-        const finalMessage = personalNote 
-            ? `${personalNote}\n\n${emailForm.message}` 
-            : emailForm.message;
+        const selectedTemplate = emailTemplates.find(
+            (t) => t.id?.toString() === emailForm.template?.toString()
+        );
+        const defaultContent = selectedTemplate
+            ? getDefaultEmailTemplateContent(selectedTemplate, selectedBookingForEmail)
+            : null;
+
+        const baseMessage =
+            (emailForm.message && emailForm.message.trim() !== ''
+                ? emailForm.message
+                : defaultContent?.body || '') || '';
+
+        const finalMessage = applyPersonalNote(baseMessage, personalNote);
+
+        if (!finalMessage || finalMessage.trim() === '') {
+            alert('Message content is missing. Please ensure the selected template has a body.');
+            return;
+        }
+
+        const finalSubject =
+            emailForm.subject || defaultContent?.subject || 'Fly Away Ballooning Update';
 
         console.log('📧 Sending email with data:', {
             to: emailForm.to,
-            subject: emailForm.subject,
+            subject: finalSubject,
             messageLength: finalMessage?.length || 0,
             message: finalMessage?.substring(0, 100) + '...',
             template: emailForm.template
@@ -242,7 +263,7 @@ const BookingPage = () => {
             const response = await axios.post('/api/sendBookingEmail', {
                 bookingId: selectedBookingForEmail.id,
                 to: emailForm.to,
-                subject: emailForm.subject,
+                subject: finalSubject,
                 message: finalMessage,
                 template: emailForm.template,
                 bookingData: selectedBookingForEmail
@@ -287,21 +308,64 @@ const BookingPage = () => {
         fetchEmailTemplates();
     }, []);
 
+    const selectedEmailTemplate = useMemo(() => {
+        if (!emailForm.template) return null;
+        return (
+            emailTemplates.find(
+                (t) => t.id?.toString() === emailForm.template?.toString()
+            ) || null
+        );
+    }, [emailForm.template, emailTemplates]);
+
+    const previewHtml = useMemo(() => {
+        let baseMessage = emailForm.message;
+        const defaultContent = selectedEmailTemplate
+            ? getDefaultEmailTemplateContent(selectedEmailTemplate, selectedBookingForEmail)
+            : null;
+
+        if (!baseMessage || baseMessage.trim() === '') {
+            baseMessage = defaultContent?.body || '';
+        }
+
+        if (!baseMessage) {
+            const fallbackText = `Dear ${
+                selectedBookingForEmail?.name || 'Customer'
+            },
+
+We look forward to sharing the sky with you soon!`;
+            return getPreviewHtml(fallbackText, personalNote);
+        }
+
+        return getPreviewHtml(baseMessage, personalNote);
+    }, [
+        emailForm.message,
+        personalNote,
+        selectedEmailTemplate,
+        selectedBookingForEmail
+    ]);
+
     // Auto-populate email form when template changes
     useEffect(() => {
         if (emailForm.template && emailTemplates.length > 0 && !emailForm.message) {
-            console.log('🔄 Template set but message empty, populating from template');
-            const dbTemplate = emailTemplates.find(t => t.id.toString() === emailForm.template.toString());
-            if (dbTemplate && dbTemplate.body) {
-                console.log('✨ Auto-setting message from template:', dbTemplate.name);
-                setEmailForm(prev => ({
-                    ...prev,
-                    subject: dbTemplate.subject || prev.subject,
-                    message: dbTemplate.body || ''
-                }));
+            console.log('🔄 Template set but message empty, populating from defaults');
+            const dbTemplate = emailTemplates.find(
+                (t) => t.id.toString() === emailForm.template.toString()
+            );
+            if (dbTemplate) {
+                const defaultContent = getDefaultEmailTemplateContent(
+                    dbTemplate,
+                    selectedBookingForEmail
+                );
+                if (defaultContent) {
+                    setEmailForm((prev) => ({
+                        ...prev,
+                        subject: defaultContent.subject || prev.subject,
+                        message: defaultContent.body || ''
+                    }));
+                }
             }
         }
-    }, [emailForm.template, emailTemplates, emailForm.message]);
+    }, [emailForm.template, emailTemplates, emailForm.message, selectedBookingForEmail]);
 
     const handleEmailTemplateChange = (templateValue) => {
         console.log('🎯 handleEmailTemplateChange called with:', templateValue);
@@ -311,71 +375,63 @@ const BookingPage = () => {
         let message = '';
 
         // Check if it's a database template (numeric ID)
-        const dbTemplate = emailTemplates.find(t => t.id.toString() === templateValue.toString());
+        const dbTemplate = emailTemplates.find(
+            (t) => t.id.toString() === templateValue.toString()
+        );
         console.log('🔍 Found template:', dbTemplate);
         
         if (dbTemplate) {
-            // Use template from database
             subject = dbTemplate.subject || '';
             message = dbTemplate.body || '';
-            console.log('✅ Template data - Subject:', subject, 'Body length:', message.length, 'Body:', message);
+
+            const defaultContent = getDefaultEmailTemplateContent(
+                dbTemplate,
+                selectedBookingForEmail
+            );
+
+            if (defaultContent) {
+                subject = defaultContent.subject || subject;
+                message = defaultContent.body || message;
+                console.log(
+                    '✅ Using default template content',
+                    defaultContent.subject,
+                    'Body length:',
+                    (defaultContent.body || '').length
+                );
+            }
         } else {
-            // Use hardcoded templates (legacy)
+            // Legacy fallback templates
             switch (templateValue) {
             case 'confirmation':
-                subject = `Booking Confirmation - ${selectedBookingForEmail?.name}`;
-                message = `Dear ${selectedBookingForEmail?.name},
+                subject = `Booking Confirmation - ${selectedBookingForEmail?.name || ''}`;
+                message = `Dear ${selectedBookingForEmail?.name || 'Customer'},
 
 Thank you for booking with Fly Away Ballooning! Your booking has been confirmed.
-
-Booking Details:
-- Experience: ${selectedBookingForEmail?.flight_type}
-- Location: ${selectedBookingForEmail?.location}
-- Passengers: ${selectedBookingForEmail?.pax}
-- Flight Date: ${selectedBookingForEmail?.flight_date || 'To be scheduled'}
-- Booking ID: ${selectedBookingForEmail?.id}
-
-We will contact you soon with more details about your flight.
 
 Best regards,
 Fly Away Ballooning Team`;
                 break;
             case 'reminder':
-                subject = `Flight Reminder - ${selectedBookingForEmail?.name}`;
-                message = `Dear ${selectedBookingForEmail?.name},
+                subject = `Flight Reminder - ${selectedBookingForEmail?.name || ''}`;
+                message = `Dear ${selectedBookingForEmail?.name || 'Customer'},
 
 This is a reminder about your upcoming balloon flight with Fly Away Ballooning.
-
-Flight Details:
-- Date: ${selectedBookingForEmail?.flight_date || 'To be confirmed'}
-- Experience: ${selectedBookingForEmail?.flight_type}
-- Location: ${selectedBookingForEmail?.location}
-- Passengers: ${selectedBookingForEmail?.pax}
-
-Please ensure you arrive 30 minutes before your scheduled flight time.
 
 Best regards,
 Fly Away Ballooning Team`;
                 break;
             case 'reschedule':
-                subject = `Flight Rescheduling - ${selectedBookingForEmail?.name}`;
-                message = `Dear ${selectedBookingForEmail?.name},
+                subject = `Flight Rescheduling - ${selectedBookingForEmail?.name || ''}`;
+                message = `Dear ${selectedBookingForEmail?.name || 'Customer'},
 
-We need to reschedule your balloon flight due to weather conditions.
-
-Current Booking:
-- Experience: ${selectedBookingForEmail?.flight_type}
-- Location: ${selectedBookingForEmail?.location}
-- Passengers: ${selectedBookingForEmail?.pax}
-
-We will contact you shortly to arrange a new date that works for you.
+We need to reschedule your balloon flight.
 
 Best regards,
 Fly Away Ballooning Team`;
-                    break;
-                case 'to_be_updated':
-                    subject = `Flight update`;
-                    message = `Dear ${selectedBookingForEmail?.name || 'Customer'},
+                break;
+            case 'to_be_updated':
+                subject = `Flight update`;
+                message = `Dear ${selectedBookingForEmail?.name || 'Customer'},
 
 We know that you're waiting to hear from us regarding your flight on ${selectedBookingForEmail?.flight_date ? dayjs(selectedBookingForEmail.flight_date).format('MMMM D, YYYY [at] h:mm A') : '[Date TBD]'}.
 
@@ -387,12 +443,12 @@ Best regards,
 Fly Away Ballooning Team`;
                 break;
             default:
-                subject = `Regarding your Fly Away Ballooning booking - ${selectedBookingForEmail?.name}`;
+                subject = `Regarding your Fly Away Ballooning booking - ${selectedBookingForEmail?.name || ''}`;
                 message = '';
             }
         }
 
-        setEmailForm(prev => ({
+        setEmailForm((prev) => ({
             ...prev,
             subject,
             message,
@@ -1782,45 +1838,45 @@ setBookingDetail(finalVoucherDetail);
         
         const booking = bookingDetail.booking;
         
-        // Set selected booking for email
         setSelectedBookingForEmail(booking);
         
         console.log('📧 Opening email modal...');
         console.log('📚 Available emailTemplates:', emailTemplates);
         
-        // Find first template or use "To Be Updated" as fallback
         const firstTemplate = emailTemplates.length > 0 ? emailTemplates[0] : null;
         
-        console.log('🎯 Selected first template:', firstTemplate);
+        let subject = '';
+        let message = '';
+        let templateValue = 'to_be_updated';
         
-        // Pre-fill email form with first template INCLUDING body
         if (firstTemplate) {
-            setEmailForm({
-                to: booking.email || '',
-                subject: firstTemplate.subject || '',
-                message: firstTemplate.body || '',
-                template: firstTemplate.id
-            });
+            templateValue = firstTemplate.id;
+            subject = firstTemplate.subject || '';
+            message = firstTemplate.body || '';
+            
+            const defaultContent = getDefaultEmailTemplateContent(firstTemplate, booking);
+            if (defaultContent) {
+                subject = defaultContent.subject || subject;
+                message = defaultContent.body || message;
+            }
+            
             console.log('✅ Email form populated with template body:', {
-                subject: firstTemplate.subject,
-                bodyLength: firstTemplate.body?.length || 0,
+                subject,
+                bodyLength: (message || '').length,
                 templateId: firstTemplate.id
             });
         } else {
-            // Fallback if no templates
-            setEmailForm({
-                to: booking.email || '',
-                subject: '',
-                message: '',
-                template: 'to_be_updated'
-            });
-            console.log('⚠️ No templates available, using empty form');
+            console.log('⚠️ No templates available, using fallback');
         }
         
-        // Clear personal note
-        setPersonalNote('');
+        setEmailForm({
+            to: booking.email || '',
+            subject,
+            message,
+            template: templateValue
+        });
         
-        // Open email modal
+        setPersonalNote('');
         setEmailModalOpen(true);
     };
 
@@ -4102,9 +4158,10 @@ setBookingDetail(finalVoucherDetail);
                                             <Typography sx={{ color: '#fff', fontSize: 48 }}>🎈</Typography>
                                         </Box>
                                         
-                                        <Typography sx={{ whiteSpace: 'pre-line', lineHeight: 1.6, color: '#333' }}>
-                                            {emailForm.message || `Dear ${selectedBookingForEmail?.name || 'Customer'},\n\nWe know that you're waiting to hear from us regarding your flight on ${selectedBookingForEmail?.flight_date ? dayjs(selectedBookingForEmail.flight_date).format('MMMM D, YYYY [at] h:mm A') : '[Date TBD]'}.\n\nWe're really sorry for the delay and we will be in touch with you as soon as possible.\n\nThank you for your patience and understanding.\n\nBest regards,\nFly Away Ballooning Team`}
-                                        </Typography>
+                                        <div
+                                            style={{ lineHeight: 1.6, color: '#333' }}
+                                            dangerouslySetInnerHTML={{ __html: previewHtml }}
+                                        />
                                     </Box>
                                 </Box>
                             </Grid>
