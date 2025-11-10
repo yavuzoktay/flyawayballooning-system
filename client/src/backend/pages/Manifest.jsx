@@ -314,8 +314,14 @@ Fly Away Ballooning Team`;
     };
 
     const handleSendEmail = async () => {
-        if (!emailForm.to || !emailForm.subject || !emailForm.message) {
-            alert('Please fill all fields');
+        // Validate only essential fields (message comes from template, personalNote is optional)
+        if (!emailForm.to || !emailForm.subject) {
+            alert('Please fill in recipient email and subject');
+            return;
+        }
+
+        if (!emailForm.message) {
+            alert('Please select a template or enter a message');
             return;
         }
         
