@@ -4,13 +4,15 @@ const HERO_IMAGE_URL =
     'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=80';
 const PERSONAL_NOTE_PLACEHOLDER = '<!--PERSONAL_NOTE-->';
 
-const escapeHtml = (unsafe = '') =>
-    unsafe
+const escapeHtml = (unsafe = '') => {
+    const str = unsafe == null ? '' : String(unsafe);
+    return str
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+};
 
 export const isHtmlContent = (value = '') =>
     typeof value === 'string' && /<\/?[a-z][\s\S]*>/i.test(value);
