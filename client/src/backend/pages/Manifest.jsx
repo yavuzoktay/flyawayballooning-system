@@ -3508,12 +3508,14 @@ Fly Away Ballooning Team`;
                                 const statusInfo = getStatusDisplay(log.last_event || log.status);
                                 const expanded = !!expandedMessageIds[log.id || index];
                                 const preview = getMessagePreview(log);
-                                const previewHtml = getPreviewHtml(
-                                    expanded
-                                        ? (log.message_html
-                                            ? sanitizeMessageHtml(log.message_html)
-                                            : (log.message_text || ''))
-                                        : getMessagePreview(log),
+                                const collapsedPreviewHtml = getPreviewHtml(
+                                    getMessagePreview(log),
+                                    ''
+                                );
+                                const expandedPreviewHtml = getPreviewHtml(
+                                    log.message_html
+                                        ? sanitizeMessageHtml(log.message_html)
+                                        : (log.message_text || ''),
                                     ''
                                 );
                                 return (
@@ -3600,12 +3602,12 @@ Fly Away Ballooning Team`;
                                                         maxHeight: 400,
                                                         overflowY: 'auto'
                                                     }}
-                                                    dangerouslySetInnerHTML={{ __html: previewHtml }}
+                                                    dangerouslySetInnerHTML={{ __html: expandedPreviewHtml }}
                                                 />
                                             ) : (
                                                 <Box
                                                     sx={{ color: '#475569', lineHeight: 1.6 }}
-                                                    dangerouslySetInnerHTML={{ __html: preview || ' ' }}
+                                                    dangerouslySetInnerHTML={{ __html: collapsedPreviewHtml }}
                                                 />
                                             )}
                                             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
