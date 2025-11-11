@@ -490,6 +490,61 @@ Fly Away Ballooning Team`;
             .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
     };
 
+    const getTemplateContentForLog = (log) => {
+        const templateKey = log?.template_type;
+        if (!templateKey) return '';
+
+        const dbTemplate = emailTemplates.find(
+            (t) => t.id?.toString() === templateKey?.toString()
+        );
+
+        if (dbTemplate) {
+            const defaultContent = getDefaultEmailTemplateContent(
+                dbTemplate,
+                selectedBookingForEmail
+            );
+            if (defaultContent?.body) {
+                return defaultContent.body;
+            }
+        }
+
+        return '';
+    };
+
+    const buildLogHtml = (log) => {
+        let html = '';
+
+        if (log?.message_html) {
+            html = sanitizeMessageHtml(log.message_html);
+        }
+
+        if ((!html || !html.trim()) && log?.message_text) {
+            html = `<div>${log.message_text.replace(/\n/g, '<br>')}</div>`;
+        }
+
+        if (!html || !html.trim()) {
+            const defaultTemplateHtml = getTemplateContentForLog(log);
+            if (defaultTemplateHtml) {
+                html = sanitizeMessageHtml(defaultTemplateHtml);
+            }
+        }
+
+        return html;
+    };
+
+    const buildCollapsedPreviewHtml = (log) => {
+        const fullHtml = buildLogHtml(log);
+        if (!fullHtml) return '';
+
+        const plain = stripHtml(fullHtml);
+        if (!plain) return fullHtml;
+
+        const truncated =
+            plain.length > 240 ? `${plain.slice(0, 240).trim()}…` : plain.trim();
+
+        return truncated.replace(/\n/g, '<br>');
+    };
+
     const getMessagePreview = (log) => {
         if (log?.message_html) {
             const sanitized = sanitizeMessageHtml(log.message_html);
@@ -3508,16 +3563,12 @@ Fly Away Ballooning Team`;
                                 const statusInfo = getStatusDisplay(log.last_event || log.status);
                                 const expanded = !!expandedMessageIds[log.id || index];
                                 const preview = getMessagePreview(log);
-                                const collapsedPreviewHtml = getPreviewHtml(
-                                    getMessagePreview(log),
-                                    ''
-                                );
-                                const expandedPreviewHtml = getPreviewHtml(
-                                    log.message_html
-                                        ? sanitizeMessageHtml(log.message_html)
-                                        : (log.message_text || ''),
-                                    ''
-                                );
+                                const fullHtml = buildLogHtml(log);
+                                const collapsedPreviewHtml =
+                                    buildCollapsedPreviewHtml(log) ||
+                                    '<span style="color:#94a3b8;">Expand to view full message.</span>';
+                                const expandedPreviewHtml =
+                                    fullHtml || collapsedPreviewHtml;
                                 return (
                                     <Box
                                         key={log.id || index}
