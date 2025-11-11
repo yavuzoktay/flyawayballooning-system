@@ -181,7 +181,8 @@ const BookingPage = () => {
     };
 
     const resolveTemplateName = (templateValue, dbTemplate) => {
-        if (dbTemplate?.name) return dbTemplate.name;
+        const dbName = dbTemplate?.name ? dbTemplate.name.trim() : '';
+        if (dbName) return dbName;
         switch (templateValue) {
             case 'confirmation':
                 return 'Booking Confirmation';
@@ -194,7 +195,7 @@ const BookingPage = () => {
             case 'custom':
                 return 'Custom Message';
             default:
-                return dbTemplate?.name || 'Custom Message';
+                return dbName || 'Custom Message';
         }
     };
 
@@ -398,6 +399,8 @@ const BookingPage = () => {
             messageLength: finalHtml?.length || 0,
             template: emailForm.template
         });
+
+        console.log('📄 Final HTML contains receipt:', /Receipt/i.test(finalHtml));
 
         setSendingEmail(true);
         try {

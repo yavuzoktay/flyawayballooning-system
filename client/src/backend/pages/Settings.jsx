@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useTransition } from 'react';
 import axios from 'axios';
 import { 
     Plus, 
@@ -17,7 +17,7 @@ import {
     ChevronUp
 } from 'lucide-react';
 import { 
-    getDefaultTemplateMessage,
+    getDefaultTemplateMessageHtml,
     extractMessageFromTemplateBody
 } from '../utils/emailTemplateUtils';
 
@@ -204,31 +204,67 @@ const Settings = () => {
     const [showEmailTemplateForm, setShowEmailTemplateForm] = useState(false);
     const [showEditEmailTemplateForm, setShowEditEmailTemplateForm] = useState(false);
     const [selectedEmailTemplate, setSelectedEmailTemplate] = useState(null);
-    const getDefaultTemplateBody = (templateName) => getDefaultTemplateMessage(templateName) || '';
+    const getDefaultTemplateBody = (templateName) => extractMessageFromTemplateBody(getDefaultTemplateMessageHtml(templateName)) || '';
 
     const RichTextEditor = ({ value, onChange, placeholder }) => {
         const editorRef = useRef(null);
+        const inputDebounceRef = useRef(null);
+        const [, startTransition] = useTransition();
 
         useEffect(() => {
-            if (editorRef.current) {
-                const currentHtml = editorRef.current.innerHTML;
-                const nextHtml = value || '';
-                if (currentHtml !== nextHtml) {
-                    editorRef.current.innerHTML = nextHtml;
-                }
+            if (!editorRef.current) return;
+            if (document.activeElement === editorRef.current) return;
+            const currentHtml = editorRef.current.innerHTML;
+            const nextHtml = value || '';
+            if (currentHtml !== nextHtml) {
+                editorRef.current.innerHTML = nextHtml;
             }
         }, [value]);
+
+        useEffect(() => () => {
+            if (inputDebounceRef.current) {
+                clearTimeout(inputDebounceRef.current);
+            }
+        }, []);
 
         const exec = (command, arg = null) => {
             if (!editorRef.current) return;
             editorRef.current.focus();
             document.execCommand(command, false, arg);
-            onChange(editorRef.current.innerHTML);
+            const html = editorRef.current.innerHTML;
+            startTransition(() => {
+                onChange(html);
+            });
+        };
+
+        const scheduleChange = () => {
+            if (!editorRef.current) return;
+            const html = editorRef.current.innerHTML;
+            if (inputDebounceRef.current) {
+                clearTimeout(inputDebounceRef.current);
+            }
+            inputDebounceRef.current = setTimeout(() => {
+                inputDebounceRef.current = null;
+                startTransition(() => {
+                    onChange(html);
+                });
+            }, 200);
         };
 
         const handleInput = () => {
+            scheduleChange();
+        };
+
+        const handleBlur = () => {
             if (!editorRef.current) return;
-            onChange(editorRef.current.innerHTML);
+            if (inputDebounceRef.current) {
+                clearTimeout(inputDebounceRef.current);
+                inputDebounceRef.current = null;
+            }
+            const html = editorRef.current.innerHTML;
+            startTransition(() => {
+                onChange(html);
+            });
         };
 
         const handleLink = () => {
@@ -260,6 +296,7 @@ const Settings = () => {
                     ref={editorRef}
                     contentEditable
                     onInput={handleInput}
+                    onBlur={handleBlur}
                     style={{
                         width: '100%',
                         minHeight: '200px',

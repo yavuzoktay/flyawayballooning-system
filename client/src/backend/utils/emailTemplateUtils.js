@@ -4,6 +4,8 @@ const HERO_IMAGE_URL =
     'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=80';
 const PERSONAL_NOTE_PLACEHOLDER = '<!--PERSONAL_NOTE-->';
 
+const normalizeTemplateName = (name = '') => (name || '').trim();
+
 const escapeHtml = (unsafe = '') => {
     const str = unsafe == null ? '' : String(unsafe);
     return str
@@ -291,9 +293,15 @@ const getUpcomingFlightReminderMessageHtml = (booking = {}) => {
     return wrapParagraphs([
         `Just a quick reminder that your flight is scheduled for <strong>${flightDate}</strong>.`,
         'Please arrive at least 30 minutes before your scheduled launch so we can complete check-in and the safety briefing.',
-        'Keep an eye on your inbox — we’ll notify you if weather conditions require any last-minute adjustments.'
+        'Keep an eye on your inbox - we will notify you if weather conditions require any last-minute adjustments.'
     ]);
 };
+
+const getToBeUpdatedMessageHtml = (booking = {}) => 
+    wrapParagraphs([
+        'We wanted to let you know that we are still finalizing the details of your flight.',
+        'We will be in touch as soon as we have an update. Thank you for your patience!'
+    ]);
 
 const DEFAULT_EDITOR_BOOKING = {
     name: 'First Name',
@@ -398,45 +406,73 @@ const DEFAULT_TEMPLATE_BUILDERS = {
             customerName,
             signatureLines: ['Accounts Team', 'Fly Away Ballooning'],
             footerLinks: [
-                { label: 'Payment FAQs', url: 'https://flyawayballooning.com/payment-help' },
+                { label: 'Pay online', url: 'https://flyawayballooning.com/pay' },
                 { label: 'Call us', url: 'tel:+441234567890' }
             ]
         });
     },
     'Upcoming Flight Reminder': ({ template, booking }) => {
         const customerName = booking?.name || booking?.customer_name || 'Guest';
-        const subject = '⏰ Your flight is coming up';
+        const subject = '🚀 Your flight is coming up';
         const defaultBodyHtml = getUpcomingFlightReminderMessageHtml(booking);
 
         return buildEmailLayout({
             subject,
-            headline: 'Your adventure is right around the corner!',
+            headline: 'We can’t wait to see you!',
             bodyHtml: resolveBodyHtml(template, defaultBodyHtml),
             customerName,
             signatureLines: ['Operations Team', 'Fly Away Ballooning'],
             footerLinks: [
-                { label: 'Directions', url: 'https://flyawayballooning.com/directions' },
-                { label: 'What to bring', url: 'https://flyawayballooning.com/checklist' }
+                { label: 'Manage booking', url: 'https://flyawayballooning.com/manage' },
+                { label: 'Weather FAQs', url: 'https://flyawayballooning.com/weather' }
+            ]
+        });
+    },
+    'To Be Updated': ({ template, booking }) => {
+        const customerName = booking?.name || booking?.customer_name || 'Guest';
+        const subject = '🛠️ Update in progress';
+        const defaultBodyHtml = getToBeUpdatedMessageHtml(booking);
+
+        return buildEmailLayout({
+            subject,
+            headline: 'We’re on it!',
+            bodyHtml: resolveBodyHtml(template, defaultBodyHtml),
+            customerName,
+            signatureLines: ['Fly Away Ballooning Team'],
+            footerLinks: [
+                { label: 'Contact support', url: 'mailto:hello@flyawayballooning.com' }
             ]
         });
     }
 };
 
+const findTemplateBuilder = (name = '') => {
+    const trimmed = normalizeTemplateName(name);
+    if (!trimmed) return undefined;
+    if (DEFAULT_TEMPLATE_BUILDERS[trimmed]) return DEFAULT_TEMPLATE_BUILDERS[trimmed];
+    const lower = trimmed.toLowerCase();
+    const match = Object.entries(DEFAULT_TEMPLATE_BUILDERS).find(
+        ([key]) => key.toLowerCase() === lower
+    );
+    return match ? match[1] : undefined;
+};
+
 export const getDefaultTemplateMessageHtml = (templateName, booking = DEFAULT_EDITOR_BOOKING) => {
-    switch (templateName) {
-        case 'Follow up':
+    const normalizedName = normalizeTemplateName(templateName).toLowerCase();
+    switch (normalizedName) {
+        case 'follow up':
             return getFollowUpMessageHtml(booking);
-        case 'Booking Confirmation':
+        case 'booking confirmation':
             return getBookingConfirmationMessageHtml(booking);
-        case 'Booking Rescheduled':
+        case 'booking rescheduled':
             return getBookingRescheduledMessageHtml(booking);
-        case 'Gift Card Confirmation':
+        case 'gift card confirmation':
             return getGiftCardMessageHtml(booking);
-        case 'Request for Payment/Deposit':
+        case 'request for payment/deposit':
             return getPaymentRequestMessageHtml(booking);
-        case 'Upcoming Flight Reminder':
+        case 'upcoming flight reminder':
             return getUpcomingFlightReminderMessageHtml(booking);
-        case 'To Be Updated':
+        case 'to be updated':
             return wrapParagraphs([
                 'We wanted to let you know that we are still finalizing the details of your flight.',
                 'We will be in touch as soon as we have an update. Thank you for your patience!'
@@ -449,7 +485,7 @@ export const getDefaultTemplateMessageHtml = (templateName, booking = DEFAULT_ED
 export const getDefaultEmailTemplateContent = (template, booking = {}) => {
     if (!template) return null;
     const templateName = template.name || template.subject;
-    const builder = DEFAULT_TEMPLATE_BUILDERS[templateName];
+    const builder = findTemplateBuilder(templateName);
     const templateBody = template.body && template.body.trim() !== ''
         ? template.body
         : null;
@@ -459,10 +495,6 @@ export const getDefaultEmailTemplateContent = (template, booking = {}) => {
         return templateBody
             ? { subject: template.subject, body: resolveBodyHtml(template, '') }
             : null;
-    }
-
-    if (templateBody && isEdited) {
-        return builder({ template, booking });
     }
 
     return builder({ template, booking });

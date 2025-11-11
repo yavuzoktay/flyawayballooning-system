@@ -139,6 +139,7 @@ const Manifest = () => {
     const [globalMenuGroupFlights, setGlobalMenuGroupFlights] = useState([]);
     // Confirm cancel-all dialog state
     const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+    const [confirmCancelLoading, setConfirmCancelLoading] = useState(false);
     const handleGlobalMenuOpen = (event, group, groupFlights) => {
       setGlobalMenuAnchorEl(event.currentTarget);
       setGlobalMenuGroup(group);
@@ -503,6 +504,8 @@ const Manifest = () => {
             personalNote
         });
         const finalText = stripHtml(finalHtml);
+
+        console.log('📄 Final HTML contains receipt:', /Receipt/i.test(finalHtml));
         
         setSendingEmail(true);
         try {
@@ -628,6 +631,25 @@ const Manifest = () => {
     const stripHtml = (input = '') => {
         if (!input) return '';
         return input.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    };
+
+    const resolveTemplateName = (templateValue, dbTemplate) => {
+        const dbName = dbTemplate?.name ? dbTemplate.name.trim() : '';
+        if (dbName) return dbName;
+        switch (templateValue) {
+            case 'confirmation':
+                return 'Booking Confirmation';
+            case 'reminder':
+                return 'Upcoming Flight Reminder';
+            case 'reschedule':
+                return 'Booking Rescheduled';
+            case 'to_be_updated':
+                return 'To Be Updated';
+            case 'custom':
+                return 'Custom Message';
+            default:
+                return dbName || 'Custom Message';
+        }
     };
 
     const fetchMessageLogs = async (bookingId) => {
@@ -2283,29 +2305,6 @@ const Manifest = () => {
                 type: 'error'
             });
             setTimeout(() => setCrewNotification({ show: false, message: '', type: 'error' }), 5000);
-        }
-    };
-
-    const stripHtml = (input = '') => {
-        if (!input) return '';
-        return input.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    };
-
-    const resolveTemplateName = (templateValue, dbTemplate) => {
-        if (dbTemplate?.name) return dbTemplate.name;
-        switch (templateValue) {
-            case 'confirmation':
-                return 'Booking Confirmation';
-            case 'reminder':
-                return 'Upcoming Flight Reminder';
-            case 'reschedule':
-                return 'Booking Rescheduled';
-            case 'to_be_updated':
-                return 'To Be Updated';
-            case 'custom':
-                return 'Custom Message';
-            default:
-                return dbTemplate?.name || 'Custom Message';
         }
     };
 
