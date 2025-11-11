@@ -103,6 +103,17 @@ const Manifest = () => {
     const [emailLogs, setEmailLogs] = useState([]);
     const [emailLogsPollId, setEmailLogsPollId] = useState(null);
     const [emailTemplates, setEmailTemplates] = useState([]);
+    const [groupMessageModalOpen, setGroupMessageModalOpen] = useState(false);
+    const [groupMessageForm, setGroupMessageForm] = useState({
+        to: [],
+        subject: '',
+        message: '',
+        template: ''
+    });
+    const [groupPersonalNote, setGroupPersonalNote] = useState('');
+    const [groupMessageSending, setGroupMessageSending] = useState(false);
+    const [groupSelectedBookings, setGroupSelectedBookings] = useState([]);
+    const [groupMessagePreviewBooking, setGroupMessagePreviewBooking] = useState(null);
     const [messagesModalOpen, setMessagesModalOpen] = useState(false);
     const [messagesLoading, setMessagesLoading] = useState(false);
     const [messageLogs, setMessageLogs] = useState([]);
@@ -139,12 +150,120 @@ const Manifest = () => {
     };
     const handleGlobalMenuAction = async (action) => {
       if (action === 'cancelAllGuests') {
-        // Open confirmation dialog instead of immediate action
         setConfirmCancelOpen(true);
         return;
       }
-      console.log('Action:', action);
+
+      if (action === 'sendMessageAllGuests') {
+        handleGlobalMenuClose();
+        if (!globalMenuGroupFlights || globalMenuGroupFlights.length === 0) {
+          alert('No guests found for this flight.');
+          return;
+        }
+
+        const recipients = Array.from(
+          new Set(
+            globalMenuGroupFlights
+              .map(flight => (flight.email || '').trim())
+              .filter(Boolean)
+          )
+        );
+
+        if (recipients.length === 0) {
+          alert('No email addresses available for the guests on this flight.');
+          return;
+        }
+
+        const firstTemplate = emailTemplates.length > 0 ? emailTemplates[0].id : 'custom';
+        const primaryBooking = globalMenuGroupFlights[0] || null;
+
+        setGroupSelectedBookings([...globalMenuGroupFlights]);
+        setGroupMessagePreviewBooking(primaryBooking);
+        setGroupMessageForm({
+          to: recipients,
+          subject: '',
+          message: '',
+          template: firstTemplate
+        });
+        setGroupPersonalNote('');
+        setGroupMessageModalOpen(true);
+
+        if (firstTemplate && emailTemplates.length > 0) {
+          setTimeout(() => handleGroupTemplateChange(firstTemplate), 0);
+        }
+
+        return;
+      }
+
       handleGlobalMenuClose();
+    };
+
+    const handleGroupTemplateChange = (templateValue) => {
+        let subject = '';
+        let message = '';
+
+        const dbTemplate = emailTemplates.find(
+            (t) => t.id.toString() === templateValue.toString()
+        );
+
+        const previewBooking =
+            groupMessagePreviewBooking ||
+            (groupSelectedBookings.length > 0 ? groupSelectedBookings[0] : null);
+
+        if (dbTemplate) {
+            subject = dbTemplate.subject || '';
+            message = dbTemplate.body || '';
+
+            const defaultContent = getDefaultEmailTemplateContent(
+                dbTemplate,
+                previewBooking
+            );
+
+            if (defaultContent) {
+                subject = defaultContent.subject || subject;
+                message = defaultContent.body || message;
+            }
+        } else {
+            switch (templateValue) {
+                case 'confirmation':
+                    subject = `Booking Confirmation`;
+                    message = `Dear Guest,
+
+Thank you for booking with Fly Away Ballooning! Your booking has been confirmed.
+
+Best regards,
+Fly Away Ballooning Team`;
+                    break;
+                case 'reminder':
+                    subject = `Flight Reminder`;
+                    message = `Dear Guest,
+
+This is a reminder about your upcoming balloon flight with Fly Away Ballooning.
+
+Best regards,
+Fly Away Ballooning Team`;
+                    break;
+                case 'reschedule':
+                    subject = `Flight Rescheduling`;
+                    message = `Dear Guest,
+
+We need to reschedule your balloon flight.
+
+Best regards,
+Fly Away Ballooning Team`;
+                    break;
+                default:
+                    subject = groupMessageForm.subject || '';
+                    message = groupMessageForm.message || '';
+            }
+        }
+
+        setGroupMessageForm((prev) => ({
+            ...prev,
+            subject,
+            message,
+            template: templateValue
+        }));
     };
 
     // Confirm cancel all - update status to cancelled and increment flight_attempts
@@ -240,6 +359,15 @@ const Manifest = () => {
         );
     }, [emailForm.template, emailTemplates]);
 
+    const groupSelectedEmailTemplate = useMemo(() => {
+        if (!groupMessageForm.template) return null;
+        return (
+            emailTemplates.find(
+                (t) => t.id?.toString() === groupMessageForm.template?.toString()
+            ) || null
+        );
+    }, [groupMessageForm.template, emailTemplates]);
+
     const previewHtml = useMemo(() => {
         let baseMessage = emailForm.message;
         const defaultContent = selectedEmailTemplate
@@ -265,6 +393,36 @@ We look forward to sharing the sky with you soon!`;
         personalNote,
         selectedEmailTemplate,
         selectedBookingForEmail
+    ]);
+
+    const groupPreviewHtml = useMemo(() => {
+        const previewBooking =
+            groupMessagePreviewBooking ||
+            (groupSelectedBookings.length > 0 ? groupSelectedBookings[0] : null);
+
+        let baseMessage = groupMessageForm.message;
+        const defaultContent = groupSelectedEmailTemplate
+            ? getDefaultEmailTemplateContent(groupSelectedEmailTemplate, previewBooking)
+            : null;
+
+        if (!baseMessage || baseMessage.trim() === '') {
+            baseMessage = defaultContent?.body || '';
+        }
+
+        if (!baseMessage) {
+            const fallbackText = `Dear Guest,
+
+We look forward to sharing the sky with you soon!`;
+            return getPreviewHtml(fallbackText, groupPersonalNote);
+        }
+
+        return getPreviewHtml(baseMessage, groupPersonalNote);
+    }, [
+        groupMessageForm.message,
+        groupPersonalNote,
+        groupSelectedEmailTemplate,
+        groupMessagePreviewBooking,
+        groupSelectedBookings
     ]);
 
     // Auto-populate email form when template changes
@@ -367,6 +525,42 @@ Fly Away Ballooning Team`;
         }));
     };
 
+    useEffect(() => {
+        if (
+            groupMessageModalOpen &&
+            groupMessageForm.template &&
+            emailTemplates.length > 0 &&
+            !groupMessageForm.message
+        ) {
+            const dbTemplate = emailTemplates.find(
+                (t) => t.id.toString() === groupMessageForm.template.toString()
+            );
+            if (dbTemplate) {
+                const previewBooking =
+                    groupMessagePreviewBooking ||
+                    (groupSelectedBookings.length > 0 ? groupSelectedBookings[0] : null);
+                const defaultContent = getDefaultEmailTemplateContent(
+                    dbTemplate,
+                    previewBooking
+                );
+                if (defaultContent) {
+                    setGroupMessageForm((prev) => ({
+                        ...prev,
+                        subject: defaultContent.subject || prev.subject,
+                        message: defaultContent.body || ''
+                    }));
+                }
+            }
+        }
+    }, [
+        groupMessageModalOpen,
+        groupMessageForm.template,
+        emailTemplates,
+        groupMessageForm.message,
+        groupMessagePreviewBooking,
+        groupSelectedBookings
+    ]);
+
     const handleSendEmail = async () => {
         // Validate only essential fields
         if (!emailForm.to) {
@@ -434,6 +628,82 @@ Fly Away Ballooning Team`;
             alert('Failed to send email: ' + (err?.response?.data?.message || err.message));
         } finally {
             setSendingEmail(false);
+        }
+    };
+
+    const handleSendGroupEmail = async () => {
+        if (groupMessageForm.to.length === 0) {
+            alert('No recipients selected.');
+            return;
+        }
+
+        if (!groupMessageForm.subject) {
+            alert('Subject is required. Please select a template.');
+            return;
+        }
+
+        const finalMessage = groupPersonalNote
+            ? `${groupPersonalNote}\n\n${groupMessageForm.message}`
+            : groupMessageForm.message;
+
+        if (!finalMessage || !finalMessage.trim()) {
+            alert('Message content is missing. Please ensure the selected template has a body.');
+            return;
+        }
+
+        if (!groupSelectedBookings.length) {
+            alert('No bookings found for this group.');
+            return;
+        }
+
+        setGroupMessageSending(true);
+        let successCount = 0;
+        const failures = [];
+
+        for (const booking of groupSelectedBookings) {
+            const to = booking.email || '';
+            if (!to) {
+                failures.push({ booking, reason: 'Missing email address' });
+                continue;
+            }
+
+            try {
+                await axios.post('/api/sendBookingEmail', {
+                    bookingId: booking.id,
+                    to,
+                    subject: groupMessageForm.subject,
+                    message: finalMessage,
+                    template: groupMessageForm.template,
+                    bookingData: booking
+                });
+                successCount += 1;
+            } catch (err) {
+                failures.push({
+                    booking,
+                    reason: err?.response?.data?.message || err.message || 'Unknown error'
+                });
+            }
+        }
+
+        setGroupMessageSending(false);
+
+        let summary = `Emails sent: ${successCount}`;
+        if (failures.length > 0) {
+            summary += `\nFailed: ${failures.length}`;
+        }
+
+        alert(summary);
+        if (failures.length === 0) {
+            setGroupMessageModalOpen(false);
+            setGroupMessageForm({
+                to: [],
+                subject: '',
+                message: '',
+                template: ''
+            });
+            setGroupPersonalNote('');
+            setGroupSelectedBookings([]);
+            setGroupMessagePreviewBooking(null);
         }
     };
 
@@ -3678,6 +3948,198 @@ Fly Away Ballooning Team`;
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setMessagesModalOpen(false)}>Close</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Group Message Modal */}
+            <Dialog
+                open={groupMessageModalOpen}
+                onClose={() => setGroupMessageModalOpen(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle sx={{ fontWeight: 700, fontSize: 24 }}>
+                    Send Message to Guests
+                    {groupSelectedBookings.length > 0 && (
+                        <Typography variant="subtitle2" color="textSecondary" sx={{ mt: 0.5 }}>
+                            {groupSelectedBookings.length} booking(s)
+                        </Typography>
+                    )}
+                </DialogTitle>
+                <DialogContent sx={{ mt: 1 }}>
+                    <Grid container spacing={2}>
+                        <Grid item xs={12}>
+                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
+                                Recipients
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, background: '#f8fafc', borderRadius: 2, p: 2 }}>
+                                {groupMessageForm.to.map((email) => (
+                                    <Box
+                                        key={email}
+                                        sx={{
+                                            px: 1.5,
+                                            py: 0.75,
+                                            background: '#eef2ff',
+                                            color: '#4338ca',
+                                            borderRadius: 999,
+                                            fontSize: 12,
+                                            fontWeight: 600
+                                        }}
+                                    >
+                                        {email}
+                                    </Box>
+                                ))}
+                            </Box>
+                        </Grid>
+                        <Grid item xs={12}>
+                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
+                                Choose a template:
+                            </Typography>
+                            <FormControl fullWidth size="small">
+                                <Select
+                                    value={groupMessageForm.template}
+                                    onChange={(e) => handleGroupTemplateChange(e.target.value)}
+                                    displayEmpty
+                                >
+                                    {emailTemplates.map((template) => (
+                                        <MenuItem key={template.id} value={template.id}>
+                                            {template.name}
+                                        </MenuItem>
+                                    ))}
+                                    {emailTemplates.length === 0 && (
+                                        <>
+                                            <MenuItem value="to_be_updated">To Be Updated</MenuItem>
+                                            <MenuItem value="custom">Custom Message</MenuItem>
+                                            <MenuItem value="confirmation">Booking Confirmation</MenuItem>
+                                            <MenuItem value="reminder">Flight Reminder</MenuItem>
+                                            <MenuItem value="reschedule">Flight Rescheduling</MenuItem>
+                                        </>
+                                    )}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12}>
+                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
+                                Add an optional, personalized note
+                            </Typography>
+                            <TextField
+                                fullWidth
+                                placeholder="Nice to speak with you today!"
+                                value={groupPersonalNote}
+                                onChange={(e) => setGroupPersonalNote(e.target.value)}
+                                multiline
+                                rows={6}
+                                variant="outlined"
+                                sx={{
+                                    '& .MuiOutlinedInput-root': {
+                                        borderRadius: 2
+                                    }
+                                }}
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <Box sx={{
+                                border: '1px solid #e0e0e0',
+                                borderRadius: 2,
+                                p: 3,
+                                backgroundColor: '#f9f9f9',
+                                position: 'relative'
+                            }}>
+                                <Box sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1,
+                                    mb: 2,
+                                    pb: 2,
+                                    borderBottom: '1px solid #e0e0e0'
+                                }}>
+                                    <Box sx={{
+                                        width: 12,
+                                        height: 12,
+                                        borderRadius: '50%',
+                                        backgroundColor: '#ff5f57'
+                                    }} />
+                                    <Box sx={{
+                                        width: 12,
+                                        height: 12,
+                                        borderRadius: '50%',
+                                        backgroundColor: '#ffbd2e'
+                                    }} />
+                                    <Box sx={{
+                                        width: 12,
+                                        height: 12,
+                                        borderRadius: '50%',
+                                        backgroundColor: '#28ca42'
+                                    }} />
+                                </Box>
+
+                                <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 0.5 }}>
+                                    From "Fly Away Ballooning" &lt;bookings@tripworks.com&gt;
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: '#999', display: 'block', mb: 2 }}>
+                                    {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                                </Typography>
+
+                <Typography sx={{
+                    color: '#d32f2f',
+                    fontWeight: 600,
+                    mb: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1
+                }}>
+                    <span style={{ fontSize: 20 }}>🎈</span> {groupMessageForm.subject || 'Flight update'}
+                </Typography>
+
+                <Box sx={{
+                    backgroundColor: '#fff',
+                    p: 3,
+                    borderRadius: 2,
+                    minHeight: 200
+                }}>
+                    <Box sx={{
+                        width: '100%',
+                        height: 200,
+                        backgroundColor: '#e3f2fd',
+                        borderRadius: 2,
+                        mb: 3,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundImage: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                    }}>
+                        <Typography sx={{ color: '#fff', fontSize: 48 }}>🎈</Typography>
+                    </Box>
+                    <Box
+                        sx={{ lineHeight: 1.6, color: '#333' }}
+                        dangerouslySetInnerHTML={{ __html: groupPreviewHtml }}
+                    />
+                </Box>
+            </Box>
+        </Grid>
+    </Grid>
+</DialogContent>
+                <DialogActions sx={{ p: 3, justifyContent: 'flex-end' }}>
+                    <Button
+                        onClick={handleSendGroupEmail}
+                        variant="contained"
+                        startIcon={<span>✈️</span>}
+                        sx={{
+                            backgroundColor: '#1976d2',
+                            px: 4,
+                            py: 1.5,
+                            borderRadius: 2,
+                            fontWeight: 600,
+                            textTransform: 'none',
+                            fontSize: 16,
+                            '&:hover': {
+                                backgroundColor: '#1565c0'
+                            }
+                        }}
+                        disabled={groupMessageSending || groupMessageForm.to.length === 0 || !groupMessageForm.subject}
+                    >
+                        {groupMessageSending ? 'Sending...' : 'Send'}
+                    </Button>
                 </DialogActions>
             </Dialog>
 
