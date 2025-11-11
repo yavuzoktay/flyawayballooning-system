@@ -11,8 +11,9 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import RebookAvailabilityModal from '../components/BookingPage/RebookAvailabilityModal';
 import {
     getDefaultEmailTemplateContent,
-    applyPersonalNote,
-    getPreviewHtml
+    getDefaultTemplateMessageHtml,
+    extractMessageFromTemplateBody,
+    buildEmailHtml
 } from '../utils/emailTemplateUtils';
 
 const BookingPage = () => {
@@ -179,6 +180,24 @@ const BookingPage = () => {
         return input.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     };
 
+    const resolveTemplateName = (templateValue, dbTemplate) => {
+        if (dbTemplate?.name) return dbTemplate.name;
+        switch (templateValue) {
+            case 'confirmation':
+                return 'Booking Confirmation';
+            case 'reminder':
+                return 'Upcoming Flight Reminder';
+            case 'reschedule':
+                return 'Booking Rescheduled';
+            case 'to_be_updated':
+                return 'To Be Updated';
+            case 'custom':
+                return 'Custom Message';
+            default:
+                return dbTemplate?.name || 'Custom Message';
+        }
+    };
+
     const fetchMessageLogs = async (bookingId) => {
         if (!bookingId) return;
         setMessagesLoading(true);
@@ -223,10 +242,11 @@ const BookingPage = () => {
         const dbTemplate = emailTemplates.find(
             (t) => t.id?.toString() === templateKey?.toString()
         );
+        const templateName = resolveTemplateName(templateKey, dbTemplate);
 
         if (dbTemplate) {
             const defaultContent = getDefaultEmailTemplateContent(
-                dbTemplate,
+                { ...dbTemplate, name: templateName },
                 selectedBookingForEmail
             );
             if (defaultContent?.body) {
@@ -234,7 +254,8 @@ const BookingPage = () => {
             }
         }
 
-        return '';
+        const defaultMessage = getDefaultTemplateMessageHtml(templateName, selectedBookingForEmail);
+        return defaultMessage;
     };
 
     const buildLogHtml = (log) => {
@@ -349,7 +370,6 @@ const BookingPage = () => {
         console.log('🔍 Current emailForm state:', emailForm);
         console.log('🔍 Personal note:', personalNote);
         
-        // Validate only essential fields
         if (!emailForm.to) {
             alert('Recipient email is required');
             return;
@@ -360,33 +380,22 @@ const BookingPage = () => {
             return;
         }
 
-        const selectedTemplate = emailTemplates.find(
+        const dbTemplate = emailTemplates.find(
             (t) => t.id?.toString() === emailForm.template?.toString()
         );
-        const defaultContent = selectedTemplate
-            ? getDefaultEmailTemplateContent(selectedTemplate, selectedBookingForEmail)
-            : null;
-
-        const baseMessage =
-            (emailForm.message && emailForm.message.trim() !== ''
-                ? emailForm.message
-                : defaultContent?.body || '') || '';
-
-        const finalMessage = applyPersonalNote(baseMessage, personalNote);
-
-        if (!finalMessage || finalMessage.trim() === '') {
-            alert('Message content is missing. Please ensure the selected template has a body.');
-            return;
-        }
-
-        const finalSubject =
-            emailForm.subject || defaultContent?.subject || 'Fly Away Ballooning Update';
+        const templateName = resolveTemplateName(emailForm.template, dbTemplate);
+        const finalHtml = buildEmailHtml({
+            templateName,
+            messageHtml: emailForm.message,
+            booking: selectedBookingForEmail,
+            personalNote
+        });
+        const finalText = stripHtml(finalHtml);
 
         console.log('📧 Sending email with data:', {
             to: emailForm.to,
-            subject: finalSubject,
-            messageLength: finalMessage?.length || 0,
-            message: finalMessage?.substring(0, 100) + '...',
+            subject: emailForm.subject,
+            messageLength: finalHtml?.length || 0,
             template: emailForm.template
         });
 
@@ -395,21 +404,18 @@ const BookingPage = () => {
             const response = await axios.post('/api/sendBookingEmail', {
                 bookingId: selectedBookingForEmail.id,
                 to: emailForm.to,
-                subject: finalSubject,
-                message: finalMessage,
+                subject: emailForm.subject,
+                message: finalHtml,
+                messageText: finalText,
                 template: emailForm.template,
                 bookingData: selectedBookingForEmail
             });
 
             if (response.data.success) {
                 alert('Email sent successfully!');
-                if (messagesModalOpen && selectedBookingForEmail?.id) {
-                    fetchMessageLogs(selectedBookingForEmail.id);
-                }
                 setEmailModalOpen(false);
                 setEmailForm({ to: '', subject: '', message: '', template: 'custom' });
                 setPersonalNote('');
-                // Refresh logs after send
                 if (selectedBookingForEmail?.id) {
                     try {
                         const resp = await axios.get(`/api/bookingEmails/${selectedBookingForEmail.id}`);
@@ -453,31 +459,22 @@ const BookingPage = () => {
     }, [emailForm.template, emailTemplates]);
 
     const previewHtml = useMemo(() => {
-        let baseMessage = emailForm.message;
-        const defaultContent = selectedEmailTemplate
-            ? getDefaultEmailTemplateContent(selectedEmailTemplate, selectedBookingForEmail)
-            : null;
-
-        if (!baseMessage || baseMessage.trim() === '') {
-            baseMessage = defaultContent?.body || '';
+        if (!selectedBookingForEmail) {
+            return '';
         }
 
-        if (!baseMessage) {
-            const fallbackText = `Dear ${
-                selectedBookingForEmail?.name || 'Customer'
-            },
+        const dbTemplate = emailTemplates.find(
+            (t) => t.id?.toString() === emailForm.template?.toString()
+        );
+        const templateName = resolveTemplateName(emailForm.template, dbTemplate);
 
-We look forward to sharing the sky with you soon!`;
-            return getPreviewHtml(fallbackText, personalNote);
-        }
-
-        return getPreviewHtml(baseMessage, personalNote);
-    }, [
-        emailForm.message,
-        personalNote,
-        selectedEmailTemplate,
-        selectedBookingForEmail
-    ]);
+        return buildEmailHtml({
+            templateName,
+            messageHtml: emailForm.message,
+            booking: selectedBookingForEmail,
+            personalNote
+        });
+    }, [emailForm.message, personalNote, emailForm.template, emailTemplates, selectedBookingForEmail]);
 
     // Auto-populate email form when template changes
     useEffect(() => {
@@ -509,77 +506,36 @@ We look forward to sharing the sky with you soon!`;
         let subject = '';
         let message = '';
 
-        // Check if it's a database template (numeric ID)
         const dbTemplate = emailTemplates.find(
             (t) => t.id.toString() === templateValue.toString()
         );
+        const templateName = resolveTemplateName(templateValue, dbTemplate);
         console.log('🔍 Found template:', dbTemplate);
         
         if (dbTemplate) {
             subject = dbTemplate.subject || '';
-            message = dbTemplate.body || '';
-
-            const defaultContent = getDefaultEmailTemplateContent(
-                dbTemplate,
-                selectedBookingForEmail
-            );
-
-            if (defaultContent) {
-                subject = defaultContent.subject || subject;
-                message = defaultContent.body || message;
-                console.log(
-                    '✅ Using default template content',
-                    defaultContent.subject,
-                    'Body length:',
-                    (defaultContent.body || '').length
-                );
-            }
+            message = extractMessageFromTemplateBody(dbTemplate.body) || getDefaultTemplateMessageHtml(templateName, selectedBookingForEmail);
         } else {
-            // Legacy fallback templates
             switch (templateValue) {
             case 'confirmation':
                 subject = `Booking Confirmation - ${selectedBookingForEmail?.name || ''}`;
-                message = `Dear ${selectedBookingForEmail?.name || 'Customer'},
-
-Thank you for booking with Fly Away Ballooning! Your booking has been confirmed.
-
-Best regards,
-Fly Away Ballooning Team`;
+                message = getDefaultTemplateMessageHtml('Booking Confirmation', selectedBookingForEmail);
                 break;
             case 'reminder':
                 subject = `Flight Reminder - ${selectedBookingForEmail?.name || ''}`;
-                message = `Dear ${selectedBookingForEmail?.name || 'Customer'},
-
-This is a reminder about your upcoming balloon flight with Fly Away Ballooning.
-
-Best regards,
-Fly Away Ballooning Team`;
+                message = getDefaultTemplateMessageHtml('Upcoming Flight Reminder', selectedBookingForEmail);
                 break;
             case 'reschedule':
                 subject = `Flight Rescheduling - ${selectedBookingForEmail?.name || ''}`;
-                message = `Dear ${selectedBookingForEmail?.name || 'Customer'},
-
-We need to reschedule your balloon flight.
-
-Best regards,
-Fly Away Ballooning Team`;
+                message = getDefaultTemplateMessageHtml('Booking Rescheduled', selectedBookingForEmail);
                 break;
             case 'to_be_updated':
                 subject = `Flight update`;
-                message = `Dear ${selectedBookingForEmail?.name || 'Customer'},
-
-We know that you're waiting to hear from us regarding your flight on ${selectedBookingForEmail?.flight_date ? dayjs(selectedBookingForEmail.flight_date).format('MMMM D, YYYY [at] h:mm A') : '[Date TBD]'}.
-
-We're really sorry for the delay and we will be in touch with you as soon as possible.
-
-Thank you for your patience and understanding.
-
-Best regards,
-Fly Away Ballooning Team`;
+                message = getDefaultTemplateMessageHtml('To Be Updated', selectedBookingForEmail) || '';
                 break;
             default:
                 subject = `Regarding your Fly Away Ballooning booking - ${selectedBookingForEmail?.name || ''}`;
-                message = '';
+                message = getDefaultTemplateMessageHtml(templateName, selectedBookingForEmail) || '';
             }
         }
 
@@ -1982,25 +1938,20 @@ setBookingDetail(finalVoucherDetail);
         
         let subject = '';
         let message = '';
-        let templateValue = 'to_be_updated';
+        let templateValue = 'custom';
         
         if (firstTemplate) {
             templateValue = firstTemplate.id;
             subject = firstTemplate.subject || '';
-            message = firstTemplate.body || '';
-            
-            const defaultContent = getDefaultEmailTemplateContent(firstTemplate, booking);
-            if (defaultContent) {
-                subject = defaultContent.subject || subject;
-                message = defaultContent.body || message;
-            }
-            
+            message = extractMessageFromTemplateBody(firstTemplate.body) || getDefaultTemplateMessageHtml(firstTemplate.name, booking);
             console.log('✅ Email form populated with template body:', {
                 subject,
                 bodyLength: (message || '').length,
                 templateId: firstTemplate.id
             });
         } else {
+            subject = `Regarding your Fly Away Ballooning booking - ${booking.name || ''}`;
+            message = getDefaultTemplateMessageHtml('Custom Message', booking) || '';
             console.log('⚠️ No templates available, using fallback');
         }
         

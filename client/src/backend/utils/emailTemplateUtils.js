@@ -17,27 +17,12 @@ const escapeHtml = (unsafe = '') => {
 export const isHtmlContent = (value = '') =>
     typeof value === 'string' && /<\/?[a-z][\s\S]*>/i.test(value);
 
-const stripDocumentTags = (html = '') =>
-    html
-        .replace(/<!DOCTYPE[^>]*>/gi, '')
-        .replace(/<\/?(html|head|body)[^>]*>/gi, '');
-
-const RECEIPT_MARKER_START = '<!-- RECEIPT_SECTION_START -->';
-const RECEIPT_MARKER_END = '<!-- RECEIPT_SECTION_END -->';
-
-const sanitizeTemplateHtml = (html = '') => {
+export const sanitizeTemplateHtml = (html = '') => {
     const raw = html == null ? '' : String(html);
-    return stripDocumentTags(raw).trim();
-};
-
-export const extractMessageFromTemplateBody = (html = '') => {
-    const sanitized = sanitizeTemplateHtml(html);
-    if (!sanitized) return '';
-    const markerIndex = sanitized.indexOf(RECEIPT_MARKER_START);
-    if (markerIndex !== -1) {
-        return sanitized.slice(0, markerIndex).trim();
-    }
-    return sanitized;
+    return raw
+        .replace(/<!DOCTYPE[^>]*>/gi, '')
+        .replace(/<\/?(html|head|body)[^>]*>/gi, '')
+        .trim();
 };
 
 const textToParagraphHtml = (text = '') =>
@@ -52,11 +37,21 @@ const textToParagraphHtml = (text = '') =>
         )
         .join('') || '<p style="margin:0 0 16px;">&nbsp;</p>';
 
+export const extractMessageFromTemplateBody = (html = '') => {
+    const sanitized = sanitizeTemplateHtml(html);
+    if (!sanitized) return '';
+    const markerIndex = sanitized.indexOf(RECEIPT_MARKER_START);
+    if (markerIndex !== -1) {
+        return sanitized.slice(0, markerIndex).trim();
+    }
+    return sanitized;
+};
+
 const resolveBodyHtml = (template = {}, fallbackParagraphsHtml = '') => {
     const raw = template?.body;
     if (raw && raw.trim() !== '') {
         if (isHtmlContent(raw)) {
-            return stripDocumentTags(raw);
+            return sanitizeTemplateHtml(raw);
         }
         return textToParagraphHtml(raw);
     }
@@ -105,7 +100,7 @@ const buildEmailLayout = ({
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${subject}</title>
+    <title>${escapeHtml(subject)}</title>
 </head>
 <body style="margin:0; padding:0; background-color:#f5f5f5; font-family:'Helvetica Neue', Arial, sans-serif;">
     <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
@@ -149,6 +144,14 @@ const buildEmailLayout = ({
         body: html
     };
 };
+
+const formatDateTime = (value) =>
+    value ? dayjs(value).format('MMMM D, YYYY [at] h:mm A') : null;
+
+const formatDate = (value) => (value ? dayjs(value).format('MMMM D, YYYY') : null);
+
+const RECEIPT_MARKER_START = '<!-- RECEIPT_SECTION_START -->';
+const RECEIPT_MARKER_END = '<!-- RECEIPT_SECTION_END -->';
 
 const wrapParagraphs = (paragraphs = []) =>
     paragraphs
@@ -306,11 +309,6 @@ const DEFAULT_EDITOR_BOOKING = {
     passengers: [{ first_name: 'First', last_name: 'Guest' }]
 };
 
-const formatDateTime = (value) =>
-    value ? dayjs(value).format('MMMM D, YYYY [at] h:mm A') : null;
-
-const formatDate = (value) => (value ? dayjs(value).format('MMMM D, YYYY') : null);
-
 const DEFAULT_TEMPLATE_BUILDERS = {
     'Follow up': ({ template, booking }) => {
         const customerName = booking?.name || booking?.customer_name || 'Guest';
@@ -336,17 +334,16 @@ const DEFAULT_TEMPLATE_BUILDERS = {
         const customerName = booking?.name || booking?.customer_name || 'Guest';
         const subject = '🎈 Your flight is confirmed';
 
-        const defaultMessageHtml = getBookingConfirmationMessageHtml(booking);
         const customMessageHtml = template?.body
             ? extractMessageFromTemplateBody(template.body)
             : '';
-        const messageHtml = customMessageHtml || defaultMessageHtml;
-        const receiptHtml = getBookingConfirmationReceiptHtml(booking);
+        const messageHtml = customMessageHtml || getBookingConfirmationMessageHtml(booking);
+        const bodyHtml = `${messageHtml}${getBookingConfirmationReceiptHtml(booking)}`;
 
         return buildEmailLayout({
             subject,
             headline: 'Your balloon flight is booked!',
-            bodyHtml: `${messageHtml}${receiptHtml}`,
+            bodyHtml,
             customerName,
             signatureLines: ['Fly Away Ballooning Team'],
             footerLinks: [
@@ -357,12 +354,8 @@ const DEFAULT_TEMPLATE_BUILDERS = {
     },
     'Booking Rescheduled': ({ template, booking }) => {
         const customerName = booking?.name || booking?.customer_name || 'Guest';
-        const previousDate = formatDateTime(booking?.flight_date);
         const subject = '✈️ Your flight is rescheduled';
-        const defaultBodyHtml = getBookingRescheduledMessageHtml({
-            ...booking,
-            flight_date: booking?.flight_date
-        });
+        const defaultBodyHtml = getBookingRescheduledMessageHtml(booking);
 
         return buildEmailLayout({
             subject,
@@ -378,7 +371,6 @@ const DEFAULT_TEMPLATE_BUILDERS = {
     },
     'Gift Card Confirmation': ({ template, booking }) => {
         const purchaserName = booking?.name || booking?.customer_name || 'Guest';
-        const recipient = booking?.recipient_name || 'your recipient';
         const subject = '🎁 Your Gift Voucher is ready';
         const defaultBodyHtml = getGiftCardMessageHtml(booking);
 
@@ -396,9 +388,6 @@ const DEFAULT_TEMPLATE_BUILDERS = {
     },
     'Request for Payment/Deposit': ({ template, booking }) => {
         const customerName = booking?.name || booking?.customer_name || 'Guest';
-        const amountDue = booking?.due
-            ? `£${Number(booking?.due).toFixed(2)}`
-            : 'the remaining balance';
         const subject = '💳 Payment request';
         const defaultBodyHtml = getPaymentRequestMessageHtml(booking);
 
@@ -416,7 +405,6 @@ const DEFAULT_TEMPLATE_BUILDERS = {
     },
     'Upcoming Flight Reminder': ({ template, booking }) => {
         const customerName = booking?.name || booking?.customer_name || 'Guest';
-        const flightDate = formatDateTime(booking?.flight_date);
         const subject = '⏰ Your flight is coming up';
         const defaultBodyHtml = getUpcomingFlightReminderMessageHtml(booking);
 
@@ -434,25 +422,47 @@ const DEFAULT_TEMPLATE_BUILDERS = {
     }
 };
 
+export const getDefaultTemplateMessageHtml = (templateName, booking = DEFAULT_EDITOR_BOOKING) => {
+    switch (templateName) {
+        case 'Follow up':
+            return getFollowUpMessageHtml(booking);
+        case 'Booking Confirmation':
+            return getBookingConfirmationMessageHtml(booking);
+        case 'Booking Rescheduled':
+            return getBookingRescheduledMessageHtml(booking);
+        case 'Gift Card Confirmation':
+            return getGiftCardMessageHtml(booking);
+        case 'Request for Payment/Deposit':
+            return getPaymentRequestMessageHtml(booking);
+        case 'Upcoming Flight Reminder':
+            return getUpcomingFlightReminderMessageHtml(booking);
+        case 'To Be Updated':
+            return wrapParagraphs([
+                'We wanted to let you know that we are still finalizing the details of your flight.',
+                'We will be in touch as soon as we have an update. Thank you for your patience!'
+            ]);
+        default:
+            return '';
+    }
+};
+
 export const getDefaultEmailTemplateContent = (template, booking = {}) => {
     if (!template) return null;
     const templateName = template.name || template.subject;
     const builder = DEFAULT_TEMPLATE_BUILDERS[templateName];
-    const templateBody =
-        template.body && template.body.trim() !== '' ? template.body : null;
+    const templateBody = template.body && template.body.trim() !== ''
+        ? template.body
+        : null;
+    const isEdited = template.edited === 1 || template.edited === true;
 
     if (!builder) {
-        if (!templateBody) return null;
-        if (isHtmlContent(templateBody)) {
-            return {
-                subject: template.subject,
-                body: stripDocumentTags(templateBody)
-            };
-        }
-        return {
-            subject: template.subject,
-            body: textToParagraphHtml(templateBody)
-        };
+        return templateBody
+            ? { subject: template.subject, body: resolveBodyHtml(template, '') }
+            : null;
+    }
+
+    if (templateBody && isEdited) {
+        return builder({ template, booking });
     }
 
     return builder({ template, booking });
@@ -518,23 +528,17 @@ export const getPreviewHtml = (message, personalNote = '') => {
     ).replace(/\n/g, '<br>')}</div>`;
 };
 
-export const getDefaultTemplateMessage = (templateName) => {
-    switch (templateName) {
-        case 'Follow up':
-            return getFollowUpMessageHtml(DEFAULT_EDITOR_BOOKING);
-        case 'Booking Confirmation':
-            return getBookingConfirmationMessageHtml(DEFAULT_EDITOR_BOOKING);
-        case 'Booking Rescheduled':
-            return getBookingRescheduledMessageHtml(DEFAULT_EDITOR_BOOKING);
-        case 'Gift Card Confirmation':
-            return getGiftCardMessageHtml(DEFAULT_EDITOR_BOOKING);
-        case 'Request for Payment/Deposit':
-            return getPaymentRequestMessageHtml(DEFAULT_EDITOR_BOOKING);
-        case 'Upcoming Flight Reminder':
-            return getUpcomingFlightReminderMessageHtml(DEFAULT_EDITOR_BOOKING);
-        default:
-            return '';
-    }
+export const buildEmailHtml = ({ templateName, messageHtml, booking, personalNote }) => {
+    const effectiveTemplateName = templateName || 'Custom Message';
+    const baseMessage = messageHtml && messageHtml.trim() !== ''
+        ? sanitizeTemplateHtml(messageHtml)
+        : getDefaultTemplateMessageHtml(effectiveTemplateName, booking);
+    const messageWithNote = applyPersonalNote(baseMessage, personalNote);
+    const layout = getDefaultEmailTemplateContent(
+        { name: effectiveTemplateName, body: messageWithNote, edited: true },
+        booking
+    );
+    return layout?.body || messageWithNote;
 };
 
 export const PERSONAL_NOTE_TOKEN = PERSONAL_NOTE_PLACEHOLDER;
