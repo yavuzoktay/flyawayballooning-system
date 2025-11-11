@@ -16,6 +16,7 @@ import {
     ChevronDown,
     ChevronUp
 } from 'lucide-react';
+import { getDefaultEmailTemplateContent } from '../utils/emailTemplateUtils';
 
 const Settings = () => {
     const [activeTab, setActiveTab] = useState('admin'); // 'admin' or 'user_generated'
@@ -200,10 +201,17 @@ const Settings = () => {
     const [showEmailTemplateForm, setShowEmailTemplateForm] = useState(false);
     const [showEditEmailTemplateForm, setShowEditEmailTemplateForm] = useState(false);
     const [selectedEmailTemplate, setSelectedEmailTemplate] = useState(null);
+    const getDefaultTemplateBody = (templateName) => {
+        return getDefaultEmailTemplateContent(
+            { name: templateName || '', subject: '' },
+            {}
+        )?.body || '';
+    };
+
     const [emailTemplateFormData, setEmailTemplateFormData] = useState({
         name: '',
         subject: '',
-        body: '',
+        body: getDefaultTemplateBody('Booking Confirmation'),
         category: 'User Defined Message',
         sms_enabled: false
     });
@@ -4076,7 +4084,7 @@ const Settings = () => {
                                                 setEmailTemplateFormData({
                                                     name: template.name,
                                                     subject: template.subject,
-                                                    body: template.body || '',
+                                                    body: template.body || getDefaultTemplateBody(template.name),
                                                     category: template.category,
                                                     sms_enabled: template.sms_enabled || false
                                                 });
@@ -6234,7 +6242,7 @@ const Settings = () => {
                                     setEmailTemplateFormData({
                                         name: '',
                                         subject: '',
-                                        body: '',
+                                        body: getDefaultTemplateBody('Booking Confirmation'),
                                         category: 'User Defined Message',
                                         sms_enabled: false
                                     });
@@ -6253,7 +6261,7 @@ const Settings = () => {
                                     setEmailTemplateFormData({
                                         name: '',
                                         subject: '',
-                                        body: '',
+                                        body: getDefaultTemplateBody('Booking Confirmation'),
                                         category: 'User Defined Message',
                                         sms_enabled: false
                                     });
@@ -6480,7 +6488,7 @@ const Settings = () => {
                                     setEmailTemplateFormData({
                                         name: '',
                                         subject: '',
-                                        body: '',
+                                        body: getDefaultTemplateBody('Booking Confirmation'),
                                         category: 'User Defined Message',
                                         sms_enabled: false
                                     });
