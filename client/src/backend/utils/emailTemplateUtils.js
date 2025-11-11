@@ -22,6 +22,24 @@ const stripDocumentTags = (html = '') =>
         .replace(/<!DOCTYPE[^>]*>/gi, '')
         .replace(/<\/?(html|head|body)[^>]*>/gi, '');
 
+const RECEIPT_MARKER_START = '<!-- RECEIPT_SECTION_START -->';
+const RECEIPT_MARKER_END = '<!-- RECEIPT_SECTION_END -->';
+
+const sanitizeTemplateHtml = (html = '') => {
+    const raw = html == null ? '' : String(html);
+    return stripDocumentTags(raw).trim();
+};
+
+export const extractMessageFromTemplateBody = (html = '') => {
+    const sanitized = sanitizeTemplateHtml(html);
+    if (!sanitized) return '';
+    const markerIndex = sanitized.indexOf(RECEIPT_MARKER_START);
+    if (markerIndex !== -1) {
+        return sanitized.slice(0, markerIndex).trim();
+    }
+    return sanitized;
+};
+
 const textToParagraphHtml = (text = '') =>
     text
         .split(/\n{2,}/)
@@ -132,6 +150,162 @@ const buildEmailLayout = ({
     };
 };
 
+const wrapParagraphs = (paragraphs = []) =>
+    paragraphs
+        .map(
+            (text, index) =>
+                `<p style="margin:0 0 ${index === paragraphs.length - 1 ? '24px' : '16px'};">${text}</p>`
+        )
+        .join('');
+
+const getBookingConfirmationMessageHtml = (booking = {}) => {
+    const name = escapeHtml(booking?.name || booking?.customer_name || 'Guest');
+    const flightDate = escapeHtml(formatDateTime(booking?.flight_date) || 'November 14, 2025 at 3:30 PM');
+    const location = escapeHtml(booking?.location || 'Bath');
+    const experience = escapeHtml(booking?.flight_type || 'Private Charter');
+
+    return wrapParagraphs([
+        `Dear ${name},`,
+        `We’re thrilled to confirm your balloon flight experience with us!`,
+        `🗓 <strong>Date:</strong> ${flightDate}`,
+        `📍 <strong>Meeting point:</strong> ${location}`,
+        `🎫 <strong>Experience:</strong> ${experience}`,
+        'We’ll be in touch again closer to the flight with weather updates and meeting instructions. In the meantime, feel free to reply directly if you have any questions.',
+        'Thank you,',
+        'Fly Away Ballooning Team'
+    ]);
+};
+
+const getBookingConfirmationReceiptHtml = (booking = {}) => {
+    const receiptItems = Array.isArray(booking?.passengers) ? booking.passengers : [];
+    const paidAmount = booking?.paid != null ? Number(booking.paid) : null;
+    const dueAmount = booking?.due != null ? Number(booking.due) : null;
+    const subtotal = paidAmount != null && dueAmount != null ? paidAmount + dueAmount : null;
+    const receiptId = booking?.receipt_number || booking?.booking_reference || booking?.id || '';
+    const receiptSoldDate = booking?.created_at ? formatDate(booking.created_at) : null;
+    const location = escapeHtml(booking?.location || 'Bath');
+    const experience = escapeHtml(booking?.flight_type || 'Flight Experience');
+    const guestCount = receiptItems.length;
+
+    return `${RECEIPT_MARKER_START}<div style="margin:32px 0; padding:24px; background:#f9fafb; border-radius:16px; border:1px solid #e2e8f0;">
+        <div style="font-size:12px; letter-spacing:0.2em; color:#64748b; text-transform:uppercase; margin-bottom:12px;">Receipt</div>
+        <div style="display:flex; flex-wrap:wrap; gap:16px; font-size:14px; color:#475569;">
+            <div style="min-width:220px;">
+                <div><strong>Sold:</strong> ${receiptSoldDate || '—'}</div>
+                <div><strong>Confirmation:</strong> ${escapeHtml(receiptId)}</div>
+            </div>
+            <div style="min-width:220px;">
+                <div><strong>Sold to:</strong></div>
+                <div>${escapeHtml(booking?.name || booking?.customer_name || 'Guest')}</div>
+                <div>${escapeHtml(booking?.phone || '')}</div>
+                <div>${escapeHtml(booking?.email || '')}</div>
+                <div>${escapeHtml(booking?.billing_address || '')}</div>
+            </div>
+            <div style="min-width:220px; background:#f8fafc; border-radius:12px; padding:16px;">
+                <div style="font-weight:700; margin-bottom:8px;">Questions?</div>
+                <div style="font-size:13px;">Questions? We're here to help! Contact us by calling <a href="tel:+441823778127" style="color:#2563eb; text-decoration:none;">+44 1823 778 127</a></div>
+            </div>
+        </div>
+        <div style="margin-top:24px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; font-size:13px; color:#475569;">
+                <thead>
+                    <tr>
+                        <th align="left" style="padding:8px 0; border-bottom:1px solid #e2e8f0; text-transform:uppercase; letter-spacing:0.08em;">Item</th>
+                        <th align="left" style="padding:8px 0; border-bottom:1px solid #e2e8f0; text-transform:uppercase; letter-spacing:0.08em;">Description</th>
+                        <th align="right" style="padding:8px 0; border-bottom:1px solid #e2e8f0; text-transform:uppercase; letter-spacing:0.08em;">Amount</th>
+                        <th align="right" style="padding:8px 0; border-bottom:1px solid #e2e8f0; text-transform:uppercase; letter-spacing:0.08em;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding:12px 0; border-bottom:1px solid #f1f5f9; font-weight:600;">${experience}</td>
+                        <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;">
+                            ${location}
+                            ${guestCount > 0 ? `<div style="margin-top:4px; font-size:12px; color:#64748b;">Guests: ${guestCount}</div>` : ''}
+                        </td>
+                        <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;" align="right">
+                            ${guestCount > 0 && subtotal != null ? `£${(subtotal / guestCount).toFixed(2)} × ${guestCount}` : '—'}
+                        </td>
+                        <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;" align="right">
+                            £${subtotal != null ? subtotal.toFixed(2) : '—'}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div style="margin-top:16px; display:flex; flex-direction:column; align-items:flex-end; gap:8px; font-size:13px; color:#475569;">
+            <div><strong>Subtotal:</strong> £${subtotal != null ? subtotal.toFixed(2) : '—'}</div>
+            <div><strong>Total:</strong> £${subtotal != null ? subtotal.toFixed(2) : '—'}</div>
+            <div><strong>Paid:</strong> £${paidAmount != null ? paidAmount.toFixed(2) : '—'}</div>
+            <div><strong>Due:</strong> £${dueAmount != null ? dueAmount.toFixed(2) : '—'}</div>
+        </div>
+    </div>${RECEIPT_MARKER_END}
+    <div style="margin-top:24px; text-align:center;">
+        <a href="https://flyawayballooning.com/faq" style="margin-right:16px; font-size:13px; color:#2563eb; text-decoration:none;">View FAQs</a>
+        <a href="mailto:bookings@tripworks.com" style="font-size:13px; color:#2563eb; text-decoration:none;">Contact us</a>
+    </div>`;
+};
+
+const getFollowUpMessageHtml = (booking = {}) =>
+    wrapParagraphs([
+        'As the chief pilot of Fly Away Ballooning, I wanted to personally thank you for trusting us with your flight.',
+        'If you have a moment to share what the day felt like for you, our whole crew would love to hear it. Your feedback helps us keep improving every single launch.',
+        'Thanks for choosing FAB — we hope to see you floating with us again soon! 🎈'
+    ]);
+
+const getBookingRescheduledMessageHtml = (booking = {}) => {
+    const previousDate = escapeHtml(formatDateTime(booking?.flight_date) || 'soon');
+    return wrapParagraphs([
+        'Thanks for your flexibility — we’ve updated your booking and are ready to help you choose a new launch window.',
+        `Originally scheduled for <strong>${previousDate}</strong>, we’ll reach out shortly with next available alternatives that match your preferences.`,
+        'If you already have a date in mind, simply reply to this email and we’ll take care of the rest.',
+        'We appreciate your patience as we work around the weather. Ballooning is worth waiting for!'
+    ]);
+};
+
+const getGiftCardMessageHtml = (booking = {}) => {
+    const recipient = escapeHtml(booking?.recipient_name || 'your recipient');
+    return wrapParagraphs([
+        'Thanks for choosing Fly Away Ballooning — your gift voucher is confirmed and ready to deliver!',
+        `🎁 <strong>Recipient:</strong> ${recipient}`,
+        '📬 We’ll email the voucher directly, and you’ll also receive a printable copy in your account.',
+        'If you’d prefer to add a personal note or change the delivery date, just reply to this message and our team will help right away.'
+    ]);
+};
+
+const getPaymentRequestMessageHtml = (booking = {}) => {
+    const amountDue = booking?.due != null ? `£${Number(booking?.due).toFixed(2)}` : 'the remaining balance';
+    return wrapParagraphs([
+        `We’re looking forward to hosting you! There’s just one small step left — completing ${escapeHtml(amountDue)} for your booking.`,
+        'You can securely pay online using the button below. Once the payment is confirmed, you’ll receive an updated receipt straight away.',
+        '<a href="https://flyawayballooning.com/pay" style="display:inline-block; margin:16px 0 24px; background:#6366f1; color:#fff; padding:14px 28px; border-radius:999px; text-decoration:none; font-weight:600;">Complete payment</a>',
+        'If you have any questions or would prefer to pay over the phone, reply to this email and we’ll be happy to help.'
+    ]);
+};
+
+const getUpcomingFlightReminderMessageHtml = (booking = {}) => {
+    const flightDate = escapeHtml(formatDateTime(booking?.flight_date) || 'soon');
+    return wrapParagraphs([
+        `Just a quick reminder that your flight is scheduled for <strong>${flightDate}</strong>.`,
+        'Please arrive at least 30 minutes before your scheduled launch so we can complete check-in and the safety briefing.',
+        'Keep an eye on your inbox — we’ll notify you if weather conditions require any last-minute adjustments.'
+    ]);
+};
+
+const DEFAULT_EDITOR_BOOKING = {
+    name: 'First Name',
+    customer_name: 'First Name',
+    flight_date: dayjs().add(5, 'day').toISOString(),
+    location: 'Bath',
+    flight_type: 'Private Charter',
+    phone: '+44 1234 567890',
+    email: 'guest@example.com',
+    billing_address: '123 High Street, Bath, UK',
+    paid: 150,
+    due: 500,
+    passengers: [{ first_name: 'First', last_name: 'Guest' }]
+};
+
 const formatDateTime = (value) =>
     value ? dayjs(value).format('MMMM D, YYYY [at] h:mm A') : null;
 
@@ -143,16 +317,7 @@ const DEFAULT_TEMPLATE_BUILDERS = {
         const subject = '🎈 Thank you';
         const highlightHtml =
             'This sends automatically a few hours after the flight. It can also be cancelled beforehand from the Tripworks customer profile email section.';
-        const defaultBodyHtml = [
-            'As the chief pilot of Fly Away Ballooning, I wanted to personally thank you for trusting us with your flight.',
-            'If you have a moment to share what the day felt like for you, our whole crew would love to hear it. Your feedback helps us keep improving every single launch.',
-            'Thanks for choosing FAB — we hope to see you floating with us again soon! 🎈'
-        ]
-            .map(
-                (paragraph) =>
-                    `<p style="margin:0 0 16px;">${paragraph}</p>`
-            )
-            .join('');
+        const defaultBodyHtml = getFollowUpMessageHtml(booking);
 
         return buildEmailLayout({
             subject,
@@ -169,88 +334,19 @@ const DEFAULT_TEMPLATE_BUILDERS = {
     },
     'Booking Confirmation': ({ template, booking }) => {
         const customerName = booking?.name || booking?.customer_name || 'Guest';
-        const flightDate = formatDateTime(booking?.flight_date);
-        const location = booking?.location || 'our launch site';
-        const experience = booking?.flight_type || 'your flight';
         const subject = '🎈 Your flight is confirmed';
 
-        const receiptItems = Array.isArray(booking?.passengers) ? booking.passengers : [];
-        const paidAmount = booking?.paid != null ? Number(booking.paid) : null;
-        const dueAmount = booking?.due != null ? Number(booking.due) : null;
-        const subtotal = paidAmount != null && dueAmount != null ? paidAmount + dueAmount : null;
-        const receiptId = booking?.receipt_number || booking?.booking_reference || booking?.id || '';
-        const receiptSoldDate = booking?.created_at ? formatDate(booking.created_at) : null;
-
-        const defaultBodyHtml = [
-            `<p style="margin:0 0 16px;">We’re thrilled to confirm your balloon flight experience with us!</p>`,
-            `<p style="margin:0 0 16px;">🗓 <strong>Date:</strong> ${escapeHtml(flightDate || 'We will reach out to schedule with you shortly.')}</p>`,
-            `<p style="margin:0 0 16px;">📍 <strong>Meeting point:</strong> ${escapeHtml(location)}</p>`,
-            `<p style="margin:0 0 24px;">🎫 <strong>Experience:</strong> ${escapeHtml(experience)}</p>`,
-            `<p style="margin:0 0 16px;">We’ll be in touch again closer to the flight with weather updates and meeting instructions. In the meantime, feel free to reply directly if you have any questions.</p>`,
-            `<p style="margin:0 0 24px;">Fly Away Ballooning Team</p>`,
-            `<div style="margin:32px 0; padding:24px; background:#f9fafb; border-radius:16px; border:1px solid #e2e8f0;">
-                <div style="font-size:12px; letter-spacing:0.2em; color:#64748b; text-transform:uppercase; margin-bottom:12px;">Receipt</div>
-                <div style="display:flex; flex-wrap:wrap; gap:16px; font-size:14px; color:#475569;">
-                    <div style="min-width:220px;">
-                        <div><strong>Sold:</strong> ${receiptSoldDate || '—'}</div>
-                        <div><strong>Confirmation:</strong> ${escapeHtml(receiptId)}</div>
-                    </div>
-                    <div style="min-width:220px;">
-                        <div><strong>Sold to:</strong></div>
-                        <div>${escapeHtml(booking?.name || booking?.customer_name || 'Guest')}</div>
-                        <div>${escapeHtml(booking?.phone || '')}</div>
-                        <div>${escapeHtml(booking?.email || '')}</div>
-                        <div>${escapeHtml(booking?.billing_address || '')}</div>
-                    </div>
-                    <div style="min-width:220px; background:#f8fafc; border-radius:12px; padding:16px;">
-                        <div style="font-weight:700; margin-bottom:8px;">Questions?</div>
-                        <div style="font-size:13px;">Questions? We're here to help! Contact us by calling <a href="tel:+441823778127" style="color:#2563eb; text-decoration:none;">+44 1823 778 127</a></div>
-                    </div>
-                </div>
-                <div style="margin-top:24px;">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; font-size:13px; color:#475569;">
-                        <thead>
-                            <tr>
-                                <th align="left" style="padding:8px 0; border-bottom:1px solid #e2e8f0; text-transform:uppercase; letter-spacing:0.08em;">Item</th>
-                                <th align="left" style="padding:8px 0; border-bottom:1px solid #e2e8f0; text-transform:uppercase; letter-spacing:0.08em;">Description</th>
-                                <th align="right" style="padding:8px 0; border-bottom:1px solid #e2e8f0; text-transform:uppercase; letter-spacing:0.08em;">Amount</th>
-                                <th align="right" style="padding:8px 0; border-bottom:1px solid #e2e8f0; text-transform:uppercase; letter-spacing:0.08em;">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td style="padding:12px 0; border-bottom:1px solid #f1f5f9; font-weight:600;">${escapeHtml(experience || 'Flight Experience')}</td>
-                                <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;">
-                                    ${escapeHtml(location || 'Bath')}
-                                    ${receiptItems.length > 0 ? `<div style="margin-top:4px; font-size:12px; color:#64748b;">Guests: ${receiptItems.length}</div>` : ''}
-                                </td>
-                                <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;" align="right">
-                                    ${receiptItems.length > 0 && subtotal != null ? `£${(subtotal / receiptItems.length).toFixed(2)} × ${receiptItems.length}` : '—'}
-                                </td>
-                                <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;" align="right">
-                                    £${subtotal != null ? subtotal.toFixed(2) : '—'}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div style="margin-top:16px; display:flex; flex-direction:column; align-items:flex-end; gap:8px; font-size:13px; color:#475569;">
-                    <div><strong>Subtotal:</strong> £${subtotal != null ? subtotal.toFixed(2) : '—'}</div>
-                    <div><strong>Total:</strong> £${subtotal != null ? subtotal.toFixed(2) : '—'}</div>
-                    <div><strong>Paid:</strong> £${paidAmount != null ? paidAmount.toFixed(2) : '—'}</div>
-                    <div><strong>Due:</strong> £${dueAmount != null ? dueAmount.toFixed(2) : '—'}</div>
-                </div>
-            </div>
-            <div style="margin-top:24px; text-align:center;">
-                <a href="https://flyawayballooning.com/faq" style="margin-right:16px; font-size:13px; color:#2563eb; text-decoration:none;">View FAQs</a>
-                <a href="mailto:bookings@tripworks.com" style="font-size:13px; color:#2563eb; text-decoration:none;">Contact us</a>
-            </div>`
-        ].join('');
+        const defaultMessageHtml = getBookingConfirmationMessageHtml(booking);
+        const customMessageHtml = template?.body
+            ? extractMessageFromTemplateBody(template.body)
+            : '';
+        const messageHtml = customMessageHtml || defaultMessageHtml;
+        const receiptHtml = getBookingConfirmationReceiptHtml(booking);
 
         return buildEmailLayout({
             subject,
             headline: 'Your balloon flight is booked!',
-            bodyHtml: resolveBodyHtml(template, defaultBodyHtml),
+            bodyHtml: `${messageHtml}${receiptHtml}`,
             customerName,
             signatureLines: ['Fly Away Ballooning Team'],
             footerLinks: [
@@ -263,16 +359,10 @@ const DEFAULT_TEMPLATE_BUILDERS = {
         const customerName = booking?.name || booking?.customer_name || 'Guest';
         const previousDate = formatDateTime(booking?.flight_date);
         const subject = '✈️ Your flight is rescheduled';
-        const defaultBodyHtml = [
-            `Thanks for your flexibility — we’ve updated your booking and are ready to help you choose a new launch window.`,
-            previousDate
-                ? `Originally scheduled for <strong>${escapeHtml(previousDate)}</strong>, we’ll reach out shortly with next available alternatives that match your preferences.`
-                : 'We’ll reach out shortly with new availability options that match your preferences.',
-            'If you already have a date in mind, simply reply to this email and we’ll take care of the rest.',
-            'We appreciate your patience as we work around the weather. Ballooning is worth waiting for!'
-        ]
-            .map((paragraph) => `<p style="margin:0 0 16px;">${paragraph}</p>`)
-            .join('');
+        const defaultBodyHtml = getBookingRescheduledMessageHtml({
+            ...booking,
+            flight_date: booking?.flight_date
+        });
 
         return buildEmailLayout({
             subject,
@@ -290,17 +380,7 @@ const DEFAULT_TEMPLATE_BUILDERS = {
         const purchaserName = booking?.name || booking?.customer_name || 'Guest';
         const recipient = booking?.recipient_name || 'your recipient';
         const subject = '🎁 Your Gift Voucher is ready';
-        const defaultBodyHtml = [
-            'Thanks for choosing Fly Away Ballooning — your gift voucher is confirmed and ready to deliver!',
-            `🎁 <strong>Recipient:</strong> ${escapeHtml(recipient)}`,
-            '📬 We’ll email the voucher directly, and you’ll also receive a printable copy in your account.',
-            'If you’d prefer to add a personal note or change the delivery date, just reply to this message and our team will help right away.'
-        ]
-            .map((paragraph, index) => {
-                const margin = index === 0 ? 'margin:0 0 16px;' : 'margin:0 0 14px;';
-                return `<p style="${margin}">${paragraph}</p>`;
-            })
-            .join('');
+        const defaultBodyHtml = getGiftCardMessageHtml(booking);
 
         return buildEmailLayout({
             subject,
@@ -320,16 +400,7 @@ const DEFAULT_TEMPLATE_BUILDERS = {
             ? `£${Number(booking?.due).toFixed(2)}`
             : 'the remaining balance';
         const subject = '💳 Payment request';
-        const defaultBodyHtml = [
-            `We’re looking forward to hosting you! There’s just one small step left — completing ${escapeHtml(
-                amountDue
-            )} for your booking.`,
-            'You can securely pay online using the button below. Once the payment is confirmed, you’ll receive an updated receipt straight away.',
-            '<a href="https://flyawayballooning.com/pay" style="display:inline-block; margin:16px 0 24px; background:#6366f1; color:#fff; padding:14px 28px; border-radius:999px; text-decoration:none; font-weight:600;">Complete payment</a>',
-            'If you have any questions or would prefer to pay over the phone, reply to this email and we’ll be happy to help.'
-        ]
-            .map((paragraph) => `<p style="margin:0 0 16px;">${paragraph}</p>`)
-            .join('');
+        const defaultBodyHtml = getPaymentRequestMessageHtml(booking);
 
         return buildEmailLayout({
             subject,
@@ -347,15 +418,7 @@ const DEFAULT_TEMPLATE_BUILDERS = {
         const customerName = booking?.name || booking?.customer_name || 'Guest';
         const flightDate = formatDateTime(booking?.flight_date);
         const subject = '⏰ Your flight is coming up';
-        const defaultBodyHtml = [
-            `Just a quick reminder that your flight is scheduled for <strong>${escapeHtml(
-                flightDate || 'soon'
-            )}</strong>.`,
-            'Please arrive at least 30 minutes before your scheduled launch so we can complete check-in and the safety briefing.',
-            'Keep an eye on your inbox — we’ll notify you if weather conditions require any last-minute adjustments.'
-        ]
-            .map((paragraph) => `<p style="margin:0 0 16px;">${paragraph}</p>`)
-            .join('');
+        const defaultBodyHtml = getUpcomingFlightReminderMessageHtml(booking);
 
         return buildEmailLayout({
             subject,
@@ -453,6 +516,25 @@ export const getPreviewHtml = (message, personalNote = '') => {
     return `<div style="font-size:16px; line-height:1.7; color:#1f2937;">${escapeHtml(
         messageWithNote
     ).replace(/\n/g, '<br>')}</div>`;
+};
+
+export const getDefaultTemplateMessage = (templateName) => {
+    switch (templateName) {
+        case 'Follow up':
+            return getFollowUpMessageHtml(DEFAULT_EDITOR_BOOKING);
+        case 'Booking Confirmation':
+            return getBookingConfirmationMessageHtml(DEFAULT_EDITOR_BOOKING);
+        case 'Booking Rescheduled':
+            return getBookingRescheduledMessageHtml(DEFAULT_EDITOR_BOOKING);
+        case 'Gift Card Confirmation':
+            return getGiftCardMessageHtml(DEFAULT_EDITOR_BOOKING);
+        case 'Request for Payment/Deposit':
+            return getPaymentRequestMessageHtml(DEFAULT_EDITOR_BOOKING);
+        case 'Upcoming Flight Reminder':
+            return getUpcomingFlightReminderMessageHtml(DEFAULT_EDITOR_BOOKING);
+        default:
+            return '';
+    }
 };
 
 export const PERSONAL_NOTE_TOKEN = PERSONAL_NOTE_PLACEHOLDER;

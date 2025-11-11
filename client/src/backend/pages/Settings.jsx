@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { 
     Plus, 
@@ -16,7 +16,10 @@ import {
     ChevronDown,
     ChevronUp
 } from 'lucide-react';
-import { getDefaultEmailTemplateContent } from '../utils/emailTemplateUtils';
+import { 
+    getDefaultTemplateMessage,
+    extractMessageFromTemplateBody
+} from '../utils/emailTemplateUtils';
 
 const Settings = () => {
     const [activeTab, setActiveTab] = useState('admin'); // 'admin' or 'user_generated'
@@ -201,11 +204,79 @@ const Settings = () => {
     const [showEmailTemplateForm, setShowEmailTemplateForm] = useState(false);
     const [showEditEmailTemplateForm, setShowEditEmailTemplateForm] = useState(false);
     const [selectedEmailTemplate, setSelectedEmailTemplate] = useState(null);
-    const getDefaultTemplateBody = (templateName) => {
-        return getDefaultEmailTemplateContent(
-            { name: templateName || '', subject: '' },
-            {}
-        )?.body || '';
+    const getDefaultTemplateBody = (templateName) => getDefaultTemplateMessage(templateName) || '';
+
+    const RichTextEditor = ({ value, onChange, placeholder }) => {
+        const editorRef = useRef(null);
+
+        useEffect(() => {
+            if (editorRef.current) {
+                const currentHtml = editorRef.current.innerHTML;
+                const nextHtml = value || '';
+                if (currentHtml !== nextHtml) {
+                    editorRef.current.innerHTML = nextHtml;
+                }
+            }
+        }, [value]);
+
+        const exec = (command, arg = null) => {
+            if (!editorRef.current) return;
+            editorRef.current.focus();
+            document.execCommand(command, false, arg);
+            onChange(editorRef.current.innerHTML);
+        };
+
+        const handleInput = () => {
+            if (!editorRef.current) return;
+            onChange(editorRef.current.innerHTML);
+        };
+
+        const handleLink = () => {
+            const url = prompt('Enter URL');
+            if (url) {
+                exec('createLink', url);
+            }
+        };
+
+        const handleClear = () => {
+            exec('removeFormat');
+        };
+
+        return (
+            <div>
+                <div style={{
+                    display: 'flex',
+                    gap: '8px',
+                    marginBottom: '12px'
+                }}>
+                    <button type="button" className="btn btn-secondary" onClick={() => exec('bold')} style={{ padding: '6px 12px' }}>B</button>
+                    <button type="button" className="btn btn-secondary" onClick={() => exec('italic')} style={{ padding: '6px 12px', fontStyle: 'italic' }}>I</button>
+                    <button type="button" className="btn btn-secondary" onClick={() => exec('underline')} style={{ padding: '6px 12px', textDecoration: 'underline' }}>U</button>
+                    <button type="button" className="btn btn-secondary" onClick={() => exec('insertUnorderedList')} style={{ padding: '6px 12px' }}>• List</button>
+                    <button type="button" className="btn btn-secondary" onClick={handleLink} style={{ padding: '6px 12px' }}>Link</button>
+                    <button type="button" className="btn btn-secondary" onClick={handleClear} style={{ padding: '6px 12px' }}>Clear</button>
+                </div>
+                <div
+                    ref={editorRef}
+                    contentEditable
+                    onInput={handleInput}
+                    style={{
+                        width: '100%',
+                        minHeight: '200px',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        padding: '16px',
+                        backgroundColor: '#fff',
+                        fontSize: '14px',
+                        lineHeight: '1.7',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                        color: '#374151',
+                        outline: 'none'
+                    }}
+                    data-placeholder={placeholder}
+                />
+            </div>
+        );
     };
 
     const [emailTemplateFormData, setEmailTemplateFormData] = useState({
@@ -4084,7 +4155,7 @@ const Settings = () => {
                                                 setEmailTemplateFormData({
                                                     name: template.name,
                                                     subject: template.subject,
-                                                    body: template.body || getDefaultTemplateBody(template.name),
+                                                                    body: extractMessageFromTemplateBody(template.body) || getDefaultTemplateBody(template.name),
                                                     category: template.category,
                                                     sms_enabled: template.sms_enabled || false
                                                 });
@@ -6392,26 +6463,11 @@ const Settings = () => {
                                             </div>
 
                                             {/* Editable Content Area */}
-                                            <div style={{ 
-                                                padding: '24px',
-                                                backgroundColor: '#fff',
-                                                minHeight: '200px'
-                                            }}>
-                                                <textarea
+                                            <div style={{ padding: '24px', backgroundColor: '#fff', minHeight: '200px' }}>
+                                                <RichTextEditor
                                                     value={emailTemplateFormData.body}
-                                                    onChange={(e) => setEmailTemplateFormData({ ...emailTemplateFormData, body: e.target.value })}
+                                                    onChange={(html) => setEmailTemplateFormData({ ...emailTemplateFormData, body: html })}
                                                     placeholder="Enter your message here..."
-                                                    style={{ 
-                                                        width: '100%',
-                                                        minHeight: '150px',
-                                                        border: 'none',
-                                                        outline: 'none',
-                                                        resize: 'vertical',
-                                                        fontSize: '14px',
-                                                        lineHeight: '1.6',
-                                                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                                                        color: '#374151'
-                                                    }}
                                                 />
                                             </div>
 
@@ -6644,21 +6700,10 @@ const Settings = () => {
                                                 backgroundColor: '#fff',
                                                 minHeight: '200px'
                                             }}>
-                                                <textarea
+                                                <RichTextEditor
                                                     value={emailTemplateFormData.body}
-                                                    onChange={(e) => setEmailTemplateFormData({ ...emailTemplateFormData, body: e.target.value })}
+                                                    onChange={(html) => setEmailTemplateFormData({ ...emailTemplateFormData, body: html })}
                                                     placeholder="Enter your message here..."
-                                                    style={{
-                                                        width: '100%',
-                                                        minHeight: '150px',
-                                                        border: 'none',
-                                                        outline: 'none',
-                                                        resize: 'vertical',
-                                                        fontSize: '14px',
-                                                        lineHeight: '1.6',
-                                                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                                                        color: '#374151'
-                                                    }}
                                                 />
                                             </div>
 
