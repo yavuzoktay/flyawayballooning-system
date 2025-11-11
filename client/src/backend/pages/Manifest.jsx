@@ -488,11 +488,13 @@ Fly Away Ballooning Team`;
                 .replace(/<!DOCTYPE[^>]*>/gi, '')
                 .replace(/<\/?(html|head|body)[^>]*>/gi, '')
                 .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-            const dividerIndex = sanitized.toLowerCase().indexOf('<hr');
-            if (dividerIndex !== -1) {
-                return sanitized.slice(0, dividerIndex);
+            const mainIndex = sanitized.toLowerCase().indexOf('<main');
+            if (mainIndex !== -1) {
+                return sanitized.slice(mainIndex);
             }
-            return sanitized;
+            const dividerIndex = sanitized.toLowerCase().indexOf('<hr');
+            const trimmed = dividerIndex !== -1 ? sanitized.slice(0, dividerIndex) : sanitized;
+            return trimmed.trim() ? trimmed : sanitized;
         }
         const plain = log?.message_text ? log.message_text.trim() : '';
         return plain ? plain.replace(/\n/g, '<br>') : '';
@@ -3502,7 +3504,7 @@ Fly Away Ballooning Team`;
                                 const expanded = !!expandedMessageIds[log.id || index];
                                 const preview = getMessagePreview(log);
                                 const previewHtml = getPreviewHtml(
-                                    log.message_html || log.message_text || '',
+                                    expanded ? (log.message_html || log.message_text || '') : getMessagePreview(log),
                                     ''
                                 );
                                 return (
