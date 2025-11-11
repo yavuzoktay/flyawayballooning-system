@@ -208,12 +208,17 @@ const BookingPage = () => {
         }));
     };
 
+    const sanitizeMessageHtml = (html) => {
+        if (!html) return '';
+        return html
+            .replace(/<!DOCTYPE[^>]*>/gi, '')
+            .replace(/<\/?(html|head|body)[^>]*>/gi, '')
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+    };
+
     const getMessagePreview = (log) => {
         if (log?.message_html) {
-            const sanitized = log.message_html
-                .replace(/<!DOCTYPE[^>]*>/gi, '')
-                .replace(/<\/?(html|head|body)[^>]*>/gi, '')
-                .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+            const sanitized = sanitizeMessageHtml(log.message_html);
             const mainIndex = sanitized.toLowerCase().indexOf('<main');
             if (mainIndex !== -1) {
                 return sanitized.slice(mainIndex);
@@ -4124,9 +4129,12 @@ setBookingDetail(finalVoucherDetail);
                                 .map((log, index) => {
                                     const statusInfo = getStatusDisplay(log.last_event || log.status);
                                     const expanded = !!expandedMessageIds[log.id || index];
-                                    const preview = getMessagePreview(log);
                                     const previewHtml = getPreviewHtml(
-                                        expanded ? (log.message_html || log.message_text || '') : getMessagePreview(log),
+                                        expanded
+                                            ? (log.message_html
+                                                ? sanitizeMessageHtml(log.message_html)
+                                                : (log.message_text || ''))
+                                            : getMessagePreview(log),
                                         ''
                                     );
                                     return (
