@@ -209,11 +209,19 @@ const BookingPage = () => {
     };
 
     const getMessagePreview = (log) => {
-        const plain =
-            stripHtml(log?.message_html || '') ||
-            (log?.message_text ? log.message_text.trim() : '');
-        if (!plain) return 'No preview available.';
-        return plain.length > 220 ? `${plain.slice(0, 220)}…` : plain;
+        if (log?.message_html) {
+            const sanitized = log.message_html
+                .replace(/<!DOCTYPE[^>]*>/gi, '')
+                .replace(/<\/?(html|head|body)[^>]*>/gi, '')
+                .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+            const dividerIndex = sanitized.toLowerCase().indexOf('<hr');
+            if (dividerIndex !== -1) {
+                return sanitized.slice(0, dividerIndex);
+            }
+            return sanitized;
+        }
+        const plain = log?.message_text ? log.message_text.trim() : '';
+        return plain ? plain.replace(/\n/g, '<br>') : '';
     };
 
     const getStatusDisplay = (status) => {
@@ -4206,9 +4214,10 @@ setBookingDetail(finalVoucherDetail);
                                                         dangerouslySetInnerHTML={{ __html: previewHtml }}
                                                     />
                                                 ) : (
-                                                    <Typography variant="body2" color="text.secondary">
-                                                        {preview}
-                                                    </Typography>
+                                                    <Box
+                                                        sx={{ color: '#475569', lineHeight: 1.6 }}
+                                                        dangerouslySetInnerHTML={{ __html: preview || ' ' }}
+                                                    />
                                                 )}
                                                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
                                                     <Button
