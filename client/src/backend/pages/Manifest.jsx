@@ -46,6 +46,7 @@ import {
 } from '../utils/emailTemplateUtils';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
+import MailOutlineIcon from '@mui/icons-material/MailOutline';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -102,6 +103,10 @@ const Manifest = () => {
     const [emailLogs, setEmailLogs] = useState([]);
     const [emailLogsPollId, setEmailLogsPollId] = useState(null);
     const [emailTemplates, setEmailTemplates] = useState([]);
+    const [messagesModalOpen, setMessagesModalOpen] = useState(false);
+    const [messagesLoading, setMessagesLoading] = useState(false);
+    const [messageLogs, setMessageLogs] = useState([]);
+    const [expandedMessageIds, setExpandedMessageIds] = useState({});
 
     // SMS state
     const [smsModalOpen, setSmsModalOpen] = useState(false);
@@ -412,6 +417,9 @@ Fly Away Ballooning Team`;
                 setEmailModalOpen(false);
                 setEmailForm({ to: '', subject: '', message: '', template: 'custom' });
                 setPersonalNote('');
+                if (messagesModalOpen && selectedBookingForEmail?.id) {
+                    fetchMessageLogs(selectedBookingForEmail.id);
+                }
                 // Refresh email logs by booking id for sync
                 if (selectedBookingForEmail?.id) {
                     try {
@@ -438,6 +446,63 @@ Fly Away Ballooning Team`;
         if (s.startsWith('0')) return '+44' + s.slice(1);
         if (/^7\d{8,9}$/.test(s)) return '+44' + s;
         return s;
+    };
+
+    const stripHtml = (input = '') => {
+        if (!input) return '';
+        return input.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    };
+
+    const fetchMessageLogs = async (bookingId) => {
+        if (!bookingId) return;
+        setMessagesLoading(true);
+        try {
+            const resp = await axios.get(`/api/bookingEmails/${bookingId}`);
+            setMessageLogs(resp.data?.data || []);
+        } catch (error) {
+            console.error('Error fetching message history:', error);
+            setMessageLogs([]);
+        } finally {
+            setMessagesLoading(false);
+        }
+    };
+
+    const handleMessagesClick = (booking) => {
+        if (!booking) return;
+        setSelectedBookingForEmail(booking);
+        setMessagesModalOpen(true);
+        setExpandedMessageIds({});
+        fetchMessageLogs(booking.id);
+    };
+
+    const toggleMessageExpand = (id) => {
+        setExpandedMessageIds(prev => ({
+            ...prev,
+            [id]: !prev[id]
+        }));
+    };
+
+    const getMessagePreview = (log) => {
+        const plain =
+            stripHtml(log?.message_html || '') ||
+            (log?.message_text ? log.message_text.trim() : '');
+        if (!plain) return 'No preview available.';
+        return plain.length > 220 ? `${plain.slice(0, 220)}…` : plain;
+    };
+
+    const getStatusDisplay = (status) => {
+        if (!status) return { label: 'Unknown', color: '#adb5bd' };
+        const normalized = status.toLowerCase();
+        if (normalized.includes('delivered') || normalized.includes('sent')) {
+            return { label: 'Sent', color: '#28a745' };
+        }
+        if (normalized.includes('bounce')) {
+            return { label: 'Bounced', color: '#dc3545' };
+        }
+        if (normalized.includes('open')) {
+            return { label: 'Opened', color: '#0d6efd' };
+        }
+        return { label: status, color: '#6c757d' };
     };
 
     // SMS handlers
@@ -2967,6 +3032,15 @@ Fly Away Ballooning Team`;
                                                 <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleAddGuestClick}>Add Guest</Button>
                                                 <Button variant="contained" color="info" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d' }} onClick={handleCancelFlight}>Cancel Flight</Button>
                                                 <Button variant="contained" color="success" sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#28a745' }} onClick={handleEmailBooking}>Email</Button>
+                                                <Button
+                                                    variant="contained"
+                                                    color="secondary"
+                                                    sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#17a2b8' }}
+                                                    onClick={() => bookingDetail?.booking && handleMessagesClick(bookingDetail.booking)}
+                                                    disabled={!bookingDetail?.booking}
+                                                >
+                                                    Messages
+                                                </Button>
                                             </Box>
                                         </Box>
                                         <Divider sx={{ my: 2 }} />
@@ -3388,6 +3462,150 @@ Fly Away Ballooning Team`;
                   {confirmCancelLoading ? 'Cancelling...' : 'Yes, Cancel All'}
                 </Button>
               </DialogActions>
+            </Dialog>
+
+            {/* Messages Modal */}
+            <Dialog
+                open={messagesModalOpen}
+                onClose={() => setMessagesModalOpen(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle sx={{ fontWeight: 700, fontSize: 24 }}>
+                    Messages
+                    {selectedBookingForEmail && (
+                        <Typography variant="subtitle2" color="textSecondary" sx={{ mt: 0.5 }}>
+                            Booking: {selectedBookingForEmail.name} ({selectedBookingForEmail.id})
+                        </Typography>
+                    )}
+                </DialogTitle>
+                <DialogContent dividers sx={{ background: '#f5f7fb' }}>
+                    {messagesLoading ? (
+                        <Typography variant="body2">Loading messages...</Typography>
+                    ) : messageLogs.length === 0 ? (
+                        <Typography variant="body2" color="text.secondary">
+                            No messages have been sent for this booking yet.
+                        </Typography>
+                    ) : (
+                        messageLogs
+                            .sort((a, b) => dayjs(b.sent_at).valueOf() - dayjs(a.sent_at).valueOf())
+                            .map((log, index) => {
+                                const statusInfo = getStatusDisplay(log.last_event || log.status);
+                                const expanded = !!expandedMessageIds[log.id || index];
+                                const preview = getMessagePreview(log);
+                                const previewHtml = getPreviewHtml(
+                                    log.message_html || log.message_text || '',
+                                    ''
+                                );
+                                return (
+                                    <Box
+                                        key={log.id || index}
+                                        sx={{
+                                            mb: 3,
+                                            borderRadius: 3,
+                                            background: '#ffffff',
+                                            boxShadow: '0 10px 30px rgba(15, 23, 42, 0.08)',
+                                            overflow: 'hidden',
+                                            border: '1px solid #e2e8f0'
+                                        }}
+                                    >
+                                        <Box
+                                            sx={{
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'flex-start',
+                                                p: 3,
+                                                borderBottom: '1px solid #f1f5f9'
+                                            }}
+                                        >
+                                            <Box sx={{ display: 'flex', gap: 2 }}>
+                                                <Box
+                                                    sx={{
+                                                        width: 42,
+                                                        height: 42,
+                                                        borderRadius: '50%',
+                                                        background: '#eef2ff',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        color: '#4f46e5'
+                                                    }}
+                                                >
+                                                    <MailOutlineIcon />
+                                                </Box>
+                                                <Box>
+                                                    <Typography sx={{ fontWeight: 700, fontSize: 18, mb: 0.5 }}>
+                                                        {log.subject || 'Email'}
+                                                    </Typography>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        {log.sent_at
+                                                            ? dayjs(log.sent_at).format('dddd, MMMM D, YYYY h:mm A')
+                                                            : 'Unknown send date'}
+                                                    </Typography>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        To: {log.recipient_email || '—'}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+                                            <Box sx={{ textAlign: 'right' }}>
+                                                <Box
+                                                    sx={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        px: 1.5,
+                                                        py: 0.5,
+                                                        borderRadius: 999,
+                                                        fontSize: 12,
+                                                        fontWeight: 600,
+                                                        color: '#fff',
+                                                        backgroundColor: statusInfo.color
+                                                    }}
+                                                >
+                                                    {statusInfo.label}
+                                                </Box>
+                                                <Typography variant="caption" display="block" sx={{ mt: 1, color: '#64748b' }}>
+                                                    Category: {log.template_type || 'Custom'}
+                                                </Typography>
+                                                <Typography variant="caption" display="block" sx={{ color: '#64748b' }}>
+                                                    Opens: {log.opens || 0} · Clicks: {log.clicks || 0}
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+                                        <Box sx={{ p: 3 }}>
+                                            {expanded ? (
+                                                <Box
+                                                    sx={{
+                                                        background: '#f8fafc',
+                                                        borderRadius: 2,
+                                                        p: 2,
+                                                        maxHeight: 400,
+                                                        overflowY: 'auto'
+                                                    }}
+                                                    dangerouslySetInnerHTML={{ __html: previewHtml }}
+                                                />
+                                            ) : (
+                                                <Typography variant="body2" color="text.secondary">
+                                                    {preview}
+                                                </Typography>
+                                            )}
+                                            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                                                <Button
+                                                    size="small"
+                                                    onClick={() => toggleMessageExpand(log.id || index)}
+                                                    sx={{ textTransform: 'none' }}
+                                                >
+                                                    {expanded ? 'Collapse' : 'Expand'}
+                                                </Button>
+                                            </Box>
+                                        </Box>
+                                    </Box>
+                                );
+                            })
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setMessagesModalOpen(false)}>Close</Button>
+                </DialogActions>
             </Dialog>
 
             {/* Email Modal */}

@@ -12720,6 +12720,8 @@ function ensureEmailLogsSchema(callback) {
             recipient_email VARCHAR(255),
             subject VARCHAR(500),
             template_type VARCHAR(50),
+            message_html MEDIUMTEXT,
+            message_text MEDIUMTEXT,
             sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             status VARCHAR(50) DEFAULT 'sent',
             message_id VARCHAR(255),
@@ -12741,7 +12743,9 @@ function ensureEmailLogsSchema(callback) {
         "ALTER TABLE email_logs ADD COLUMN last_event VARCHAR(50)",
         "ALTER TABLE email_logs ADD COLUMN last_event_at TIMESTAMP NULL DEFAULT NULL",
         "ALTER TABLE email_logs MODIFY COLUMN status VARCHAR(50) DEFAULT 'sent'",
-        "ALTER TABLE email_logs ADD INDEX idx_message_id (message_id)"
+        "ALTER TABLE email_logs ADD INDEX idx_message_id (message_id)",
+        "ALTER TABLE email_logs ADD COLUMN message_html MEDIUMTEXT",
+        "ALTER TABLE email_logs ADD COLUMN message_text MEDIUMTEXT"
     ];
 
     con.query(createTableSql, (err) => {
@@ -12844,6 +12848,8 @@ app.post('/api/sendBookingEmail', async (req, res) => {
                     recipient_email,
                     subject,
                     template_type,
+                    message_html,
+                    message_text,
                     sent_at,
                     status,
                     message_id,
@@ -12852,11 +12858,19 @@ app.post('/api/sendBookingEmail', async (req, res) => {
                     last_event,
                     last_event_at
                 )
-                VALUES (?, ?, ?, ?, NOW(), 'sent', ?, 0, 0, 'sent', NOW())
+                VALUES (?, ?, ?, ?, ?, ?, NOW(), 'sent', ?, 0, 0, 'sent', NOW())
             `;
             ensureEmailLogsSchema(() => {
                 const messageId = response[0]?.headers?.['x-message-id'] || null;
-                con.query(logSql, [bookingId || null, to, subject, template || 'custom', messageId], (err) => {
+                con.query(logSql, [
+                    bookingId || null,
+                    to,
+                    subject,
+                    template || 'custom',
+                    htmlBody,
+                    textBody,
+                    messageId
+                ], (err) => {
                     if (err) {
                         console.error('Error logging email activity:', err);
                     } else {
