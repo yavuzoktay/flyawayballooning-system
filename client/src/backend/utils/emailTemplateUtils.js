@@ -172,18 +172,78 @@ const DEFAULT_TEMPLATE_BUILDERS = {
         const experience = booking?.flight_type || 'your flight';
         const subject = '🎈 Your flight is confirmed';
 
+        const receiptItems = Array.isArray(booking?.passengers) ? booking.passengers : [];
+        const paidAmount = booking?.paid != null ? Number(booking.paid) : null;
+        const dueAmount = booking?.due != null ? Number(booking.due) : null;
+        const subtotal = paidAmount != null && dueAmount != null ? paidAmount + dueAmount : null;
+        const receiptId = booking?.receipt_number || booking?.booking_reference || booking?.id || '';
+        const receiptSoldDate = booking?.created_at ? formatDate(booking.created_at) : null;
+
         const defaultBodyHtml = [
-            `We’re thrilled to confirm your balloon flight experience with us!`,
-            `🗓 <strong>Date:</strong> ${escapeHtml(flightDate || 'We will reach out to schedule with you shortly.')}`,
-            `📍 <strong>Meeting point:</strong> ${escapeHtml(location)}`,
-            `🎫 <strong>Experience:</strong> ${escapeHtml(experience)}`,
-            'We’ll be in touch again closer to the flight with weather updates and meeting instructions. In the meantime, feel free to reply directly if you have any questions.'
-        ]
-            .map((paragraph, index) => {
-                const margin = index === 0 ? 'margin:0 0 16px;' : 'margin:0 0 14px;';
-                return `<p style="${margin}">${paragraph}</p>`;
-            })
-            .join('');
+            `<p style="margin:0 0 16px;">We’re thrilled to confirm your balloon flight experience with us!</p>`,
+            `<p style="margin:0 0 16px;">🗓 <strong>Date:</strong> ${escapeHtml(flightDate || 'We will reach out to schedule with you shortly.')}</p>`,
+            `<p style="margin:0 0 16px;">📍 <strong>Meeting point:</strong> ${escapeHtml(location)}</p>`,
+            `<p style="margin:0 0 24px;">🎫 <strong>Experience:</strong> ${escapeHtml(experience)}</p>`,
+            `<p style="margin:0 0 16px;">We’ll be in touch again closer to the flight with weather updates and meeting instructions. In the meantime, feel free to reply directly if you have any questions.</p>`,
+            `<p style="margin:0 0 24px;">Fly Away Ballooning Team</p>`,
+            `<div style="margin:32px 0; padding:24px; background:#f9fafb; border-radius:16px; border:1px solid #e2e8f0;">
+                <div style="font-size:12px; letter-spacing:0.2em; color:#64748b; text-transform:uppercase; margin-bottom:12px;">Receipt</div>
+                <div style="display:flex; flex-wrap:wrap; gap:16px; font-size:14px; color:#475569;">
+                    <div style="min-width:220px;">
+                        <div><strong>Sold:</strong> ${receiptSoldDate || '—'}</div>
+                        <div><strong>Confirmation:</strong> ${escapeHtml(receiptId)}</div>
+                    </div>
+                    <div style="min-width:220px;">
+                        <div><strong>Sold to:</strong></div>
+                        <div>${escapeHtml(booking?.name || booking?.customer_name || 'Guest')}</div>
+                        <div>${escapeHtml(booking?.phone || '')}</div>
+                        <div>${escapeHtml(booking?.email || '')}</div>
+                        <div>${escapeHtml(booking?.billing_address || '')}</div>
+                    </div>
+                    <div style="min-width:220px; background:#f8fafc; border-radius:12px; padding:16px;">
+                        <div style="font-weight:700; margin-bottom:8px;">Questions?</div>
+                        <div style="font-size:13px;">Questions? We're here to help! Contact us by calling <a href="tel:+441823778127" style="color:#2563eb; text-decoration:none;">+44 1823 778 127</a></div>
+                    </div>
+                </div>
+                <div style="margin-top:24px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; font-size:13px; color:#475569;">
+                        <thead>
+                            <tr>
+                                <th align="left" style="padding:8px 0; border-bottom:1px solid #e2e8f0; text-transform:uppercase; letter-spacing:0.08em;">Item</th>
+                                <th align="left" style="padding:8px 0; border-bottom:1px solid #e2e8f0; text-transform:uppercase; letter-spacing:0.08em;">Description</th>
+                                <th align="right" style="padding:8px 0; border-bottom:1px solid #e2e8f0; text-transform:uppercase; letter-spacing:0.08em;">Amount</th>
+                                <th align="right" style="padding:8px 0; border-bottom:1px solid #e2e8f0; text-transform:uppercase; letter-spacing:0.08em;">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding:12px 0; border-bottom:1px solid #f1f5f9; font-weight:600;">${escapeHtml(experience || 'Flight Experience')}</td>
+                                <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;">
+                                    ${escapeHtml(location || 'Bath')}
+                                    ${receiptItems.length > 0 ? `<div style="margin-top:4px; font-size:12px; color:#64748b;">Guests: ${receiptItems.length}</div>` : ''}
+                                </td>
+                                <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;" align="right">
+                                    ${receiptItems.length > 0 && subtotal != null ? `£${(subtotal / receiptItems.length).toFixed(2)} × ${receiptItems.length}` : '—'}
+                                </td>
+                                <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;" align="right">
+                                    £${subtotal != null ? subtotal.toFixed(2) : '—'}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div style="margin-top:16px; display:flex; flex-direction:column; align-items:flex-end; gap:8px; font-size:13px; color:#475569;">
+                    <div><strong>Subtotal:</strong> £${subtotal != null ? subtotal.toFixed(2) : '—'}</div>
+                    <div><strong>Total:</strong> £${subtotal != null ? subtotal.toFixed(2) : '—'}</div>
+                    <div><strong>Paid:</strong> £${paidAmount != null ? paidAmount.toFixed(2) : '—'}</div>
+                    <div><strong>Due:</strong> £${dueAmount != null ? dueAmount.toFixed(2) : '—'}</div>
+                </div>
+            </div>
+            <div style="margin-top:24px; text-align:center;">
+                <a href="https://flyawayballooning.com/faq" style="margin-right:16px; font-size:13px; color:#2563eb; text-decoration:none;">View FAQs</a>
+                <a href="mailto:bookings@tripworks.com" style="font-size:13px; color:#2563eb; text-decoration:none;">Contact us</a>
+            </div>`
+        ].join('');
 
         return buildEmailLayout({
             subject,
