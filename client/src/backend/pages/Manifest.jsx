@@ -2710,14 +2710,24 @@ const Manifest = () => {
                                         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                                             <Box display="flex" flexDirection="column" alignItems="flex-start">
                                                 {/* Section başlığında activityName ve flight time birlikte gösterilecek */}
-                                                <Typography variant="h6">{activityName} - Flight Time: {displayFlightTime}</Typography>
+                                                {/* Check if any booking in this group has Proposal Flight voucher type */}
+                                                {(() => {
+                                                    const hasProposal = groupFlights.some(f => {
+                                                        const voucherType = (f.voucher_type || '').toLowerCase();
+                                                        return voucherType.includes('proposal');
+                                                    });
+                                                    const titleSuffix = hasProposal ? ' | Proposal' : '';
+                                                    return (
+                                                        <Typography variant="h6">{activityName}{titleSuffix} - Flight Time: {displayFlightTime}</Typography>
+                                                    );
+                                                })()}
                                                 <Box display="flex" alignItems="center" gap={3} mt={1}>
                                                     <Typography>Pax Booked: {paxBookedDisplay} / {paxTotalDisplay}</Typography>
                                                     <Typography>Balloon Resource: {balloonResource}</Typography>
                                                     <Typography>Status: <span
    style={{ color: status === 'Closed' ? 'red' : 'green', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
    onClick={() => handleToggleGroupStatus(groupFlights)}
- >{status}{statusLoadingGroup === first.id ? '...' : ''}</span></Typography>
+>{status}{statusLoadingGroup === first.id ? '...' : ''}</span></Typography>
                                                     <Typography>Type: {first.flight_type}</Typography>
                                                 </Box>
                                             </Box>
