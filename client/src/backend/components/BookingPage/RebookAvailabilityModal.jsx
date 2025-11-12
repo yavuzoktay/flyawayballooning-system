@@ -772,7 +772,21 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                     onClick={() => {
                         onSlotSelect(selectedDate, selectedTime, activityId, selectedActivity, selectedLocation, selectedFlightTypes, selectedVoucherTypes);
                     }}
-                    disabled={!selectedDate || !selectedTime || !selectedActivity || !selectedLocation}
+                    disabled={
+                        isGiftVoucherDetails
+                            ? // Gift Voucher: Require purchaser info and at least one flight type and voucher type
+                              !purchaserFirstName || 
+                              !purchaserLastName || 
+                              !purchaserMobile || 
+                              !purchaserEmail || 
+                              selectedFlightTypes.length === 0 || 
+                              selectedVoucherTypes.length === 0
+                            : // Regular/Flight Voucher: Require date, time, activity, location
+                              !selectedDate || 
+                              !selectedTime || 
+                              !selectedActivity || 
+                              !selectedLocation
+                    }
                     variant="contained"
                 >
                     Confirm
