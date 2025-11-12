@@ -3926,12 +3926,34 @@ app.get('/api/getAllBookingData', (req, res) => {
             return r;
         });
         
-        // Fetch additional information for all bookings in batch queries (optimized)
+        // Fetch additional information and add-on items for all bookings in batch queries (optimized)
         try {
             // Get all booking IDs
             const bookingIds = enriched.map(b => b.id);
                 
             if (bookingIds.length > 0) {
+                // Batch fetch all add-on items from add_to_booking_items table
+                const [addOnItemsRows] = await new Promise((resolve, reject) => {
+                    const addOnSql = `SELECT id, title, price, price_unit, image_url, description FROM add_to_booking_items WHERE is_active = 1`;
+                    con.query(addOnSql, (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
+                });
+                
+                // Create a map of add-on items by title for quick lookup
+                const addOnItemsByTitle = {};
+                addOnItemsRows.forEach(item => {
+                    addOnItemsByTitle[item.title] = {
+                        id: item.id,
+                        title: item.title,
+                        price: parseFloat(item.price) || 0,
+                        price_unit: item.price_unit,
+                        image_url: item.image_url,
+                        description: item.description
+                    };
+                });
+                
                 // Batch fetch all additional information answers for all bookings
                 const [allAnswersRows] = await new Promise((resolve, reject) => {
                     const answersSql = `
@@ -4047,9 +4069,34 @@ app.get('/api/getAllBookingData', (req, res) => {
                     }
                 });
                 
-                // Add additional information to each booking object
+                // Add additional information and add-on items to each booking object
                 enriched.forEach((booking, index) => {
                     const bookingAnswers = answersByBooking[booking.id] || [];
+                    
+                    // Parse and enrich add-on items for this booking
+                    let addOnItems = [];
+                    let addOnTotalPrice = 0;
+                    
+                    // Check if choose_add_on field contains a value (e.g., "FAB Cap")
+                    if (booking.choose_add_on && booking.choose_add_on !== '' && booking.choose_add_on !== 'null') {
+                        const chosenAddOnTitle = booking.choose_add_on.trim();
+                        const addOnItem = addOnItemsByTitle[chosenAddOnTitle];
+                        
+                        if (addOnItem) {
+                            addOnItems.push(addOnItem);
+                            addOnTotalPrice += addOnItem.price;
+                        } else {
+                            // If item not found in database, create a placeholder
+                            addOnItems.push({
+                                title: chosenAddOnTitle,
+                                price: 0,
+                                price_unit: 'GBP',
+                                image_url: null,
+                                description: null,
+                                note: 'Item not found in add_to_booking_items table'
+                            });
+                        }
+                    }
                     
                     const additionalInfo = {
                         questions: formattedQuestions,
@@ -4084,6 +4131,10 @@ app.get('/api/getAllBookingData', (req, res) => {
                 };
                 
                     enriched[index].additional_information = additionalInfo;
+                    
+                    // Add add-on items information
+                    enriched[index].add_to_booking_items = addOnItems;
+                    enriched[index].add_to_booking_items_total_price = addOnTotalPrice;
                 });
             }
         } catch (error) {
@@ -6500,8 +6551,8 @@ app.post('/api/addPassenger', (req, res) => {
         return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
     
-    // First, get current booking details including experience, location, activity_id, voucher_type
-    const getBookingSql = 'SELECT paid, pax, due, experience, location, activity_id, voucher_type FROM all_booking WHERE id = ? LIMIT 1';
+    // First, get current booking details including experience, location, activity_id, voucher_type, add_to_booking_items_total_price, choose_add_on
+    const getBookingSql = 'SELECT paid, pax, due, experience, location, activity_id, voucher_type, COALESCE(add_to_booking_items_total_price, 0) as add_on_price, choose_add_on FROM all_booking WHERE id = ? LIMIT 1';
     con.query(getBookingSql, [booking_id], (getErr, bookingRows) => {
         if (getErr) {
             console.error('Error fetching booking details:', getErr);
@@ -6513,7 +6564,19 @@ app.post('/api/addPassenger', (req, res) => {
         }
         
         const booking = bookingRows[0];
-        const currentPaid = parseFloat(booking.paid) || 0;
+        const totalPaid = parseFloat(booking.paid) || 0;
+        const addOnPrice = parseFloat(booking.add_on_price) || 0;
+        const chooseAddOn = booking.choose_add_on || '';
+        
+        // If add_to_booking_items_total_price is 0 but choose_add_on exists, fetch from add_to_booking_items table
+        let actualAddOnPrice = addOnPrice;
+        if (addOnPrice === 0 && chooseAddOn && chooseAddOn !== '' && chooseAddOn !== 'null') {
+            // We'll handle this in the calculation
+            console.log('⚠️ Add-on item exists but price not stored, will fetch from add_to_booking_items table');
+        }
+        
+        // Calculate base paid (excluding add-on price)
+        const currentPaid = totalPaid - actualAddOnPrice;
         const currentPax = parseInt(booking.pax) || 1;
         const currentDue = parseFloat(booking.due) || 0;
         const experience = booking.experience || '';
@@ -6522,12 +6585,15 @@ app.post('/api/addPassenger', (req, res) => {
         
         console.log('=== ADD PASSENGER - INITIAL INFO ===');
         console.log('Booking ID:', booking_id);
-        console.log('Current Paid:', currentPaid);
+        console.log('Total Paid (with add-on):', totalPaid);
+        console.log('Add-on Price:', actualAddOnPrice);
+        console.log('Base Paid (for passengers):', currentPaid);
         console.log('Current Pax:', currentPax);
         console.log('Current Due:', currentDue);
         console.log('Experience:', experience);
         console.log('Location:', location);
         console.log('Voucher Type:', voucherType);
+        console.log('Choose Add-on:', chooseAddOn);
         
         // Check if this is a Private Charter booking
         const isPrivateCharter = experience === 'Private Charter' || experience.includes('Private');
@@ -6710,8 +6776,8 @@ app.delete('/api/deletePassenger', (req, res) => {
         return res.status(400).json({ success: false, message: 'passenger_id and booking_id are required' });
     }
     
-    // First, get current booking details including experience, location, voucher_type
-    const getBookingSql = 'SELECT paid, pax, due, experience, location, voucher_type FROM all_booking WHERE id = ? LIMIT 1';
+    // First, get current booking details including experience, location, voucher_type, add_to_booking_items_total_price, choose_add_on
+    const getBookingSql = 'SELECT paid, pax, due, experience, location, voucher_type, COALESCE(add_to_booking_items_total_price, 0) as add_on_price, choose_add_on FROM all_booking WHERE id = ? LIMIT 1';
     con.query(getBookingSql, [booking_id], (getErr, bookingRows) => {
         if (getErr) {
             console.error('Error fetching booking details:', getErr);
@@ -6723,7 +6789,12 @@ app.delete('/api/deletePassenger', (req, res) => {
         }
         
         const booking = bookingRows[0];
-        const currentPaid = parseFloat(booking.paid) || 0;
+        const totalPaid = parseFloat(booking.paid) || 0;
+        const addOnPrice = parseFloat(booking.add_on_price) || 0;
+        const chooseAddOn = booking.choose_add_on || '';
+        
+        // Calculate base paid (excluding add-on price)
+        const currentPaid = totalPaid - addOnPrice;
         const currentPax = parseInt(booking.pax) || 1;
         const currentDue = parseFloat(booking.due) || 0;
         const experience = booking.experience || '';
@@ -6732,12 +6803,15 @@ app.delete('/api/deletePassenger', (req, res) => {
         
         console.log('=== DELETE PASSENGER - INITIAL INFO ===');
         console.log('Booking ID:', booking_id);
-        console.log('Current Paid:', currentPaid);
+        console.log('Total Paid (with add-on):', totalPaid);
+        console.log('Add-on Price:', addOnPrice);
+        console.log('Base Paid (for passengers):', currentPaid);
         console.log('Current Pax:', currentPax);
         console.log('Current Due:', currentDue);
         console.log('Experience:', experience);
         console.log('Location:', location);
         console.log('Voucher Type:', voucherType);
+        console.log('Choose Add-on:', chooseAddOn);
         
         // Delete the passenger
     const deletePassengerSql = 'DELETE FROM passenger WHERE id = ? AND booking_id = ?';
