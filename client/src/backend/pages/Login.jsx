@@ -11,7 +11,7 @@ const Login = () => {
     const handleSubmit = (e) => {
         e.preventDefault();
         // Simple hardcoded credentials for now
-        if (username === 'admin' && password === '12345') {
+        if (username === 'Flyawayballooning' && password === 'cevcov-5FABys-kaafds') {
             localStorage.setItem('fab_admin_auth', 'true');
             const redirectTo = location.state?.from || '/';
             navigate(redirectTo, { replace: true });
@@ -43,7 +43,7 @@ const Login = () => {
                         type="text"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
-                        placeholder="admin"
+                        placeholder="Flyawayballooning"
                         style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
                     />
                 </div>
@@ -53,7 +53,7 @@ const Login = () => {
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="12345"
+                        placeholder="••••••••••••••"
                         style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
                     />
                 </div>
