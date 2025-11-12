@@ -690,30 +690,64 @@ const BookingPage = () => {
         const savedVoucherIds = localStorage.getItem('lastViewedVoucherIds');
         
         if (savedBookingIds) {
-            setLastViewedBookings(JSON.parse(savedBookingIds));
+            try {
+                setLastViewedBookings(JSON.parse(savedBookingIds));
+            } catch (e) {
+                console.error('Error parsing saved booking IDs:', e);
+                localStorage.removeItem('lastViewedBookingIds');
+            }
         }
         if (savedVoucherIds) {
-            setLastViewedVouchers(JSON.parse(savedVoucherIds));
+            try {
+                setLastViewedVouchers(JSON.parse(savedVoucherIds));
+            } catch (e) {
+                console.error('Error parsing saved voucher IDs:', e);
+                localStorage.removeItem('lastViewedVoucherIds');
+            }
         }
     }, []);
 
-    // Check for new bookings
+    // Check for new bookings - show badge if there are new IDs not in lastViewed
     useEffect(() => {
-        if (booking.length > 0 && lastViewedBookings.length > 0) {
-            const currentBookingIds = booking.map(b => b.id);
-            const newBookings = currentBookingIds.filter(id => !lastViewedBookings.includes(id));
-            setHasNewBookings(newBookings.length > 0);
+        if (booking.length > 0) {
+            const currentBookingIds = booking.map(b => b.id).filter(id => id != null);
+            
+            // If no last viewed data exists, don't show badge (first time user or cleared storage)
+            if (lastViewedBookings.length === 0) {
+                // Initialize with current IDs if user is on bookings tab
+                if (activeTab === "bookings") {
+                    setLastViewedBookings(currentBookingIds);
+                    localStorage.setItem('lastViewedBookingIds', JSON.stringify(currentBookingIds));
+                }
+                setHasNewBookings(false);
+            } else {
+                // Check if there are any new bookings not in the last viewed list
+                const newBookings = currentBookingIds.filter(id => !lastViewedBookings.includes(id));
+                setHasNewBookings(newBookings.length > 0);
+            }
         }
-    }, [booking, lastViewedBookings]);
+    }, [booking, lastViewedBookings, activeTab]);
 
-    // Check for new vouchers
+    // Check for new vouchers - show badge if there are new IDs not in lastViewed
     useEffect(() => {
-        if (voucher.length > 0 && lastViewedVouchers.length > 0) {
-            const currentVoucherIds = voucher.map(v => v.id);
-            const newVouchers = currentVoucherIds.filter(id => !lastViewedVouchers.includes(id));
-            setHasNewVouchers(newVouchers.length > 0);
+        if (voucher.length > 0) {
+            const currentVoucherIds = voucher.map(v => v.id).filter(id => id != null);
+            
+            // If no last viewed data exists, don't show badge (first time user or cleared storage)
+            if (lastViewedVouchers.length === 0) {
+                // Initialize with current IDs if user is on vouchers tab
+                if (activeTab === "vouchers") {
+                    setLastViewedVouchers(currentVoucherIds);
+                    localStorage.setItem('lastViewedVoucherIds', JSON.stringify(currentVoucherIds));
+                }
+                setHasNewVouchers(false);
+            } else {
+                // Check if there are any new vouchers not in the last viewed list
+                const newVouchers = currentVoucherIds.filter(id => !lastViewedVouchers.includes(id));
+                setHasNewVouchers(newVouchers.length > 0);
+            }
         }
-    }, [voucher, lastViewedVouchers]);
+    }, [voucher, lastViewedVouchers, activeTab]);
 
     // Handle tab change and mark as viewed
     const handleTabChange = (tab) => {
@@ -2568,24 +2602,38 @@ setBookingDetail(finalVoucherDetail);
                                 marginRight: "10px",
                                 background: activeTab === "bookings" ? "#3274b4" : "#A6A6A6",
                                 color: "#FFF",
-                                padding: "8px 12px",
+                                padding: "8px 16px",
                                 border: "none",
                                 cursor: "pointer",
                                 position: "relative",
                                 display: "inline-flex",
                                 alignItems: "center",
-                                gap: "6px"
+                                gap: "6px",
+                                borderRadius: "4px",
+                                fontSize: "14px",
+                                fontWeight: "500",
+                                transition: "all 0.3s ease"
                             }}
                         >
                             All Bookings
                             {hasNewBookings && (
                                 <span style={{
-                                    color: "#ff0000",
-                                    fontSize: "18px",
+                                    position: "absolute",
+                                    top: "-6px",
+                                    right: "-6px",
+                                    width: "16px",
+                                    height: "16px",
+                                    background: "#ff0000",
+                                    borderRadius: "50%",
+                                    border: "2px solid white",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontSize: "10px",
                                     fontWeight: "bold",
-                                    marginLeft: "4px"
+                                    color: "white",
+                                    animation: "pulse 2s infinite"
                                 }}>
-                                    ★
                                 </span>
                             )}
                         </button>
@@ -2595,24 +2643,38 @@ setBookingDetail(finalVoucherDetail);
                                 marginRight: "10px",
                                 background: activeTab === "vouchers" ? "#3274b4" : "#A6A6A6",
                                 color: "#FFF",
-                                padding: "8px 12px",
+                                padding: "8px 16px",
                                 border: "none",
                                 cursor: "pointer",
                                 position: "relative",
                                 display: "inline-flex",
                                 alignItems: "center",
-                                gap: "6px"
+                                gap: "6px",
+                                borderRadius: "4px",
+                                fontSize: "14px",
+                                fontWeight: "500",
+                                transition: "all 0.3s ease"
                             }}
                         >
                             All Vouchers
                             {hasNewVouchers && (
                                 <span style={{
-                                    color: "#ff0000",
-                                    fontSize: "18px",
+                                    position: "absolute",
+                                    top: "-6px",
+                                    right: "-6px",
+                                    width: "16px",
+                                    height: "16px",
+                                    background: "#ff0000",
+                                    borderRadius: "50%",
+                                    border: "2px solid white",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontSize: "10px",
                                     fontWeight: "bold",
-                                    marginLeft: "4px"
+                                    color: "white",
+                                    animation: "pulse 2s infinite"
                                 }}>
-                                    ★
                                 </span>
                             )}
                         </button>
@@ -2621,14 +2683,34 @@ setBookingDetail(finalVoucherDetail);
                             style={{
                                 background: activeTab === "dateRequests" ? "#3274b4" : "#A6A6A6",
                                 color: "#FFF",
-                                padding: "8px 12px",
+                                padding: "8px 16px",
                                 border: "none",
-                                cursor: "pointer"
+                                cursor: "pointer",
+                                borderRadius: "4px",
+                                fontSize: "14px",
+                                fontWeight: "500",
+                                transition: "all 0.3s ease"
                             }}
                         >
                             Date Requests
                         </button>
                     </div>
+                    
+                    {/* Add pulse animation for notification badges */}
+                    <style>
+                        {`
+                            @keyframes pulse {
+                                0%, 100% {
+                                    transform: scale(1);
+                                    opacity: 1;
+                                }
+                                50% {
+                                    transform: scale(1.1);
+                                    opacity: 0.8;
+                                }
+                            }
+                        `}
+                    </style>
 
                     {/* Tab Content */}
                     <div>
