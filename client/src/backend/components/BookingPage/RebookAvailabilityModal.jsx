@@ -570,7 +570,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                         )}
 
                         {/* Date and Time Selection */}
-                        {((selectedActivity && selectedLocation) || isFlightVoucherDetails) && (
+                        {((selectedActivity && selectedLocation) || isFlightVoucherDetails) && !isGiftVoucherDetails && (
                             <>
                                 {/* Flight Type Selector */}
                                 {!isFlightVoucherDetails && !isGiftVoucherDetails && (
