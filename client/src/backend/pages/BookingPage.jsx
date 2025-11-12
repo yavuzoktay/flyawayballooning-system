@@ -1596,17 +1596,70 @@ setBookingDetail(finalVoucherDetail);
                 
                 console.log('Save response:', response.data);
                 
+                // For Gift Vouchers, also update purchaser fields when name or email is updated
+                const isGiftVoucher = bookingDetail?.voucher?.book_flight === 'Gift Voucher';
+                if (isGiftVoucher && (editField === 'name' || editField === 'email')) {
+                    const purchaserField = editField === 'name' ? 'purchaser_name' : 'purchaser_email';
+                    console.log('Gift Voucher: Also updating', purchaserField, 'to match', editField);
+                    
+                    try {
+                        if (window.currentVoucherSourceEdit === 'all_booking') {
+                            // For booking-based vouchers, skip purchaser update (not applicable)
+                            console.log('Skipping purchaser update for booking-based voucher');
+                        } else {
+                            await axios.patch('/api/updateVoucherField', {
+                                voucher_id: voucherId,
+                                field: purchaserField,
+                                value: editValue
+                            });
+                            console.log('✅ Purchaser field updated:', purchaserField, '=', editValue);
+                        }
+                    } catch (err) {
+                        console.error('Error updating purchaser field:', err);
+                        // Don't fail the main update if purchaser update fails
+                    }
+                }
+                
                 // Local state güncelle
                 setBookingDetail(prev => ({
                     ...prev,
                     voucher: {
                         ...prev.voucher,
-                        [editField]: editValue
+                        [editField]: editValue,
+                        // Also update purchaser fields in local state for Gift Vouchers
+                        ...(isGiftVoucher && editField === 'name' ? { purchaser_name: editValue } : {}),
+                        ...(isGiftVoucher && editField === 'email' ? { purchaser_email: editValue } : {})
                     }
                 }));
                 // Tabloyu güncelle
-                setVoucher(prev => prev.map(v => v.id === voucherId ? { ...v, [editField]: editValue } : v));
-                setFilteredData(prev => prev.map(v => v.id === voucherId ? { ...v, [editField]: editValue } : v));
+                setVoucher(prev => prev.map(v => {
+                    if (v.id === voucherId) {
+                        const updated = { ...v, [editField]: editValue };
+                        // Also update purchaser fields in table for Gift Vouchers
+                        if (isGiftVoucher && editField === 'name') {
+                            updated.purchaser_name = editValue;
+                        }
+                        if (isGiftVoucher && editField === 'email') {
+                            updated.purchaser_email = editValue;
+                        }
+                        return updated;
+                    }
+                    return v;
+                }));
+                setFilteredData(prev => prev.map(v => {
+                    if (v.id === voucherId) {
+                        const updated = { ...v, [editField]: editValue };
+                        // Also update purchaser fields in filtered data for Gift Vouchers
+                        if (isGiftVoucher && editField === 'name') {
+                            updated.purchaser_name = editValue;
+                        }
+                        if (isGiftVoucher && editField === 'email') {
+                            updated.purchaser_email = editValue;
+                        }
+                        return updated;
+                    }
+                    return v;
+                }));
             } else {
                 // Booking güncelleme
                 if (!bookingDetail?.booking?.id) return;
@@ -3357,8 +3410,8 @@ setBookingDetail(finalVoucherDetail);
                                                             </>
                                                         ) : (
                                                             <>
-                                                                {v.book_flight === "Gift Voucher" ? (v.purchaser_name || v.name || '-') : (v.name || '-')}
-                                                                <IconButton size="small" onClick={() => handleEditClick('name', v.book_flight === "Gift Voucher" ? (v.purchaser_name || v.name) : v.name)}><EditIcon fontSize="small" /></IconButton>
+                                                                {v.name || '-'}
+                                                                <IconButton size="small" onClick={() => handleEditClick('name', v.name)}><EditIcon fontSize="small" /></IconButton>
                                                             </>
                                                         )}</Typography>
                                                         {/* Phone field - show purchaser_phone for Gift Vouchers, mobile for others */}
@@ -3394,8 +3447,8 @@ setBookingDetail(finalVoucherDetail);
                                                             </>
                                                         ) : (
                                                             <>
-                                                                {v.book_flight === "Gift Voucher" ? (v.purchaser_email || v.email || '-') : (v.email || '-')}
-                                                                <IconButton size="small" onClick={() => handleEditClick('email', v.book_flight === "Gift Voucher" ? (v.purchaser_email || v.email) : v.email)}><EditIcon fontSize="small" /></IconButton>
+                                                                {v.email || '-'}
+                                                                <IconButton size="small" onClick={() => handleEditClick('email', v.email)}><EditIcon fontSize="small" /></IconButton>
                                                             </>
                                                         )}</Typography>
                                                         <Typography><b>Created:</b> {bookingDetail.voucher.created_at ? (
