@@ -4580,18 +4580,24 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     purchaser_mobile: row.purchaser_mobile ?? row.mobile ?? '',
                     expires: expiresVal ? (() => {
                         // Parse expires date correctly - handle both Date objects and string formats
-                        const expiresMoment = moment(expiresVal);
-                        // If moment couldn't parse, try MM/DD/YYYY format
-                        if (!expiresMoment.isValid() && typeof expiresVal === 'string' && expiresVal.includes('/')) {
+                        if (typeof expiresVal === 'string' && expiresVal.includes('/')) {
                             const parts = expiresVal.split('/');
                             if (parts.length === 3) {
-                                // Assume MM/DD/YYYY format and convert to DD/MM/YYYY
-                                const month = parts[0];
-                                const day = parts[1];
-                                const year = parts[2];
-                                return `${day}/${month}/${year}`;
+                                const firstPart = parseInt(parts[0], 10);
+                                const secondPart = parseInt(parts[1], 10);
+                                // If first part is > 12, it's likely DD/MM/YYYY, use moment
+                                // If first part is <= 12, it could be MM/DD/YYYY, convert manually
+                                if (firstPart <= 12 && secondPart <= 31) {
+                                    // Likely MM/DD/YYYY format, convert to DD/MM/YYYY
+                                    const month = parts[0];
+                                    const day = parts[1];
+                                    const year = parts[2];
+                                    return `${day}/${month}/${year}`;
+                                }
                             }
                         }
+                        // Try moment parsing for Date objects or other formats
+                        const expiresMoment = moment(expiresVal);
                         return expiresMoment.isValid() ? expiresMoment.format('DD/MM/YYYY') : '';
                     })() : '',
                     redeemed: row.redeemed ?? '',
@@ -4605,21 +4611,27 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     all_voucher_codes: (row.all_voucher_codes || voucher_ref || ''),
                     created_at: row.created_at ? (() => {
                         // Parse created_at date correctly - handle both Date objects and string formats
-                        const createdMoment = moment(row.created_at);
-                        // If moment couldn't parse, try MM/DD/YYYY format
-                        if (!createdMoment.isValid() && typeof row.created_at === 'string' && row.created_at.includes('/')) {
+                        if (typeof row.created_at === 'string' && row.created_at.includes('/')) {
                             const dateTimeParts = row.created_at.split(' ');
                             const datePart = dateTimeParts[0];
                             const timePart = dateTimeParts[1] || '';
                             const dateParts = datePart.split('/');
                             if (dateParts.length === 3) {
-                                // Assume MM/DD/YYYY format and convert to DD/MM/YYYY
-                                const month = dateParts[0];
-                                const day = dateParts[1];
-                                const year = dateParts[2];
-                                return timePart ? `${day}/${month}/${year} ${timePart}` : `${day}/${month}/${year}`;
+                                const firstPart = parseInt(dateParts[0], 10);
+                                const secondPart = parseInt(dateParts[1], 10);
+                                // If first part is > 12, it's likely DD/MM/YYYY, use moment
+                                // If first part is <= 12, it could be MM/DD/YYYY, convert manually
+                                if (firstPart <= 12 && secondPart <= 31) {
+                                    // Likely MM/DD/YYYY format, convert to DD/MM/YYYY
+                                    const month = dateParts[0];
+                                    const day = dateParts[1];
+                                    const year = dateParts[2];
+                                    return timePart ? `${day}/${month}/${year} ${timePart}` : `${day}/${month}/${year}`;
+                                }
                             }
                         }
+                        // Try moment parsing for Date objects or other formats
+                        const createdMoment = moment(row.created_at);
                         return createdMoment.isValid() ? createdMoment.format('DD/MM/YYYY HH:mm') : '';
                     })() : '',
                     booking_email: row.booking_email ?? '',
