@@ -3664,18 +3664,27 @@ setBookingDetail(finalVoucherDetail);
                                                                                             placeholder="Weight (kg)"
                                                                                             style={{ marginRight: 4, width: 70 }}
                                                                                         />
-                                                                                        <input
-                                                                                            value={editVoucherPassengerPrice}
-                                                                                            onChange={e => setEditVoucherPassengerPrice(e.target.value.replace(/[^0-9.]/g, ''))}
-                                                                                            placeholder="Price (£)"
-                                                                                            style={{ marginRight: 4, width: 70 }}
-                                                                                        />
+                                                                                        {/* Hide price input for Private Charter */}
+                                                                                        {v.experience_type !== 'Private Charter' && (
+                                                                                            <input
+                                                                                                value={editVoucherPassengerPrice}
+                                                                                                onChange={e => setEditVoucherPassengerPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+                                                                                                placeholder="Price (£)"
+                                                                                                style={{ marginRight: 4, width: 70 }}
+                                                                                            />
+                                                                                        )}
                                                                                         <Button size="small" onClick={() => handleSaveVoucherPassengerEdit(p, i, voucherId)} disabled={savingVoucherPassengerEdit}>Save</Button>
                                                                                         <Button size="small" onClick={handleCancelVoucherPassengerEdit} disabled={savingVoucherPassengerEdit}>Cancel</Button>
                                                                                     </>
                                                                                 ) : (
                                                                                     <>
-                                                                                        {p.first_name || '-'} {p.last_name || '-'}{p.weight ? ` (${p.weight}kg${p.price ? ' £' + p.price : ''})` : ''}
+                                                                                        {/* Hide price for Private Charter experience */}
+                                                                                        {p.first_name || '-'} {p.last_name || '-'}
+                                                                                        {p.weight ? (
+                                                                                            v.experience_type === 'Private Charter' 
+                                                                                                ? ` (${p.weight}kg)` 
+                                                                                                : ` (${p.weight}kg${p.price ? ' £' + p.price : ''})`
+                                                                                        ) : ''}
                                                                                         <IconButton size="small" onClick={() => handleEditVoucherPassengerClick(p, i, voucherId)}><EditIcon fontSize="small" /></IconButton>
                                                                                     </>
                                                                                 )}
@@ -3711,12 +3720,15 @@ setBookingDetail(finalVoucherDetail);
                                                                                 placeholder="Weight (kg)"
                                                                                 style={{ marginRight: 4, width: 70 }}
                                                                             />
-                                                                            <input
-                                                                                value={editPassengerPrice}
-                                                                                onChange={e => setEditPassengerPrice(e.target.value.replace(/[^0-9.]/g, ''))}
-                                                                                placeholder="Price (£)"
-                                                                                style={{ marginRight: 4, width: 70 }}
-                                                                            />
+                                                                            {/* Hide price input for Private Charter */}
+                                                                            {bookingDetail.booking?.experience !== 'Private Charter' && (
+                                                                                <input
+                                                                                    value={editPassengerPrice}
+                                                                                    onChange={e => setEditPassengerPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+                                                                                    placeholder="Price (£)"
+                                                                                    style={{ marginRight: 4, width: 70 }}
+                                                                                />
+                                                                            )}
                                                                             <Button size="small" onClick={async () => {
                                                                                 // Save passenger price
                                                                                 const newPrice = parseFloat(editPassengerPrice) || 0;
@@ -3751,7 +3763,13 @@ setBookingDetail(finalVoucherDetail);
                                                                         </>
                                                                     ) : (
                                                                         <>
-                                                                            {p.first_name || '-'} {p.last_name || '-'}{p.weight ? ` (${p.weight}kg${p.price ? ' £' + p.price : ''})` : ''}
+                                                                            {/* Hide price for Private Charter experience */}
+                                                                            {p.first_name || '-'} {p.last_name || '-'}
+                                                                            {p.weight ? (
+                                                                                bookingDetail.booking?.experience === 'Private Charter' 
+                                                                                    ? ` (${p.weight}kg)` 
+                                                                                    : ` (${p.weight}kg${p.price ? ' £' + p.price : ''})`
+                                                                            ) : ''}
                                                                             <IconButton size="small" onClick={() => handleEditPassengerClick(p)}><EditIcon fontSize="small" /></IconButton>
                                                                             {i > 0 && ( // Only show delete button for additional passengers (not the first one)
                                                                                 <IconButton 
