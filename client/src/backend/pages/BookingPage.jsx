@@ -1447,25 +1447,35 @@ setBookingDetail(finalVoucherDetail);
             });
             
             if (response.data.success) {
-                // First, refetch the updated passenger list to get the correct count
+                // Get new due from response if available
+                const newDue = response.data.newDue !== undefined ? response.data.newDue : null;
+                
+                // Refetch the updated passenger list and booking details
                 const res = await axios.get(`/api/getBookingDetail?booking_id=${selectedBookingId}`);
                 const updatedPassengers = res.data.passengers || [];
                 const updatedPax = updatedPassengers.length;
+                const updatedDue = newDue !== null ? newDue : (res.data.booking?.due || 0);
                 
-                // Update the main booking table with the new pax count
+                console.log('=== DELETE PASSENGER - FRONTEND UPDATE ===');
+                console.log('Updated Pax:', updatedPax);
+                console.log('New Due from backend:', newDue);
+                console.log('Updated Due:', updatedDue);
+                
+                // Update the main booking table with the new pax count and due
                 setBooking(prev => prev.map(b => 
-                    b.id === selectedBookingId ? { ...b, pax: updatedPax } : b
+                    b.id === selectedBookingId ? { ...b, pax: updatedPax, due: updatedDue } : b
                 ));
                 setFilteredData(prev => prev.map(b => 
-                    b.id === selectedBookingId ? { ...b, pax: updatedPax } : b
+                    b.id === selectedBookingId ? { ...b, pax: updatedPax, due: updatedDue } : b
                 ));
                 
-                // Update bookingDetail state to reflect the new pax count immediately
+                // Update bookingDetail state to reflect the new pax count and due immediately
                 setBookingDetail(prev => ({
                     ...prev,
                     booking: {
                         ...prev.booking,
-                        pax: updatedPax
+                        pax: updatedPax,
+                        due: updatedDue
                     },
                     passengers: updatedPassengers
                 }));
