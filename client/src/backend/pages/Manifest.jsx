@@ -3407,13 +3407,31 @@ const Manifest = () => {
                                                                 </>
                                                             ) : (
                                                                 <>
-                                                                    {/* Hide price for Private Charter experience */}
-                                                                    {p.first_name || '-'} {p.last_name || '-'}
-                                                                    {p.weight ? (
-                                                                        bookingDetail.booking?.experience === 'Private Charter' 
-                                                                            ? ` (${p.weight}kg)` 
-                                                                            : ` (${p.weight}kg${p.price ? ' £' + p.price : ''})`
-                                                                    ) : ''}
+                                                                    {/* Calculate correct passenger price dynamically */}
+                                                                    {(() => {
+                                                                        const isPrivateCharter = bookingDetail.booking?.experience === 'Private Charter';
+                                                                        
+                                                                        // For Shared Flight, calculate price from (paid + due) / pax
+                                                                        let displayPrice = p.price;
+                                                                        if (!isPrivateCharter && bookingDetail.booking && bookingDetail.passengers) {
+                                                                            const paid = parseFloat(bookingDetail.booking.paid) || 0;
+                                                                            const due = parseFloat(bookingDetail.booking.due) || 0;
+                                                                            const totalAmount = paid + due;
+                                                                            const paxCount = bookingDetail.passengers.length;
+                                                                            displayPrice = paxCount > 0 ? (totalAmount / paxCount).toFixed(2) : p.price;
+                                                                        }
+                                                                        
+                                                                        return (
+                                                                            <>
+                                                                                {p.first_name || '-'} {p.last_name || '-'}
+                                                                                {p.weight ? (
+                                                                                    isPrivateCharter 
+                                                                                        ? ` (${p.weight}kg)` 
+                                                                                        : ` (${p.weight}kg${displayPrice ? ' £' + displayPrice : ''})`
+                                                                                ) : ''}
+                                                                            </>
+                                                                        );
+                                                                    })()}
                                                                       <IconButton size="small" onClick={() => handleEditPassengerClick(p)}><EditIcon fontSize="small" /></IconButton>
                                                                       {i > 0 && ( // Only show delete button for additional passengers (not the first one)
                                                                           <IconButton 
