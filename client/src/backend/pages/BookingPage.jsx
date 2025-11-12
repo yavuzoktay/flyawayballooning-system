@@ -2800,7 +2800,6 @@ setBookingDetail(finalVoucherDetail);
                                         columns={[
                                             "created_at",
                                             "name",
-                                            "flight_type",
                                             "voucher_type",
                                             "location",
                                             "flight_date",
@@ -2961,7 +2960,7 @@ setBookingDetail(finalVoucherDetail);
                                         }
                                         return true;
                                     })}
-                                    columns={["created", "name", "flight_type", "voucher_type", "actual_voucher_type", "email", "phone", "expires", "redeemed", "paid", "offer_code", "voucher_ref"]}
+                                    columns={["created", "name", "voucher_type", "actual_voucher_type", "email", "phone", "expires", "redeemed", "paid", "offer_code", "voucher_ref"]}
                                     onNameClick={handleNameClick}
                                     onEmailClick={(voucher) => {
                                         const faux = { id: voucher.id, name: voucher.name, email: voucher.email, flight_type: voucher.flight_type };
