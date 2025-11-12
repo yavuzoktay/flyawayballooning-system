@@ -3452,11 +3452,18 @@ setBookingDetail(finalVoucherDetail);
                                                             </>
                                                         )}</Typography>
                                                         <Typography><b>Created:</b> {bookingDetail.voucher.created_at ? (
-                                                            dayjs(bookingDetail.voucher.created_at).isValid() ? 
-                                                                dayjs(bookingDetail.voucher.created_at).format('DD/MM/YYYY') : 
-                                                                (bookingDetail.voucher.created_at.includes(' ') ? 
-                                                                    bookingDetail.voucher.created_at.split(' ')[0] : 
-                                                                    bookingDetail.voucher.created_at)
+                                                            (() => {
+                                                                // Backend returns DD/MM/YYYY HH:mm format
+                                                                // If it's already in DD/MM/YYYY format, use it directly
+                                                                if (typeof bookingDetail.voucher.created_at === 'string' && bookingDetail.voucher.created_at.includes('/')) {
+                                                                    // Extract date part (before space if time exists)
+                                                                    const datePart = bookingDetail.voucher.created_at.split(' ')[0];
+                                                                    return datePart; // Already in DD/MM/YYYY format from backend
+                                                                }
+                                                                // Try dayjs parsing for Date objects or other formats
+                                                                const createdMoment = dayjs(bookingDetail.voucher.created_at);
+                                                                return createdMoment.isValid() ? createdMoment.format('DD/MM/YYYY') : bookingDetail.voucher.created_at;
+                                                            })()
                                                         ) : '-'}</Typography>
                                                         <Typography><b>Paid:</b> {editField === 'paid' ? (
                                                             <>
@@ -3491,9 +3498,16 @@ setBookingDetail(finalVoucherDetail);
                                                         ) : (
                                                             <>
                                                                 {bookingDetail.voucher.expires ? (
-                                                                    dayjs(bookingDetail.voucher.expires).isValid() ? 
-                                                                        dayjs(bookingDetail.voucher.expires).format('DD/MM/YYYY') : 
-                                                                        bookingDetail.voucher.expires
+                                                                    (() => {
+                                                                        // Backend returns DD/MM/YYYY format
+                                                                        // If it's already in DD/MM/YYYY format, use it directly
+                                                                        if (typeof bookingDetail.voucher.expires === 'string' && bookingDetail.voucher.expires.includes('/')) {
+                                                                            return bookingDetail.voucher.expires; // Already in DD/MM/YYYY format from backend
+                                                                        }
+                                                                        // Try dayjs parsing for Date objects or other formats
+                                                                        const expiresMoment = dayjs(bookingDetail.voucher.expires);
+                                                                        return expiresMoment.isValid() ? expiresMoment.format('DD/MM/YYYY') : bookingDetail.voucher.expires;
+                                                                    })()
                                                                 ) : '-'}
                                                                 <IconButton size="small" onClick={() => handleEditClick('expires', bookingDetail.voucher.expires)}><EditIcon fontSize="small" /></IconButton>
                                                             </>
@@ -3730,16 +3744,30 @@ setBookingDetail(finalVoucherDetail);
                                                                     })()}
                                                                 </Typography>
                                                                 <Typography><b>Created:</b> {v.created_at ? (
-                                                                    dayjs(v.created_at).isValid() ? 
-                                                                        dayjs(v.created_at).format('DD/MM/YYYY') : 
-                                                                        (v.created_at.includes(' ') ? 
-                                                                            v.created_at.split(' ')[0] : 
-                                                                            v.created_at)
+                                                                    (() => {
+                                                                        // Backend returns DD/MM/YYYY HH:mm format
+                                                                        // If it's already in DD/MM/YYYY format, use it directly
+                                                                        if (typeof v.created_at === 'string' && v.created_at.includes('/')) {
+                                                                            // Extract date part (before space if time exists)
+                                                                            const datePart = v.created_at.split(' ')[0];
+                                                                            return datePart; // Already in DD/MM/YYYY format from backend
+                                                                        }
+                                                                        // Try dayjs parsing for Date objects or other formats
+                                                                        const createdMoment = dayjs(v.created_at);
+                                                                        return createdMoment.isValid() ? createdMoment.format('DD/MM/YYYY') : v.created_at;
+                                                                    })()
                                                                 ) : '-'}</Typography>
                                                                 <Typography><b>Expires:</b> {v.expires ? (
-                                                                    dayjs(v.expires).isValid() ? 
-                                                                        dayjs(v.expires).format('DD/MM/YYYY') : 
-                                                                        v.expires
+                                                                    (() => {
+                                                                        // Backend returns DD/MM/YYYY format
+                                                                        // If it's already in DD/MM/YYYY format, use it directly
+                                                                        if (typeof v.expires === 'string' && v.expires.includes('/')) {
+                                                                            return v.expires; // Already in DD/MM/YYYY format from backend
+                                                                        }
+                                                                        // Try dayjs parsing for Date objects or other formats
+                                                                        const expiresMoment = dayjs(v.expires);
+                                                                        return expiresMoment.isValid() ? expiresMoment.format('DD/MM/YYYY') : v.expires;
+                                                                    })()
                                                                 ) : '-'}</Typography>
                                                             </>;
                                                         })()
