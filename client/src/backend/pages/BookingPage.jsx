@@ -2084,19 +2084,15 @@ setBookingDetail(finalVoucherDetail);
     };
 
     const handleRebook = () => {
-        // Check if this is a Gift Voucher
+        // Check if this is a Gift Voucher - don't open calendar for Gift Vouchers
         const v = bookingDetail?.voucher || {};
         const isGiftVoucher = v?.book_flight === 'Gift Voucher';
         
-        if (isGiftVoucher) {
-            // For Gift Vouchers, don't open calendar modal
-            // Just show a message or do nothing
-            alert('Please use the booking website to redeem this gift voucher.');
-            return;
+        // Only open calendar modal for Flight Vouchers and regular bookings
+        if (!isGiftVoucher) {
+            setRebookModalOpen(true);
         }
-        
-        // For Flight Vouchers and regular bookings, open rebook modal
-        setRebookModalOpen(true);
+        // For Gift Vouchers, do nothing (no calendar, no alert)
     };
 
     const handleRebookSlotSelect = async (date, time, activityId, selectedActivity, selectedLocation, selectedFlightTypes, selectedVoucherTypes) => {
