@@ -573,7 +573,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                         {((selectedActivity && selectedLocation) || isFlightVoucherDetails) && (
                             <>
                                 {/* Flight Type Selector */}
-                                {!isFlightVoucherDetails && (
+                                {!isFlightVoucherDetails && !isGiftVoucherDetails && (
                                 <Box sx={{ mb: 3 }}>
                                     <Typography variant="h6" sx={{ mb: 2 }}>Flight Type:</Typography>
                                     <FormGroup row>
@@ -612,7 +612,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                 )}
 
                                 {/* Voucher Type Selector */}
-                                {!isFlightVoucherDetails && (
+                                {!isFlightVoucherDetails && !isGiftVoucherDetails && (
                                 <Box sx={{ mb: 3 }}>
                                     <Typography variant="h6" sx={{ mb: 2 }}>Voucher Type:</Typography>
                                     <FormGroup row>
