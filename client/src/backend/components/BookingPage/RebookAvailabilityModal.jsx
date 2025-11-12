@@ -462,7 +462,9 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-            <DialogTitle>Rebook - Select New Options & Time</DialogTitle>
+            <DialogTitle>
+                {isGiftVoucherDetails ? 'Redeem - Select New Options' : 'Rebook - Select New Options & Time'}
+            </DialogTitle>
             <DialogContent>
                 {loadingActivities ? (
                     <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
