@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, CircularProgress, FormControl, InputLabel, Select, MenuItem, Box, Checkbox, FormControlLabel, FormGroup, IconButton } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, CircularProgress, FormControl, InputLabel, Select, MenuItem, Box, Checkbox, FormControlLabel, FormGroup, IconButton, TextField, Grid } from '@mui/material';
 import dayjs from 'dayjs';
 import axios from 'axios';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -24,10 +24,21 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
     const [selectedFlightTypes, setSelectedFlightTypes] = useState([]);
     const [selectedVoucherTypes, setSelectedVoucherTypes] = useState([]);
 
+    // Purchaser Information state for Gift Vouchers
+    const [purchaserFirstName, setPurchaserFirstName] = useState('');
+    const [purchaserLastName, setPurchaserLastName] = useState('');
+    const [purchaserMobile, setPurchaserMobile] = useState('');
+    const [purchaserEmail, setPurchaserEmail] = useState('');
+
     const isFlightVoucherDetails = useMemo(() => {
         const bookFlight = (bookingDetail?.voucher?.book_flight || '').toLowerCase();
         const voucherType = (bookingDetail?.voucher?.voucher_type || '').toLowerCase();
         return Boolean(bookingDetail?.voucher) && !bookFlight.includes('gift') && voucherType.includes('flight');
+    }, [bookingDetail]);
+
+    const isGiftVoucherDetails = useMemo(() => {
+        const bookFlight = (bookingDetail?.voucher?.book_flight || '').toLowerCase();
+        return Boolean(bookingDetail?.voucher) && bookFlight.includes('gift');
     }, [bookingDetail]);
 
     // availableDates state'i
@@ -60,6 +71,10 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
             setSelectedLocation('');
             setSelectedFlightTypes([]);
             setSelectedVoucherTypes([]);
+            setPurchaserFirstName('');
+            setPurchaserLastName('');
+            setPurchaserMobile('');
+            setPurchaserEmail('');
         }
     }, [open, location, bookingDetail]);
 
@@ -473,6 +488,81 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                         <FormControlLabel control={<Checkbox checked={selectedVoucherTypes.includes('flexible weekday')} onChange={(e) => { if (e.target.checked) setSelectedVoucherTypes(prev => [...prev, 'flexible weekday']); else setSelectedVoucherTypes(prev => prev.filter(t => t !== 'flexible weekday')); }} />} label="Flexible Weekday" />
                                         <FormControlLabel control={<Checkbox checked={selectedVoucherTypes.includes('any day flight')} onChange={(e) => { if (e.target.checked) setSelectedVoucherTypes(prev => [...prev, 'any day flight']); else setSelectedVoucherTypes(prev => prev.filter(t => t !== 'any day flight')); }} />} label="Any Day Flight" />
                                     </FormGroup>
+                                </Box>
+                            </>
+                        )}
+
+                        {/* Gift Voucher: Purchaser Information */}
+                        {isGiftVoucherDetails && (
+                            <>
+                                {/* Flight Type Selector */}
+                                <Box sx={{ mb: 3 }}>
+                                    <Typography variant="h6" sx={{ mb: 2 }}>Flight Type:</Typography>
+                                    <FormGroup row>
+                                        <FormControlLabel control={<Checkbox checked={selectedFlightTypes.includes('private')} onChange={(e) => { if (e.target.checked) setSelectedFlightTypes(prev => [...prev, 'private']); else setSelectedFlightTypes(prev => prev.filter(t => t !== 'private')); }} />} label="Private" />
+                                        <FormControlLabel control={<Checkbox checked={selectedFlightTypes.includes('shared')} onChange={(e) => { if (e.target.checked) setSelectedFlightTypes(prev => [...prev, 'shared']); else setSelectedFlightTypes(prev => prev.filter(t => t !== 'shared')); }} />} label="Shared" />
+                                    </FormGroup>
+                                </Box>
+                                {/* Voucher Type Selector */}
+                                <Box sx={{ mb: 3 }}>
+                                    <Typography variant="h6" sx={{ mb: 2 }}>Voucher Type:</Typography>
+                                    <FormGroup row>
+                                        <FormControlLabel control={<Checkbox checked={selectedVoucherTypes.includes('weekday morning')} onChange={(e) => { if (e.target.checked) setSelectedVoucherTypes(prev => [...prev, 'weekday morning']); else setSelectedVoucherTypes(prev => prev.filter(t => t !== 'weekday morning')); }} />} label="Weekday Morning" />
+                                        <FormControlLabel control={<Checkbox checked={selectedVoucherTypes.includes('flexible weekday')} onChange={(e) => { if (e.target.checked) setSelectedVoucherTypes(prev => [...prev, 'flexible weekday']); else setSelectedVoucherTypes(prev => prev.filter(t => t !== 'flexible weekday')); }} />} label="Flexible Weekday" />
+                                        <FormControlLabel control={<Checkbox checked={selectedVoucherTypes.includes('any day flight')} onChange={(e) => { if (e.target.checked) setSelectedVoucherTypes(prev => [...prev, 'any day flight']); else setSelectedVoucherTypes(prev => prev.filter(t => t !== 'any day flight')); }} />} label="Any Day Flight" />
+                                    </FormGroup>
+                                </Box>
+
+                                {/* Purchaser Information */}
+                                <Box sx={{ mb: 3, mt: 3, p: 3, border: '1px solid #e0e0e0', borderRadius: 2, backgroundColor: '#fafafa' }}>
+                                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>Your Details — The Purchaser</Typography>
+                                    <Grid container spacing={2}>
+                                        <Grid item xs={12} sm={6}>
+                                            <TextField
+                                                fullWidth
+                                                label="First Name"
+                                                placeholder="First Name"
+                                                value={purchaserFirstName}
+                                                onChange={(e) => setPurchaserFirstName(e.target.value)}
+                                                required
+                                                variant="outlined"
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} sm={6}>
+                                            <TextField
+                                                fullWidth
+                                                label="Last Name"
+                                                placeholder="Last Name"
+                                                value={purchaserLastName}
+                                                onChange={(e) => setPurchaserLastName(e.target.value)}
+                                                required
+                                                variant="outlined"
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} sm={6}>
+                                            <TextField
+                                                fullWidth
+                                                label="Mobile Number"
+                                                placeholder="Mobile Number"
+                                                value={purchaserMobile}
+                                                onChange={(e) => setPurchaserMobile(e.target.value)}
+                                                required
+                                                variant="outlined"
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12} sm={6}>
+                                            <TextField
+                                                fullWidth
+                                                label="Email"
+                                                placeholder="Email"
+                                                type="email"
+                                                value={purchaserEmail}
+                                                onChange={(e) => setPurchaserEmail(e.target.value)}
+                                                required
+                                                variant="outlined"
+                                            />
+                                        </Grid>
+                                    </Grid>
                                 </Box>
                             </>
                         )}
