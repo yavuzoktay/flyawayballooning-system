@@ -6500,8 +6500,8 @@ app.post('/api/addPassenger', (req, res) => {
         return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
     
-    // First, get current booking details to calculate price per passenger
-    const getBookingSql = 'SELECT paid, pax, due FROM all_booking WHERE id = ? LIMIT 1';
+    // First, get current booking details including experience, location, activity_id, voucher_type
+    const getBookingSql = 'SELECT paid, pax, due, experience, location, activity_id, voucher_type FROM all_booking WHERE id = ? LIMIT 1';
     con.query(getBookingSql, [booking_id], (getErr, bookingRows) => {
         if (getErr) {
             console.error('Error fetching booking details:', getErr);
@@ -6512,18 +6512,111 @@ app.post('/api/addPassenger', (req, res) => {
             return res.status(404).json({ success: false, message: 'Booking not found' });
         }
         
-        const currentPaid = parseFloat(bookingRows[0].paid) || 0;
-        const currentPax = parseInt(bookingRows[0].pax) || 1;
-        const currentDue = parseFloat(bookingRows[0].due) || 0;
-        const pricePerPassenger = currentPax > 0 ? (currentPaid / currentPax) : 0;
+        const booking = bookingRows[0];
+        const currentPaid = parseFloat(booking.paid) || 0;
+        const currentPax = parseInt(booking.pax) || 1;
+        const currentDue = parseFloat(booking.due) || 0;
+        const experience = booking.experience || '';
+        const location = booking.location || '';
+        const voucherType = booking.voucher_type || '';
         
-        console.log('=== ADD PASSENGER - PRICE CALCULATION ===');
+        console.log('=== ADD PASSENGER - INITIAL INFO ===');
         console.log('Booking ID:', booking_id);
         console.log('Current Paid:', currentPaid);
         console.log('Current Pax:', currentPax);
         console.log('Current Due:', currentDue);
-        console.log('Price Per Passenger:', pricePerPassenger);
-        console.log('New Due will be:', currentDue + pricePerPassenger);
+        console.log('Experience:', experience);
+        console.log('Location:', location);
+        console.log('Voucher Type:', voucherType);
+        
+        // Check if this is a Private Charter booking
+        const isPrivateCharter = experience === 'Private Charter' || experience.includes('Private');
+        
+        if (isPrivateCharter && location) {
+            // For Private Charter, get pricing from activity table based on passenger count
+            const activitySql = 'SELECT private_charter_pricing FROM activity WHERE location = ? AND status = "Live" ORDER BY id DESC LIMIT 1';
+            con.query(activitySql, [location], (actErr, activityRows) => {
+                if (actErr || !activityRows || activityRows.length === 0) {
+                    console.error('Error fetching activity pricing:', actErr);
+                    // Fallback to equal division if activity not found
+                    handlePassengerAddition(currentPaid / currentPax);
+                    return;
+                }
+                
+                const activity = activityRows[0];
+                let pricingMap = {};
+                try {
+                    const raw = activity.private_charter_pricing;
+                    pricingMap = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
+                } catch (e) {
+                    console.error('Error parsing private_charter_pricing:', e);
+                    pricingMap = {};
+                }
+                
+                // New passenger count will be current + 1
+                const newPassengerCount = currentPax + 1;
+                console.log('New Passenger Count:', newPassengerCount);
+                console.log('Pricing Map:', pricingMap);
+                
+                // Find the price for the new passenger count and voucher type
+                // The pricing map structure: { "Private Charter Flights": { "2": 900, "3": 1050, ... } }
+                let newTotalPrice = null;
+                
+                // Normalize voucher type for matching
+                const normalizeKey = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+                const voucherTypeNormalized = normalizeKey(voucherType);
+                
+                // Try to find pricing for the voucher type
+                for (const [key, prices] of Object.entries(pricingMap)) {
+                    if (normalizeKey(key).includes('private charter') || normalizeKey(key).includes('proposal')) {
+                        // Check if this key matches the voucher type
+                        if (normalizeKey(key) === voucherTypeNormalized || 
+                            voucherTypeNormalized.includes(normalizeKey(key)) || 
+                            normalizeKey(key).includes(voucherTypeNormalized)) {
+                            
+                            // Found matching voucher type, get price for passenger count
+                            if (prices && typeof prices === 'object') {
+                                const priceForCount = prices[String(newPassengerCount)] || prices[newPassengerCount];
+                                if (priceForCount) {
+                                    newTotalPrice = parseFloat(priceForCount);
+                                    console.log(`Found price for ${newPassengerCount} passengers:`, newTotalPrice);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // If no specific pricing found, fallback to current average
+                if (newTotalPrice === null) {
+                    console.log('No activity pricing found, using equal division');
+                    const pricePerPassenger = currentPaid / currentPax;
+                    handlePassengerAddition(pricePerPassenger);
+                } else {
+                    // Calculate the new due based on activity pricing
+                    // New Total Price = newTotalPrice (from activity)
+                    // Paid remains the same (currentPaid)
+                    // New Due = newTotalPrice - currentPaid
+                    const newDue = Math.max(0, newTotalPrice - currentPaid);
+                    console.log('=== PRIVATE CHARTER PRICING ===');
+                    console.log('New Total Price from Activity:', newTotalPrice);
+                    console.log('Current Paid:', currentPaid);
+                    console.log('New Due:', newDue);
+                    
+                    handlePassengerAddition(0, newDue); // Pass 0 for pricePerPassenger, newDue for absolute due
+                }
+            });
+        } else {
+            // For Shared Flight or non-Private Charter, use equal division
+            const pricePerPassenger = currentPaid / currentPax;
+            console.log('=== SHARED FLIGHT PRICING ===');
+            console.log('Price Per Passenger:', pricePerPassenger);
+            console.log('New Due will be:', currentDue + pricePerPassenger);
+            handlePassengerAddition(pricePerPassenger);
+        }
+        
+        // Helper function to handle passenger addition
+        function handlePassengerAddition(pricePerPassenger, absoluteDue = null) {
         
     // passenger tablosunda email, phone, ticket_type, weight varsa ekle
     const sql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone, ticket_type) VALUES (?, ?, ?, ?, ?, ?, ?)';
@@ -6534,22 +6627,42 @@ app.post('/api/addPassenger', (req, res) => {
             return res.status(500).json({ success: false, message: 'Database error' });
         }
             
-            // After insert, update pax count and add to due amount
-            // New due = old due + price_per_passenger (for the newly added passenger)
-            const updateBookingSql = `
-                UPDATE all_booking 
-                SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
-                    due = COALESCE(due, 0) + ?
-                WHERE id = ?
-            `;
-            con.query(updateBookingSql, [booking_id, pricePerPassenger, booking_id], (err2, updateResult) => {
+            // After insert, update pax count and due amount
+            // For Private Charter with absoluteDue, set due to the absolute value
+            // For Shared Flight, add pricePerPassenger to current due
+            let updateBookingSql, updateParams;
+            
+            if (absoluteDue !== null) {
+                // Private Charter: set due to absolute value from activity pricing
+                updateBookingSql = `
+                    UPDATE all_booking 
+                    SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
+                        due = ?
+                    WHERE id = ?
+                `;
+                updateParams = [booking_id, absoluteDue, booking_id];
+                console.log('Setting absolute due for Private Charter:', absoluteDue);
+            } else {
+                // Shared Flight: add to current due
+                updateBookingSql = `
+                    UPDATE all_booking 
+                    SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
+                        due = COALESCE(due, 0) + ?
+                    WHERE id = ?
+                `;
+                updateParams = [booking_id, pricePerPassenger, booking_id];
+                console.log('Adding to due for Shared Flight:', pricePerPassenger);
+            }
+            
+            con.query(updateBookingSql, updateParams, (err2, updateResult) => {
             if (err2) {
                     console.error('Error updating pax and due after addPassenger:', err2);
                 // Still return success for passenger creation
                     return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: false, dueUpdated: false });
             }
                 
-                console.log('✅ Updated booking - Added to due:', pricePerPassenger);
+                const finalDue = absoluteDue !== null ? absoluteDue : (currentDue + pricePerPassenger);
+                console.log('✅ Updated booking - New due:', finalDue);
                 console.log('✅ Pax updated, rows affected:', updateResult.affectedRows);
                 
 			// Also recompute availability for this booking's slot
@@ -6557,10 +6670,10 @@ app.post('/api/addPassenger', (req, res) => {
 			con.query(bookingInfoSql, [booking_id], (infoErr, infoRows) => {
 				if (infoErr) {
 					console.error('Error fetching booking info for availability update after addPassenger:', infoErr);
-                        return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: false });
+                        return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: false, newDue: finalDue });
 				}
 				if (!infoRows || infoRows.length === 0) {
-                        return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: false });
+                        return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: false, newDue: finalDue });
 				}
 				const row = infoRows[0];
 				const bookingDate = (row.flight_date ? dayjs(row.flight_date).format('YYYY-MM-DD') : null);
@@ -6568,23 +6681,24 @@ app.post('/api/addPassenger', (req, res) => {
 				const activityId = row.activity_id;
 				if (bookingDate && bookingTime && activityId) {
 					updateSpecificAvailability(bookingDate, bookingTime, activityId, 1);
-                        return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: true, newDue: currentDue + pricePerPassenger });
+                        return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: true, newDue: finalDue });
 				}
 				if (bookingDate && bookingTime && row.location && !activityId) {
 					const activitySql = 'SELECT id FROM activity WHERE location = ? AND status = "Live" LIMIT 1';
 					con.query(activitySql, [row.location], (actErr, actRows) => {
-						if (!actErr && actRows && actRows.length > 0) {
-							updateSpecificAvailability(bookingDate, bookingTime, actRows[0].id, 1);
-                                return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: true, newDue: currentDue + pricePerPassenger });
-						}
-                            return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: false, newDue: currentDue + pricePerPassenger });
-					});
-					return; // response will be sent in callback above
-				}
-                    return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: false, newDue: currentDue + pricePerPassenger });
+					if (!actErr && actRows && actRows.length > 0) {
+						updateSpecificAvailability(bookingDate, bookingTime, actRows[0].id, 1);
+                                return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: true, newDue: finalDue });
+					}
+                            return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: false, newDue: finalDue });
+				});
+				return; // response will be sent in callback above
+			}
+                    return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: false, newDue: finalDue });
                 });
-			});
+		});
         });
+        }
     });
 });
 

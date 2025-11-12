@@ -1279,6 +1279,7 @@ setBookingDetail(finalVoucherDetail);
                 // Handle booking guest addition (existing logic)
             // Add each guest and collect updated pax counts
             let lastUpdatedPax = null;
+            let lastNewDue = null;
             for (const g of guestForms) {
                 const response = await axios.post('/api/addPassenger', {
                     booking_id: selectedBookingId,
@@ -1290,34 +1291,50 @@ setBookingDetail(finalVoucherDetail);
                     weight: g.weight
                 });
                 lastUpdatedPax = response.data.updatedPax;
+                if (response.data.newDue !== undefined) {
+                    lastNewDue = response.data.newDue;
+                }
             }
             
             // Fetch updated passengers
             const res = await axios.get(`/api/getBookingDetail?booking_id=${selectedBookingId}`);
             const updatedPassengers = res.data.passengers || [];
             
-            // Recalculate prices - Include both paid and due
+            // Get booking details after guest addition
             const paid = parseFloat(res.data.booking?.paid) || 0;
             const due = parseFloat(res.data.booking?.due) || 0;
+            const experience = res.data.booking?.experience || '';
             const totalAmount = paid + due;
             const n = updatedPassengers.length;
-            const perPassenger = n > 0 ? parseFloat((totalAmount / n).toFixed(2)) : 0;
             
-            console.log('=== RECALCULATING PASSENGER PRICES ===');
+            console.log('=== AFTER ADD GUEST ===');
+            console.log('Experience:', experience);
             console.log('Paid:', paid);
             console.log('Due:', due);
             console.log('Total Amount:', totalAmount);
             console.log('Number of Passengers:', n);
-            console.log('Price Per Passenger:', perPassenger);
             
-            // Update all passenger prices in backend
-            await Promise.all(updatedPassengers.map((p) =>
-                axios.patch('/api/updatePassengerField', {
-                    passenger_id: p.id,
-                    field: 'price',
-                    value: perPassenger
-                })
-            ));
+            // For Private Charter, skip recalculation as backend already set correct due
+            const isPrivateCharter = experience === 'Private Charter' || experience.includes('Private');
+            
+            if (!isPrivateCharter) {
+                // For Shared Flight only: recalculate and update passenger prices
+                const perPassenger = n > 0 ? parseFloat((totalAmount / n).toFixed(2)) : 0;
+                
+                console.log('=== RECALCULATING PASSENGER PRICES (SHARED FLIGHT) ===');
+                console.log('Price Per Passenger:', perPassenger);
+                
+                // Update all passenger prices in backend
+                await Promise.all(updatedPassengers.map((p) =>
+                    axios.patch('/api/updatePassengerField', {
+                        passenger_id: p.id,
+                        field: 'price',
+                        value: perPassenger
+                    })
+                ));
+            } else {
+                console.log('=== PRIVATE CHARTER - SKIPPING PASSENGER PRICE RECALCULATION ===');
+            }
             
             // Update the booking table with new pax count (use fresh count from fetched passengers)
             const updatedPax = n;
