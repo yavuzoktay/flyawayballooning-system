@@ -1395,16 +1395,34 @@ const Manifest = () => {
             });
             
             if (response.data.success) {
+                // Get new due from response if available
+                const newDue = response.data.newDue !== undefined ? response.data.newDue : null;
+                
+                console.log('=== MANIFEST - DELETE PASSENGER ===');
+                console.log('New Due from backend:', newDue);
+                
                 // Refetch passengers to update UI
                 await fetchBookingDetail(bookingDetail.booking.id);
                 
-                // Update flights state to reflect the new pax count
+                // Update bookingDetail with new due if available
+                if (newDue !== null) {
+                    setBookingDetail(prev => ({
+                        ...prev,
+                        booking: {
+                            ...prev.booking,
+                            due: newDue
+                        }
+                    }));
+                }
+                
+                // Update flights state to reflect the new pax count and due
                 setFlights(prevFlights => prevFlights.map(flight => {
                     if (flight.id === bookingDetail.booking.id) {
-                        // Update the pax count for this specific flight
+                        // Update the pax count and due for this specific flight
                         return {
                             ...flight,
-                            pax: (flight.pax || 0) - 1
+                            pax: (flight.pax || 0) - 1,
+                            due: newDue !== null ? newDue : flight.due
                         };
                     }
                     return flight;

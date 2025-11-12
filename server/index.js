@@ -6710,8 +6710,8 @@ app.delete('/api/deletePassenger', (req, res) => {
         return res.status(400).json({ success: false, message: 'passenger_id and booking_id are required' });
     }
     
-    // First, get current booking details to calculate price per passenger (before deletion)
-    const getBookingSql = 'SELECT paid, pax, due FROM all_booking WHERE id = ? LIMIT 1';
+    // First, get current booking details including experience, location, voucher_type
+    const getBookingSql = 'SELECT paid, pax, due, experience, location, voucher_type FROM all_booking WHERE id = ? LIMIT 1';
     con.query(getBookingSql, [booking_id], (getErr, bookingRows) => {
         if (getErr) {
             console.error('Error fetching booking details:', getErr);
@@ -6722,17 +6722,22 @@ app.delete('/api/deletePassenger', (req, res) => {
             return res.status(404).json({ success: false, message: 'Booking not found' });
         }
         
-        const currentPaid = parseFloat(bookingRows[0].paid) || 0;
-        const currentPax = parseInt(bookingRows[0].pax) || 1;
-        const currentDue = parseFloat(bookingRows[0].due) || 0;
-        const pricePerPassenger = currentPax > 0 ? (currentPaid / currentPax) : 0;
+        const booking = bookingRows[0];
+        const currentPaid = parseFloat(booking.paid) || 0;
+        const currentPax = parseInt(booking.pax) || 1;
+        const currentDue = parseFloat(booking.due) || 0;
+        const experience = booking.experience || '';
+        const location = booking.location || '';
+        const voucherType = booking.voucher_type || '';
         
-        console.log('=== DELETE PASSENGER - PRICE CALCULATION ===');
+        console.log('=== DELETE PASSENGER - INITIAL INFO ===');
         console.log('Booking ID:', booking_id);
         console.log('Current Paid:', currentPaid);
         console.log('Current Pax:', currentPax);
         console.log('Current Due:', currentDue);
-        console.log('Price Per Passenger:', pricePerPassenger);
+        console.log('Experience:', experience);
+        console.log('Location:', location);
+        console.log('Voucher Type:', voucherType);
         
         // Delete the passenger
     const deletePassengerSql = 'DELETE FROM passenger WHERE id = ? AND booking_id = ?';
@@ -6746,11 +6751,86 @@ app.delete('/api/deletePassenger', (req, res) => {
             return res.status(404).json({ success: false, message: 'Passenger not found or does not belong to this booking' });
         }
         
-            // After deletion, update pax count and subtract from due amount (if due > 0)
-            // Only subtract if there was due amount (meaning extra guests were added)
-            const newDue = Math.max(0, currentDue - pricePerPassenger);
+            // Check if this is a Private Charter booking
+            const isPrivateCharter = experience === 'Private Charter' || experience.includes('Private');
             
-            console.log('New Due after deletion:', newDue);
+            // Calculate new due based on experience type
+            if (isPrivateCharter && location) {
+                // For Private Charter, get pricing from activity table based on new passenger count
+                const activitySql = 'SELECT private_charter_pricing FROM activity WHERE location = ? AND status = "Live" ORDER BY id DESC LIMIT 1';
+                con.query(activitySql, [location], (actErr, activityRows) => {
+                    if (actErr || !activityRows || activityRows.length === 0) {
+                        console.error('Error fetching activity pricing:', actErr);
+                        // Fallback to simple subtraction
+                        handleDueUpdate(Math.max(0, currentDue - (currentPaid / currentPax)));
+                        return;
+                    }
+                    
+                    const activity = activityRows[0];
+                    let pricingMap = {};
+                    try {
+                        const raw = activity.private_charter_pricing;
+                        pricingMap = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
+                    } catch (e) {
+                        console.error('Error parsing private_charter_pricing:', e);
+                        pricingMap = {};
+                    }
+                    
+                    // New passenger count after deletion
+                    const newPassengerCount = currentPax - 1;
+                    console.log('New Passenger Count after deletion:', newPassengerCount);
+                    console.log('Pricing Map:', pricingMap);
+                    
+                    // Find the price for the new passenger count
+                    let newTotalPrice = null;
+                    const normalizeKey = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+                    const voucherTypeNormalized = normalizeKey(voucherType);
+                    
+                    for (const [key, prices] of Object.entries(pricingMap)) {
+                        if (normalizeKey(key).includes('private charter') || normalizeKey(key).includes('proposal')) {
+                            if (normalizeKey(key) === voucherTypeNormalized || 
+                                voucherTypeNormalized.includes(normalizeKey(key)) || 
+                                normalizeKey(key).includes(voucherTypeNormalized)) {
+                                
+                                if (prices && typeof prices === 'object') {
+                                    const priceForCount = prices[String(newPassengerCount)] || prices[newPassengerCount];
+                                    if (priceForCount) {
+                                        newTotalPrice = parseFloat(priceForCount);
+                                        console.log(`Found price for ${newPassengerCount} passengers:`, newTotalPrice);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (newTotalPrice === null) {
+                        console.log('No activity pricing found for new count, using simple subtraction');
+                        handleDueUpdate(Math.max(0, currentDue - (currentPaid / currentPax)));
+                    } else {
+                        // Calculate new due: newTotalPrice - currentPaid
+                        const newDue = Math.max(0, newTotalPrice - currentPaid);
+                        console.log('=== PRIVATE CHARTER DELETE PRICING ===');
+                        console.log('New Total Price from Activity:', newTotalPrice);
+                        console.log('Current Paid:', currentPaid);
+                        console.log('New Due:', newDue);
+                        handleDueUpdate(newDue);
+                    }
+                });
+            } else {
+                // For Shared Flight, use simple subtraction
+                const pricePerPassenger = currentPax > 0 ? (currentPaid / currentPax) : 0;
+                const newDue = Math.max(0, currentDue - pricePerPassenger);
+                console.log('=== SHARED FLIGHT DELETE PRICING ===');
+                console.log('Price Per Passenger:', pricePerPassenger);
+                console.log('New Due after deletion:', newDue);
+                handleDueUpdate(newDue);
+            }
+            
+            // Helper function to update due in database
+            function handleDueUpdate(newDue) {
+            
+            console.log('Final New Due:', newDue);
             
             const updateBookingSql = `
                 UPDATE all_booking 
@@ -6765,8 +6845,7 @@ app.delete('/api/deletePassenger', (req, res) => {
                     return res.status(200).json({ success: true, message: 'Passenger deleted but pax/due update failed', paxUpdated: false, dueUpdated: false });
             }
             
-                console.log('✅ Updated booking - Subtracted from due:', pricePerPassenger);
-                console.log('✅ New due:', newDue);
+                console.log('✅ Updated booking - New due:', newDue);
             
             
 		// Recompute availability for this booking's slot
@@ -6801,6 +6880,7 @@ app.delete('/api/deletePassenger', (req, res) => {
                     return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, dueUpdated: true, availabilityUpdated: false, remainingPax: row.pax, newDue: newDue });
                 });
 		});
+            }
         });
     });
 });
