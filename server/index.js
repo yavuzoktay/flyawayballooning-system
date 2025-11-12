@@ -4928,17 +4928,33 @@ app.post('/api/createBooking', (req, res) => {
                 experience,
                 voucher_type,
                 voucher_discount,
-                original_amount
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                original_amount,
+                add_to_booking_items_total_price
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         // Debug log for choose_add_on and bookingValues
         let choose_add_on_str = '';
+        let add_on_total_price = 0;
         if (Array.isArray(choose_add_on) && choose_add_on.length > 0) {
             choose_add_on_str = choose_add_on.map(a => a && a.name ? a.name : '').filter(Boolean).join(', ');
+            // Calculate total add-on price
+            add_on_total_price = choose_add_on.reduce((sum, addon) => {
+                const price = parseFloat(addon.price) || 0;
+                return sum + price;
+            }, 0);
         }
         console.log('DEBUG choose_add_on:', choose_add_on);
         console.log('DEBUG choose_add_on_str:', choose_add_on_str);
+        console.log('DEBUG add_on_total_price:', add_on_total_price);
+        
+        // Calculate base original_amount (excluding add-ons)
+        // Formula: original_amount = totalPrice - add_on_total_price
+        const base_original_amount = (parseFloat(totalPrice) || 0) - add_on_total_price;
+        console.log('=== ORIGINAL AMOUNT CALCULATION ===');
+        console.log('Total Price:', totalPrice);
+        console.log('Add-on Total Price:', add_on_total_price);
+        console.log('Base Original Amount (excluding add-ons):', base_original_amount);
         
         // Use actual passenger count from passengerData array
         const actualPaxCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
@@ -4979,7 +4995,8 @@ app.post('/api/createBooking', (req, res) => {
             chooseFlightType.type, // experience
             chooseFlightType.type, // voucher_type
             0, // voucher_discount
-            totalPrice // original_amount
+            base_original_amount, // original_amount (base price excluding add-ons)
+            add_on_total_price // add_to_booking_items_total_price
         ];
         console.log('bookingValues:', bookingValues);
 
@@ -9380,9 +9397,22 @@ async function createBookingFromWebhook(bookingData) {
             }
 
             let choose_add_on_str = '';
+            let add_on_total_price = 0;
             if (Array.isArray(choose_add_on) && choose_add_on.length > 0) {
                 choose_add_on_str = choose_add_on.map(a => a && a.name ? a.name : '').filter(Boolean).join(', ');
+                // Calculate total add-on price for webhook
+                add_on_total_price = choose_add_on.reduce((sum, addon) => {
+                    const price = parseFloat(addon.price) || 0;
+                    return sum + price;
+                }, 0);
             }
+            
+            // Calculate base original_amount (excluding add-ons) for webhook
+            const base_original_amount = (parseFloat(totalPrice) || 0) - add_on_total_price;
+            console.log('=== WEBHOOK ORIGINAL AMOUNT CALCULATION ===');
+            console.log('Total Price:', totalPrice);
+            console.log('Add-on Total Price:', add_on_total_price);
+            console.log('Base Original Amount (excluding add-ons):', base_original_amount);
 
             const bookingSql = `
                 INSERT INTO all_booking (
@@ -9390,8 +9420,9 @@ async function createBookingFromWebhook(bookingData) {
                     voucher_code, created_at, expires, manual_status_override, additional_notes, hear_about_us,
                     ballooning_reason, prefer, weight, email, phone, choose_add_on,
                     preferred_location, preferred_time, preferred_day, flight_attempts,
-                    activity_id, time_slot, experience, voucher_type, voucher_discount, original_amount
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    activity_id, time_slot, experience, voucher_type, voucher_discount, original_amount,
+                    add_to_booking_items_total_price
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
 
             // Use actual passenger count from passengerData array
@@ -9432,7 +9463,8 @@ async function createBookingFromWebhook(bookingData) {
                 // Persist the selected voucher type if provided from frontend
                 emptyToNull(bookingData?.voucher_type || bookingData?.selectedVoucherType?.title || 'Any Day Flight'), // voucher_type
                 0, // voucher_discount
-                totalPrice // original_amount
+                base_original_amount, // original_amount (base price excluding add-ons)
+                add_on_total_price // add_to_booking_items_total_price
             ];
 
             con.query(bookingSql, bookingValues, (err, result) => {
