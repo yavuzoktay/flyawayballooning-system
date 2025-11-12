@@ -2084,21 +2084,118 @@ setBookingDetail(finalVoucherDetail);
     };
 
     const handleRebook = () => {
-        // Check if this is a Gift Voucher - don't open calendar for Gift Vouchers
-        const v = bookingDetail?.voucher || {};
-        const isGiftVoucher = v?.book_flight === 'Gift Voucher';
-        
-        // Only open calendar modal for Flight Vouchers and regular bookings
-        if (!isGiftVoucher) {
-            setRebookModalOpen(true);
-        }
-        // For Gift Vouchers, do nothing (no calendar, no alert)
+        setRebookModalOpen(true);
     };
 
-    const handleRebookSlotSelect = async (date, time, activityId, selectedActivity, selectedLocation, selectedFlightTypes, selectedVoucherTypes) => {
-        if (!bookingDetail || !bookingDetail.booking) return;
+    const handleRebookSlotSelect = async (date, time, activityId, selectedActivity, selectedLocation, selectedFlightTypes, selectedVoucherTypes, purchaserInfo) => {
+        if (!bookingDetail) return;
         setRebookLoading(true);
         try {
+            // Check if this is a Gift Voucher redemption
+            const isGiftVoucher = bookingDetail?.voucher && 
+                                 (bookingDetail.voucher.book_flight || '').toLowerCase().includes('gift');
+            
+            if (isGiftVoucher && bookingDetail.voucher) {
+                // Gift Voucher: Update voucher details only
+                console.log('Gift Voucher Redemption - Updating voucher details');
+                
+                // Determine experience based on selected flight types
+                let experience = '';
+                if (selectedFlightTypes && selectedFlightTypes.length > 0) {
+                    if (selectedFlightTypes.includes('shared')) {
+                        experience = 'Shared Flight';
+                    } else if (selectedFlightTypes.includes('private')) {
+                        experience = 'Private Charter';
+                    }
+                }
+                
+                // Determine book_flight (voucher type) based on selected voucher types
+                let bookFlight = '';
+                if (selectedVoucherTypes && selectedVoucherTypes.length > 0) {
+                    if (selectedVoucherTypes.includes('weekday morning')) {
+                        bookFlight = 'Weekday Morning Flight';
+                    } else if (selectedVoucherTypes.includes('flexible weekday')) {
+                        bookFlight = 'Flexible Weekday Flight';
+                    } else if (selectedVoucherTypes.includes('any day flight')) {
+                        bookFlight = 'Any Day Flight';
+                    }
+                }
+                
+                // Update voucher fields
+                const voucherId = bookingDetail.voucher.id;
+                const updates = [];
+                
+                if (experience) {
+                    updates.push({ 
+                        voucher_id: voucherId, 
+                        field: 'experience_type', 
+                        value: experience 
+                    });
+                }
+                
+                if (bookFlight) {
+                    updates.push({ 
+                        voucher_id: voucherId, 
+                        field: 'voucher_type', 
+                        value: bookFlight 
+                    });
+                }
+                
+                // Update purchaser information
+                if (purchaserInfo) {
+                    if (purchaserInfo.firstName) {
+                        updates.push({ 
+                            voucher_id: voucherId, 
+                            field: 'purchaser_first_name', 
+                            value: purchaserInfo.firstName 
+                        });
+                    }
+                    if (purchaserInfo.lastName) {
+                        updates.push({ 
+                            voucher_id: voucherId, 
+                            field: 'purchaser_last_name', 
+                            value: purchaserInfo.lastName 
+                        });
+                    }
+                    if (purchaserInfo.mobile) {
+                        updates.push({ 
+                            voucher_id: voucherId, 
+                            field: 'purchaser_phone', 
+                            value: purchaserInfo.mobile 
+                        });
+                    }
+                    if (purchaserInfo.email) {
+                        updates.push({ 
+                            voucher_id: voucherId, 
+                            field: 'purchaser_email', 
+                            value: purchaserInfo.email 
+                        });
+                    }
+                }
+                
+                console.log('Gift Voucher Updates:', updates);
+                
+                // Execute all updates
+                for (const update of updates) {
+                    await axios.patch('/api/updateVoucherField', update);
+                }
+                
+                setRebookModalOpen(false);
+                setDetailDialogOpen(false);
+                
+                // Refresh voucher data
+                if (activeTab === 'vouchers') {
+                    const response = await axios.get(`/api/getAllVoucherData`, { params: filters });
+                    setVoucher(response.data.data || []);
+                    setFilteredData(response.data.data || []);
+                }
+                
+                alert('Gift Voucher successfully updated!');
+                return;
+            }
+            
+            // Regular booking rebook logic
+            if (!bookingDetail.booking) return;
             // Get activity details to determine flight type and pricing
             const activityResponse = await axios.get(`/api/activity/${activityId}`);
             const activity = activityResponse.data.data;

@@ -770,7 +770,22 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                 <Button onClick={onClose}>Cancel</Button>
                 <Button
                     onClick={() => {
-                        onSlotSelect(selectedDate, selectedTime, activityId, selectedActivity, selectedLocation, selectedFlightTypes, selectedVoucherTypes);
+                        onSlotSelect(
+                            selectedDate, 
+                            selectedTime, 
+                            activityId, 
+                            selectedActivity, 
+                            selectedLocation, 
+                            selectedFlightTypes, 
+                            selectedVoucherTypes,
+                            // Pass purchaser info for Gift Vouchers
+                            {
+                                firstName: purchaserFirstName,
+                                lastName: purchaserLastName,
+                                mobile: purchaserMobile,
+                                email: purchaserEmail
+                            }
+                        );
                     }}
                     disabled={
                         isGiftVoucherDetails
