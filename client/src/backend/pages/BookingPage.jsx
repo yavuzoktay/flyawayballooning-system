@@ -148,6 +148,12 @@ const BookingPage = () => {
     const [messageLogs, setMessageLogs] = useState([]);
     const [expandedMessageIds, setExpandedMessageIds] = useState({});
 
+    // Notification states for new entries
+    const [hasNewBookings, setHasNewBookings] = useState(false);
+    const [hasNewVouchers, setHasNewVouchers] = useState(false);
+    const [lastViewedBookings, setLastViewedBookings] = useState([]);
+    const [lastViewedVouchers, setLastViewedVouchers] = useState([]);
+
     // SMS state
     const [smsModalOpen, setSmsModalOpen] = useState(false);
     const [smsForm, setSmsForm] = useState({ to: '', message: '' });
@@ -674,11 +680,58 @@ const BookingPage = () => {
         }
     };
 
-    // Load data on component mount
+    // Load data on component mount and check for notifications from localStorage
     useEffect(() => {
         voucherData();
         dateRequestedData();
+        
+        // Load last viewed IDs from localStorage
+        const savedBookingIds = localStorage.getItem('lastViewedBookingIds');
+        const savedVoucherIds = localStorage.getItem('lastViewedVoucherIds');
+        
+        if (savedBookingIds) {
+            setLastViewedBookings(JSON.parse(savedBookingIds));
+        }
+        if (savedVoucherIds) {
+            setLastViewedVouchers(JSON.parse(savedVoucherIds));
+        }
     }, []);
+
+    // Check for new bookings
+    useEffect(() => {
+        if (booking.length > 0 && lastViewedBookings.length > 0) {
+            const currentBookingIds = booking.map(b => b.id);
+            const newBookings = currentBookingIds.filter(id => !lastViewedBookings.includes(id));
+            setHasNewBookings(newBookings.length > 0);
+        }
+    }, [booking, lastViewedBookings]);
+
+    // Check for new vouchers
+    useEffect(() => {
+        if (voucher.length > 0 && lastViewedVouchers.length > 0) {
+            const currentVoucherIds = voucher.map(v => v.id);
+            const newVouchers = currentVoucherIds.filter(id => !lastViewedVouchers.includes(id));
+            setHasNewVouchers(newVouchers.length > 0);
+        }
+    }, [voucher, lastViewedVouchers]);
+
+    // Handle tab change and mark as viewed
+    const handleTabChange = (tab) => {
+        setActiveTab(tab);
+        
+        // Mark as viewed and save to localStorage
+        if (tab === "bookings" && booking.length > 0) {
+            const bookingIds = booking.map(b => b.id);
+            setLastViewedBookings(bookingIds);
+            localStorage.setItem('lastViewedBookingIds', JSON.stringify(bookingIds));
+            setHasNewBookings(false);
+        } else if (tab === "vouchers" && voucher.length > 0) {
+            const voucherIds = voucher.map(v => v.id);
+            setLastViewedVouchers(voucherIds);
+            localStorage.setItem('lastViewedVoucherIds', JSON.stringify(voucherIds));
+            setHasNewVouchers(false);
+        }
+    };
 
     // Tab değiştiğinde ilgili filtered data'yı göster
     useEffect(() => {
@@ -2510,37 +2563,65 @@ setBookingDetail(finalVoucherDetail);
                     {/* Tabs */}
                     <div style={{ marginBottom: "20px" }}>
                         <button
-                            onClick={() => setActiveTab("bookings")}
+                            onClick={() => handleTabChange("bookings")}
                             style={{
                                 marginRight: "10px",
                                 background: activeTab === "bookings" ? "#3274b4" : "#A6A6A6",
                                 color: "#FFF",
-                                padding: "8px",
+                                padding: "8px 12px",
                                 border: "none",
-                                cursor: "pointer"
+                                cursor: "pointer",
+                                position: "relative",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "6px"
                             }}
                         >
                             All Bookings
+                            {hasNewBookings && (
+                                <span style={{
+                                    color: "#ff0000",
+                                    fontSize: "18px",
+                                    fontWeight: "bold",
+                                    marginLeft: "4px"
+                                }}>
+                                    ★
+                                </span>
+                            )}
                         </button>
                         <button
-                            onClick={() => setActiveTab("vouchers")}
+                            onClick={() => handleTabChange("vouchers")}
                             style={{
                                 marginRight: "10px",
                                 background: activeTab === "vouchers" ? "#3274b4" : "#A6A6A6",
                                 color: "#FFF",
-                                padding: "8px",
+                                padding: "8px 12px",
                                 border: "none",
-                                cursor: "pointer"
+                                cursor: "pointer",
+                                position: "relative",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "6px"
                             }}
                         >
                             All Vouchers
+                            {hasNewVouchers && (
+                                <span style={{
+                                    color: "#ff0000",
+                                    fontSize: "18px",
+                                    fontWeight: "bold",
+                                    marginLeft: "4px"
+                                }}>
+                                    ★
+                                </span>
+                            )}
                         </button>
                         <button
-                            onClick={() => setActiveTab("dateRequests")}
+                            onClick={() => handleTabChange("dateRequests")}
                             style={{
                                 background: activeTab === "dateRequests" ? "#3274b4" : "#A6A6A6",
                                 color: "#FFF",
-                                padding: "8px",
+                                padding: "8px 12px",
                                 border: "none",
                                 cursor: "pointer"
                             }}
