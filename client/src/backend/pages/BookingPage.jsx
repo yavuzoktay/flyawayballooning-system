@@ -1322,16 +1322,16 @@ setBookingDetail(finalVoucherDetail);
                 const perPassenger = n > 0 ? parseFloat((totalAmount / n).toFixed(2)) : 0;
                 
                 console.log('=== RECALCULATING PASSENGER PRICES (SHARED FLIGHT) ===');
-                console.log('Price Per Passenger:', perPassenger);
-                
-                // Update all passenger prices in backend
-                await Promise.all(updatedPassengers.map((p) =>
-                    axios.patch('/api/updatePassengerField', {
-                        passenger_id: p.id,
-                        field: 'price',
-                        value: perPassenger
-                    })
-                ));
+            console.log('Price Per Passenger:', perPassenger);
+            
+            // Update all passenger prices in backend
+            await Promise.all(updatedPassengers.map((p) =>
+                axios.patch('/api/updatePassengerField', {
+                    passenger_id: p.id,
+                    field: 'price',
+                    value: perPassenger
+                })
+            ));
             } else {
                 console.log('=== PRIVATE CHARTER - SKIPPING PASSENGER PRICE RECALCULATION ===');
             }
@@ -2084,6 +2084,18 @@ setBookingDetail(finalVoucherDetail);
     };
 
     const handleRebook = () => {
+        // Check if this is a Gift Voucher
+        const v = bookingDetail?.voucher || {};
+        const isGiftVoucher = v?.book_flight === 'Gift Voucher';
+        
+        if (isGiftVoucher) {
+            // For Gift Vouchers, don't open calendar modal
+            // Just show a message or do nothing
+            alert('Please use the booking website to redeem this gift voucher.');
+            return;
+        }
+        
+        // For Flight Vouchers and regular bookings, open rebook modal
         setRebookModalOpen(true);
     };
 
@@ -3749,12 +3761,12 @@ setBookingDetail(finalVoucherDetail);
                                                                             />
                                                                             {/* Hide price input for Private Charter */}
                                                                             {bookingDetail.booking?.experience !== 'Private Charter' && (
-                                                                                <input
-                                                                                    value={editPassengerPrice}
-                                                                                    onChange={e => setEditPassengerPrice(e.target.value.replace(/[^0-9.]/g, ''))}
-                                                                                    placeholder="Price (£)"
-                                                                                    style={{ marginRight: 4, width: 70 }}
-                                                                                />
+                                                                            <input
+                                                                                value={editPassengerPrice}
+                                                                                onChange={e => setEditPassengerPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+                                                                                placeholder="Price (£)"
+                                                                                style={{ marginRight: 4, width: 70 }}
+                                                                            />
                                                                             )}
                                                                             <Button size="small" onClick={async () => {
                                                                                 // Save passenger price
