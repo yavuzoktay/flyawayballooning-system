@@ -2143,24 +2143,21 @@ setBookingDetail(finalVoucherDetail);
                 
                 // Update purchaser information
                 if (purchaserInfo) {
-                    if (purchaserInfo.firstName) {
-                        updates.push({ 
-                            voucher_id: voucherId, 
-                            field: 'purchaser_first_name', 
-                            value: purchaserInfo.firstName 
-                        });
-                    }
-                    if (purchaserInfo.lastName) {
-                        updates.push({ 
-                            voucher_id: voucherId, 
-                            field: 'purchaser_last_name', 
-                            value: purchaserInfo.lastName 
-                        });
+                    // Combine first and last name into purchaser_name
+                    if (purchaserInfo.firstName || purchaserInfo.lastName) {
+                        const fullName = `${purchaserInfo.firstName || ''} ${purchaserInfo.lastName || ''}`.trim();
+                        if (fullName) {
+                            updates.push({ 
+                                voucher_id: voucherId, 
+                                field: 'purchaser_name', 
+                                value: fullName 
+                            });
+                        }
                     }
                     if (purchaserInfo.mobile) {
                         updates.push({ 
                             voucher_id: voucherId, 
-                            field: 'purchaser_phone', 
+                            field: 'purchaser_mobile', 
                             value: purchaserInfo.mobile 
                         });
                     }

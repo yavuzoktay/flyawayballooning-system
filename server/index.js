@@ -8477,7 +8477,12 @@ app.patch("/api/updateVoucherField", (req, res) => {
     const { voucher_id, field, value } = req.body;
     
     // Add field validation for security
-    const allowedFields = ['name', 'email', 'mobile', 'phone', 'paid', 'weight', 'expires', 'flight_type', 'voucher_type', 'status', 'flight_attempts'];
+    const allowedFields = [
+        'name', 'email', 'mobile', 'phone', 'paid', 'weight', 'expires', 
+        'flight_type', 'voucher_type', 'status', 'flight_attempts',
+        'experience_type', 'book_flight',
+        'purchaser_name', 'purchaser_email', 'purchaser_phone', 'purchaser_mobile'
+    ];
     
     if (!voucher_id || !field) {
         return res.status(400).json({ success: false, message: "Missing voucher_id or field" });
@@ -12842,7 +12847,11 @@ app.patch('/api/updateVoucherField', (req, res) => {
     console.log('Updating voucher:', { voucher_id, field, value });
     
     // Validate field names
-    const allowedFields = ['name', 'weight', 'paid', 'email', 'phone', 'mobile', 'expires'];
+    const allowedFields = [
+        'name', 'weight', 'paid', 'email', 'phone', 'mobile', 'expires',
+        'experience_type', 'voucher_type', 'book_flight', 'status', 'flight_attempts',
+        'purchaser_name', 'purchaser_email', 'purchaser_phone', 'purchaser_mobile'
+    ];
     if (!allowedFields.includes(field)) {
         return res.status(400).json({
             success: false,
