@@ -2144,12 +2144,20 @@ setBookingDetail(finalVoucherDetail);
                 // Update purchaser information
                 if (purchaserInfo) {
                     // Combine first and last name into purchaser_name
+                    let fullName = '';
                     if (purchaserInfo.firstName || purchaserInfo.lastName) {
-                        const fullName = `${purchaserInfo.firstName || ''} ${purchaserInfo.lastName || ''}`.trim();
+                        fullName = `${purchaserInfo.firstName || ''} ${purchaserInfo.lastName || ''}`.trim();
                         if (fullName) {
+                            // Update purchaser_name
                             updates.push({ 
                                 voucher_id: voucherId, 
                                 field: 'purchaser_name', 
+                                value: fullName 
+                            });
+                            // Also update name field to match purchaser_name (for All Vouchers table)
+                            updates.push({ 
+                                voucher_id: voucherId, 
+                                field: 'name', 
                                 value: fullName 
                             });
                         }
@@ -2162,9 +2170,16 @@ setBookingDetail(finalVoucherDetail);
                         });
                     }
                     if (purchaserInfo.email) {
+                        // Update purchaser_email
                         updates.push({ 
                             voucher_id: voucherId, 
                             field: 'purchaser_email', 
+                            value: purchaserInfo.email 
+                        });
+                        // Also update email field to match purchaser_email (for All Vouchers table)
+                        updates.push({ 
+                            voucher_id: voucherId, 
+                            field: 'email', 
                             value: purchaserInfo.email 
                         });
                     }
