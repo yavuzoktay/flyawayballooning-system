@@ -6661,15 +6661,16 @@ app.post('/api/addPassenger', (req, res) => {
                 } else {
                     // Calculate the new due based on activity pricing
                     // New Total Price = newTotalPrice (from activity)
-                    // Paid remains the same (currentPaid)
+                    // Current Paid (base) = currentPaid (excluding add-ons)
                     // New Due = newTotalPrice - currentPaid
                     const newDue = Math.max(0, newTotalPrice - currentPaid);
                     console.log('=== PRIVATE CHARTER PRICING ===');
                     console.log('New Total Price from Activity:', newTotalPrice);
-                    console.log('Current Paid:', currentPaid);
+                    console.log('Base Paid (excluding add-ons):', currentPaid);
                     console.log('New Due:', newDue);
+                    console.log('New original_amount will be:', newTotalPrice);
                     
-                    handlePassengerAddition(0, newDue); // Pass 0 for pricePerPassenger, newDue for absolute due
+                    handlePassengerAddition(0, newDue, newTotalPrice); // Pass newTotalPrice as 3rd param
                 }
             });
         } else {
@@ -6682,7 +6683,7 @@ app.post('/api/addPassenger', (req, res) => {
         }
         
         // Helper function to handle passenger addition
-        function handlePassengerAddition(pricePerPassenger, absoluteDue = null) {
+        function handlePassengerAddition(pricePerPassenger, absoluteDue = null, newTotalPrice = null) {
         
     // passenger tablosunda email, phone, ticket_type, weight varsa ekle
     const sql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone, ticket_type) VALUES (?, ?, ?, ?, ?, ?, ?)';
@@ -6693,21 +6694,24 @@ app.post('/api/addPassenger', (req, res) => {
             return res.status(500).json({ success: false, message: 'Database error' });
         }
             
-            // After insert, update pax count and due amount
-            // For Private Charter with absoluteDue, set due to the absolute value
+            // After insert, update pax count, due amount, and original_amount
+            // For Private Charter with absoluteDue, set due to the absolute value and update original_amount
             // For Shared Flight, add pricePerPassenger to current due
             let updateBookingSql, updateParams;
             
-            if (absoluteDue !== null) {
+            if (absoluteDue !== null && newTotalPrice !== null) {
                 // Private Charter: set due to absolute value from activity pricing
+                // Also update original_amount to reflect base price (excluding add-ons)
                 updateBookingSql = `
                     UPDATE all_booking 
                     SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
-                        due = ?
+                        due = ?,
+                        original_amount = ?
                     WHERE id = ?
                 `;
-                updateParams = [booking_id, absoluteDue, booking_id];
+                updateParams = [booking_id, absoluteDue, newTotalPrice, booking_id];
                 console.log('Setting absolute due for Private Charter:', absoluteDue);
+                console.log('Updating original_amount to:', newTotalPrice);
             } else {
                 // Shared Flight: add to current due
                 updateBookingSql = `
@@ -6880,15 +6884,16 @@ app.delete('/api/deletePassenger', (req, res) => {
                     
                     if (newTotalPrice === null) {
                         console.log('No activity pricing found for new count, using simple subtraction');
-                        handleDueUpdate(Math.max(0, currentDue - (currentPaid / currentPax)));
+                        handleDueUpdate(Math.max(0, currentDue - (currentPaid / currentPax)), null);
                     } else {
-                        // Calculate new due: newTotalPrice - currentPaid
+                        // Calculate new due: newTotalPrice - currentPaid (base, excluding add-ons)
                         const newDue = Math.max(0, newTotalPrice - currentPaid);
                         console.log('=== PRIVATE CHARTER DELETE PRICING ===');
                         console.log('New Total Price from Activity:', newTotalPrice);
-                        console.log('Current Paid:', currentPaid);
+                        console.log('Base Paid (excluding add-ons):', currentPaid);
                         console.log('New Due:', newDue);
-                        handleDueUpdate(newDue);
+                        console.log('New original_amount will be:', newTotalPrice);
+                        handleDueUpdate(newDue, newTotalPrice);
                     }
                 });
             } else {
@@ -6898,21 +6903,41 @@ app.delete('/api/deletePassenger', (req, res) => {
                 console.log('=== SHARED FLIGHT DELETE PRICING ===');
                 console.log('Price Per Passenger:', pricePerPassenger);
                 console.log('New Due after deletion:', newDue);
-                handleDueUpdate(newDue);
+                handleDueUpdate(newDue, null);
             }
             
-            // Helper function to update due in database
-            function handleDueUpdate(newDue) {
+            // Helper function to update due and original_amount in database
+            function handleDueUpdate(newDue, newTotalPrice = null) {
             
             console.log('Final New Due:', newDue);
+            if (newTotalPrice !== null) {
+                console.log('Updating original_amount to:', newTotalPrice);
+            }
             
-            const updateBookingSql = `
-                UPDATE all_booking 
-                SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
-                    due = ?
-                WHERE id = ?
-            `;
-            con.query(updateBookingSql, [booking_id, newDue, booking_id], (err2) => {
+            let updateBookingSql, updateParams;
+            
+            if (newTotalPrice !== null) {
+                // Update both due and original_amount for Private Charter
+                updateBookingSql = `
+                    UPDATE all_booking 
+                    SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
+                        due = ?,
+                        original_amount = ?
+                    WHERE id = ?
+                `;
+                updateParams = [booking_id, newDue, newTotalPrice, booking_id];
+            } else {
+                // Update only due for Shared Flight
+                updateBookingSql = `
+                    UPDATE all_booking 
+                    SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
+                        due = ?
+                    WHERE id = ?
+                `;
+                updateParams = [booking_id, newDue, booking_id];
+            }
+            
+            con.query(updateBookingSql, updateParams, (err2) => {
             if (err2) {
                     console.error('Error updating pax and due after deletePassenger:', err2);
                 // Still return success for passenger deletion
