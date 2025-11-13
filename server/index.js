@@ -6784,12 +6784,30 @@ app.post('/api/addPassenger', (req, res) => {
                 }
             });
         } else {
-            // For Shared Flight or non-Private Charter, use equal division
-            const pricePerPassenger = currentPaid / currentPax;
+            // For Shared Flight or non-Private Charter, calculate due based on per-passenger base price
+            const newPassengerCount = currentPax + 1;
+            if (newPassengerCount <= 0) {
+                console.warn('Invalid passenger count when adding (Shared Flight).');
+                handlePassengerAddition(0, Math.max(0, currentDue));
+                return;
+            }
+            
+            // Base price per passenger is total (paid + due) divided by current passenger count
+            const basePricePerPassenger = (currentPaid + currentDue) / currentPax;
+            const newBaseTotal = basePricePerPassenger * newPassengerCount;
+            const newDue = Math.max(0, newBaseTotal - currentPaid);
+            
             console.log('=== SHARED FLIGHT PRICING ===');
-        console.log('Price Per Passenger:', pricePerPassenger);
-        console.log('New Due will be:', currentDue + pricePerPassenger);
-            handlePassengerAddition(pricePerPassenger);
+            console.log('Current Paid (base):', currentPaid);
+            console.log('Current Due:', currentDue);
+            console.log('Current Pax:', currentPax);
+            console.log('Base Price Per Passenger:', basePricePerPassenger);
+            console.log('New Passenger Count:', newPassengerCount);
+            console.log('New Base Total:', newBaseTotal);
+            console.log('New Due:', newDue);
+            
+            // Set absolute due (no original_amount update for shared flight)
+            handlePassengerAddition(0, newDue, null);
         }
         
         // Helper function to handle passenger addition
@@ -6805,25 +6823,37 @@ app.post('/api/addPassenger', (req, res) => {
         }
             
             // After insert, update pax count, due amount, and original_amount
-            // For Private Charter with absoluteDue, set due to the absolute value and update original_amount
-            // For Shared Flight, add pricePerPassenger to current due
+            // When absoluteDue is provided, set due directly (used for Private Charter and adjusted Shared logic)
+            // Otherwise (legacy Shared Flight flow), add pricePerPassenger to current due
             let updateBookingSql, updateParams;
             
-            if (absoluteDue !== null && newTotalPrice !== null) {
-                // Private Charter: set due to absolute value from activity pricing
-                // Also update original_amount to reflect base price (excluding add-ons)
-                updateBookingSql = `
-                    UPDATE all_booking 
-                    SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
-                        due = ?,
-                        original_amount = ?
-                    WHERE id = ?
-                `;
-                updateParams = [booking_id, absoluteDue, newTotalPrice, booking_id];
-                console.log('Setting absolute due for Private Charter:', absoluteDue);
-                console.log('Updating original_amount to:', newTotalPrice);
+            if (absoluteDue !== null) {
+                if (newTotalPrice !== null) {
+                    // Private Charter: set due to absolute value from activity pricing
+                    // Also update original_amount to reflect base price (excluding add-ons)
+                    updateBookingSql = `
+                        UPDATE all_booking 
+                        SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
+                            due = ?,
+                            original_amount = ?
+                        WHERE id = ?
+                    `;
+                    updateParams = [booking_id, absoluteDue, newTotalPrice, booking_id];
+                    console.log('Setting absolute due for Private Charter:', absoluteDue);
+                    console.log('Updating original_amount to:', newTotalPrice);
+                } else {
+                    // Shared Flight (absolute due provided): update due only
+                    updateBookingSql = `
+                        UPDATE all_booking 
+                        SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
+                            due = ?
+                        WHERE id = ?
+                    `;
+                    updateParams = [booking_id, absoluteDue, booking_id];
+                    console.log('Setting absolute due for Shared Flight:', absoluteDue);
+                }
             } else {
-                // Shared Flight: add to current due
+                // Legacy Shared Flight path: add to current due
                 updateBookingSql = `
                 UPDATE all_booking 
                 SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
@@ -7053,12 +7083,27 @@ app.delete('/api/deletePassenger', (req, res) => {
                     }
                 });
             } else {
-                // For Shared Flight, use simple subtraction
-                const pricePerPassenger = currentPax > 0 ? (currentPaid / currentPax) : 0;
-                const newDue = Math.max(0, currentDue - pricePerPassenger);
+                // For Shared Flight, recompute due based on per-passenger price
+                const newPassengerCount = currentPax - 1;
+                if (newPassengerCount <= 0) {
+                    console.warn('Invalid passenger count after deletion (Shared Flight). Setting due to 0.');
+                    handleDueUpdate(0, null);
+                    return;
+                }
+                
+                const basePricePerPassenger = (currentPaid + currentDue) / currentPax;
+                const newBaseTotal = basePricePerPassenger * newPassengerCount;
+                const newDue = Math.max(0, newBaseTotal - currentPaid);
+                
                 console.log('=== SHARED FLIGHT DELETE PRICING ===');
-                console.log('Price Per Passenger:', pricePerPassenger);
-            console.log('New Due after deletion:', newDue);
+                console.log('Current Paid (base):', currentPaid);
+                console.log('Current Due:', currentDue);
+                console.log('Current Pax:', currentPax);
+                console.log('Base Price Per Passenger:', basePricePerPassenger);
+                console.log('New Passenger Count:', newPassengerCount);
+                console.log('New Base Total:', newBaseTotal);
+                console.log('New Due after deletion:', newDue);
+                
                 handleDueUpdate(newDue, null);
             }
             
