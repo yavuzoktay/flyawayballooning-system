@@ -1,7 +1,7 @@
 import axios from "axios";
 import React, { useEffect, useMemo, useState } from "react";
 import PaginatedTable from "../components/BookingPage/PaginatedTable";
-import { Container, FormControl, InputLabel, MenuItem, OutlinedInput, Select, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Grid, Typography, Box, Divider, IconButton, Table, TableHead, TableRow, TableCell, TableBody } from "@mui/material";
+import { Container, FormControl, InputLabel, MenuItem, OutlinedInput, Select, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Grid, Typography, Box, Divider, IconButton, Table, TableHead, TableRow, TableCell, TableBody, FormControlLabel, Switch } from "@mui/material";
 import dayjs from 'dayjs';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -1185,14 +1185,30 @@ setBookingDetail(finalVoucherDetail);
         const flightType = bookingDetail.booking?.flight_type || bookingDetail.voucher?.flight_type || 'Shared Flight';
         setGuestType(flightType);
         setGuestCount(0);
-        setGuestForms(Array.from({ length: guestCount }, (_, i) => ({ firstName: '', lastName: '', email: '', phone: '', ticketType: guestType, weight: '' })));
+        setGuestForms(Array.from({ length: guestCount }, () => ({
+            firstName: '',
+            lastName: '',
+            email: '',
+            phone: '',
+            ticketType: guestType,
+            weight: '',
+            weatherRefund: false
+        })));
         setAddGuestDialogOpen(true);
     };
 
     // Kişi sayısı seçilince passenger formu oluştur
     useEffect(() => {
         if (guestCount > 0) {
-            setGuestForms(Array.from({ length: guestCount }, (_, i) => ({ firstName: '', lastName: '', email: '', phone: '', ticketType: guestType, weight: '' })));
+            setGuestForms(Array.from({ length: guestCount }, () => ({
+                firstName: '',
+                lastName: '',
+                email: '',
+                phone: '',
+                ticketType: guestType,
+                weight: '',
+                weatherRefund: false
+            })));
         } else {
             setGuestForms([]);
         }
@@ -1288,7 +1304,8 @@ setBookingDetail(finalVoucherDetail);
                     email: g.email,
                     phone: g.phone,
                     ticket_type: g.ticketType,
-                    weight: g.weight
+                    weight: g.weight,
+                    weather_refund: g.weatherRefund ? 1 : 0
                 });
                 lastUpdatedPax = response.data.updatedPax;
                 if (response.data.newDue !== undefined) {
@@ -4517,6 +4534,24 @@ setBookingDetail(finalVoucherDetail);
                                 <TextField label="First Name" value={g.firstName} onChange={e => handleGuestFormChange(idx, 'firstName', e.target.value)} fullWidth margin="dense" />
                                 <TextField label="Last Name" value={g.lastName} onChange={e => handleGuestFormChange(idx, 'lastName', e.target.value)} fullWidth margin="dense" />
                                 <TextField label="Weight (kg)" value={g.weight} onChange={e => handleGuestFormChange(idx, 'weight', e.target.value)} fullWidth margin="dense" />
+                                {guestType && guestType.toLowerCase().includes('shared') && (
+                                    <Box sx={{ mt: 2, p: 2, backgroundColor: '#f5f9ff', borderRadius: 2, border: '1px solid #dbeafe' }}>
+                                        <FormControlLabel
+                                            control={
+                                                <Switch
+                                                    checked={Boolean(g.weatherRefund)}
+                                                    onChange={(_, checked) => handleGuestFormChange(idx, 'weatherRefund', checked)}
+                                                    color="primary"
+                                                />
+                                            }
+                                            label={`Weather Refundable (+£47.50)`}
+                                            sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', margin: 0 }}
+                                        />
+                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                            Provides weather protection for this guest. Charged per passenger.
+                                        </Typography>
+                                    </Box>
+                                )}
                             </Box>
                         ))}
                     </DialogContent>
