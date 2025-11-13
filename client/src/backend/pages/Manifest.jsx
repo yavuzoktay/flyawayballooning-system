@@ -22,6 +22,8 @@ import {
     Button,
     FormControl,
     InputLabel,
+    FormControlLabel,
+    Switch,
 } from "@mui/material";
 import { MoreVert as MoreVertIcon, Edit as EditIcon } from "@mui/icons-material";
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -1207,7 +1209,15 @@ const Manifest = () => {
 
     useEffect(() => {
         if (guestCount > 0) {
-            setGuestForms(Array.from({ length: guestCount }, (_, i) => ({ firstName: '', lastName: '', email: '', phone: '', ticketType: guestType, weight: '' })));
+            setGuestForms(Array.from({ length: guestCount }, () => ({
+                firstName: '',
+                lastName: '',
+                email: '',
+                phone: '',
+                ticketType: guestType,
+                weight: '',
+                weatherRefund: false
+            })));
         } else {
             setGuestForms([]);
         }
@@ -1234,7 +1244,8 @@ const Manifest = () => {
                     email: (g.email || '').trim() || null,
                     phone: (g.phone || '').trim() || null,
                     ticket_type: g.ticketType,
-                    weight: (g.weight || '').toString().trim() || null
+                    weight: (g.weight || '').toString().trim() || null,
+                    weather_refund: g.weatherRefund ? 1 : 0
                 });
                 if (response.data.newDue !== undefined) {
                     lastNewDue = response.data.newDue;
@@ -1271,14 +1282,14 @@ const Manifest = () => {
             console.log('=== RECALCULATING PASSENGER PRICES (SHARED FLIGHT - MANIFEST) ===');
             console.log('Price Per Passenger:', perPassenger);
             
-            // Update all passenger prices in backend
-            await Promise.all(updatedPassengers.map((p) =>
-                axios.patch('/api/updatePassengerField', {
-                    passenger_id: p.id,
-                    field: 'price',
-                    value: perPassenger
-                })
-            ));
+        // Update all passenger prices in backend
+        await Promise.all(updatedPassengers.map((p) =>
+            axios.patch('/api/updatePassengerField', {
+                passenger_id: p.id,
+                field: 'price',
+                value: perPassenger
+            })
+        ));
         } else {
             console.log('=== PRIVATE CHARTER - SKIPPING PASSENGER PRICE RECALCULATION (MANIFEST) ===');
         }
@@ -2727,7 +2738,7 @@ const Manifest = () => {
                                                     <Typography>Status: <span
    style={{ color: status === 'Closed' ? 'red' : 'green', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
    onClick={() => handleToggleGroupStatus(groupFlights)}
->{status}{statusLoadingGroup === first.id ? '...' : ''}</span></Typography>
+ >{status}{statusLoadingGroup === first.id ? '...' : ''}</span></Typography>
                                                     <Typography>Type: {first.flight_type}</Typography>
                                                 </Box>
                                             </Box>
@@ -3395,12 +3406,12 @@ const Manifest = () => {
                                                                     />
                                                                     {/* Hide price input for Private Charter */}
                                                                     {bookingDetail.booking?.experience !== 'Private Charter' && (
-                                                                        <input
-                                                                            value={editPassengerPrice}
-                                                                            onChange={e => setEditPassengerPrice(e.target.value.replace(/[^0-9.]/g, ''))}
-                                                                            placeholder="Price (£)"
-                                                                            style={{ marginRight: 4, width: 70 }}
-                                                                        />
+                                                                    <input
+                                                                        value={editPassengerPrice}
+                                                                        onChange={e => setEditPassengerPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+                                                                        placeholder="Price (£)"
+                                                                        style={{ marginRight: 4, width: 70 }}
+                                                                    />
                                                                     )}
                                                                     <Button size="small" onClick={() => handleSavePassengerEdit(p)} disabled={savingPassengerEdit}>Save</Button>
                                                                     <Button size="small" onClick={handleCancelPassengerEdit} disabled={savingPassengerEdit}>Cancel</Button>
@@ -3641,6 +3652,24 @@ const Manifest = () => {
                             <TextField label="First Name" value={g.firstName} onChange={e => handleGuestFormChange(idx, 'firstName', e.target.value)} fullWidth margin="dense" />
                             <TextField label="Last Name" value={g.lastName} onChange={e => handleGuestFormChange(idx, 'lastName', e.target.value)} fullWidth margin="dense" />
                             <TextField label="Weight (kg)" value={g.weight} onChange={e => handleGuestFormChange(idx, 'weight', e.target.value)} fullWidth margin="dense" />
+                            {guestType && guestType.toLowerCase().includes('shared') && (
+                                <Box sx={{ mt: 2, p: 2, backgroundColor: '#f5f9ff', borderRadius: 2, border: '1px solid #dbeafe' }}>
+                                    <FormControlLabel
+                                        control={
+                                            <Switch
+                                                checked={Boolean(g.weatherRefund)}
+                                                onChange={(_, checked) => handleGuestFormChange(idx, 'weatherRefund', checked)}
+                                                color="primary"
+                                            />
+                                        }
+                                        label={`Weather Refundable (+£47.50)`}
+                                        sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', margin: 0 }}
+                                    />
+                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                        Provides weather protection for this guest. Charged per passenger.
+                                    </Typography>
+                                </Box>
+                            )}
                         </Box>
                     ))}
                 </DialogContent>
