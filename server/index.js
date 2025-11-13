@@ -6686,31 +6686,79 @@ app.post('/api/addPassenger', (req, res) => {
                 console.log('New Passenger Count:', newPassengerCount);
                 console.log('Pricing Map:', pricingMap);
                 
+                // Helpers to normalise keys and extract passenger count
+                const normalizeKey = (s) => (s || '').toString().trim().toLowerCase();
+                const extractPassengerCount = (key) => {
+                    if (typeof key === 'number') return key;
+                    if (typeof key === 'string') {
+                        const match = key.match(/\d+/);
+                        if (match) {
+                            const parsed = parseInt(match[0], 10);
+                            return isNaN(parsed) ? null : parsed;
+                        }
+                    }
+                    return null;
+                };
+                const parsePrice = (val) => {
+                    if (val === undefined || val === null || val === '') return null;
+                    if (typeof val === 'string') {
+                        val = val.replace(/,/g, '').trim();
+                    }
+                    const parsed = parseFloat(val);
+                    return isNaN(parsed) ? null : parsed;
+                };
+                const getPriceForCount = (pricesObj, count) => {
+                    if (!pricesObj || typeof pricesObj !== 'object') return null;
+                    // Direct lookup first
+                    const direct = pricesObj[String(count)] ?? pricesObj[count];
+                    const directParsed = parsePrice(direct);
+                    if (directParsed !== null) return directParsed;
+                    // Attempt to match keys like "3 passengers"
+                    for (const [k, v] of Object.entries(pricesObj)) {
+                        const extracted = extractPassengerCount(k);
+                        if (extracted === count) {
+                            const parsed = parsePrice(v);
+                            if (parsed !== null) return parsed;
+                        }
+                    }
+                    return null;
+                };
+
                 // Find the price for the new passenger count and voucher type
-                // The pricing map structure: { "Private Charter Flights": { "2": 900, "3": 1050, ... } }
+                // The pricing map structure: { "Private Charter Flights": { "2 passengers": 900, "3 passengers": 1050, ... } }
                 let newTotalPrice = null;
                 
                 // Normalize voucher type for matching
-                const normalizeKey = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
                 const voucherTypeNormalized = normalizeKey(voucherType);
                 
-                // Try to find pricing for the voucher type
+                // Try to find pricing for the voucher type (exact/partial match)
                 for (const [key, prices] of Object.entries(pricingMap)) {
-                    if (normalizeKey(key).includes('private charter') || normalizeKey(key).includes('proposal')) {
-                        // Check if this key matches the voucher type
-                        if (normalizeKey(key) === voucherTypeNormalized || 
-                            voucherTypeNormalized.includes(normalizeKey(key)) || 
-                            normalizeKey(key).includes(voucherTypeNormalized)) {
-                            
-                            // Found matching voucher type, get price for passenger count
-                            if (prices && typeof prices === 'object') {
-                                const priceForCount = prices[String(newPassengerCount)] || prices[newPassengerCount];
-                                if (priceForCount) {
-                                    newTotalPrice = parseFloat(priceForCount);
-                                    console.log(`Found price for ${newPassengerCount} passengers:`, newTotalPrice);
-                                    break;
-                                }
-                            }
+                    const normalizedKey = normalizeKey(key);
+                    const isPrivateKey = normalizedKey.includes('private') || normalizedKey.includes('proposal');
+                    const matchesVoucherType = voucherTypeNormalized
+                        ? normalizedKey === voucherTypeNormalized ||
+                          normalizedKey.includes(voucherTypeNormalized) ||
+                          voucherTypeNormalized.includes(normalizedKey)
+                        : isPrivateKey;
+                    
+                    if (!matchesVoucherType) continue;
+                    
+                    const priceForCount = getPriceForCount(prices, newPassengerCount);
+                    if (priceForCount !== null) {
+                        newTotalPrice = priceForCount;
+                        console.log(`Found price for ${newPassengerCount} passengers under key "${key}":`, newTotalPrice);
+                        break;
+                    }
+                }
+                
+                // If still not found, attempt to find pricing regardless of voucher type (fallback)
+                if (newTotalPrice === null) {
+                    for (const prices of Object.values(pricingMap)) {
+                        const priceForCount = getPriceForCount(prices, newPassengerCount);
+                        if (priceForCount !== null) {
+                            newTotalPrice = priceForCount;
+                            console.log(`Fallback pricing used for ${newPassengerCount} passengers:`, newTotalPrice);
+                            break;
                         }
                     }
                 }
@@ -6921,25 +6969,71 @@ app.delete('/api/deletePassenger', (req, res) => {
                     console.log('New Passenger Count after deletion:', newPassengerCount);
                     console.log('Pricing Map:', pricingMap);
                     
-                    // Find the price for the new passenger count
+                    const normalizeKey = (s) => (s || '').toString().trim().toLowerCase();
+                    const extractPassengerCount = (key) => {
+                        if (typeof key === 'number') return key;
+                        if (typeof key === 'string') {
+                            const match = key.match(/\d+/);
+                            if (match) {
+                                const parsed = parseInt(match[0], 10);
+                                return isNaN(parsed) ? null : parsed;
+                            }
+                        }
+                        return null;
+                    };
+                    const parsePrice = (val) => {
+                        if (val === undefined || val === null || val === '') return null;
+                        if (typeof val === 'string') {
+                            val = val.replace(/,/g, '').trim();
+                        }
+                        const parsed = parseFloat(val);
+                        return isNaN(parsed) ? null : parsed;
+                    };
+                    const getPriceForCount = (pricesObj, count) => {
+                        if (!pricesObj || typeof pricesObj !== 'object') return null;
+                        const direct = pricesObj[String(count)] ?? pricesObj[count];
+                        const directParsed = parsePrice(direct);
+                        if (directParsed !== null) return directParsed;
+                        for (const [k, v] of Object.entries(pricesObj)) {
+                            const extracted = extractPassengerCount(k);
+                            if (extracted === count) {
+                                const parsed = parsePrice(v);
+                                if (parsed !== null) return parsed;
+                            }
+                        }
+                        return null;
+                    };
+                    
                     let newTotalPrice = null;
-                    const normalizeKey = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
                     const voucherTypeNormalized = normalizeKey(voucherType);
                     
                     for (const [key, prices] of Object.entries(pricingMap)) {
-                        if (normalizeKey(key).includes('private charter') || normalizeKey(key).includes('proposal')) {
-                            if (normalizeKey(key) === voucherTypeNormalized || 
-                                voucherTypeNormalized.includes(normalizeKey(key)) || 
-                                normalizeKey(key).includes(voucherTypeNormalized)) {
-                                
-                                if (prices && typeof prices === 'object') {
-                                    const priceForCount = prices[String(newPassengerCount)] || prices[newPassengerCount];
-                                    if (priceForCount) {
-                                        newTotalPrice = parseFloat(priceForCount);
-                                        console.log(`Found price for ${newPassengerCount} passengers:`, newTotalPrice);
-                                        break;
-                                    }
-                                }
+                        const normalizedKey = normalizeKey(key);
+                        const isPrivateKey = normalizedKey.includes('private') || normalizedKey.includes('proposal');
+                        const matchesVoucherType = voucherTypeNormalized
+                            ? normalizedKey === voucherTypeNormalized ||
+                              normalizedKey.includes(voucherTypeNormalized) ||
+                              voucherTypeNormalized.includes(normalizedKey)
+                            : isPrivateKey;
+                        
+                        if (!matchesVoucherType) continue;
+                        
+                        const priceForCount = getPriceForCount(prices, newPassengerCount);
+                        if (priceForCount !== null) {
+                            newTotalPrice = priceForCount;
+                            console.log(`Found price for ${newPassengerCount} passengers after deletion under key "${key}":`, newTotalPrice);
+                            break;
+                        }
+                    }
+                    
+                    if (newTotalPrice === null) {
+                        // Fallback to any pricing entry
+                        for (const prices of Object.values(pricingMap)) {
+                            const priceForCount = getPriceForCount(prices, newPassengerCount);
+                            if (priceForCount !== null) {
+                                newTotalPrice = priceForCount;
+                                console.log(`Fallback pricing used after deletion for ${newPassengerCount} passengers:`, newTotalPrice);
+                                break;
                             }
                         }
                     }
