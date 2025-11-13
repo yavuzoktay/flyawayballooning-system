@@ -6702,7 +6702,7 @@ app.post('/api/addPassenger', (req, res) => {
                 const parsePrice = (val) => {
                     if (val === undefined || val === null || val === '') return null;
                     if (typeof val === 'string') {
-                        val = val.replace(/,/g, '').trim();
+                        val = val.replace(/[^0-9.\-]/g, '').trim();
                     }
                     const parsed = parseFloat(val);
                     return isNaN(parsed) ? null : parsed;
@@ -6787,8 +6787,8 @@ app.post('/api/addPassenger', (req, res) => {
             // For Shared Flight or non-Private Charter, use equal division
             const pricePerPassenger = currentPaid / currentPax;
             console.log('=== SHARED FLIGHT PRICING ===');
-            console.log('Price Per Passenger:', pricePerPassenger);
-            console.log('New Due will be:', currentDue + pricePerPassenger);
+        console.log('Price Per Passenger:', pricePerPassenger);
+        console.log('New Due will be:', currentDue + pricePerPassenger);
             handlePassengerAddition(pricePerPassenger);
         }
         
@@ -6825,11 +6825,11 @@ app.post('/api/addPassenger', (req, res) => {
             } else {
                 // Shared Flight: add to current due
                 updateBookingSql = `
-                    UPDATE all_booking 
-                    SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
-                        due = COALESCE(due, 0) + ?
-                    WHERE id = ?
-                `;
+                UPDATE all_booking 
+                SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
+                    due = COALESCE(due, 0) + ?
+                WHERE id = ?
+            `;
                 updateParams = [booking_id, pricePerPassenger, booking_id];
                 console.log('Adding to due for Shared Flight:', pricePerPassenger);
             }
@@ -6866,17 +6866,17 @@ app.post('/api/addPassenger', (req, res) => {
 				if (bookingDate && bookingTime && row.location && !activityId) {
 					const activitySql = 'SELECT id FROM activity WHERE location = ? AND status = "Live" LIMIT 1';
 					con.query(activitySql, [row.location], (actErr, actRows) => {
-					if (!actErr && actRows && actRows.length > 0) {
-						updateSpecificAvailability(bookingDate, bookingTime, actRows[0].id, 1);
+						if (!actErr && actRows && actRows.length > 0) {
+							updateSpecificAvailability(bookingDate, bookingTime, actRows[0].id, 1);
                                 return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: true, newDue: finalDue });
-					}
+						}
                             return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: false, newDue: finalDue });
-				});
-				return; // response will be sent in callback above
-			}
+					});
+					return; // response will be sent in callback above
+				}
                     return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: false, newDue: finalDue });
                 });
-		});
+			});
         });
         }
     });
@@ -6984,7 +6984,7 @@ app.delete('/api/deletePassenger', (req, res) => {
                     const parsePrice = (val) => {
                         if (val === undefined || val === null || val === '') return null;
                         if (typeof val === 'string') {
-                            val = val.replace(/,/g, '').trim();
+                            val = val.replace(/[^0-9.\-]/g, '').trim();
                         }
                         const parsed = parseFloat(val);
                         return isNaN(parsed) ? null : parsed;
@@ -7058,7 +7058,7 @@ app.delete('/api/deletePassenger', (req, res) => {
                 const newDue = Math.max(0, currentDue - pricePerPassenger);
                 console.log('=== SHARED FLIGHT DELETE PRICING ===');
                 console.log('Price Per Passenger:', pricePerPassenger);
-                console.log('New Due after deletion:', newDue);
+            console.log('New Due after deletion:', newDue);
                 handleDueUpdate(newDue, null);
             }
             
@@ -7085,11 +7085,11 @@ app.delete('/api/deletePassenger', (req, res) => {
             } else {
                 // Update only due for Shared Flight
                 updateBookingSql = `
-                    UPDATE all_booking 
-                    SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
-                        due = ?
-                    WHERE id = ?
-                `;
+                UPDATE all_booking 
+                SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
+                    due = ?
+                WHERE id = ?
+            `;
                 updateParams = [booking_id, newDue, booking_id];
             }
             
