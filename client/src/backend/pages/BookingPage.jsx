@@ -4534,24 +4534,32 @@ setBookingDetail(finalVoucherDetail);
                                 <TextField label="First Name" value={g.firstName} onChange={e => handleGuestFormChange(idx, 'firstName', e.target.value)} fullWidth margin="dense" />
                                 <TextField label="Last Name" value={g.lastName} onChange={e => handleGuestFormChange(idx, 'lastName', e.target.value)} fullWidth margin="dense" />
                                 <TextField label="Weight (kg)" value={g.weight} onChange={e => handleGuestFormChange(idx, 'weight', e.target.value)} fullWidth margin="dense" />
-                                {guestType && guestType.toLowerCase().includes('shared') && (
-                                    <Box sx={{ mt: 2, p: 2, backgroundColor: '#f5f9ff', borderRadius: 2, border: '1px solid #dbeafe' }}>
-                                        <FormControlLabel
-                                            control={
-                                                <Switch
-                                                    checked={Boolean(g.weatherRefund)}
-                                                    onChange={(_, checked) => handleGuestFormChange(idx, 'weatherRefund', checked)}
-                                                    color="primary"
-                                                />
-                                            }
-                                            label={`Weather Refundable (+£47.50)`}
-                                            sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', margin: 0 }}
-                                        />
-                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                            Provides weather protection for this guest. Charged per passenger.
-                                        </Typography>
-                                    </Box>
-                                )}
+                                {(() => {
+                                    const isSharedFlight = guestType && guestType.toLowerCase().includes('shared');
+                                    const voucherType = bookingDetail?.voucher?.voucher_type || bookingDetail?.booking?.voucher_type || '';
+                                    const isFlexibleWeekday = voucherType.toLowerCase().includes('flexible weekday');
+                                    // Hide Weather Refundable for Shared Flight + Flexible Weekday voucher type
+                                    const shouldShowWeatherRefund = isSharedFlight && !isFlexibleWeekday;
+                                    
+                                    return shouldShowWeatherRefund && (
+                                        <Box sx={{ mt: 2, p: 2, backgroundColor: '#f5f9ff', borderRadius: 2, border: '1px solid #dbeafe' }}>
+                                            <FormControlLabel
+                                                control={
+                                                    <Switch
+                                                        checked={Boolean(g.weatherRefund)}
+                                                        onChange={(_, checked) => handleGuestFormChange(idx, 'weatherRefund', checked)}
+                                                        color="primary"
+                                                    />
+                                                }
+                                                label={`Weather Refundable (+£47.50)`}
+                                                sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', margin: 0 }}
+                                            />
+                                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                                Provides weather protection for this guest. Charged per passenger.
+                                            </Typography>
+                                        </Box>
+                                    );
+                                })()}
                             </Box>
                         ))}
                     </DialogContent>
