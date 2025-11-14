@@ -4177,6 +4177,21 @@ app.get('/api/getAllBookingData', (req, res) => {
                         : (dbWeatherRefundTotal > 0 ? dbWeatherRefundTotal : calculatedWeatherRefundTotal);
                     
                     enriched[index].weather_refund_total_price = finalWeatherRefundTotal;
+                    
+                    // Fix original_amount calculation
+                    // Formula: paid = original_amount + add_to_booking_items_total_price + weather_refund_total_price
+                    // Therefore: original_amount = paid - add_to_booking_items_total_price - weather_refund_total_price
+                    const paid = parseFloat(booking.paid) || 0;
+                    const correctedOriginalAmount = paid - addOnTotalPrice - finalWeatherRefundTotal;
+                    
+                    // Only update if there's a significant difference (more than 0.01) to avoid unnecessary updates
+                    const currentOriginalAmount = parseFloat(booking.original_amount) || 0;
+                    if (Math.abs(currentOriginalAmount - correctedOriginalAmount) > 0.01) {
+                        console.log(`Fixing original_amount for booking ${booking.id}: ${currentOriginalAmount} -> ${correctedOriginalAmount}`);
+                        enriched[index].original_amount = correctedOriginalAmount.toFixed(2);
+                    } else {
+                        enriched[index].original_amount = booking.original_amount;
+                    }
                 });
             }
         } catch (error) {
