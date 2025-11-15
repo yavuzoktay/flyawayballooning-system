@@ -3209,7 +3209,51 @@ const Manifest = () => {
 ) : (
   <>
     <span style={{ color: bookingDetail.booking.due > 0 ? '#d32f2f' : '#666', fontWeight: bookingDetail.booking.due > 0 ? 600 : 400 }}>
-      £{parseFloat(bookingDetail.booking.due || 0).toFixed(2)}
+      {(() => {
+        const experience = bookingDetail.booking?.experience || '';
+        const isPrivateCharter = experience === 'Private Charter' || experience.includes('Private');
+        
+        if (isPrivateCharter) {
+          // For Private Charter: Due is calculated as difference between new total price and current paid
+          // Due = (new total price for current passenger count) - (current paid)
+          // This represents the amount owed for added guests
+          const currentPaid = parseFloat(bookingDetail.booking?.paid) || 0;
+          const currentDue = parseFloat(bookingDetail.booking?.due) || 0;
+          
+          // For Private Charter, use the stored due value (calculated by backend based on activity pricing)
+          // Backend calculates: newDue = newTotalPrice - currentPaid
+          // where newTotalPrice comes from activity.private_charter_pricing
+          return `£${currentDue.toFixed(2)}`;
+        } else {
+          // For Shared Flight: Calculate Due as sum of all guest prices (base price + weather refundable)
+          const originalAmount = parseFloat(bookingDetail.booking?.original_amount) || 0;
+          const BASE_PRICE_PER_PASSENGER = 220;
+          const WEATHER_REFUND_PRICE = 47.5;
+          
+          // Calculate original passenger count (guest NOT included)
+          const sortedPassengers = bookingDetail.passengers ? [...bookingDetail.passengers].sort((a, b) => (a.id || 0) - (b.id || 0)) : [];
+          const originalPaxCount = originalAmount > 0 
+            ? Math.floor(originalAmount / BASE_PRICE_PER_PASSENGER) 
+            : sortedPassengers.length;
+          
+          // Calculate base price per passenger
+          const basePricePerPassenger = originalAmount > 0 && originalPaxCount > 0 
+            ? originalAmount / originalPaxCount 
+            : 0;
+          
+          // Find all guests (passengers after originalPaxCount)
+          const guests = sortedPassengers.filter((p, i) => i >= originalPaxCount);
+          
+          // Calculate total due: sum of all guest prices (base + weather refundable)
+          const totalDue = guests.reduce((sum, guest) => {
+            const hasWeatherRefund = guest.weather_refund === 1 || guest.weather_refund === '1' || guest.weather_refund === true;
+            const weatherRefundPrice = hasWeatherRefund ? WEATHER_REFUND_PRICE : 0;
+            return sum + basePricePerPassenger + weatherRefundPrice;
+          }, 0);
+          
+          return `£${totalDue.toFixed(2)}`;
+        }
+      })()}
     </span>
     <IconButton size="small" onClick={() => handleEditClick('due', bookingDetail.booking.due)}><EditIcon fontSize="small" /></IconButton>
   </>
@@ -3382,81 +3426,132 @@ const Manifest = () => {
                                             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Passenger Details</Typography>
                                             {bookingDetail.passengers && bookingDetail.passengers.length > 0 ? (
                                                 <Box>
-                                                    {bookingDetail.passengers.map((p, i) => (
-                                                        <Typography key={p.id}>
-                                                            Passenger {i + 1}: {editingPassenger === p.id ? (
-                                                                <>
-                                                                    <input
-                                                                        value={editPassengerFirstName}
-                                                                        onChange={e => setEditPassengerFirstName(e.target.value)}
-                                                                        placeholder="First Name"
-                                                                        style={{ marginRight: 4, width: 90 }}
-                                                                    />
-                                                                    <input
-                                                                        value={editPassengerLastName}
-                                                                        onChange={e => setEditPassengerLastName(e.target.value)}
-                                                                        placeholder="Last Name"
-                                                                        style={{ marginRight: 4, width: 90 }}
-                                                                    />
-                                                                    <input
-                                                                        value={editPassengerWeight}
-                                                                        onChange={e => setEditPassengerWeight(e.target.value.replace(/[^0-9.]/g, ''))}
-                                                                        placeholder="Weight (kg)"
-                                                                        style={{ marginRight: 4, width: 70 }}
-                                                                    />
-                                                                    {/* Hide price input for Private Charter */}
-                                                                    {bookingDetail.booking?.experience !== 'Private Charter' && (
-                                                                    <input
-                                                                        value={editPassengerPrice}
-                                                                        onChange={e => setEditPassengerPrice(e.target.value.replace(/[^0-9.]/g, ''))}
-                                                                        placeholder="Price (£)"
-                                                                        style={{ marginRight: 4, width: 70 }}
-                                                                    />
+                                                    {(() => {
+                                                        // Sort passengers by ID to identify original booking passengers (from ballooning-book)
+                                                        // Original passengers are those with lower IDs (created first)
+                                                        const sortedPassengers = [...bookingDetail.passengers].sort((a, b) => (a.id || 0) - (b.id || 0));
+                                                        
+                                                        // Calculate original passenger count from original_amount
+                                                        // original_amount = 220 * originalPaxCount (for Shared Flight)
+                                                        const BASE_PRICE_PER_PASSENGER = 220;
+                                                        const originalAmount = parseFloat(bookingDetail.booking?.original_amount) || 0;
+                                                        const originalPaxCount = originalAmount > 0 
+                                                            ? Math.round(originalAmount / BASE_PRICE_PER_PASSENGER) 
+                                                            : sortedPassengers.length; // Fallback to all passengers if original_amount is 0
+                                                        
+                                                        return sortedPassengers.map((p, i) => {
+                                                            const isOriginalPassenger = i < originalPaxCount; // First N passengers are from original booking (ballooning-book)
+                                                            const passengerIndex = bookingDetail.passengers.findIndex(pp => pp.id === p.id);
+                                                            
+                                                            return (
+                                                                <Typography key={p.id}>
+                                                                    Passenger {passengerIndex + 1}: {editingPassenger === p.id ? (
+                                                                        <>
+                                                                            <input
+                                                                                value={editPassengerFirstName}
+                                                                                onChange={e => setEditPassengerFirstName(e.target.value)}
+                                                                                placeholder="First Name"
+                                                                                style={{ marginRight: 4, width: 90 }}
+                                                                            />
+                                                                            <input
+                                                                                value={editPassengerLastName}
+                                                                                onChange={e => setEditPassengerLastName(e.target.value)}
+                                                                                placeholder="Last Name"
+                                                                                style={{ marginRight: 4, width: 90 }}
+                                                                            />
+                                                                            <input
+                                                                                value={editPassengerWeight}
+                                                                                onChange={e => setEditPassengerWeight(e.target.value.replace(/[^0-9.]/g, ''))}
+                                                                                placeholder="Weight (kg)"
+                                                                                style={{ marginRight: 4, width: 70 }}
+                                                                            />
+                                                                            {/* Hide price input for Private Charter */}
+                                                                            {bookingDetail.booking?.experience !== 'Private Charter' && (
+                                                                            <input
+                                                                                value={editPassengerPrice}
+                                                                                onChange={e => setEditPassengerPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+                                                                                placeholder="Price (£)"
+                                                                                style={{ marginRight: 4, width: 70 }}
+                                                                            />
+                                                                            )}
+                                                                            <Button size="small" onClick={() => handleSavePassengerEdit(p)} disabled={savingPassengerEdit}>Save</Button>
+                                                                            <Button size="small" onClick={handleCancelPassengerEdit} disabled={savingPassengerEdit}>Cancel</Button>
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            {/* Calculate correct passenger price dynamically */}
+                                                                            {(() => {
+                                                                                const isPrivateCharter = bookingDetail.booking?.experience === 'Private Charter';
+                                                                                
+                                                                                if (isPrivateCharter) {
+                                                                                    return (
+                                                                                        <>
+                                                                                            {p.first_name || '-'} {p.last_name || '-'}
+                                                                                            {p.weight ? ` (${p.weight}kg)` : ''}
+                                                                                        </>
+                                                                                    );
+                                                                                }
+                                                                                
+                                                                                // For Shared Flight: Calculate price as originalAmount/pax (only for original booking passengers) + add_on (only first) + weather_refundable
+                                                                                // For add-guest passengers: use stored price (calculated as originalAmount / currentPax when added) + weather_refundable
+                                                                                const originalAmount = parseFloat(bookingDetail.booking?.original_amount) || 0;
+                                                                                const addOnTotalPrice = parseFloat(bookingDetail.booking?.add_to_booking_items_total_price) || 0;
+                                                                                const WEATHER_REFUND_PRICE = 47.5;
+                                                                                const hasWeatherRefund = p.weather_refund === 1 || p.weather_refund === '1' || p.weather_refund === true;
+                                                                                const weatherRefundPrice = hasWeatherRefund ? WEATHER_REFUND_PRICE : 0;
+                                                                                
+                                                                                let basePricePerPassenger = 0;
+                                                                                let addOnPrice = 0;
+                                                                                
+                                                                                if (isOriginalPassenger && originalPaxCount > 0) {
+                                                                                    // Original booking passengers (from ballooning-book): use originalAmount/pax
+                                                                                    basePricePerPassenger = originalAmount / originalPaxCount;
+                                                                                    // Add-on price (only for first passenger)
+                                                                                    const isFirstPassenger = passengerIndex === 0;
+                                                                                    addOnPrice = isFirstPassenger ? addOnTotalPrice : 0;
+                                                                                } else {
+                                                                                    // Add-guest passengers: use stored price (calculated as originalAmount / currentPax when added, where currentPax is the passenger count BEFORE adding the new guest)
+                                                                                    basePricePerPassenger = parseFloat(p.price) || 0;
+                                                                                    addOnPrice = 0; // Add-on is only for first original passenger
+                                                                                }
+                                                                                
+                                                                                // Build price display string
+                                                                                let priceDisplay = `£${basePricePerPassenger.toFixed(2)}`;
+                                                                                if (addOnPrice > 0) {
+                                                                                    priceDisplay += ` + £${addOnPrice.toFixed(2)}`;
+                                                                                }
+                                                                                if (weatherRefundPrice > 0) {
+                                                                                    priceDisplay += ` + £${weatherRefundPrice.toFixed(2)}`;
+                                                                                }
+                                                                                
+                                                                                return (
+                                                                                    <>
+                                                                                        {p.first_name || '-'} {p.last_name || '-'}
+                                                                                        {p.weight ? (
+                                                                                            ` (${p.weight}kg ${priceDisplay})`
+                                                                                        ) : (
+                                                                                            ` (${priceDisplay})`
+                                                                                        )}
+                                                                                        {!isOriginalPassenger && ' guest'}
+                                                                                    </>
+                                                                                );
+                                                                            })()}
+                                                                          <IconButton size="small" onClick={() => handleEditPassengerClick(p)}><EditIcon fontSize="small" /></IconButton>
+                                                                          {passengerIndex > 0 && ( // Only show delete button for additional passengers (not the first one)
+                                                                              <IconButton 
+                                                                                  size="small" 
+                                                                                  onClick={() => handleDeletePassenger(p.id)}
+                                                                                  sx={{ color: 'red' }}
+                                                                              >
+                                                                                  <DeleteIcon fontSize="small" />
+                                                                              </IconButton>
+                                                                          )}
+                                                                        </>
                                                                     )}
-                                                                    <Button size="small" onClick={() => handleSavePassengerEdit(p)} disabled={savingPassengerEdit}>Save</Button>
-                                                                    <Button size="small" onClick={handleCancelPassengerEdit} disabled={savingPassengerEdit}>Cancel</Button>
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    {/* Calculate correct passenger price dynamically */}
-                                                                    {(() => {
-                                                                        const isPrivateCharter = bookingDetail.booking?.experience === 'Private Charter';
-                                                                        
-                                                                        // For Shared Flight, calculate price from (paid + due) / pax
-                                                                        let displayPrice = p.price;
-                                                                        if (!isPrivateCharter && bookingDetail.booking && bookingDetail.passengers) {
-                                                                            const paid = parseFloat(bookingDetail.booking.paid) || 0;
-                                                                            const due = parseFloat(bookingDetail.booking.due) || 0;
-                                                                            const totalAmount = paid + due;
-                                                                            const paxCount = bookingDetail.passengers.length;
-                                                                            displayPrice = paxCount > 0 ? (totalAmount / paxCount).toFixed(2) : p.price;
-                                                                        }
-                                                                        
-                                                                        return (
-                                                                            <>
-                                                                                {p.first_name || '-'} {p.last_name || '-'}
-                                                                                {p.weight ? (
-                                                                                    isPrivateCharter 
-                                                                                        ? ` (${p.weight}kg)` 
-                                                                                        : ` (${p.weight}kg${displayPrice ? ' £' + displayPrice : ''})`
-                                                                                ) : ''}
-                                                                            </>
-                                                                        );
-                                                                    })()}
-                                                                      <IconButton size="small" onClick={() => handleEditPassengerClick(p)}><EditIcon fontSize="small" /></IconButton>
-                                                                      {i > 0 && ( // Only show delete button for additional passengers (not the first one)
-                                                                          <IconButton 
-                                                                              size="small" 
-                                                                              onClick={() => handleDeletePassenger(p.id)}
-                                                                              sx={{ color: 'red' }}
-                                                                          >
-                                                                              <DeleteIcon fontSize="small" />
-                                                                          </IconButton>
-                                                                      )}
-                                                                </>
-                                                            )}
-                                                        </Typography>
-                                                    ))}
+                                                                </Typography>
+                                                            );
+                                                        });
+                                                    })()}
                                                 </Box>
                                             ) : null}
                                         </Box>
@@ -3652,32 +3747,24 @@ const Manifest = () => {
                             <TextField label="First Name" value={g.firstName} onChange={e => handleGuestFormChange(idx, 'firstName', e.target.value)} fullWidth margin="dense" />
                             <TextField label="Last Name" value={g.lastName} onChange={e => handleGuestFormChange(idx, 'lastName', e.target.value)} fullWidth margin="dense" />
                             <TextField label="Weight (kg)" value={g.weight} onChange={e => handleGuestFormChange(idx, 'weight', e.target.value)} fullWidth margin="dense" />
-                            {(() => {
-                                const isSharedFlight = guestType && guestType.toLowerCase().includes('shared');
-                                const voucherType = bookingDetail?.voucher?.voucher_type || bookingDetail?.booking?.voucher_type || '';
-                                const isFlexibleWeekday = voucherType.toLowerCase().includes('flexible weekday');
-                                // Hide Weather Refundable for Shared Flight + Flexible Weekday voucher type
-                                const shouldShowWeatherRefund = isSharedFlight && !isFlexibleWeekday;
-                                
-                                return shouldShowWeatherRefund && (
-                                    <Box sx={{ mt: 2, p: 2, backgroundColor: '#f5f9ff', borderRadius: 2, border: '1px solid #dbeafe' }}>
-                                        <FormControlLabel
-                                            control={
-                                                <Switch
-                                                    checked={Boolean(g.weatherRefund)}
-                                                    onChange={(_, checked) => handleGuestFormChange(idx, 'weatherRefund', checked)}
-                                                    color="primary"
-                                                />
-                                            }
-                                            label={`Weather Refundable (+£47.50)`}
-                                            sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', margin: 0 }}
-                                        />
-                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                            Provides weather protection for this guest. Charged per passenger.
-                                        </Typography>
-                                    </Box>
-                                );
-                            })()}
+                            {guestType && guestType.toLowerCase().includes('shared') && (
+                                <Box sx={{ mt: 2, p: 2, backgroundColor: '#f5f9ff', borderRadius: 2, border: '1px solid #dbeafe' }}>
+                                    <FormControlLabel
+                                        control={
+                                            <Switch
+                                                checked={Boolean(g.weatherRefund)}
+                                                onChange={(_, checked) => handleGuestFormChange(idx, 'weatherRefund', checked)}
+                                                color="primary"
+                                            />
+                                        }
+                                        label={`Weather Refundable (+£47.50)`}
+                                        sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', margin: 0 }}
+                                    />
+                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                        Provides weather protection for this guest. Charged per passenger.
+                                    </Typography>
+                                </Box>
+                            )}
                         </Box>
                     ))}
                 </DialogContent>

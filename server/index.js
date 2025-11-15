@@ -4097,6 +4097,107 @@ app.get('/api/getAllBookingData', (req, res) => {
                     }
                 });
                 
+                // Identify Private Charter bookings that need price recalculation
+                const privateCharterBookings = enriched.filter(b => 
+                    (b.experience === 'Private Charter' || b.experience === 'Private') && 
+                    b.location && 
+                    b.voucher_type && 
+                    b.pax
+                );
+                
+                // Fetch activity data for Private Charter bookings to get pricing
+                const activityDataByLocation = {};
+                if (privateCharterBookings.length > 0) {
+                    const uniqueLocations = [...new Set(privateCharterBookings.map(b => b.location))];
+                    for (const location of uniqueLocations) {
+                        try {
+                            const [activityRows] = await new Promise((resolve, reject) => {
+                                const activitySql = `SELECT id, location, private_charter_pricing FROM activity WHERE location = ? LIMIT 1`;
+                                con.query(activitySql, [location], (err, rows) => {
+                                    if (err) reject(err);
+                                    else resolve([rows]);
+                                });
+                            });
+                            
+                            if (activityRows && activityRows.length > 0) {
+                                activityDataByLocation[location] = activityRows[0];
+                            }
+                        } catch (error) {
+                            console.error(`Error fetching activity data for location ${location}:`, error);
+                        }
+                    }
+                }
+                
+                // Helper function to get Private Charter price from activity pricing
+                const getPrivateCharterPrice = (booking) => {
+                    const activityData = activityDataByLocation[booking.location];
+                    if (!activityData || !activityData.private_charter_pricing) {
+                        return null;
+                    }
+                    
+                    let pricingData = activityData.private_charter_pricing;
+                    if (typeof pricingData === 'string') {
+                        try {
+                            pricingData = JSON.parse(pricingData);
+                        } catch (e) {
+                            console.warn('Failed to parse private_charter_pricing:', e);
+                            return null;
+                        }
+                    }
+                    
+                    if (!pricingData || typeof pricingData !== 'object' || Array.isArray(pricingData)) {
+                        return null;
+                    }
+                    
+                    // Normalize voucher type for matching
+                    const normalize = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+                    const voucherTypeNorm = normalize(booking.voucher_type);
+                    
+                    // Find pricing for the voucher type
+                    let voucherPricing = null;
+                    for (const [key, value] of Object.entries(pricingData)) {
+                        const keyNorm = normalize(key);
+                        if (keyNorm === voucherTypeNorm || 
+                            keyNorm.includes(voucherTypeNorm) || 
+                            voucherTypeNorm.includes(keyNorm) ||
+                            (keyNorm.includes('private') && voucherTypeNorm.includes('private'))) {
+                            voucherPricing = value;
+                            break;
+                        }
+                    }
+                    
+                    if (!voucherPricing || typeof voucherPricing !== 'object') {
+                        return null;
+                    }
+                    
+                    // Get price for passenger count
+                    const pax = parseInt(booking.pax) || 0;
+                    const parsePrice = (val) => {
+                        if (val == null) return null;
+                        if (typeof val === 'number') return val;
+                        if (typeof val === 'string') {
+                            val = val.replace(/[^0-9.\-]/g, '').trim();
+                        }
+                        const parsed = parseFloat(val);
+                        return isNaN(parsed) ? null : parsed;
+                    };
+                    
+                    // Try direct lookup first
+                    const directPrice = parsePrice(voucherPricing[String(pax)]);
+                    if (directPrice !== null) return directPrice;
+                    
+                    // Try to match keys like "2 passengers", "3 passengers", etc.
+                    for (const [key, value] of Object.entries(voucherPricing)) {
+                        const extracted = parseInt(key.replace(/[^0-9]/g, ''));
+                        if (extracted === pax) {
+                            const price = parsePrice(value);
+                            if (price !== null) return price;
+                        }
+                    }
+                    
+                    return null;
+                };
+                
                 // Add additional information and add-on items to each booking object
                 enriched.forEach((booking, index) => {
                     const bookingAnswers = answersByBooking[booking.id] || [];
@@ -4164,33 +4265,68 @@ app.get('/api/getAllBookingData', (req, res) => {
                     enriched[index].add_to_booking_items = addOnItems;
                     enriched[index].add_to_booking_items_total_price = addOnTotalPrice;
                     
-                    // Calculate weather refund total price
-                    // First check if database has a value, if not or if 0, calculate from passengers
-                    const dbWeatherRefundTotal = parseFloat(booking.weather_refund_total_price) || 0;
-                    const calculatedWeatherRefundTotal = weatherRefundByBooking[booking.id] || 0;
+                    // Check if this is a Private Charter booking
+                    const isPrivateCharter = booking.experience === 'Private Charter' || booking.experience === 'Private';
                     
-                    // Use calculated value if database value is 0 or missing, otherwise use database value
-                    // For Shared Flight bookings, always use calculated value from passengers
-                    const isSharedFlight = booking.experience === 'Shared Flight' || booking.experience?.includes('Shared');
-                    const finalWeatherRefundTotal = (isSharedFlight && calculatedWeatherRefundTotal > 0) 
-                        ? calculatedWeatherRefundTotal 
-                        : (dbWeatherRefundTotal > 0 ? dbWeatherRefundTotal : calculatedWeatherRefundTotal);
-                    
-                    enriched[index].weather_refund_total_price = finalWeatherRefundTotal;
-                    
-                    // Fix original_amount calculation
-                    // Formula: paid = original_amount + add_to_booking_items_total_price + weather_refund_total_price
-                    // Therefore: original_amount = paid - add_to_booking_items_total_price - weather_refund_total_price
-                    const paid = parseFloat(booking.paid) || 0;
-                    const correctedOriginalAmount = paid - addOnTotalPrice - finalWeatherRefundTotal;
-                    
-                    // Only update if there's a significant difference (more than 0.01) to avoid unnecessary updates
-                    const currentOriginalAmount = parseFloat(booking.original_amount) || 0;
-                    if (Math.abs(currentOriginalAmount - correctedOriginalAmount) > 0.01) {
-                        console.log(`Fixing original_amount for booking ${booking.id}: ${currentOriginalAmount} -> ${correctedOriginalAmount}`);
-                        enriched[index].original_amount = correctedOriginalAmount.toFixed(2);
+                    // For Private Charter, recalculate original_amount and weather_refund_total_price
+                    if (isPrivateCharter) {
+                        const voucherTypePrice = getPrivateCharterPrice(booking);
+                        
+                        if (voucherTypePrice !== null && voucherTypePrice > 0) {
+                            // Update original_amount to the voucher type price
+                            enriched[index].original_amount = voucherTypePrice.toFixed(2);
+                            
+                            // Calculate weather_refund_total_price as 10% of voucher type price (one-time charge)
+                            // Check if weather refund was selected by inferring from paid amount
+                            const paid = parseFloat(booking.paid) || 0;
+                            const addOnPrice = parseFloat(enriched[index].add_to_booking_items_total_price) || 0;
+                            const weatherRefundPrice = voucherTypePrice * 0.1;
+                            const totalWithWeatherRefund = voucherTypePrice + addOnPrice + weatherRefundPrice;
+                            const totalWithoutWeatherRefund = voucherTypePrice + addOnPrice;
+                            
+                            // If paid amount matches or is close to total with weather refund, it was included
+                            // Use a small tolerance (0.01) for floating point comparison
+                            if (Math.abs(paid - totalWithWeatherRefund) < 0.01 || paid >= totalWithWeatherRefund - 0.01) {
+                                // Weather refund was included in payment
+                                enriched[index].weather_refund_total_price = parseFloat(weatherRefundPrice.toFixed(2));
+                            } else if (Math.abs(paid - totalWithoutWeatherRefund) < 0.01 || (paid >= totalWithoutWeatherRefund - 0.01 && paid < totalWithWeatherRefund - 0.01)) {
+                                // Paid amount matches total without weather refund, so it wasn't selected
+                                enriched[index].weather_refund_total_price = 0;
+                            } else {
+                                // Paid amount doesn't match either scenario, check database value or calculate difference
+                                const dbWeatherRefund = parseFloat(booking.weather_refund_total_price) || 0;
+                                if (dbWeatherRefund > 0) {
+                                    enriched[index].weather_refund_total_price = dbWeatherRefund;
+                                } else {
+                                    // Calculate from difference if it's close to weather refund price
+                                    const difference = paid - totalWithoutWeatherRefund;
+                                    if (Math.abs(difference - weatherRefundPrice) < 0.01 && difference > 0) {
+                                        enriched[index].weather_refund_total_price = parseFloat(weatherRefundPrice.toFixed(2));
+                                    } else {
+                                        enriched[index].weather_refund_total_price = 0;
+                                    }
+                                }
+                            }
+                            
+                            console.log(`Private Charter booking ${booking.id}: original_amount=${voucherTypePrice}, weather_refund=${enriched[index].weather_refund_total_price}, paid=${paid}, addOn=${addOnPrice}`);
+                        } else {
+                            console.warn(`Could not find pricing for Private Charter booking ${booking.id} (location: ${booking.location}, voucher_type: ${booking.voucher_type}, pax: ${booking.pax})`);
+                        }
                     } else {
-                        enriched[index].original_amount = booking.original_amount;
+                        // For Shared Flight or other types, use existing logic
+                        // Calculate weather refund total price
+                        // First check if database has a value, if not or if 0, calculate from passengers
+                        const dbWeatherRefundTotal = parseFloat(booking.weather_refund_total_price) || 0;
+                        const calculatedWeatherRefundTotal = weatherRefundByBooking[booking.id] || 0;
+                        
+                        // Use calculated value if database value is 0 or missing, otherwise use database value
+                        // For Shared Flight bookings, always use calculated value from passengers
+                        const isSharedFlight = booking.experience === 'Shared Flight' || booking.experience?.includes('Shared');
+                        const finalWeatherRefundTotal = (isSharedFlight && calculatedWeatherRefundTotal > 0) 
+                            ? calculatedWeatherRefundTotal 
+                            : (dbWeatherRefundTotal > 0 ? dbWeatherRefundTotal : calculatedWeatherRefundTotal);
+                        
+                        enriched[index].weather_refund_total_price = finalWeatherRefundTotal;
                     }
                 });
             }
@@ -5051,6 +5187,9 @@ app.post('/api/createBooking', (req, res) => {
         console.log('DEBUG choose_add_on_str:', choose_add_on_str);
         console.log('DEBUG add_on_total_price:', add_on_total_price);
         
+        // Use actual passenger count from passengerData array
+        const actualPaxCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
+        
         // Calculate weather refund total price (only for Shared Flight)
         const WEATHER_REFUND_PRICE = 47.5;
         const isSharedFlight = chooseFlightType && (chooseFlightType.type === 'Shared Flight' || chooseFlightType.type?.includes('Shared'));
@@ -5063,18 +5202,17 @@ app.post('/api/createBooking', (req, res) => {
         }
         console.log('=== WEATHER REFUND CALCULATION ===');
         console.log('Is Shared Flight:', isSharedFlight);
+        console.log('Passenger Count:', actualPaxCount);
         console.log('Weather Refund Total Price:', weather_refund_total_price);
         
-        // Calculate base original_amount (excluding add-ons and weather refund)
-        // Formula: original_amount = totalPrice - add_on_total_price - weather_refund_total_price
-        const base_original_amount = (parseFloat(totalPrice) || 0) - add_on_total_price - weather_refund_total_price;
+        // Calculate original_amount: passenger_count * base_price_per_passenger
+        // Base price depends on voucher_type (Any Day Flight = 220, etc.)
+        const BASE_PRICE_PER_PASSENGER = 220; // Default for Any Day Flight
+        const base_original_amount = actualPaxCount * BASE_PRICE_PER_PASSENGER;
         console.log('=== ORIGINAL AMOUNT CALCULATION ===');
-        console.log('Total Price:', totalPrice);
-        console.log('Add-on Total Price:', add_on_total_price);
-        console.log('Base Original Amount (excluding add-ons):', base_original_amount);
-        
-        // Use actual passenger count from passengerData array
-        const actualPaxCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
+        console.log('Passenger Count:', actualPaxCount);
+        console.log('Base Price Per Passenger:', BASE_PRICE_PER_PASSENGER);
+        console.log('Original Amount (passenger_count * base_price):', base_original_amount);
         console.log('=== PAX COUNT DEBUG ===');
         console.log('passengerData.length:', passengerData?.length);
         console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
@@ -6689,8 +6827,8 @@ app.post('/api/addPassenger', (req, res) => {
     const WEATHER_REFUND_PRICE = 47.5;
     const weatherRefundSelected = weather_refund === 1 || weather_refund === '1' || weather_refund === true;
     
-    // First, get current booking details including experience, location, activity_id, voucher_type, add_to_booking_items_total_price, choose_add_on, weather_refund_total_price
-    const getBookingSql = 'SELECT paid, pax, due, experience, location, activity_id, voucher_type, COALESCE(add_to_booking_items_total_price, 0) as add_on_price, COALESCE(weather_refund_total_price, 0) as weather_refund_price, choose_add_on FROM all_booking WHERE id = ? LIMIT 1';
+    // First, get current booking details including experience, location, activity_id, voucher_type, add_to_booking_items_total_price, choose_add_on, weather_refund_total_price, original_amount
+    const getBookingSql = 'SELECT paid, pax, due, experience, location, activity_id, voucher_type, COALESCE(add_to_booking_items_total_price, 0) as add_on_price, COALESCE(weather_refund_total_price, 0) as weather_refund_price, COALESCE(original_amount, 0) as original_amount, choose_add_on FROM all_booking WHERE id = ? LIMIT 1';
     con.query(getBookingSql, [booking_id], (getErr, bookingRows) => {
         if (getErr) {
             console.error('Error fetching booking details:', getErr);
@@ -6705,6 +6843,7 @@ app.post('/api/addPassenger', (req, res) => {
         const totalPaid = parseFloat(booking.paid) || 0;
         const addOnPrice = parseFloat(booking.add_on_price) || 0;
         const weatherRefundPrice = parseFloat(booking.weather_refund_price) || 0;
+        const originalAmount = parseFloat(booking.original_amount) || 0;
         const chooseAddOn = booking.choose_add_on || '';
         
         // If add_to_booking_items_total_price is 0 but choose_add_on exists, fetch from add_to_booking_items table
@@ -6744,7 +6883,8 @@ app.post('/api/addPassenger', (req, res) => {
                 if (actErr || !activityRows || activityRows.length === 0) {
                     console.error('Error fetching activity pricing:', actErr);
                     // Fallback to equal division if activity not found
-                    handlePassengerAddition(currentPaid / currentPax);
+                    // For Private Charter, newGuestPrice is not used (pass null)
+                    handlePassengerAddition(currentPaid / currentPax, null, null, null, null);
                     return;
                 }
                 
@@ -6844,7 +6984,8 @@ app.post('/api/addPassenger', (req, res) => {
                 if (newTotalPrice === null) {
                     console.log('No activity pricing found, using equal division');
                     const pricePerPassenger = currentPaid / currentPax;
-                    handlePassengerAddition(pricePerPassenger);
+                    // For Private Charter, newGuestPrice is not used (pass null)
+                    handlePassengerAddition(pricePerPassenger, null, null, null, null);
                 } else {
                     // Calculate the new due based on activity pricing
                     // New Total Price = newTotalPrice (from activity)
@@ -6857,7 +6998,8 @@ app.post('/api/addPassenger', (req, res) => {
                     console.log('New Due:', newDue);
                     console.log('New original_amount will be:', newTotalPrice);
                     
-                    handlePassengerAddition(0, newDue, newTotalPrice); // Pass newTotalPrice as 3rd param
+                    // For Private Charter, newGuestPrice is not used (pass null)
+                    handlePassengerAddition(0, newDue, newTotalPrice, null, null); // Pass newTotalPrice as 3rd param
                 }
             });
         } else {
@@ -6865,57 +7007,65 @@ app.post('/api/addPassenger', (req, res) => {
             const newPassengerCount = currentPax + 1;
             if (newPassengerCount <= 0) {
                 console.warn('Invalid passenger count when adding (Shared Flight).');
-                handlePassengerAddition(0, Math.max(0, currentDue), null, weatherRefundPrice);
+                handlePassengerAddition(0, Math.max(0, currentDue), null, weatherRefundPrice, 0);
                 return;
             }
             
-            // Base price per passenger is total (paid + due) divided by current passenger count
-            // Exclude weather refund from base calculation
-            const basePricePerPassenger = (currentPaid + currentDue) / currentPax;
-            const newBaseTotal = basePricePerPassenger * newPassengerCount;
+            // For add-guest passengers: calculate price as originalAmount / currentPax (BEFORE adding new guest)
+            // This is the price per passenger based on original amount divided by existing passenger count
+            // The new guest will pay this same price
+            let newGuestPrice = 0;
+            if (originalAmount > 0 && currentPax > 0) {
+                newGuestPrice = originalAmount / currentPax;
+                console.log('=== ADD-GUEST PRICE CALCULATION ===');
+                console.log('Original Amount:', originalAmount);
+                console.log('Current Pax (before adding new guest):', currentPax);
+                console.log('New Guest Price (originalAmount / currentPax):', newGuestPrice);
+            } else {
+                // Fallback: use average if originalAmount not available
+                const basePricePerPassenger = (currentPaid + currentDue) / currentPax;
+                newGuestPrice = basePricePerPassenger;
+                console.log('⚠️ Original Amount not available, using average price per passenger:', newGuestPrice);
+            }
             
-            // Calculate new weather refund total (existing + new passenger's weather refund if selected)
-            const newWeatherRefundTotal = weatherRefundPrice + (weatherRefundSelected ? WEATHER_REFUND_PRICE : 0);
-            
-            // New due calculation:
-            // Total needed = newBaseTotal + newWeatherRefundTotal
-            // Current total paid = totalPaid (already includes existing weather refund)
-            // New due = (newBaseTotal + newWeatherRefundTotal) - totalPaid
-            // But we can simplify: newDue = newBaseTotal - currentPaid + newPassengerWeatherRefund
-            // Because: totalPaid = currentPaid + addOnPrice + weatherRefundPrice
-            // And: newBaseTotal + newWeatherRefundTotal - totalPaid = newBaseTotal - currentPaid - addOnPrice - weatherRefundPrice + newWeatherRefundTotal
-            // = newBaseTotal - currentPaid + (newWeatherRefundTotal - weatherRefundPrice)
-            // = newBaseTotal - currentPaid + newPassengerWeatherRefund
+            // Calculate new passenger's weather refund (if selected)
             const newPassengerWeatherRefund = weatherRefundSelected ? WEATHER_REFUND_PRICE : 0;
             
-            // Calculate new due: only add new passenger's weather refund, not existing one
-            // currentPaid already excludes weather refund, so we just add new passenger's weather refund
-            const newDue = Math.max(0, newBaseTotal - currentPaid + newPassengerWeatherRefund);
+            // Calculate new weather refund total (existing + new passenger's weather refund if selected)
+            const newWeatherRefundTotal = weatherRefundPrice + newPassengerWeatherRefund;
             
-            console.log('=== SHARED FLIGHT PRICING ===');
+            // New due calculation for add-guest:
+            // The new guest pays: newGuestPrice + weather refund (if selected)
+            // New due = currentDue + newGuestPrice + newPassengerWeatherRefund
+            // This adds the new guest's price to the existing due
+            const newDue = currentDue + newGuestPrice + newPassengerWeatherRefund;
+            
+            console.log('=== SHARED FLIGHT ADD-GUEST PRICING ===');
             console.log('Total Paid (includes existing weather refund):', totalPaid);
             console.log('Current Paid (base, excluding weather refund):', currentPaid);
-            console.log('Current Due:', currentDue);
-            console.log('Current Pax:', currentPax);
-            console.log('Current Weather Refund Total (already in paid):', weatherRefundPrice);
-            console.log('Base Price Per Passenger:', basePricePerPassenger);
-            console.log('New Passenger Count:', newPassengerCount);
-            console.log('New Base Total (excluding weather refund):', newBaseTotal);
-            console.log('New Weather Refund Total:', newWeatherRefundTotal);
+            console.log('Current Due (before adding guest):', currentDue);
+            console.log('Current Pax (before adding guest):', currentPax);
+            console.log('Original Amount:', originalAmount);
+            console.log('New Guest Price (originalAmount / currentPax):', newGuestPrice);
             console.log('Weather Refund Selected for new passenger:', weatherRefundSelected);
-            console.log('New Passenger Weather Refund Price (only this added to due):', newPassengerWeatherRefund);
-            console.log('New Due (base + new passenger weather refund only):', newDue);
+            console.log('New Passenger Weather Refund Price:', newPassengerWeatherRefund);
+            console.log('New Weather Refund Total:', newWeatherRefundTotal);
+            console.log('New Due (currentDue + newGuestPrice + newPassengerWeatherRefund):', newDue);
             
             // Set absolute due and weather refund total (no original_amount update for shared flight)
-            handlePassengerAddition(0, newDue, null, newWeatherRefundTotal);
+            // Pass newGuestPrice as 5th parameter to store in passenger table
+            handlePassengerAddition(0, newDue, null, newWeatherRefundTotal, newGuestPrice);
         }
         
         // Helper function to handle passenger addition
-        function handlePassengerAddition(pricePerPassenger, absoluteDue = null, newTotalPrice = null, newWeatherRefundTotal = null) {
+        function handlePassengerAddition(pricePerPassenger, absoluteDue = null, newTotalPrice = null, newWeatherRefundTotal = null, newGuestPrice = null) {
         
-    // passenger tablosunda email, phone, ticket_type, weight ve weather_refund bilgisi varsa ekle
-    const sql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
-    const values = [booking_id, first_name, last_name, weight || null, email || null, phone || null, ticket_type || null, weatherRefundSelected ? 1 : 0];
+    // passenger tablosunda email, phone, ticket_type, weight, weather_refund ve price bilgisi varsa ekle
+    // For add-guest passengers (Shared Flight), store the calculated price (originalAmount / currentPax)
+    // For Private Charter, price is typically 0 or calculated differently
+    const sql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund, price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
+    const priceToStore = newGuestPrice !== null ? newGuestPrice : (pricePerPassenger || 0);
+    const values = [booking_id, first_name, last_name, weight || null, email || null, phone || null, ticket_type || null, weatherRefundSelected ? 1 : 0, priceToStore];
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error adding passenger:', err);
@@ -9768,12 +9918,17 @@ async function createBookingFromWebhook(bookingData) {
             console.log('Is Shared Flight:', isSharedFlight);
             console.log('Weather Refund Total Price:', weather_refund_total_price);
             
-            // Calculate base original_amount (excluding add-ons and weather refund) for webhook
-            const base_original_amount = (parseFloat(totalPrice) || 0) - add_on_total_price - weather_refund_total_price;
+            // Use actual passenger count from passengerData array
+            const actualPaxCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
+            
+            // Calculate original_amount: passenger_count * base_price_per_passenger
+            // Base price depends on voucher_type (Any Day Flight = 220, etc.)
+            const BASE_PRICE_PER_PASSENGER = 220; // Default for Any Day Flight
+            const base_original_amount = actualPaxCount * BASE_PRICE_PER_PASSENGER;
             console.log('=== WEBHOOK ORIGINAL AMOUNT CALCULATION ===');
-            console.log('Total Price:', totalPrice);
-            console.log('Add-on Total Price:', add_on_total_price);
-            console.log('Base Original Amount (excluding add-ons):', base_original_amount);
+            console.log('Passenger Count:', actualPaxCount);
+            console.log('Base Price Per Passenger:', BASE_PRICE_PER_PASSENGER);
+            console.log('Original Amount (passenger_count * base_price):', base_original_amount);
 
             const bookingSql = `
                 INSERT INTO all_booking (
@@ -9786,8 +9941,6 @@ async function createBookingFromWebhook(bookingData) {
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
 
-            // Use actual passenger count from passengerData array
-            const actualPaxCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
             console.log('=== WEBHOOK PAX COUNT DEBUG ===');
             console.log('passengerData.length:', passengerData?.length);
             console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
