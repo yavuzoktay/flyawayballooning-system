@@ -3213,46 +3213,10 @@ const Manifest = () => {
         const experience = bookingDetail.booking?.experience || '';
         const isPrivateCharter = experience === 'Private Charter' || experience.includes('Private');
         
-        if (isPrivateCharter) {
-          // For Private Charter: Due is calculated as difference between new total price and current paid
-          // Due = (new total price for current passenger count) - (current paid)
-          // This represents the amount owed for added guests
-          const currentPaid = parseFloat(bookingDetail.booking?.paid) || 0;
-          const currentDue = parseFloat(bookingDetail.booking?.due) || 0;
-          
-          // For Private Charter, use the stored due value (calculated by backend based on activity pricing)
-          // Backend calculates: newDue = newTotalPrice - currentPaid
-          // where newTotalPrice comes from activity.private_charter_pricing
-          return `£${currentDue.toFixed(2)}`;
-        } else {
-          // For Shared Flight: Calculate Due as sum of all guest prices (base price + weather refundable)
-          const originalAmount = parseFloat(bookingDetail.booking?.original_amount) || 0;
-          const BASE_PRICE_PER_PASSENGER = 220;
-          const WEATHER_REFUND_PRICE = 47.5;
-          
-          // Calculate original passenger count (guest NOT included)
-          const sortedPassengers = bookingDetail.passengers ? [...bookingDetail.passengers].sort((a, b) => (a.id || 0) - (b.id || 0)) : [];
-          const originalPaxCount = originalAmount > 0 
-            ? Math.floor(originalAmount / BASE_PRICE_PER_PASSENGER) 
-            : sortedPassengers.length;
-          
-          // Calculate base price per passenger
-          const basePricePerPassenger = originalAmount > 0 && originalPaxCount > 0 
-            ? originalAmount / originalPaxCount 
-            : 0;
-          
-          // Find all guests (passengers after originalPaxCount)
-          const guests = sortedPassengers.filter((p, i) => i >= originalPaxCount);
-          
-          // Calculate total due: sum of all guest prices (base + weather refundable)
-          const totalDue = guests.reduce((sum, guest) => {
-            const hasWeatherRefund = guest.weather_refund === 1 || guest.weather_refund === '1' || guest.weather_refund === true;
-            const weatherRefundPrice = hasWeatherRefund ? WEATHER_REFUND_PRICE : 0;
-            return sum + basePricePerPassenger + weatherRefundPrice;
-          }, 0);
-          
-          return `£${totalDue.toFixed(2)}`;
-        }
+        // For both Private Charter and Shared Flight, use the due value from backend
+        // Backend calculates the correct due amount based on booking type
+        const currentDue = parseFloat(bookingDetail.booking?.due) || 0;
+        return `£${currentDue.toFixed(2)}`;
       })()}
     </span>
     <IconButton size="small" onClick={() => handleEditClick('due', bookingDetail.booking.due)}><EditIcon fontSize="small" /></IconButton>
