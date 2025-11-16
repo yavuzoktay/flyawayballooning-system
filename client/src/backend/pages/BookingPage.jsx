@@ -2166,118 +2166,361 @@ setBookingDetail(finalVoucherDetail);
                                  (bookingDetail.voucher.book_flight || '').toLowerCase().includes('gift');
             
             if (isGiftVoucher && bookingDetail.voucher) {
-                // Gift Voucher: Update voucher details only
-                console.log('Gift Voucher Redemption - Updating voucher details');
-                
-                // Determine experience based on selected flight types
-                let experience = '';
-                if (selectedFlightTypes && selectedFlightTypes.length > 0) {
-                    if (selectedFlightTypes.includes('shared')) {
-                        experience = 'Shared Flight';
-                    } else if (selectedFlightTypes.includes('private')) {
-                        experience = 'Private Charter';
+                try {
+                    // Gift Voucher: Create booking and mark voucher as redeemed
+                    console.log('Gift Voucher Redemption - Creating booking and marking as redeemed');
+                    
+                    const voucher = bookingDetail.voucher;
+                    const voucherCode = voucher.voucher_ref || voucher.voucher_code || voucher.vc_code;
+                    
+                    // Get selected location from purchaserInfo
+                    const selectedLocationForBooking = purchaserInfo?.selectedLocations?.[0] || '';
+                    if (!selectedLocationForBooking) {
+                        alert('Please select a location');
+                        setRebookLoading(false);
+                        return;
                     }
-                }
-                
-                // Determine book_flight (voucher type) based on selected voucher types
-                let bookFlight = '';
-                if (selectedVoucherTypes && selectedVoucherTypes.length > 0) {
-                    if (selectedVoucherTypes.includes('weekday morning')) {
-                        bookFlight = 'Weekday Morning Flight';
-                    } else if (selectedVoucherTypes.includes('flexible weekday')) {
-                        bookFlight = 'Flexible Weekday Flight';
-                    } else if (selectedVoucherTypes.includes('any day flight')) {
-                        bookFlight = 'Any Day Flight';
+                    
+                    // Get activity ID from purchaserInfo (passed from modal) or use activityId parameter
+                    let finalActivityId = purchaserInfo?.activityId || activityId;
+                    
+                    if (!finalActivityId) {
+                        alert('Activity ID not found');
+                        setRebookLoading(false);
+                        return;
                     }
-                }
-                
-                // Update voucher fields
-                const voucherId = bookingDetail.voucher.id;
-                const updates = [];
-                
-                if (experience) {
-                    updates.push({ 
-                        voucher_id: voucherId, 
-                        field: 'experience_type', 
-                        value: experience 
-                    });
-                }
-                
-                if (bookFlight) {
-                    updates.push({ 
-                        voucher_id: voucherId, 
-                        field: 'voucher_type', 
-                        value: bookFlight 
-                    });
-                }
-                
-                // Update purchaser information
-                if (purchaserInfo) {
-                    // Combine first and last name into purchaser_name
-                    let fullName = '';
-                    if (purchaserInfo.firstName || purchaserInfo.lastName) {
-                        fullName = `${purchaserInfo.firstName || ''} ${purchaserInfo.lastName || ''}`.trim();
-                        if (fullName) {
-                            // Update purchaser_name
-                            updates.push({ 
-                                voucher_id: voucherId, 
-                                field: 'purchaser_name', 
-                                value: fullName 
-                            });
-                            // Also update name field to match purchaser_name (for All Vouchers table)
-                            updates.push({ 
-                                voucher_id: voucherId, 
-                                field: 'name', 
-                                value: fullName 
-                            });
+                    
+                    // Get activity details
+                    const activityResponse = await axios.get(`/api/activity/${finalActivityId}`);
+                    const activity = activityResponse.data.data;
+                    
+                    // Get experience and voucher_type from voucher details
+                    // Experience: from experience_type field (e.g., "Shared Flight", "Private Charter")
+                    const experience = voucher.experience_type || voucher.experience || 'Shared Flight';
+                    
+                    // Voucher Type: from voucher_type or actual_voucher_type field (e.g., "Any Day Flight", "Weekday Morning", "Flexible Weekday")
+                    const voucherType = voucher.voucher_type || voucher.actual_voucher_type || 'Any Day Flight';
+                    
+                    // Determine flight type from experience
+                    let flightType = experience;
+                    if (experience === 'Private Charter') {
+                        flightType = 'Private Charter';
+                    } else {
+                        flightType = 'Shared Flight';
+                    }
+                    
+                    // Prepare passenger data from purchaserInfo.passengerData
+                    const passengers = purchaserInfo?.passengerData || [];
+                    if (passengers.length === 0) {
+                        alert('Passenger information is required');
+                        setRebookLoading(false);
+                        return;
+                    }
+                    
+                    // Format date and time
+                    const flightDate = dayjs(date).format('YYYY-MM-DD');
+                    const flightDateTime = `${flightDate} ${time}`;
+                    
+                    // Get paid amount from voucher (Gift Voucher Details'teki paid bilgisi)
+                    const paidAmount = voucher.paid || 0;
+                    
+                    // Calculate total price (use voucher paid amount as primary, fallback to activity pricing)
+                    let totalPrice = paidAmount;
+                    if (!totalPrice && activity) {
+                        if (flightType === 'Shared Flight') {
+                            totalPrice = (activity.shared_price || 0) * passengers.length;
+                        } else {
+                            totalPrice = activity.private_price || 0;
                         }
                     }
-                    if (purchaserInfo.mobile) {
-                        updates.push({ 
-                            voucher_id: voucherId, 
-                            field: 'purchaser_mobile', 
-                            value: purchaserInfo.mobile 
-                        });
+                    
+                    // Prepare booking payload
+                    const bookingPayload = {
+                        activitySelect: 'Redeem Voucher',
+                        chooseLocation: selectedLocationForBooking,
+                        chooseFlightType: {
+                            type: flightType,
+                            passengerCount: passengers.length
+                        },
+                        passengerData: passengers.map(p => ({
+                            firstName: p.firstName || '',
+                            lastName: p.lastName || '',
+                            weight: p.weight || '',
+                            email: p.email || '',
+                            phone: p.mobile || '',
+                            ticketType: flightType
+                        })),
+                        selectedDate: flightDateTime,
+                        selectedTime: time,
+                        totalPrice: totalPrice,
+                        paid: paidAmount, // Add paid amount from Gift Voucher Details
+                        voucher_code: voucherCode,
+                        additionalInfo: {},
+                        choose_add_on: [],
+                        activity_id: finalActivityId, // Add activity_id for backend
+                        experience: experience, // Add experience from voucher
+                        voucher_type: voucherType, // Add voucher_type from voucher
+                        selectedVoucherType: { title: voucherType } // Add selectedVoucherType for backend compatibility
+                    };
+                    
+                    console.log('Gift Voucher Booking Payload:', bookingPayload);
+                    
+                    // Create booking
+                    const createBookingResponse = await axios.post('/api/createBooking', bookingPayload);
+                    
+                    if (!createBookingResponse.data.success) {
+                        throw new Error(createBookingResponse.data.message || 'Failed to create booking');
                     }
-                    if (purchaserInfo.email) {
-                        // Update purchaser_email
-                        updates.push({ 
-                            voucher_id: voucherId, 
-                            field: 'purchaser_email', 
-                            value: purchaserInfo.email 
+                    
+                    console.log('Booking created successfully:', createBookingResponse.data);
+                    
+                    // Note: Voucher is already marked as redeemed by /api/createBooking endpoint
+                    // when activitySelect === 'Redeem Voucher' and voucher_code exists
+                    // But we'll also call /api/redeem-voucher as a backup to ensure it's marked
+                    try {
+                        const redeemResponse = await axios.post('/api/redeem-voucher', {
+                            voucher_code: voucherCode,
+                            booking_id: createBookingResponse.data.bookingId || createBookingResponse.data.id
                         });
-                        // Also update email field to match purchaser_email (for All Vouchers table)
-                        updates.push({ 
-                            voucher_id: voucherId, 
-                            field: 'email', 
-                            value: purchaserInfo.email 
-                        });
-                    }
-                }
-                
-                console.log('Gift Voucher Updates:', updates);
-                
-                // Execute all updates
-                for (const update of updates) {
-                    await axios.patch('/api/updateVoucherField', update);
+                        
+                        if (!redeemResponse.data.success) {
+                            console.warn('Warning: Could not mark voucher as redeemed via redeem-voucher endpoint:', redeemResponse.data.message);
+                        } else {
+                            console.log('Voucher marked as redeemed successfully via redeem-voucher endpoint');
+                        }
+                    } catch (redeemErr) {
+                        console.warn('Warning: Error calling redeem-voucher endpoint (voucher may already be marked):', redeemErr.message);
                 }
                 
                 setRebookModalOpen(false);
                 setDetailDialogOpen(false);
+                    setSelectedBookingId(null);
+                    setBookingDetail(null);
+                    setBookingHistory([]);
+                    
+                    // Refresh all data
+                    // Refresh booking data
+                    const bookingResponse = await axios.get(`/api/getAllBookingData`, { params: filters });
+                    setBooking(bookingResponse.data.data || []);
+                    setFilteredBookingData(bookingResponse.data.data || []);
                 
                 // Refresh voucher data
-                if (activeTab === 'vouchers') {
-                    const response = await axios.get(`/api/getAllVoucherData`, { params: filters });
-                    setVoucher(response.data.data || []);
-                    setFilteredData(response.data.data || []);
+                    const voucherResponse = await axios.get(`/api/getAllVoucherData`, { params: filters });
+                    setVoucher(voucherResponse.data.data || []);
+                    setFilteredVoucherData(voucherResponse.data.data || []);
+                    
+                    // Update filteredData based on active tab
+                    if (activeTab === 'bookings') {
+                        setFilteredData(bookingResponse.data.data || []);
+                    } else if (activeTab === 'vouchers') {
+                        setFilteredData(voucherResponse.data.data || []);
+                    }
+                    
+                    alert('Gift Voucher successfully redeemed and booking created!');
+                    setRebookLoading(false);
+                    return;
+                } catch (error) {
+                    console.error('Gift Voucher Redemption Error:', error);
+                    alert('Error redeeming Gift Voucher: ' + (error.response?.data?.message || error.message || 'Unknown error'));
+                    setRebookLoading(false);
+                return;
+                }
+            }
+            
+            // Check if this is a Flight Voucher redemption
+            // Flight Voucher: has voucher, book_flight is "Flight Voucher" or not "Gift Voucher", and voucher_type may contain "flight"
+            const isFlightVoucher = bookingDetail?.voucher && 
+                                   (bookingDetail.voucher.book_flight === 'Flight Voucher' || 
+                                    (!(bookingDetail.voucher.book_flight || '').toLowerCase().includes('gift') && 
+                                     bookingDetail.voucher.voucher_type));
+            
+            if (isFlightVoucher && bookingDetail.voucher) {
+                try {
+                    // Flight Voucher: Create booking and mark voucher as redeemed
+                    console.log('Flight Voucher Redemption - Creating booking and marking as redeemed');
+                    
+                    const voucher = bookingDetail.voucher;
+                    const voucherCode = voucher.voucher_ref || voucher.voucher_code || voucher.vc_code;
+                    
+                    // Get selected location from purchaserInfo or selectedLocation parameter
+                    const selectedLocationForBooking = purchaserInfo?.selectedLocations?.[0] || selectedLocation || '';
+                    if (!selectedLocationForBooking) {
+                        alert('Please select a location');
+                        setRebookLoading(false);
+                        return;
+                    }
+                    
+                    // Get activity ID from purchaserInfo (passed from modal) or use activityId parameter
+                    let finalActivityId = purchaserInfo?.activityId || activityId;
+                    
+                    if (!finalActivityId) {
+                        alert('Activity ID not found');
+                        setRebookLoading(false);
+                        return;
+                    }
+                    
+                    // Get activity details
+                    const activityResponse = await axios.get(`/api/activity/${finalActivityId}`);
+                    const activity = activityResponse.data.data;
+                    
+                    // Get experience and voucher_type from voucher details
+                    // Experience: from experience_type field (e.g., "Shared Flight", "Private Charter")
+                    const experience = voucher.experience_type || voucher.experience || 'Shared Flight';
+                    
+                    // Voucher Type: from voucher_type or actual_voucher_type field (e.g., "Any Day Flight", "Weekday Morning", "Flexible Weekday")
+                    const voucherType = voucher.voucher_type || voucher.actual_voucher_type || 'Any Day Flight';
+                    
+                    // Determine flight type from experience
+                    let flightType = experience;
+                    if (experience === 'Private Charter') {
+                        flightType = 'Private Charter';
+                    } else {
+                        flightType = 'Shared Flight';
+                    }
+                    
+                    // Get passenger data from voucher (use existing passenger details)
+                    const existingPassengers = bookingDetail.passengers || [];
+                    let passengers = [];
+                    
+                    if (existingPassengers.length > 0) {
+                        // Use existing passenger data from voucher
+                        passengers = existingPassengers.map(p => ({
+                            firstName: p.first_name || '',
+                            lastName: p.last_name || '',
+                            weight: p.weight || '',
+                            email: p.email || voucher.email || '',
+                            phone: p.phone || voucher.phone || voucher.mobile || '',
+                            ticketType: flightType,
+                            weatherRefund: p.weather_refund || false
+                        }));
+                    } else {
+                        // Fallback: create passenger from voucher personal details
+                        const nameParts = (voucher.name || '').split(' ');
+                        passengers = [{
+                            firstName: nameParts[0] || '',
+                            lastName: nameParts.slice(1).join(' ') || '',
+                            weight: voucher.weight || '',
+                            email: voucher.email || '',
+                            phone: voucher.phone || voucher.mobile || '',
+                            ticketType: flightType,
+                            weatherRefund: false
+                        }];
+                    }
+                    
+                    if (passengers.length === 0) {
+                        alert('Passenger information is required');
+                        setRebookLoading(false);
+                        return;
+                    }
+                    
+                    // Format date and time
+                    const flightDate = dayjs(date).format('YYYY-MM-DD');
+                    const flightDateTime = `${flightDate} ${time}`;
+                    
+                    // Get paid amount from voucher (Flight Voucher Details'teki paid bilgisi)
+                    const paidAmount = parseFloat(voucher.paid) || 0;
+                    
+                    // Calculate total price (use voucher paid amount as primary, fallback to activity pricing)
+                    let totalPrice = paidAmount;
+                    if (!totalPrice && activity) {
+                        if (flightType === 'Shared Flight') {
+                            totalPrice = (activity.shared_price || 0) * passengers.length;
+                        } else {
+                            totalPrice = activity.private_price || 0;
+                        }
+                    }
+                    
+                    // Prepare booking payload
+                    const bookingPayload = {
+                        activitySelect: 'Redeem Voucher',
+                        chooseLocation: selectedLocationForBooking,
+                        chooseFlightType: {
+                            type: flightType,
+                            passengerCount: passengers.length
+                        },
+                        passengerData: passengers,
+                        selectedDate: flightDateTime,
+                        selectedTime: time,
+                        totalPrice: totalPrice,
+                        paid: paidAmount, // Add paid amount from Flight Voucher Details
+                        voucher_code: voucherCode,
+                        additionalInfo: {},
+                        choose_add_on: [],
+                        activity_id: finalActivityId, // Add activity_id for backend
+                        experience: experience, // Add experience from voucher
+                        voucher_type: voucherType, // Add voucher_type from voucher
+                        selectedVoucherType: { title: voucherType } // Add selectedVoucherType for backend compatibility
+                    };
+                    
+                    console.log('Flight Voucher Booking Payload:', bookingPayload);
+                    
+                    // Create booking
+                    const createBookingResponse = await axios.post('/api/createBooking', bookingPayload);
+                    
+                    if (!createBookingResponse.data.success) {
+                        throw new Error(createBookingResponse.data.message || 'Failed to create booking');
+                    }
+                    
+                    console.log('Booking created successfully:', createBookingResponse.data);
+                    
+                    // Note: Voucher is already marked as redeemed by /api/createBooking endpoint
+                    // when activitySelect === 'Redeem Voucher' and voucher_code exists
+                    // But we'll also call /api/redeem-voucher as a backup to ensure it's marked
+                    try {
+                        const redeemResponse = await axios.post('/api/redeem-voucher', {
+                            voucher_code: voucherCode,
+                            booking_id: createBookingResponse.data.bookingId || createBookingResponse.data.id
+                        });
+                        
+                        if (!redeemResponse.data.success) {
+                            console.warn('Warning: Could not mark voucher as redeemed via redeem-voucher endpoint:', redeemResponse.data.message);
+                        } else {
+                            console.log('Voucher marked as redeemed successfully via redeem-voucher endpoint');
+                        }
+                    } catch (redeemErr) {
+                        console.warn('Warning: Error calling redeem-voucher endpoint (voucher may already be marked):', redeemErr.message);
                 }
                 
-                alert('Gift Voucher successfully updated!');
+                setRebookModalOpen(false);
+                setDetailDialogOpen(false);
+                    setSelectedBookingId(null);
+                    setBookingDetail(null);
+                    setBookingHistory([]);
+                    
+                    // Refresh all data
+                    // Refresh booking data
+                    const bookingResponse = await axios.get(`/api/getAllBookingData`, { params: filters });
+                    setBooking(bookingResponse.data.data || []);
+                    setFilteredBookingData(bookingResponse.data.data || []);
+                
+                // Refresh voucher data
+                    const voucherResponse = await axios.get(`/api/getAllVoucherData`, { params: filters });
+                    setVoucher(voucherResponse.data.data || []);
+                    setFilteredVoucherData(voucherResponse.data.data || []);
+                    
+                    // Update filteredData based on active tab
+                    if (activeTab === 'bookings') {
+                        setFilteredData(bookingResponse.data.data || []);
+                    } else if (activeTab === 'vouchers') {
+                        setFilteredData(voucherResponse.data.data || []);
+                    }
+                    
+                    alert('Flight Voucher successfully redeemed and booking created!');
+                    setRebookLoading(false);
+                    return;
+                } catch (error) {
+                    console.error('Flight Voucher Redemption Error:', error);
+                    alert('Error redeeming Flight Voucher: ' + (error.response?.data?.message || error.message || 'Unknown error'));
+                    setRebookLoading(false);
                 return;
+                }
             }
             
             // Regular booking rebook logic
-            if (!bookingDetail.booking) return;
+            if (!bookingDetail.booking) {
+                setRebookLoading(false);
+                return;
+            }
             // Get activity details to determine flight type and pricing
             const activityResponse = await axios.get(`/api/activity/${activityId}`);
             const activity = activityResponse.data.data;
@@ -2347,6 +2590,12 @@ setBookingDetail(finalVoucherDetail);
                 console.log('PATCH /api/updateBookingField payload:', statusPayload);
                 await axios.patch('/api/updateBookingField', statusPayload);
             }
+            // 7. Flight Attempts'ı +1 artır
+            const currentAttempts = parseInt(bookingDetail.booking.flight_attempts || 0, 10);
+            const newAttempts = currentAttempts + 1;
+            const flightAttemptsPayload = { booking_id: bookingDetail.booking.id, field: 'flight_attempts', value: newAttempts.toString() };
+            console.log('PATCH /api/updateBookingField payload (flight_attempts):', flightAttemptsPayload);
+            await axios.patch('/api/updateBookingField', flightAttemptsPayload);
             setRebookModalOpen(false);
             setDetailDialogOpen(false);
             // Tabloyu güncelle
@@ -3090,7 +3339,7 @@ setBookingDetail(finalVoucherDetail);
                                             paid: item.paid || '',
                                             due: item.due || '',
                                             voucher_code: item.voucher_code || '',
-                                            flight_attempts: item.flight_attempts || '',
+                                            flight_attempts: item.flight_attempts ?? 0,
                                             expires: item.expires || ''
                                         }))}
                                         columns={[
@@ -3532,7 +3781,7 @@ setBookingDetail(finalVoucherDetail);
                                                         {/* Weight field moved to Passenger Details section */}
                                                         <Typography><b>Voucher ID:</b> {v.id || '-'}</Typography>
                                                         <Typography><b>Voucher Code:</b> {v.voucher_code || '-'}</Typography>
-                                                        <Typography><b>Flight Attempts:</b> {v.flight_attempts ?? '-'}</Typography>
+                                                        <Typography><b>Flight Attempts:</b> {v.flight_attempts ?? 0}</Typography>
                                                         {v.booking_references && v.booking_references.length > 0 && (
                                                             <Typography><b>Attempt History:</b></Typography>
                                                         )}
@@ -3583,7 +3832,7 @@ setBookingDetail(finalVoucherDetail);
                                                     <IconButton size="small" onClick={() => handleEditClick('email', bookingDetail.booking.email)}><EditIcon fontSize="small" /></IconButton>
                                                 </>
                                             )}</Typography>
-                                            <Typography><b>Flight Attempts:</b> {bookingDetail.booking.flight_attempts || '-'}</Typography>
+                                            <Typography><b>Flight Attempts:</b> {bookingDetail.booking.flight_attempts ?? 0}</Typography>
                                             <Typography><b>Voucher Type:</b> {bookingDetail.booking.voucher_type || '-'}</Typography>
                                             <Typography><b>Paid:</b> {editField === 'paid' ? (
                                                         <>
@@ -3723,17 +3972,45 @@ setBookingDetail(finalVoucherDetail);
                                             <Typography>
     <b>WX Refundable:</b>{' '}
     {(() => {
-        const wxPassengers = Array.isArray(bookingDetail.passengers)
-            ? bookingDetail.passengers.filter(p => Number(p.weather_refund) === 1)
-            : [];
-        if (wxPassengers.length === 0) return 'No';
-        const names = wxPassengers.map(p => `${p.first_name || ''} ${p.last_name || ''}`.trim()).filter(Boolean);
+        // For both Private Charter and Shared Flight: check weather_refund_total_price
+        // Handle both string and number types, and check for null/undefined
+        let weatherRefundTotalPrice = 0;
+        const rawValue = bookingDetail.booking?.weather_refund_total_price || 
+                        bookingDetail.weather_refund_total_price || 
+                        null;
+        
+        if (rawValue !== null && rawValue !== undefined) {
+            // Convert to number, handling both string and number types
+            const parsed = parseFloat(rawValue);
+            if (!isNaN(parsed)) {
+                weatherRefundTotalPrice = parsed;
+            }
+        }
+        
+        // Debug logging
+        console.log('WX Refundable Check:', {
+            rawValue,
+            weatherRefundTotalPrice,
+            bookingDetailBooking: bookingDetail.booking,
+            bookingDetail: bookingDetail
+        });
+        
+        // Check weather_refund_total_price for both Private Charter and Shared Flight
+        if (weatherRefundTotalPrice > 0) {
+            // Get passenger names for display
+            const passengerNames = Array.isArray(bookingDetail.passengers)
+                ? bookingDetail.passengers.map(p => `${p.first_name || ''} ${p.last_name || ''}`.trim()).filter(Boolean)
+                : [];
+            const namesDisplay = passengerNames.length > 0 ? ` — ${passengerNames.join(', ')}` : '';
         return (
             <span>
                 <span style={{ color: '#10b981', fontWeight: 'bold', marginRight: '4px' }}>✔</span>
-                Yes{names.length ? ` — ${names.join(', ')}` : ''}
+                    Yes{namesDisplay}
             </span>
         );
+        } else {
+            return 'No';
+        }
     })()}
 </Typography>
 
@@ -3826,8 +4103,10 @@ setBookingDetail(finalVoucherDetail);
                                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 140 }}>
                                                     {(() => {
                                                         const v = bookingDetail?.voucher || {};
-                                                        const isVoucherDetails = (v?.book_flight === 'Gift Voucher') || (v?.voucher_type && typeof v.voucher_type === 'string' && v.voucher_type.toLowerCase().includes('flight'));
-                                                        const label = isVoucherDetails ? 'Redeem' : 'Rebook';
+                                                        // For Gift Voucher: show "Redeem", for Flight Voucher: show "Rebook"
+                                                        const isGiftVoucher = v?.book_flight === 'Gift Voucher';
+                                                        const isFlightVoucher = !isGiftVoucher && (v?.voucher_type && typeof v.voucher_type === 'string' && v.voucher_type.toLowerCase().includes('flight'));
+                                                        const label = isGiftVoucher ? 'Redeem' : 'Rebook';
                                                         return (
                                                             <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleRebook}>{label}</Button>
                                                         );

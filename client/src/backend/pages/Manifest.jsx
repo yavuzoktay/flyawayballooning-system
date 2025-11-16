@@ -1682,6 +1682,10 @@ const Manifest = () => {
                 }
             }
             
+            // Get current flight_attempts before deleting
+            const currentAttempts = parseInt(bookingDetail.booking.flight_attempts || 0, 10);
+            const newAttempts = currentAttempts + 1;
+            
             const payload = {
                 activitySelect: flightType,
                 chooseLocation: selectedLocation || bookingDetail.booking.location,
@@ -1701,7 +1705,8 @@ const Manifest = () => {
                 selectedDate: dayjs(date).format('YYYY-MM-DD') + ' ' + time,
                 totalPrice: totalPrice,
                 additionalInfo: { notes: bookingDetail.booking.additional_notes || '' },
-                voucher_code: bookingDetail.booking.voucher_code || null
+                voucher_code: bookingDetail.booking.voucher_code || null,
+                flight_attempts: newAttempts // Add incremented flight_attempts to new booking
             };
             // First delete the old booking
             await axios.delete(`/api/deleteBooking/${bookingDetail.booking.id}`);
@@ -3091,7 +3096,7 @@ const Manifest = () => {
                                                 <IconButton size="small" onClick={() => handleEditClick('email', bookingDetail.booking.email)}><EditIcon fontSize="small" /></IconButton>
                                             </>
                                         )}</Typography>
-                                        <Typography><b>Flight Attempts:</b> {bookingDetail.booking.flight_attempts || '-'}</Typography>
+                                        <Typography><b>Flight Attempts:</b> {bookingDetail.booking.flight_attempts ?? 0}</Typography>
                                         <Typography><b>Voucher Type:</b> {bookingDetail.booking.voucher_type || '-'}</Typography>
                                         <Typography><b>Expires:</b> {editField === 'expires' ? (
   <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -3264,12 +3269,47 @@ const Manifest = () => {
                                         
                                         <Typography>
                                             <b>WX Refundable:</b>{' '}
-                                            {bookingDetail.passengers && bookingDetail.passengers.some(p => p.weather_refund === 1) ? (
-                                                <span>
-                                                    <span style={{ color: '#10b981', fontWeight: 'bold', marginRight: '4px' }}>✔</span>
-                                                    Yes
-                                                </span>
-                                            ) : 'No'}
+                                            {(() => {
+                                                // For both Private Charter and Shared Flight: check weather_refund_total_price
+                                                // Handle both string and number types, and check for null/undefined
+                                                let weatherRefundTotalPrice = 0;
+                                                const rawValue = bookingDetail.booking?.weather_refund_total_price || 
+                                                                bookingDetail.weather_refund_total_price || 
+                                                                null;
+                                                
+                                                if (rawValue !== null && rawValue !== undefined) {
+                                                    // Convert to number, handling both string and number types
+                                                    const parsed = parseFloat(rawValue);
+                                                    if (!isNaN(parsed)) {
+                                                        weatherRefundTotalPrice = parsed;
+                                                    }
+                                                }
+                                                
+                                                // Debug logging
+                                                console.log('WX Refundable Check (Manifest):', {
+                                                    rawValue,
+                                                    weatherRefundTotalPrice,
+                                                    bookingDetailBooking: bookingDetail.booking,
+                                                    bookingDetail: bookingDetail
+                                                });
+                                                
+                                                // Check weather_refund_total_price for both Private Charter and Shared Flight
+                                                if (weatherRefundTotalPrice > 0) {
+                                                    // Get passenger names for display
+                                                    const passengerNames = Array.isArray(bookingDetail.passengers)
+                                                        ? bookingDetail.passengers.map(p => `${p.first_name || ''} ${p.last_name || ''}`.trim()).filter(Boolean)
+                                                        : [];
+                                                    const namesDisplay = passengerNames.length > 0 ? ` — ${passengerNames.join(', ')}` : '';
+                                                    return (
+                                                        <span>
+                                                            <span style={{ color: '#10b981', fontWeight: 'bold', marginRight: '4px' }}>✔</span>
+                                                            Yes{namesDisplay}
+                                                        </span>
+                                                    );
+                                                } else {
+                                                    return 'No';
+                                                }
+                                            })()}
                                         </Typography>
 
                                     </Box>
