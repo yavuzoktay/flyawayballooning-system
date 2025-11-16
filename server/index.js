@@ -14080,9 +14080,37 @@ function buildEmailLayout({ subject, headline = '', heroImage, highlightHtml = '
         : '';
 
     // Use emailImage.jpg from uploads/email folder, with fallback to default
-    const baseUrl = process.env.BASE_URL || process.env.REACT_APP_API_URL || 'http://localhost:3002';
+    // For emails, we need absolute URLs that work in email clients
+    // Priority: BASE_URL env var > production domains > localhost
+    let baseUrl = process.env.BASE_URL;
+    if (!baseUrl) {
+        // Check if we're in production (NODE_ENV or check domain)
+        const isProduction = process.env.NODE_ENV === 'production' || 
+                            process.env.NODE_ENV === 'PRODUCTION' ||
+                            !process.env.NODE_ENV; // Default to production if not set
+        
+        if (isProduction) {
+            // Use production domain
+            baseUrl = 'https://flyawayballooning-system.com';
+        } else {
+            // Development
+            baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3002';
+        }
+    }
+    
+    // Ensure baseUrl doesn't end with slash
+    baseUrl = baseUrl.replace(/\/$/, '');
+    
     const defaultHeroImageUrl = `${baseUrl}/uploads/email/emailImage.jpg`;
     const heroImageUrl = heroImage || defaultHeroImageUrl;
+    
+    // Debug logging for email image URL
+    console.log('📧 Email image URL:', {
+        baseUrl,
+        heroImageUrl,
+        hasHeroImage: !!heroImage,
+        env: process.env.NODE_ENV
+    });
 
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -14098,7 +14126,7 @@ function buildEmailLayout({ subject, headline = '', heroImage, highlightHtml = '
                 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px; background:#ffffff; border-radius:24px; overflow:hidden; box-shadow:0 12px 35px rgba(20,23,38,0.12);">
                     <tr>
                         <td>
-                            <img src="${heroImageUrl}" alt="Fly Away Ballooning" style="width:100%; max-width:640px; height:auto; min-height:220px; object-fit:cover; display:block; border-radius:24px 24px 0 0;" />
+                            <img src="${heroImageUrl}" alt="Fly Away Ballooning" style="width:100%; max-width:640px; height:auto; min-height:220px; max-height:400px; object-fit:cover; display:block; border-radius:24px 24px 0 0; background-color:#f3f4f6;" />
                         </td>
                     </tr>
                     <tr>

@@ -4,9 +4,20 @@ import dayjs from 'dayjs';
 const getBaseUrl = () => {
     if (typeof window !== 'undefined') {
         // Client-side: use current origin
-        return window.location.origin;
+        const origin = window.location.origin;
+        // If localhost, check if we should use production URL for email preview
+        if (origin.includes('localhost')) {
+            // For email preview in development, use production URL so images work
+            return 'https://flyawayballooning-system.com';
+        }
+        return origin;
     }
-    // Server-side: use environment variable or default
+    // Server-side: use environment variable or production URL
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'PRODUCTION';
+    if (isProduction || !process.env.NODE_ENV) {
+        return process.env.BASE_URL || 'https://flyawayballooning-system.com';
+    }
+    // Development: use environment variable or default
     return process.env.REACT_APP_API_URL || process.env.BASE_URL || 'http://localhost:3002';
 };
 
@@ -120,7 +131,7 @@ const buildEmailLayout = ({
                 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px; background:#ffffff; border-radius:24px; overflow:hidden; box-shadow:0 12px 35px rgba(20,23,38,0.12);">
                     <tr>
                         <td>
-                            <img src="${heroImage}" alt="Fly Away Ballooning" style="width:100%; max-width:640px; height:auto; min-height:220px; object-fit:cover; display:block; border-radius:24px 24px 0 0;" />
+                            <img src="${heroImage}" alt="Fly Away Ballooning" style="width:100%; max-width:640px; height:auto; min-height:220px; max-height:400px; object-fit:cover; display:block; border-radius:24px 24px 0 0; background-color:#f3f4f6;" />
                         </td>
                     </tr>
                     <tr>
