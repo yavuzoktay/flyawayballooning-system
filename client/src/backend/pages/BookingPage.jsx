@@ -5176,7 +5176,7 @@ setBookingDetail(finalVoucherDetail);
                                     
                                     {/* Email From */}
                                     <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 0.5 }}>
-                                        From "Fly Away Ballooning" &lt;bookings@tripworks.com&gt;
+                                        From "Fly Away Ballooning" &lt;info@flyawayballooning.com&gt;
                                     </Typography>
                                     <Typography variant="caption" sx={{ color: '#999', display: 'block', mb: 2 }}>
                                         {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
@@ -5195,32 +5195,10 @@ setBookingDetail(finalVoucherDetail);
                                     </Typography>
                                     
                                     {/* Email Body Preview */}
-                                    <Box sx={{ 
-                                        backgroundColor: '#fff', 
-                                        p: 3, 
-                                        borderRadius: 2,
-                                        minHeight: 200
-                                    }}>
-                                        {/* Flight Image Placeholder */}
-                                        <Box sx={{ 
-                                            width: '100%', 
-                                            height: 200, 
-                                            backgroundColor: '#e3f2fd',
-                                            borderRadius: 2,
-                                            mb: 3,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            backgroundImage: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                                        }}>
-                                            <Typography sx={{ color: '#fff', fontSize: 48 }}>🎈</Typography>
-                                        </Box>
-                                        
-                                        <div
-                                            style={{ lineHeight: 1.6, color: '#333' }}
-                                            dangerouslySetInnerHTML={{ __html: previewHtml }}
-                                        />
-                                    </Box>
+                                    <div
+                                        style={{ lineHeight: 1.6, color: '#333' }}
+                                        dangerouslySetInnerHTML={{ __html: previewHtml }}
+                                    />
                                 </Box>
                             </Grid>
                             {/* Hidden fields for backend */}

@@ -1227,6 +1227,11 @@ app.post('/api/createRedeemBooking', (req, res) => {
 
         const bookingId = result.insertId;
         console.log('=== REDEEM BOOKING SUCCESS ===');
+        
+        // Send automatic booking confirmation email
+        if (passengerData && passengerData[0] && passengerData[0].email) {
+            sendAutomaticBookingConfirmationEmail(bookingId);
+        }
         console.log('Booking ID:', bookingId);
 
         // Update availability if date and time are provided
@@ -5541,6 +5546,9 @@ app.post('/api/createBooking', (req, res) => {
                         });
                     }
                     
+                    // Send automatic booking confirmation email
+                    sendAutomaticBookingConfirmationEmail(bookingId);
+                    
                     res.status(201).json({ success: true, message: 'Booking created successfully!', bookingId: bookingId, created_at: createdAt });
                 });
             }
@@ -6213,6 +6221,11 @@ app.post('/api/createVoucher', (req, res) => {
             
             // Now create passenger record
             createPassengerForFlightVoucher(bookingResult.insertId, name, weight, paid, passengerData);
+            
+            // Send automatic booking confirmation email for Flight Voucher
+            if (email) {
+                sendAutomaticBookingConfirmationEmail(bookingResult.insertId);
+            }
         });
     }
     
@@ -6296,6 +6309,11 @@ app.post('/api/createVoucher', (req, res) => {
             
             // Now mark the original voucher as redeemed in all_vouchers table
             updateVoucherRedemptionStatus(voucherCode, voucherId, bookingResult.insertId);
+            
+            // Send automatic booking confirmation email for Redeem Voucher
+            if (email) {
+                sendAutomaticBookingConfirmationEmail(bookingResult.insertId);
+            }
         });
     }
     
@@ -10363,6 +10381,12 @@ async function createBookingFromWebhook(bookingData) {
                             );
                         }
                         
+                        // Send automatic booking confirmation email for webhook booking
+                        const bookingEmail = (passengerData && passengerData[0]) ? passengerData[0].email : null;
+                        if (bookingEmail) {
+                            sendAutomaticBookingConfirmationEmail(bookingId);
+                        }
+                        
                         resolve(bookingId);
                     });
                 } else {
@@ -10401,6 +10425,12 @@ async function createBookingFromWebhook(bookingData) {
                                 }
                             }
                         );
+                    }
+                    
+                    // Send automatic booking confirmation email for webhook booking (no passengers case)
+                    const bookingEmailNoPassengers = bookingData?.passengerData?.[0]?.email || null;
+                    if (bookingEmailNoPassengers) {
+                        sendAutomaticBookingConfirmationEmail(bookingId);
                     }
                     
                     resolve(bookingId);
@@ -13908,6 +13938,544 @@ function ensureEmailLogsSchema(callback) {
     });
 }
 
+// Helper function to escape HTML
+function escapeHtml(unsafe) {
+    if (!unsafe) return '';
+    return String(unsafe)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+// Helper function to format date and time (matches frontend formatDateTime)
+function formatDateTime(value) {
+    if (!value) return null;
+    return moment(value).format('MMMM D, YYYY [at] h:mm A');
+}
+
+// Helper function to format date (matches frontend formatDate)
+function formatDate(value) {
+    if (!value) return null;
+    return moment(value).format('MMMM D, YYYY');
+}
+
+// Helper function to wrap paragraphs (matches frontend wrapParagraphs)
+function wrapParagraphs(paragraphs = []) {
+    if (!Array.isArray(paragraphs)) return '';
+    return paragraphs
+        .map((text, index) => {
+            const marginBottom = index === paragraphs.length - 1 ? '24px' : '16px';
+            return `<p style="margin:0 0 ${marginBottom};">${text}</p>`;
+        })
+        .join('');
+}
+
+// Helper function to generate booking confirmation message HTML (matches frontend getBookingConfirmationMessageHtml)
+function getBookingConfirmationMessageHtml(booking = {}) {
+    const name = escapeHtml(booking.name || booking.customer_name || 'Guest');
+    const flightDate = escapeHtml(formatDateTime(booking.flight_date) || 'November 14, 2025 at 3:30 PM');
+    const location = escapeHtml(booking.location || 'Bath');
+    const experience = escapeHtml(booking.flight_type || booking.experience || 'Private Charter');
+
+    return wrapParagraphs([
+        `Dear ${name},`,
+        `We're thrilled to confirm your balloon flight experience with us!`,
+        `🗓 <strong>Date:</strong> ${flightDate}`,
+        `📍 <strong>Meeting point:</strong> ${location}`,
+        `🎫 <strong>Experience:</strong> ${experience}`,
+        "We'll be in touch again closer to the flight with weather updates and meeting instructions. In the meantime, feel free to reply directly if you have any questions.",
+        'Thank you,',
+        'Fly Away Ballooning Team'
+    ]);
+}
+
+// Helper function to generate booking confirmation receipt HTML (matches frontend getBookingConfirmationReceiptHtml)
+function getBookingConfirmationReceiptHtml(booking = {}) {
+    const receiptItems = Array.isArray(booking.passengers) ? booking.passengers : [];
+    const paidAmount = booking.paid != null ? Number(booking.paid) : null;
+    const dueAmount = booking.due != null ? Number(booking.due) : null;
+    const subtotal = paidAmount != null && dueAmount != null ? paidAmount + dueAmount : null;
+    const receiptId = booking.receipt_number || booking.booking_reference || booking.id || '';
+    const receiptSoldDate = booking.created_at ? formatDate(booking.created_at) : null;
+    const location = escapeHtml(booking.location || 'Bath');
+    const experience = escapeHtml(booking.flight_type || booking.experience || 'Flight Experience');
+    const guestCount = receiptItems.length > 0 ? receiptItems.length : (booking.pax || 0);
+
+    return `<div style="margin:32px 0; padding:24px; background:#f9fafb; border-radius:16px; border:1px solid #e2e8f0;">
+        <div style="font-size:12px; letter-spacing:0.2em; color:#64748b; text-transform:uppercase; margin-bottom:12px;">Receipt</div>
+        <div style="display:flex; flex-wrap:wrap; gap:16px; font-size:14px; color:#475569;">
+            <div style="min-width:220px;">
+                <div><strong>Sold:</strong> ${receiptSoldDate || '—'}</div>
+                <div><strong>Confirmation:</strong> ${escapeHtml(receiptId)}</div>
+            </div>
+            <div style="min-width:220px;">
+                <div><strong>Sold to:</strong></div>
+                <div>${escapeHtml(booking.name || booking.customer_name || 'Guest')}</div>
+                <div>${escapeHtml(booking.phone || '')}</div>
+                <div>${escapeHtml(booking.email || '')}</div>
+                <div>${escapeHtml(booking.billing_address || '')}</div>
+            </div>
+            <div style="min-width:220px; background:#f8fafc; border-radius:12px; padding:16px;">
+                <div style="font-weight:700; margin-bottom:8px;">Questions?</div>
+                <div style="font-size:13px;">Contact us by calling <a href="tel:+441823778127" style="color:#2563eb; text-decoration:none;">+44 1823 778 127</a></div>
+            </div>
+        </div>
+        <div style="margin-top:24px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; font-size:13px; color:#475569;">
+                <thead>
+                    <tr>
+                        <th align="left" style="padding:8px 0; border-bottom:1px solid #e2e8f0; text-transform:uppercase; letter-spacing:0.08em;">Item</th>
+                        <th align="left" style="padding:8px 0; border-bottom:1px solid #e2e8f0; text-transform:uppercase; letter-spacing:0.08em;">Description</th>
+                        <th align="right" style="padding:8px 0; border-bottom:1px solid #e2e8f0; text-transform:uppercase; letter-spacing:0.08em;">Amount</th>
+                        <th align="right" style="padding:8px 0; border-bottom:1px solid #e2e8f0; text-transform:uppercase; letter-spacing:0.08em;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding:12px 0; border-bottom:1px solid #f1f5f9; font-weight:600;">${experience}</td>
+                        <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;">
+                            ${location}
+                            ${guestCount > 0 ? `<div style="margin-top:4px; font-size:12px; color:#64748b;">Guests: ${guestCount}</div>` : ''}
+                        </td>
+                        <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;" align="right">
+                            ${guestCount > 0 && subtotal != null ? `£${(subtotal / guestCount).toFixed(2)} × ${guestCount}` : '—'}
+                        </td>
+                        <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;" align="right">
+                            £${subtotal != null ? subtotal.toFixed(2) : '—'}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div style="margin-top:16px; display:flex; flex-direction:column; align-items:flex-end; gap:8px; font-size:13px; color:#475569;">
+            <div><strong>Subtotal:</strong> £${subtotal != null ? subtotal.toFixed(2) : '—'}</div>
+            <div><strong>Total:</strong> £${subtotal != null ? subtotal.toFixed(2) : '—'}</div>
+            <div><strong>Paid:</strong> £${paidAmount != null ? paidAmount.toFixed(2) : '—'}</div>
+            <div><strong>Due:</strong> £${dueAmount != null ? dueAmount.toFixed(2) : '—'}</div>
+        </div>
+    </div>
+    <div style="margin-top:24px; text-align:center;">
+        <a href="https://flyawayballooning.com/faq" style="margin-right:16px; font-size:13px; color:#2563eb; text-decoration:none;">View FAQs</a>
+        <a href="mailto:hello@flyawayballooning.com" style="font-size:13px; color:#2563eb; text-decoration:none;">Contact us</a>
+    </div>`;
+}
+
+// Helper function to build email layout (matches frontend buildEmailLayout)
+function buildEmailLayout({ subject, headline = '', heroImage, highlightHtml = '', bodyHtml = '', customerName = 'Guest', signatureLines = ['Fly Away Ballooning Team'], footerLinks = [] }) {
+    const safeName = escapeHtml(customerName || 'Guest');
+    const signatureHtml = signatureLines
+        .map(line => `<div style="font-size:16px; line-height:1.6; color:#1f2937; margin:0;">${escapeHtml(line)}</div>`)
+        .join('');
+
+    const footerHtml = footerLinks.length > 0
+        ? `<div style="margin-top:32px; text-align:center;">
+                ${footerLinks.map(({ label, url }) => `<a href="${url}" style="font-size:14px; color:#1976d2; text-decoration:none; margin:0 8px;">${escapeHtml(label)}</a>`).join('')}
+           </div>`
+        : '';
+
+    const highlightSection = highlightHtml
+        ? `<div style="background:#e8e7ff; border-radius:12px; padding:16px 18px; margin-bottom:24px; color:#4338ca; font-size:15px; line-height:1.5;">${highlightHtml}</div>`
+        : '';
+
+    // Use emailImage.jpg from uploads/email folder, with fallback to default
+    const baseUrl = process.env.BASE_URL || process.env.REACT_APP_API_URL || 'http://localhost:3002';
+    const defaultHeroImageUrl = `${baseUrl}/uploads/email/emailImage.jpg`;
+    const heroImageUrl = heroImage || defaultHeroImageUrl;
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${escapeHtml(subject)}</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f5f5f5; font-family:'Helvetica Neue', Arial, sans-serif;">
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+            <td align="center" style="padding:32px 16px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px; background:#ffffff; border-radius:24px; overflow:hidden; box-shadow:0 12px 35px rgba(20,23,38,0.12);">
+                    <tr>
+                        <td>
+                            <img src="${heroImageUrl}" alt="Fly Away Ballooning" style="width:100%; max-width:640px; height:auto; min-height:220px; object-fit:cover; display:block; border-radius:24px 24px 0 0;" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:32px;">
+                            ${headline ? `<div style="font-size:26px; line-height:1.35; font-weight:700; color:#111827; margin-bottom:20px;">${escapeHtml(headline)}</div>` : ''}
+                            ${highlightSection}
+                            <div style="font-size:16px; line-height:1.7; color:#1f2937;">
+                                ${bodyHtml}
+                            </div>
+                            <div style="font-size:16px; line-height:1.7; color:#1f2937; margin-top:24px;">
+                                ${signatureHtml}
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+                ${footerHtml}
+                <div style="font-size:12px; color:#6b7280; margin-top:24px;">
+                    You are receiving this email because you recently interacted with Fly Away Ballooning.<br/>
+                    <a href="https://flyawayballooning.com" style="color:#6b7280; text-decoration:underline;">Visit our website</a>
+                </div>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`;
+
+    return html;
+}
+
+// Helper function to extract message from template body (matches frontend extractMessageFromTemplateBody)
+function extractMessageFromTemplateBody(html = '') {
+    if (!html) return '';
+    // Remove DOCTYPE, html, head, body tags
+    let sanitized = html
+        .replace(/<!DOCTYPE[^>]*>/gi, '')
+        .replace(/<\/?(html|head|body)[^>]*>/gi, '')
+        .trim();
+    
+    // Find receipt marker and extract only the message part before it
+    const receiptMarkerStart = '<!-- RECEIPT_SECTION_START -->';
+    const markerIndex = sanitized.indexOf(receiptMarkerStart);
+    if (markerIndex !== -1) {
+        return sanitized.slice(0, markerIndex).trim();
+    }
+    return sanitized;
+}
+
+// Helper function to replace prompts in HTML (matches frontend replacePrompts)
+function replacePrompts(html = '', booking = {}) {
+    if (!html || !booking) return html;
+    
+    const bookingName = booking.name || booking.customer_name || '';
+    const nameParts = bookingName.trim().split(/\s+/);
+    const firstName = nameParts.length > 0 ? nameParts[0] : bookingName;
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+    const fullName = bookingName || 'Guest';
+    
+    let result = html;
+    result = result.replace(/\[First Name\]/gi, escapeHtml(firstName));
+    result = result.replace(/\[Last Name\]/gi, escapeHtml(lastName));
+    result = result.replace(/\[Full Name\]/gi, escapeHtml(fullName));
+    result = result.replace(/\[Email\]/gi, escapeHtml(booking.email || booking.customer_email || ''));
+    result = result.replace(/\[Phone\]/gi, escapeHtml(booking.phone || booking.customer_phone || ''));
+    result = result.replace(/\[Booking ID\]/gi, escapeHtml(booking.id ? String(booking.id) : ''));
+    
+    const flightDate = booking.flight_date || booking.flightDate || '';
+    if (flightDate) {
+        try {
+            const formattedDate = formatDateTime(flightDate);
+            result = result.replace(/\[Flight Date\]/gi, escapeHtml(formattedDate || flightDate));
+        } catch (e) {
+            result = result.replace(/\[Flight Date\]/gi, escapeHtml(flightDate));
+        }
+    } else {
+        result = result.replace(/\[Flight Date\]/gi, '');
+    }
+    
+    result = result.replace(/\[Location\]/gi, escapeHtml(booking.location || ''));
+    result = result.replace(/\[Voucher Code\]/gi, escapeHtml(booking.voucher_code || booking.voucherCode || ''));
+    
+    return result;
+}
+
+// Helper function to sanitize template HTML (matches frontend sanitizeTemplateHtml)
+function sanitizeTemplateHtml(html = '') {
+    if (!html) return '';
+    const raw = String(html);
+    return raw
+        .replace(/<!DOCTYPE[^>]*>/gi, '')
+        .replace(/<\/?(html|head|body)[^>]*>/gi, '')
+        .trim();
+}
+
+// Helper function to check if content is HTML (matches frontend isHtmlContent)
+function isHtmlContent(value = '') {
+    return typeof value === 'string' && /<\/?[a-z][\s\S]*>/i.test(value);
+}
+
+// Helper function to convert text to paragraph HTML (matches frontend textToParagraphHtml)
+function textToParagraphHtml(text = '') {
+    if (!text) return '';
+    return text
+        .split(/\n{2,}/)
+        .filter((paragraph) => paragraph.trim() !== '')
+        .map((paragraph) => {
+            const escaped = escapeHtml(paragraph).replace(/\n/g, '<br>').trim();
+            return `<p style="margin:0 0 16px;">${escaped}</p>`;
+        })
+        .join('') || '<p style="margin:0 0 16px;">&nbsp;</p>';
+}
+
+// Helper function to resolve body HTML (matches frontend resolveBodyHtml)
+function resolveBodyHtml(template = {}, fallbackParagraphsHtml = '') {
+    const raw = template?.body;
+    if (raw && raw.trim() !== '') {
+        if (isHtmlContent(raw)) {
+            return sanitizeTemplateHtml(raw);
+        }
+        return textToParagraphHtml(raw);
+    }
+    return fallbackParagraphsHtml;
+}
+
+// Helper function to generate booking confirmation email HTML using database template
+function generateBookingConfirmationEmail(booking, template = null) {
+    const customerName = booking.name || booking.customer_name || 'Guest';
+    const subject = template?.subject || '🎈 Your flight is confirmed';
+    
+    // Get message HTML from template if available, otherwise use default
+    let messageHtml = '';
+    if (template && template.body && template.body.trim() !== '') {
+        const rawBody = String(template.body).trim();
+        
+        // Template body from Settings page is already HTML from RichTextEditor
+        // It may contain inline styles and formatting, which we should preserve
+        // Only remove DOCTYPE, html, head, body tags if they exist (they usually don't from RichTextEditor)
+        messageHtml = sanitizeTemplateHtml(rawBody);
+        
+        // If sanitization removed everything (shouldn't happen), use raw body
+        if (!messageHtml || messageHtml.trim() === '') {
+            console.warn('⚠️ Template body became empty after sanitization, using raw body');
+            messageHtml = rawBody;
+        }
+        
+        console.log('📧 Using template body from database:', {
+            templateName: template.name,
+            templateId: template.id,
+            rawBodyLength: rawBody.length,
+            rawBodyPreview: rawBody.substring(0, 150),
+            messageHtmlLength: messageHtml.length,
+            messageHtmlPreview: messageHtml.substring(0, 150)
+        });
+    }
+    
+    // If no template message, use default
+    if (!messageHtml || messageHtml.trim() === '') {
+        console.log('📧 Using default message HTML (template body is empty or not found)');
+        messageHtml = getBookingConfirmationMessageHtml(booking);
+    }
+    
+    // Replace prompts in the message
+    const messageWithPrompts = replacePrompts(messageHtml, booking);
+    
+    // Get receipt HTML (always include receipt)
+    const receiptHtml = getBookingConfirmationReceiptHtml(booking);
+    
+    // Combine message and receipt
+    const bodyHtml = `${messageWithPrompts}${receiptHtml}`;
+    
+    // Build email layout (matches frontend buildEmailLayout)
+    return buildEmailLayout({
+        subject,
+        headline: '',
+        bodyHtml,
+        customerName,
+        signatureLines: ['Fly Away Ballooning Team'],
+        footerLinks: [
+            { label: 'View FAQs', url: 'https://flyawayballooning.com/faq' },
+            { label: 'Contact us', url: 'mailto:hello@flyawayballooning.com' }
+        ]
+    });
+}
+
+// Helper function to send automatic booking confirmation email
+async function sendAutomaticBookingConfirmationEmail(bookingId) {
+    try {
+        // Check if SendGrid is configured
+        if (!process.env.SENDGRID_API_KEY) {
+            console.warn('SendGrid API key not configured, skipping automatic email');
+            return;
+        }
+        
+        // Fetch booking details
+        const bookingQuery = `SELECT * FROM all_booking WHERE id = ?`;
+        
+        con.query(bookingQuery, [bookingId], async (err, bookingRows) => {
+            if (err) {
+                console.error('Error fetching booking for email:', err);
+                return;
+            }
+            
+            if (!bookingRows || bookingRows.length === 0) {
+                console.warn('Booking not found for email:', bookingId);
+                return;
+            }
+            
+            const booking = bookingRows[0];
+            
+            // Fetch passengers for this booking
+            const passengerQuery = `SELECT * FROM passenger WHERE booking_id = ?`;
+            con.query(passengerQuery, [bookingId], (passengerErr, passengerRows) => {
+                if (passengerErr) {
+                    console.error('Error fetching passengers for email:', passengerErr);
+                    // Continue without passengers
+                    booking.passengers = [];
+                } else {
+                    booking.passengers = passengerRows || [];
+                }
+                
+                // Continue with email sending
+                sendEmailToCustomerAndOwner(booking, bookingId);
+            });
+        });
+    } catch (error) {
+        console.error('Error sending automatic booking confirmation email:', error);
+        // Don't throw error - email failure shouldn't break booking creation
+    }
+}
+
+// Helper function to send email to both customer and owner
+async function sendEmailToCustomerAndOwner(booking, bookingId) {
+    try {
+        // Check if email is provided
+        if (!booking.email) {
+            console.warn('No email address for booking:', bookingId);
+            return;
+        }
+        
+        // Fetch "Booking Confirmation" template from database
+        const templateQuery = `SELECT * FROM email_templates WHERE name = 'Booking Confirmation' LIMIT 1`;
+        con.query(templateQuery, (templateErr, templateRows) => {
+            if (templateErr) {
+                console.error('❌ Error fetching Booking Confirmation template:', templateErr);
+                // Continue with default template if fetch fails
+            }
+            
+            const template = templateRows && templateRows.length > 0 ? templateRows[0] : null;
+            
+            // Debug logging
+            if (template) {
+                console.log('✅ Found Booking Confirmation template:', {
+                    id: template.id,
+                    name: template.name,
+                    subject: template.subject,
+                    bodyLength: template.body ? template.body.length : 0,
+                    bodyPreview: template.body ? template.body.substring(0, 200) : 'empty',
+                    edited: template.edited
+                });
+            } else {
+                console.log('⚠️ Booking Confirmation template not found in database, using default');
+            }
+            
+            // Generate email HTML using database template (or default if template not found)
+            const htmlBody = generateBookingConfirmationEmail(booking, template);
+            const textBody = `Thank you for choosing Fly Away Ballooning! Your flight is confirmed for ${booking.flight_date ? moment(booking.flight_date).format('MMMM D, YYYY [at] h:mm A') : 'TBD'} at ${booking.location || 'Bath'}. We'll be in touch closer to the flight with weather updates.`;
+            
+            const subject = template?.subject || '🎈 Your flight is confirmed';
+            
+            // Prepare email content for customer
+            const customerEmailContent = {
+                to: booking.email,
+                from: {
+                    email: 'info@flyawayballooning.com',
+                    name: 'Fly Away Ballooning'
+                },
+                subject: subject,
+                text: textBody,
+                html: htmlBody,
+                custom_args: {
+                    booking_id: bookingId.toString(),
+                    template_type: 'booking_confirmation_automatic'
+                }
+            };
+            
+            // Prepare email content for business owner (same content, different recipient)
+            const ownerEmailContent = {
+                to: 'info@flyawayballooning.com',
+                from: {
+                    email: 'info@flyawayballooning.com',
+                    name: 'Fly Away Ballooning'
+                },
+                subject: `📧 New Booking Confirmation - ${booking.name || 'Guest'} (Booking ID: ${bookingId})`,
+                text: `New booking confirmation sent to customer.\n\n${textBody}`,
+                html: `<div style="padding:16px; background:#f0f9ff; border-left:4px solid #3b82f6; margin-bottom:24px;">
+                    <p style="margin:0; font-weight:600; color:#1e40af;">New Booking Confirmation</p>
+                    <p style="margin:8px 0 0 0; color:#1e3a8a;">This booking confirmation was automatically sent to: ${escapeHtml(booking.email || 'N/A')}</p>
+                    <p style="margin:8px 0 0 0; color:#1e3a8a;">Booking ID: ${bookingId}</p>
+                </div>${htmlBody}`,
+                custom_args: {
+                    booking_id: bookingId.toString(),
+                    template_type: 'booking_confirmation_automatic_owner'
+                }
+            };
+            
+            // Send emails asynchronously
+            (async () => {
+                try {
+                    // Send email to customer
+                    console.log('📧 Sending automatic booking confirmation email to customer:', booking.email);
+                    const customerResponse = await sgMail.send(customerEmailContent);
+                    console.log('✅ Automatic booking confirmation email sent to customer successfully:', customerResponse[0].statusCode);
+                    
+                    // Send email to business owner
+                    console.log('📧 Sending automatic booking confirmation email to business owner: info@flyawayballooning.com');
+                    const ownerResponse = await sgMail.send(ownerEmailContent);
+                    console.log('✅ Automatic booking confirmation email sent to business owner successfully:', ownerResponse[0].statusCode);
+                    
+                    // Log email activity for customer
+                    const logSql = `
+                        INSERT INTO email_logs (
+                            booking_id,
+                            recipient_email,
+                            subject,
+                            template_type,
+                            message_html,
+                            message_text,
+                            sent_at,
+                            status,
+                            message_id,
+                            opens,
+                            clicks,
+                            last_event,
+                            last_event_at
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, NOW(), 'sent', ?, 0, 0, 'sent', NOW())
+                    `;
+                    const customerMessageId = customerResponse[0]?.headers?.['x-message-id'];
+                    con.query(logSql, [
+                        bookingId,
+                        booking.email,
+                        customerEmailContent.subject,
+                        'booking_confirmation_automatic',
+                        htmlBody,
+                        textBody,
+                        customerMessageId
+                    ], (logErr) => {
+                        if (logErr) {
+                            console.error('Error logging automatic customer email:', logErr);
+                        }
+                    });
+                    
+                    // Log email activity for business owner
+                    const ownerMessageId = ownerResponse[0]?.headers?.['x-message-id'];
+                    con.query(logSql, [
+                        bookingId,
+                        'info@flyawayballooning.com',
+                        ownerEmailContent.subject,
+                        'booking_confirmation_automatic_owner',
+                        ownerEmailContent.html,
+                        ownerEmailContent.text,
+                        ownerMessageId
+                    ], (logErr) => {
+                        if (logErr) {
+                            console.error('Error logging automatic owner email:', logErr);
+                        }
+                    });
+                } catch (emailErr) {
+                    console.error('Error sending emails:', emailErr);
+                }
+            })();
+        });
+    } catch (error) {
+        console.error('Error sending email to customer and owner:', error);
+        // Don't throw error - email failure shouldn't break booking creation
+    }
+}
+
 // Send booking email via SendGrid
 app.post('/api/sendBookingEmail', async (req, res) => {
     console.log('POST /api/sendBookingEmail called');
@@ -13959,10 +14527,11 @@ app.post('/api/sendBookingEmail', async (req, res) => {
         const textBody = containsHtml ? convertHtmlToText(message) : message;
 
         // Prepare email content
+        // Always use info@flyawayballooning.com as from email address
         const emailContent = {
             to: to,
             from: {
-                email: process.env.SENDGRID_FROM_EMAIL || 'bookings@tripworks.com',
+                email: 'info@flyawayballooning.com',
                 name: 'Fly Away Ballooning'
             },
             subject: subject,

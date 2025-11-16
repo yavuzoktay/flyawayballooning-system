@@ -278,12 +278,34 @@ const Settings = () => {
             exec('removeFormat');
         };
 
+        const insertPrompt = (promptText) => {
+            if (!editorRef.current) return;
+            editorRef.current.focus();
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                range.deleteContents();
+                const textNode = document.createTextNode(promptText);
+                range.insertNode(textNode);
+                range.setStartAfter(textNode);
+                range.collapse(true);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            } else {
+                // If no selection, append at the end
+                const textNode = document.createTextNode(promptText);
+                editorRef.current.appendChild(textNode);
+            }
+            scheduleChange();
+        };
+
         return (
             <div>
                 <div style={{
                     display: 'flex',
                     gap: '8px',
-                    marginBottom: '12px'
+                    marginBottom: '12px',
+                    flexWrap: 'wrap'
                 }}>
                     <button type="button" className="btn btn-secondary" onClick={() => exec('bold')} style={{ padding: '6px 12px' }}>B</button>
                     <button type="button" className="btn btn-secondary" onClick={() => exec('italic')} style={{ padding: '6px 12px', fontStyle: 'italic' }}>I</button>
@@ -291,6 +313,13 @@ const Settings = () => {
                     <button type="button" className="btn btn-secondary" onClick={() => exec('insertUnorderedList')} style={{ padding: '6px 12px' }}>• List</button>
                     <button type="button" className="btn btn-secondary" onClick={handleLink} style={{ padding: '6px 12px' }}>Link</button>
                     <button type="button" className="btn btn-secondary" onClick={handleClear} style={{ padding: '6px 12px' }}>Clear</button>
+                    <div style={{ width: '1px', backgroundColor: '#e5e7eb', margin: '0 4px' }}></div>
+                    <button type="button" className="btn btn-secondary" onClick={() => insertPrompt('[First Name]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[First Name]</button>
+                    <button type="button" className="btn btn-secondary" onClick={() => insertPrompt('[Last Name]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Last Name]</button>
+                    <button type="button" className="btn btn-secondary" onClick={() => insertPrompt('[Full Name]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Full Name]</button>
+                    <button type="button" className="btn btn-secondary" onClick={() => insertPrompt('[Email]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Email]</button>
+                    <button type="button" className="btn btn-secondary" onClick={() => insertPrompt('[Phone]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Phone]</button>
+                    <button type="button" className="btn btn-secondary" onClick={() => insertPrompt('[Booking ID]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Booking ID]</button>
                 </div>
                 <div
                     ref={editorRef}
@@ -6477,28 +6506,6 @@ const Settings = () => {
 
                                         {/* Email Body */}
                                         <div style={{ padding: '0' }}>
-                                            <div style={{ 
-                                                fontSize: '11px',
-                                                color: '#6b7280',
-                                                padding: '12px 16px',
-                                                borderBottom: '1px solid #e5e7eb',
-                                                backgroundColor: '#fefce8'
-                                            }}>
-                                                If you are unable to see this message, <a href="#" style={{ color: '#2563eb' }}>click here to view in browser</a>
-                                            </div>
-
-                                            {/* Balloon Image */}
-                                            <div style={{ 
-                                                width: '100%',
-                                                height: '250px',
-                                                backgroundImage: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center'
-                                            }}>
-                                                <span style={{ fontSize: '80px' }}>🎈</span>
-                                            </div>
-
                                             {/* Editable Content Area */}
                                             <div style={{ padding: '24px', backgroundColor: '#fff', minHeight: '200px' }}>
                                                 <RichTextEditor
@@ -6506,34 +6513,6 @@ const Settings = () => {
                                                     onChange={(html) => setEmailTemplateFormData({ ...emailTemplateFormData, body: html })}
                                                     placeholder="Enter your message here..."
                                                 />
-                                            </div>
-
-                                            {/* Email Footer */}
-                                            <div style={{ 
-                                                padding: '24px',
-                                                backgroundColor: '#f9fafb',
-                                                borderTop: '1px solid #e5e7eb',
-                                                textAlign: 'center'
-                                            }}>
-                                                <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '16px' }}>
-                                                    <span style={{ fontSize: '20px', color: '#374151' }}>📘</span>
-                                                    <span style={{ fontSize: '20px', color: '#374151' }}>📷</span>
-                                                    <span style={{ fontSize: '20px', color: '#374151' }}>✈️</span>
-                                                    <span style={{ fontSize: '20px', color: '#374151' }}>▶️</span>
-                                                    <span style={{ fontSize: '20px', color: '#374151' }}>🌐</span>
-                                                </div>
-                                                <p style={{ fontSize: '12px', color: '#6b7280', margin: '8px 0' }}>
-                                                    You are receiving this email because you provided your email while booking with Fly Away Ballooning.
-                                                </p>
-                                                <p style={{ fontSize: '11px', color: '#9ca3af', margin: '8px 0' }}>
-                                                    Unsubscribe from Marketing Emails
-                                                </p>
-                                                <p style={{ fontSize: '11px', color: '#9ca3af', margin: '16px 0 0 0' }}>
-                                                    Powered by <strong>Tripworks</strong>. We help tour operators grow.
-                                                </p>
-                                                <p style={{ fontSize: '10px', color: '#d1d5db', margin: '4px 0 0 0' }}>
-                                                    © 2025 Tripworks, Inc. All rights reserved.
-                                                </p>
                                             </div>
                                         </div>
                                     </div>
@@ -6709,28 +6688,6 @@ const Settings = () => {
 
                                         {/* Email Body */}
                                         <div style={{ padding: '0' }}>
-                                            <div style={{
-                                                fontSize: '11px',
-                                                color: '#6b7280',
-                                                padding: '12px 16px',
-                                                borderBottom: '1px solid #e5e7eb',
-                                                backgroundColor: '#fefce8'
-                                            }}>
-                                                If you are unable to see this message, <a href="#" style={{ color: '#2563eb' }}>click here to view in browser</a>
-                                            </div>
-
-                                            {/* Balloon Image */}
-                                            <div style={{
-                                                width: '100%',
-                                                height: '250px',
-                                                backgroundImage: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center'
-                                            }}>
-                                                <span style={{ fontSize: '80px' }}>🎈</span>
-                                            </div>
-
                                             {/* Editable Content Area */}
                                             <div style={{
                                                 padding: '24px',
@@ -6742,34 +6699,6 @@ const Settings = () => {
                                                     onChange={(html) => setEmailTemplateFormData({ ...emailTemplateFormData, body: html })}
                                                     placeholder="Enter your message here..."
                                                 />
-                                            </div>
-
-                                            {/* Email Footer */}
-                                            <div style={{
-                                                padding: '24px',
-                                                backgroundColor: '#f9fafb',
-                                                borderTop: '1px solid #e5e7eb',
-                                                textAlign: 'center'
-                                            }}>
-                                                <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '16px' }}>
-                                                    <span style={{ fontSize: '20px', color: '#374151' }}>📘</span>
-                                                    <span style={{ fontSize: '20px', color: '#374151' }}>📷</span>
-                                                    <span style={{ fontSize: '20px', color: '#374151' }}>✈️</span>
-                                                    <span style={{ fontSize: '20px', color: '#374151' }}>▶️</span>
-                                                    <span style={{ fontSize: '20px', color: '#374151' }}>🌐</span>
-                                                </div>
-                                                <p style={{ fontSize: '12px', color: '#6b7280', margin: '8px 0' }}>
-                                                    You are receiving this email because you provided your email while booking with Fly Away Ballooning.
-                                                </p>
-                                                <p style={{ fontSize: '11px', color: '#9ca3af', margin: '8px 0' }}>
-                                                    Unsubscribe from Marketing Emails
-                                                </p>
-                                                <p style={{ fontSize: '11px', color: '#9ca3af', margin: '16px 0 0 0' }}>
-                                                    Powered by <strong>Tripworks</strong>. We help tour operators grow.
-                                                </p>
-                                                <p style={{ fontSize: '10px', color: '#d1d5db', margin: '4px 0 0 0' }}>
-                                                    © 2025 Tripworks, Inc. All rights reserved.
-                                                </p>
                                             </div>
                                         </div>
                                     </div>

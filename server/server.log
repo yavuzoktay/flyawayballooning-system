@@ -191146,3 +191146,5571 @@ Node.js v22.14.0
   ]
 }
 
+2025-11-16T13:08:21.551Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "ddd",
+    "question_13": "The Bath Gin Company",
+    "question_14": "Yes",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.556Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.558Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.561Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.607Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.610Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "Yes",
+    "question_16": "Prosecco",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.631Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.636Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Email Marketing",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.640Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Email Marketing",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.652Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.690Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:21.712Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.716Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.733Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "Yes",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.741Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:21.743Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "edfs",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.772Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "cdsd",
+    "question_13": "Google",
+    "question_14": "No",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.794Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "iouj",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.814Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "dss",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.821Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "dss",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.823Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "xcsz",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.825Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "dsswx",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.827Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:21.829Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:21.835Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:21.842Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.854Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:21.874Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:21.896Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "deedwdwq",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.903Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "dddd",
+    "question_13": "TripAdvisor",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.905Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:21.908Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:21.909Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:21.926Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "deedwdwq",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.927Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:21.934Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Facebook",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.935Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Facebook",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.955Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Facebook",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.977Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:21.984Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:21.986Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:21.990Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:21.992Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:22.017Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:22.019Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:22.028Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:22.030Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:22.036Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:22.058Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:22.065Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:22.068Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:22.071Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:22.073Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:22.100Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:08:22.110Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday ",
+    "question_13": "Facebook",
+    "question_14": "No",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:22.116Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Please read",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:22.118Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday ",
+    "question_13": "Facebook",
+    "question_14": "No",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:22.134Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday ",
+    "question_13": "Facebook",
+    "question_14": "No",
+    "question_16": "Champagne",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:22.138Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Please read",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:22.146Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday surprise. ",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:22.149Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday surprise. ",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:22.151Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "Birthday surprise. ",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "Yes",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:08:22.154Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Spotted our Balloon, Vehicle or Trailer",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T13:45:44.509Z - SESSION STORE SAVE
+{
+  "session_id": "cs_test_a1ucexcgyGafEJZ3wEBqJ0nPJujWBvQHjjg7eC5LLpqfggbyvUpGn7DRAd",
+  "type": "voucher",
+  "voucherData": {
+    "name": "test test",
+    "weight": "",
+    "flight_type": "Shared Flight",
+    "voucher_type": "Gift Voucher",
+    "voucher_type_detail": "Any Day Flight",
+    "email": "test@gmail.com",
+    "phone": "353",
+    "mobile": "353",
+    "redeemed": "No",
+    "paid": 225,
+    "offer_code": "",
+    "voucher_ref": "",
+    "recipient_name": "Recipient",
+    "recipient_email": "353@gmail.com",
+    "recipient_phone": "111",
+    "recipient_gift_date": "2025-11-27",
+    "purchaser_name": "test test",
+    "purchaser_email": "test@gmail.com",
+    "purchaser_phone": "353",
+    "purchaser_mobile": "353",
+    "numberOfPassengers": 1,
+    "preferred_location": "",
+    "experience_type": "Shared Flight",
+    "passengerData": [
+      {
+        "firstName": "test",
+        "lastName": "test",
+        "weight": "",
+        "phone": "353",
+        "email": "test@gmail.com",
+        "weatherRefund": false
+      }
+    ],
+    "preferred_time": "",
+    "preferred_day": "",
+    "additionalInfo": {
+      "notes": ""
+    },
+    "add_to_booking_items": [
+      {
+        "name": "Postal Voucher ",
+        "price": "5.00"
+      }
+    ],
+    "additional_information_json": {
+      "notes": ""
+    }
+  }
+}
+
+2025-11-16T13:46:00.228Z - Inserting voucher with data:
+{
+  "additionalInfo": {
+    "notes": ""
+  },
+  "additional_information_json": {
+    "notes": ""
+  },
+  "finalAdditionalInfoJson": {
+    "notes": ""
+  },
+  "add_to_booking_items": [
+    {
+      "name": "Postal Voucher ",
+      "price": "5.00"
+    }
+  ]
+}
+
+2025-11-16T13:46:04.475Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:46:34.786Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:47:20.904Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:54:11.384Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:55:13.834Z - SESSION STORE SAVE
+{
+  "session_id": "cs_test_a1sTQTXPN0JwNz2b8w28g5PcfhY9Xb7YRtTpozJ3oDGCCSF2PWH02r27Bu",
+  "type": "voucher",
+  "voucherData": {
+    "name": "Purchaser Purchaser",
+    "weight": "",
+    "flight_type": "Shared Flight",
+    "voucher_type": "Gift Voucher",
+    "voucher_type_detail": "Any Day Flight",
+    "email": "test@gmail.com",
+    "phone": "5454",
+    "mobile": "5454",
+    "redeemed": "No",
+    "paid": 225,
+    "offer_code": "",
+    "voucher_ref": "",
+    "recipient_name": "Recipient",
+    "recipient_email": "test353@gmail.com",
+    "recipient_phone": "345353",
+    "recipient_gift_date": "2025-11-27",
+    "purchaser_name": "Purchaser Purchaser",
+    "purchaser_email": "test@gmail.com",
+    "purchaser_phone": "5454",
+    "purchaser_mobile": "5454",
+    "numberOfPassengers": 1,
+    "preferred_location": "",
+    "experience_type": "Shared Flight",
+    "passengerData": [
+      {
+        "firstName": "Purchaser",
+        "lastName": "Purchaser",
+        "weight": "",
+        "phone": "5454",
+        "email": "test@gmail.com",
+        "weatherRefund": false
+      }
+    ],
+    "preferred_time": "",
+    "preferred_day": "",
+    "additionalInfo": {
+      "notes": ""
+    },
+    "add_to_booking_items": [
+      {
+        "name": "Postal Voucher ",
+        "price": "5.00"
+      }
+    ],
+    "additional_information_json": {
+      "notes": ""
+    }
+  }
+}
+
+2025-11-16T13:55:31.026Z - Inserting voucher with data:
+{
+  "additionalInfo": {
+    "notes": ""
+  },
+  "additional_information_json": {
+    "notes": ""
+  },
+  "finalAdditionalInfoJson": {
+    "notes": ""
+  },
+  "add_to_booking_items": [
+    {
+      "name": "Postal Voucher ",
+      "price": "5.00"
+    }
+  ]
+}
+
+2025-11-16T13:55:33.130Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:55:54.634Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T13:59:35.080Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T14:10:55.759Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T14:19:33.752Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T14:25:52.787Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T14:32:50.397Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T14:42:16.200Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T14:43:37.484Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T14:48:29.912Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T14:52:12.065Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T14:56:08.763Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T14:56:50.920Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T15:01:03.177Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T15:01:26.232Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T15:03:43.721Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T15:08:35.040Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T15:09:55.471Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T15:24:41.471Z - SESSION STORE SAVE
+{
+  "session_id": "cs_test_a1J4ZPKmBmNA6zVg7fGxr7YF3nuyTo5YffwEhkJcYKUc43etz2K3rzBMrW",
+  "type": "voucher",
+  "voucherData": {
+    "name": "Purchaser Purchaser",
+    "weight": "",
+    "flight_type": "Shared Flight",
+    "voucher_type": "Gift Voucher",
+    "voucher_type_detail": "Any Day Flight",
+    "email": "test@gmail.com",
+    "phone": "353",
+    "mobile": "353",
+    "redeemed": "No",
+    "paid": 225,
+    "offer_code": "",
+    "voucher_ref": "",
+    "recipient_name": "Recipient",
+    "recipient_email": "test353@gmail.com",
+    "recipient_phone": "353",
+    "recipient_gift_date": "2025-11-19",
+    "purchaser_name": "Purchaser Purchaser",
+    "purchaser_email": "test@gmail.com",
+    "purchaser_phone": "353",
+    "purchaser_mobile": "353",
+    "numberOfPassengers": 1,
+    "preferred_location": "",
+    "experience_type": "Shared Flight",
+    "passengerData": [
+      {
+        "firstName": "Purchaser",
+        "lastName": "Purchaser",
+        "weight": "",
+        "phone": "353",
+        "email": "test@gmail.com",
+        "weatherRefund": false
+      }
+    ],
+    "preferred_time": "",
+    "preferred_day": "",
+    "additionalInfo": {
+      "notes": ""
+    },
+    "add_to_booking_items": [
+      {
+        "name": "Postal Voucher ",
+        "price": "5.00"
+      }
+    ],
+    "additional_information_json": {
+      "notes": ""
+    }
+  }
+}
+
+2025-11-16T15:24:58.160Z - Inserting voucher with data:
+{
+  "additionalInfo": {
+    "notes": ""
+  },
+  "additional_information_json": {
+    "notes": ""
+  },
+  "finalAdditionalInfoJson": {
+    "notes": ""
+  },
+  "add_to_booking_items": [
+    {
+      "name": "Postal Voucher ",
+      "price": "5.00"
+    }
+  ]
+}
+
+2025-11-16T15:24:59.966Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T15:25:18.211Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T15:48:01.815Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T15:49:36.769Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T15:53:35.801Z - SESSION STORE SAVE
+{
+  "session_id": "cs_test_a180QgD24ca0ucBB0KrHA5PIFglicuAPlg4hCly1FesLnKKc0Y7q6LOljf",
+  "type": "voucher",
+  "voucherData": {
+    "name": "şeögş tete",
+    "weight": "",
+    "flight_type": "Private Charter",
+    "voucher_type": "Gift Voucher",
+    "voucher_type_detail": "Private Charter Flights",
+    "email": "test@gmail.com",
+    "phone": "353",
+    "mobile": "353",
+    "redeemed": "No",
+    "paid": 905,
+    "offer_code": "",
+    "voucher_ref": "",
+    "recipient_name": "testRe",
+    "recipient_email": "test353@gmail.com",
+    "recipient_phone": "353",
+    "recipient_gift_date": "2025-11-19",
+    "purchaser_name": "şeögş tete",
+    "purchaser_email": "test@gmail.com",
+    "purchaser_phone": "353",
+    "purchaser_mobile": "353",
+    "numberOfPassengers": 2,
+    "preferred_location": "",
+    "experience_type": "Private Charter",
+    "passengerData": [
+      {
+        "firstName": "şeögş",
+        "lastName": "tete",
+        "weight": "",
+        "phone": "353",
+        "email": "test@gmail.com",
+        "weatherRefund": false
+      }
+    ],
+    "preferred_time": "",
+    "preferred_day": "",
+    "additionalInfo": {
+      "notes": ""
+    },
+    "add_to_booking_items": [
+      {
+        "name": "Postal Voucher ",
+        "price": "5.00"
+      }
+    ],
+    "additional_information_json": {
+      "notes": ""
+    }
+  }
+}
+
+2025-11-16T15:53:54.139Z - Inserting voucher with data:
+{
+  "additionalInfo": {
+    "notes": ""
+  },
+  "additional_information_json": {
+    "notes": ""
+  },
+  "finalAdditionalInfoJson": {
+    "notes": ""
+  },
+  "add_to_booking_items": [
+    {
+      "name": "Postal Voucher ",
+      "price": "5.00"
+    }
+  ]
+}
+
+2025-11-16T15:53:57.841Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T15:53:57.853Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T15:56:37.678Z - SESSION STORE SAVE
+{
+  "session_id": "cs_test_a1iFsRUkUPpVVRMa2Yd1NthKBRIbhZng7iMSPoOBUVqPZjjqcy07uQcBFc",
+  "type": "voucher",
+  "voucherData": {
+    "name": "Flight Flight",
+    "weight": "353",
+    "flight_type": "Private Charter",
+    "voucher_type": "Flight Voucher",
+    "voucher_type_detail": "Private Charter Flights",
+    "email": "test@gmail.com",
+    "phone": "353",
+    "mobile": "353",
+    "redeemed": "No",
+    "paid": 900,
+    "offer_code": "",
+    "voucher_ref": "",
+    "recipient_name": "",
+    "recipient_email": "",
+    "recipient_phone": "",
+    "recipient_gift_date": "",
+    "purchaser_name": "",
+    "purchaser_email": "",
+    "purchaser_phone": "",
+    "purchaser_mobile": "",
+    "numberOfPassengers": 2,
+    "preferred_location": "",
+    "experience_type": "Private Charter",
+    "passengerData": [
+      {
+        "firstName": "Flight",
+        "lastName": "Flight",
+        "weight": "353",
+        "phone": "353",
+        "email": "test@gmail.com",
+        "weatherRefund": false
+      },
+      {
+        "firstName": "Flight 2 ",
+        "lastName": "Flight 2 ",
+        "weight": "53",
+        "phone": "",
+        "email": "",
+        "weatherRefund": false
+      }
+    ],
+    "preferred_time": "",
+    "preferred_day": "",
+    "additionalInfo": {
+      "notes": "",
+      "__requiredKeys": [
+        "question_16",
+        "question_14",
+        "question_13"
+      ],
+      "question_16": "We'll bring our own",
+      "question_14": "No",
+      "question_13": "Visit Bristol/Bath"
+    },
+    "add_to_booking_items": null,
+    "additional_information_json": {
+      "notes": "",
+      "__requiredKeys": [
+        "question_16",
+        "question_14",
+        "question_13"
+      ],
+      "question_16": "We'll bring our own",
+      "question_14": "No",
+      "question_13": "Visit Bristol/Bath"
+    }
+  }
+}
+
+2025-11-16T15:56:53.963Z - Inserting voucher with data:
+{
+  "additionalInfo": {
+    "notes": "",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ],
+    "question_16": "We'll bring our own",
+    "question_14": "No",
+    "question_13": "Visit Bristol/Bath"
+  },
+  "additional_information_json": {
+    "notes": "",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ],
+    "question_16": "We'll bring our own",
+    "question_14": "No",
+    "question_13": "Visit Bristol/Bath"
+  },
+  "finalAdditionalInfoJson": {
+    "notes": "",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ],
+    "question_16": "We'll bring our own",
+    "question_14": "No",
+    "question_13": "Visit Bristol/Bath"
+  },
+  "add_to_booking_items": null
+}
+
+2025-11-16T15:56:57.147Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T15:56:57.148Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T15:56:57.154Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T15:57:21.810Z - SESSION STORE SAVE
+{
+  "session_id": "cs_test_a117XEExRI1bP0BJM3NMsyAEQaJNFTgvbvGMpKYmSxq4sh1wzm3CuZP9Ga",
+  "type": "voucher",
+  "voucherData": {
+    "name": "te te",
+    "weight": "et",
+    "flight_type": "Shared Flight",
+    "voucher_type": "Flight Voucher",
+    "voucher_type_detail": "Any Day Flight",
+    "email": "test353@gmail.com",
+    "phone": "35",
+    "mobile": "35",
+    "redeemed": "No",
+    "paid": 220,
+    "offer_code": "",
+    "voucher_ref": "",
+    "recipient_name": "",
+    "recipient_email": "",
+    "recipient_phone": "",
+    "recipient_gift_date": "",
+    "purchaser_name": "",
+    "purchaser_email": "",
+    "purchaser_phone": "",
+    "purchaser_mobile": "",
+    "numberOfPassengers": 1,
+    "preferred_location": "",
+    "experience_type": "Shared Flight",
+    "passengerData": [
+      {
+        "firstName": "te",
+        "lastName": "te",
+        "weight": "et",
+        "phone": "35",
+        "email": "test353@gmail.com",
+        "weatherRefund": false
+      }
+    ],
+    "preferred_time": "",
+    "preferred_day": "",
+    "additionalInfo": {
+      "notes": "",
+      "__requiredKeys": [
+        "question_14",
+        "question_13"
+      ],
+      "question_14": "No",
+      "question_13": "The Bath Gin Company"
+    },
+    "add_to_booking_items": null,
+    "additional_information_json": {
+      "notes": "",
+      "__requiredKeys": [
+        "question_14",
+        "question_13"
+      ],
+      "question_14": "No",
+      "question_13": "The Bath Gin Company"
+    }
+  }
+}
+
+2025-11-16T15:57:37.531Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T15:57:37.535Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T15:57:37.537Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T15:57:39.118Z - Inserting voucher with data:
+{
+  "additionalInfo": {
+    "notes": "",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ],
+    "question_14": "No",
+    "question_13": "The Bath Gin Company"
+  },
+  "additional_information_json": {
+    "notes": "",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ],
+    "question_14": "No",
+    "question_13": "The Bath Gin Company"
+  },
+  "finalAdditionalInfoJson": {
+    "notes": "",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ],
+    "question_14": "No",
+    "question_13": "The Bath Gin Company"
+  },
+  "add_to_booking_items": null
+}
+
+2025-11-16T15:57:40.436Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T15:57:40.438Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T15:57:40.438Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T15:57:40.448Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:02:37.831Z - SESSION STORE SAVE
+{
+  "session_id": "cs_test_a1CldleMXp2Duoy0As0krbG8qpB47kVH8SaWFbU1WIX1INh2PM12EOejrz",
+  "type": "booking",
+  "voucherData": null
+}
+
+2025-11-16T16:02:55.014Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:02:55.019Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:02:55.021Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:02:55.022Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:03:06.384Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:03:06.389Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:03:06.395Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:03:06.396Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:04:33.841Z - SESSION STORE SAVE
+{
+  "session_id": "cs_test_a1Jeuoob6gsP4n0Pr8nBHrcfj2Darc9x777aoAlBz4oCGJb2smUVeHOfUq",
+  "type": "booking",
+  "voucherData": null
+}
+
+2025-11-16T16:04:50.088Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:04:50.090Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:04:50.091Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:04:50.093Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:05:01.291Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:05:01.292Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:05:01.294Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:05:01.296Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:05:42.248Z - SESSION STORE SAVE
+{
+  "session_id": "cs_test_a1I6KTjVC8J8Levj8UExkQvOKyIKqeY32tozGrkmDFU3PW3WOGOl46xiNY",
+  "type": "booking",
+  "voucherData": null
+}
+
+2025-11-16T16:06:01.390Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:06:01.392Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:06:01.392Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:06:01.393Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:06:22.910Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:06:22.919Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:06:22.925Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:06:22.930Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:11:11.311Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:11:11.312Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:11:11.314Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:11:11.321Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:11:58.567Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:11:58.569Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:11:58.570Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:11:58.587Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:13:40.599Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:13:40.607Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:13:40.613Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:13:40.614Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:14:49.899Z - SESSION STORE SAVE
+{
+  "session_id": "cs_test_a1DkJp3BejLj9q4J0fO5Yn7caf6cT2choTVBdyqgWPLYd5ldQTYiuwq0fk",
+  "type": "booking",
+  "voucherData": null
+}
+
+2025-11-16T16:14:50.672Z - SESSION STORE SAVE
+{
+  "session_id": "cs_test_a1fun34rRzsVLawS0NDW99GApRuhJGSK0tNIDhy9qTj4u9QXUXeYsrxndx",
+  "type": "booking",
+  "voucherData": null
+}
+
+2025-11-16T16:15:53.474Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:15:53.475Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:15:53.478Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:15:53.479Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:16:01.476Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:16:01.477Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:16:01.477Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:16:01.478Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:17:39.778Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:17:39.779Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:17:39.781Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:17:39.782Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:18:34.161Z - SESSION STORE SAVE
+{
+  "session_id": "cs_test_a1dBbO1xKSMphEJ2TAw0A5Nr9OMvDcaFdKxkG8c5zrs1vXdG802AQ3u2vU",
+  "type": "booking",
+  "voucherData": null
+}
+
+2025-11-16T16:19:29.070Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:19:29.072Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:19:29.075Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:19:29.076Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:19:46.969Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:19:46.970Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:19:46.972Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:19:46.973Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:23:02.553Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:23:02.598Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:23:02.600Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:23:02.602Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:23:17.382Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:23:17.387Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:23:17.389Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:23:17.390Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:24:32.583Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:24:32.585Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:24:32.586Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:24:32.588Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:26:31.963Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:26:31.968Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:26:31.975Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:26:31.984Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:26:47.769Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:26:47.771Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:26:47.772Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:26:47.773Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:28:42.378Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:28:42.381Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:28:42.382Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:28:42.382Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:29:02.068Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:29:02.071Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:29:02.072Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:29:02.076Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:31:55.172Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:31:55.179Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:31:55.181Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:31:55.183Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:33:20.532Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T16:33:20.534Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:33:20.538Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T16:33:20.540Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T17:05:22.771Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T17:05:31.075Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T17:05:47.645Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T17:05:47.647Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T17:05:47.730Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T17:05:47.731Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T17:06:18.008Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T17:06:18.011Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T17:06:18.090Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T17:06:18.091Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T17:07:04.750Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T17:07:04.754Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T17:07:05.072Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T17:07:05.075Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T17:11:12.972Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T17:11:12.974Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T17:11:12.983Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T17:11:12.986Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T17:11:21.105Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T17:11:21.107Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T17:11:21.119Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T17:11:21.122Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T17:36:47.965Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T17:36:47.968Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T17:36:47.971Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T17:36:47.973Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T17:38:53.522Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T17:38:53.526Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T17:38:53.528Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T17:38:53.537Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T17:39:17.989Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T17:39:17.993Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T17:39:17.994Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T17:39:17.997Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T17:40:35.903Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T17:40:35.907Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T17:40:35.908Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T17:40:35.915Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T17:41:01.872Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T17:41:01.874Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T17:41:01.880Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T17:41:01.882Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T18:16:30.036Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T18:16:30.064Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T18:16:30.067Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T18:16:30.068Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T18:18:10.874Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T18:18:10.876Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T18:18:10.885Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T18:18:10.888Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T18:34:17.982Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T18:34:17.988Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T18:34:17.990Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T18:34:17.991Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T18:56:12.925Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T18:56:12.931Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T18:56:12.932Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T18:56:12.933Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T19:15:53.799Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T19:15:53.808Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T19:15:53.810Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T19:15:53.811Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T19:28:18.630Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T19:28:18.633Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T19:28:18.638Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T19:28:18.639Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T19:32:20.883Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T19:32:20.885Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T19:32:20.885Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T19:32:20.897Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T19:33:02.651Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T19:33:02.653Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T19:33:02.657Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T19:33:02.660Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T19:40:33.719Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T19:40:33.727Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T19:40:33.731Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T19:40:33.732Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T19:45:48.229Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T19:45:48.236Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T19:45:48.240Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T19:45:48.241Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T19:49:43.936Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T19:49:43.939Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T19:49:43.939Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T19:49:43.941Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T19:53:59.995Z - SESSION STORE SAVE
+{
+  "session_id": "cs_test_a18PERP73EAHXfVE8tk1iGZjKFgTa4Ve0yfvYKXHga5XwzfYQbGqV4rpWF",
+  "type": "booking",
+  "voucherData": null
+}
+
+2025-11-16T19:54:22.811Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T19:54:22.814Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T19:54:22.817Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T19:54:22.818Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T20:01:37.283Z - SESSION STORE SAVE
+{
+  "session_id": "cs_test_a1Hj2tQGgTMBNf3dWBP1L1wXjx33agK6lHslXCAnolejGefkunQrRaL6UD",
+  "type": "booking",
+  "voucherData": null
+}
+
+2025-11-16T20:10:43.585Z - SESSION STORE SAVE
+{
+  "session_id": "cs_test_a1i0c1Cl3G3mmypwcJGIn4MijFic6Uc3ddbbRI5Ju5a2lirJj7Us7t0PBi",
+  "type": "booking",
+  "voucherData": null
+}
+
+2025-11-16T20:23:13.807Z - SESSION STORE SAVE
+{
+  "session_id": "cs_test_a1UKC5wxyEcIuST4ObZa0ekA6I867LUp6XRKplaEcJCPxlM5GPqvCnxBd6",
+  "type": "booking",
+  "voucherData": null
+}
+
+2025-11-16T20:30:31.957Z - SESSION STORE SAVE
+{
+  "session_id": "cs_test_a1hGcPtwLTdc5tIxNp4Skk71SEdQ6qUL1jbEFQLqOuAshHtWFbtQAzlBS7",
+  "type": "booking",
+  "voucherData": null
+}
+
+2025-11-16T22:01:09.284Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T22:01:09.292Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T22:01:09.296Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T22:01:09.297Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T22:01:10.498Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T22:01:10.501Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T22:01:10.505Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T22:01:10.507Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T22:01:13.931Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "The Bath Gin Company",
+    "question_14": "No",
+    "__requiredKeys": [
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "__requiredKeys"
+  ]
+}
+
+2025-11-16T22:01:13.936Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T22:01:13.938Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": ""
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes"
+  ]
+}
+
+2025-11-16T22:01:13.940Z - Final additionalInfoData before processing answers:
+{
+  "additionalInfoData": {
+    "notes": "",
+    "question_13": "Visit Bristol/Bath",
+    "question_14": "No",
+    "question_16": "We'll bring our own",
+    "__requiredKeys": [
+      "question_16",
+      "question_14",
+      "question_13"
+    ]
+  },
+  "hasData": true,
+  "dataType": "object",
+  "keys": [
+    "notes",
+    "question_13",
+    "question_14",
+    "question_16",
+    "__requiredKeys"
+  ]
+}
+
