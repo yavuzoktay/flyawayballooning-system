@@ -24,11 +24,26 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
     const [selectedFlightTypes, setSelectedFlightTypes] = useState([]);
     const [selectedVoucherTypes, setSelectedVoucherTypes] = useState([]);
 
+    // Locations checkbox listesi için state (Gift Voucher ve Flight Voucher için)
+    const [availableLocations, setAvailableLocations] = useState([]);
+    const [selectedLocations, setSelectedLocations] = useState([]);
+    const [giftVoucherActivities, setGiftVoucherActivities] = useState([]); // Activities from /api/activities for Gift Voucher
+    const [flightVoucherActivities, setFlightVoucherActivities] = useState([]); // Activities from /api/activities for Flight Voucher
+    const [flightVoucherSelectedLocations, setFlightVoucherSelectedLocations] = useState([]); // Selected locations for Flight Voucher
+    
+    // Gift Voucher için availabilities state
+    const [giftVoucherAvailabilities, setGiftVoucherAvailabilities] = useState([]);
+    const [giftVoucherFilteredAvailabilities, setGiftVoucherFilteredAvailabilities] = useState([]);
+    const [giftVoucherLoading, setGiftVoucherLoading] = useState(false);
+
     // Purchaser Information state for Gift Vouchers
     const [purchaserFirstName, setPurchaserFirstName] = useState('');
     const [purchaserLastName, setPurchaserLastName] = useState('');
     const [purchaserMobile, setPurchaserMobile] = useState('');
     const [purchaserEmail, setPurchaserEmail] = useState('');
+    
+    // Passenger Information state for Gift Voucher Redeem
+    const [passengerData, setPassengerData] = useState([]);
 
     const isFlightVoucherDetails = useMemo(() => {
         const bookFlight = (bookingDetail?.voucher?.book_flight || '').toLowerCase();
@@ -39,6 +54,12 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
     const isGiftVoucherDetails = useMemo(() => {
         const bookFlight = (bookingDetail?.voucher?.book_flight || '').toLowerCase();
         return Boolean(bookingDetail?.voucher) && bookFlight.includes('gift');
+    }, [bookingDetail]);
+    
+    // Get numberOfVouchers from bookingDetail
+    const numberOfVouchers = useMemo(() => {
+        const v = bookingDetail?.voucher || {};
+        return v.numberOfVouchers || v.numberOfPassengers || 1;
     }, [bookingDetail]);
 
     // availableDates state'i
@@ -52,6 +73,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
     useEffect(() => {
         if (open) {
             setLoadingActivities(true);
+            // Load activities for rebook (existing functionality)
             axios.get('/api/activitiesForRebook')
                 .then(res => {
                     if (res.data.success) {
@@ -60,7 +82,47 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                         setLocations(uniqueLocations.map(loc => ({ location: loc })));
                     }
                 })
-                .catch(err => console.error('Error loading activities:', err))
+                .catch(err => {
+                    console.error('Error loading activities:', err);
+                    // If activitiesForRebook fails, try to use activities endpoint as fallback
+                    if (isGiftVoucherDetails) {
+                        // For Gift Voucher, we'll use /api/activities which is loaded below
+                        console.log('Using /api/activities as fallback for activitiesForRebook');
+                    }
+                });
+            
+            // Load activities for Locations checkbox list (Gift Voucher ve Flight Voucher için)
+            axios.get('/api/activities')
+                .then(res => {
+                    // Handle both response formats: { success: true, data: [...] } or direct array
+                    const activitiesData = res.data?.data || (Array.isArray(res.data) ? res.data : []);
+                    if (Array.isArray(activitiesData) && activitiesData.length > 0) {
+                        // Store activities for Gift Voucher
+                        setGiftVoucherActivities(activitiesData);
+                        // Store activities for Flight Voucher
+                        setFlightVoucherActivities(activitiesData);
+                        // Extract unique locations from activities with status 'Live'
+                        const uniqueLocations = [...new Set(activitiesData
+                            .filter(a => a.location && a.status === 'Live')
+                            .map(a => a.location)
+                        )];
+                        setAvailableLocations(uniqueLocations);
+                        
+                        // If activitiesForRebook failed, use this data as fallback
+                        if ((isGiftVoucherDetails || isFlightVoucherDetails) && activities.length === 0) {
+                            setActivities(activitiesData);
+                            const uniqueLocationsForRebook = [...new Set(activitiesData.map(a => a.location))];
+                            setLocations(uniqueLocationsForRebook.map(loc => ({ location: loc })));
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error('Error loading activities for locations:', err);
+                    // If both endpoints fail, show error but don't block the modal
+                    if (isGiftVoucherDetails || isFlightVoucherDetails) {
+                        console.warn('Could not load activities. Please ensure backend server is running.');
+                    }
+                })
                 .finally(() => setLoadingActivities(false));
         } else {
             setAvailabilities([]);
@@ -71,12 +133,118 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
             setSelectedLocation('');
             setSelectedFlightTypes([]);
             setSelectedVoucherTypes([]);
+            setSelectedLocations([]);
+            setGiftVoucherActivities([]);
+            setGiftVoucherAvailabilities([]);
+            setGiftVoucherFilteredAvailabilities([]);
             setPurchaserFirstName('');
             setPurchaserLastName('');
             setPurchaserMobile('');
             setPurchaserEmail('');
+            setPassengerData([]);
         }
     }, [open, location, bookingDetail]);
+    
+    // Initialize passenger data based on numberOfVouchers when modal opens
+    useEffect(() => {
+        if (open && isGiftVoucherDetails && numberOfVouchers > 0) {
+            // Initialize passenger data array with empty objects
+            const initialPassengerData = Array.from({ length: numberOfVouchers }, (_, index) => ({
+                firstName: '',
+                lastName: '',
+                weight: '',
+                mobile: '',
+                email: ''
+            }));
+            setPassengerData(initialPassengerData);
+            console.log('Initialized passenger data for', numberOfVouchers, 'vouchers');
+        }
+    }, [open, isGiftVoucherDetails, numberOfVouchers]);
+    
+    // Gift Voucher: Fetch availabilities when location is selected
+    useEffect(() => {
+        if (isGiftVoucherDetails && selectedLocations.length > 0 && giftVoucherActivities.length > 0) {
+            setGiftVoucherLoading(true);
+            setGiftVoucherAvailabilities([]);
+            setGiftVoucherFilteredAvailabilities([]);
+            setSelectedDate(null);
+            setSelectedTime(null);
+            
+            // Get the first selected location (or combine all selected locations)
+            const firstSelectedLocation = selectedLocations[0];
+            
+            // Find activity for the selected location from giftVoucherActivities
+            const activityForLocation = giftVoucherActivities.find(a => a.location === firstSelectedLocation);
+            
+            if (activityForLocation) {
+                console.log('Fetching availabilities for Gift Voucher location:', firstSelectedLocation, 'activity ID:', activityForLocation.id);
+                axios.get(`/api/activity/${activityForLocation.id}/availabilities`)
+                    .then(res => {
+                        if (res.data.success) {
+                            const data = Array.isArray(res.data.data) ? res.data.data : [];
+                            console.log('Gift Voucher availabilities loaded:', data.length, 'slots');
+                            console.log('Sample availability data:', data.length > 0 ? {
+                                date: data[0].date,
+                                time: data[0].time,
+                                available: data[0].available,
+                                capacity: data[0].capacity,
+                                status: data[0].status
+                            } : 'No data');
+                            // Filter only open/available slots
+                            const filteredData = data.filter(slot => {
+                                const status = slot.status || slot.calculated_status || '';
+                                const available = Number(slot.available) || Number(slot.calculated_available) || 0;
+                                return (status.toLowerCase() === 'open' || available > 0);
+                            });
+                            console.log('Filtered availabilities (Open status or available > 0):', filteredData.length);
+                            setGiftVoucherAvailabilities(filteredData);
+                            setGiftVoucherFilteredAvailabilities(filteredData);
+                        } else {
+                            console.warn('Gift Voucher availabilities response not successful:', res.data);
+                            setGiftVoucherAvailabilities([]);
+                            setGiftVoucherFilteredAvailabilities([]);
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Error loading availabilities for Gift Voucher:', err);
+                        // Show user-friendly error message
+                        if (err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
+                            console.warn('Network error: Backend server may not be running. Please check server status.');
+                        }
+                        setGiftVoucherAvailabilities([]);
+                        setGiftVoucherFilteredAvailabilities([]);
+                    })
+                    .finally(() => setGiftVoucherLoading(false));
+            } else {
+                console.warn('Activity not found for location:', firstSelectedLocation);
+                setGiftVoucherLoading(false);
+            }
+        } else if (isGiftVoucherDetails && selectedLocations.length === 0) {
+            // Reset when no locations selected
+            setGiftVoucherAvailabilities([]);
+            setGiftVoucherFilteredAvailabilities([]);
+            setSelectedDate(null);
+            setSelectedTime(null);
+        }
+    }, [selectedLocations, giftVoucherActivities, isGiftVoucherDetails]);
+
+    // Flight Voucher: Location seçildiğinde activity'yi otomatik ayarla
+    useEffect(() => {
+        if (isFlightVoucherDetails && flightVoucherSelectedLocations.length > 0 && flightVoucherActivities.length > 0) {
+            const firstSelectedLocation = flightVoucherSelectedLocations[0];
+            const activityForLocation = flightVoucherActivities.find(a => a.location === firstSelectedLocation && a.status === 'Live');
+            if (activityForLocation) {
+                setSelectedLocation(firstSelectedLocation);
+                setSelectedActivity(activityForLocation.activity_name);
+                setActivityId(activityForLocation.id);
+            }
+        } else if (isFlightVoucherDetails && flightVoucherSelectedLocations.length === 0) {
+            // Reset when no locations selected
+            setSelectedDate(null);
+            setSelectedTime(null);
+            setActivityId(null);
+        }
+    }, [flightVoucherSelectedLocations, flightVoucherActivities, isFlightVoucherDetails]);
 
     // Set default values after activities are loaded
     useEffect(() => {
@@ -293,9 +461,27 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         }
     }, [selectedVoucherTypes, onVoucherTypesChange]);
 
-    const getTimesForDate = (date) => {
+    const getTimesForDate = (date, useGiftVoucher = false) => {
+        if (!date) return [];
         const dateStr = dayjs(date).format('YYYY-MM-DD');
-        const times = filteredAvailabilities.filter(a => a.date === dateStr);
+        const availabilitiesToUse = useGiftVoucher ? giftVoucherFilteredAvailabilities : filteredAvailabilities;
+        console.log('getTimesForDate called:', {
+            date,
+            dateStr,
+            useGiftVoucher,
+            availabilitiesCount: availabilitiesToUse.length,
+            matchingSlots: availabilitiesToUse.filter(a => {
+                const slotDate = a.date ? (a.date.includes('T') ? a.date.split('T')[0] : a.date) : '';
+                return slotDate === dateStr;
+            }).length
+        });
+        // Handle both date formats: "2025-11-14" or "2025-11-14T00:00:00.000Z"
+        const times = availabilitiesToUse.filter(a => {
+            if (!a.date) return false;
+            const slotDate = a.date.includes('T') ? a.date.split('T')[0] : a.date;
+            return slotDate === dateStr;
+        });
+        console.log('Filtered times for date:', dateStr, 'count:', times.length, 'times:', times.map(t => ({ time: t.time, date: t.date })));
         return times;
     };
 
@@ -305,7 +491,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
     const endOfMonth = currentMonth.endOf('month');
     const startDay = startOfMonth.day(); // 0-6 (Sun-Sat)
 
-    const buildDayCells = () => {
+    const buildDayCells = (useGiftVoucher = false) => {
         const cells = [];
         // Create a 6-week grid (42 cells)
         // Calendar headers: Mon, Tue, Wed, Thu, Fri, Sat, Sun
@@ -331,13 +517,18 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         
         const firstCellDate = startOfMonth.subtract(daysBack, 'day');
         
+        // Use appropriate availabilities based on context
+        const availabilitiesToUse = useGiftVoucher ? giftVoucherFilteredAvailabilities : filteredAvailabilities;
+        
         console.log('Calendar Debug:', {
             month: currentMonth.format('MMMM YYYY'),
             firstDayOfMonth: firstDayOfMonth,
             firstDayName: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][firstDayOfMonth],
             daysBack,
             firstCellDate: firstCellDate.format('YYYY-MM-DD (ddd)'),
-            shouldStartWith: 'Monday'
+            shouldStartWith: 'Monday',
+            useGiftVoucher,
+            availabilitiesCount: availabilitiesToUse.length
         });
         
         for (let i = 0; i < 42; i++) {
@@ -355,7 +546,13 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                 console.log('Date is selected:', d.format('YYYY-MM-DD'), 'selectedDate:', selectedDate ? dayjs(selectedDate).format('YYYY-MM-DD') : 'null');
             }
             // Aggregate availability for this date
-            const slots = filteredAvailabilities.filter(a => a.date === d.format('YYYY-MM-DD'));
+            // Handle both date formats: "2025-11-14" or "2025-11-14T00:00:00.000Z"
+            const dateStr = d.format('YYYY-MM-DD');
+            const slots = availabilitiesToUse.filter(a => {
+                if (!a.date) return false;
+                const slotDate = a.date.includes('T') ? a.date.split('T')[0] : a.date;
+                return slotDate === dateStr;
+            });
             const totalAvailable = slots.reduce((acc, s) => acc + (Number(s.available) || 0), 0);
             const soldOut = slots.length > 0 && totalAvailable <= 0;
             
@@ -474,58 +671,193 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                     <>
                         {isFlightVoucherDetails && (
                             <>
-                                {/* Flight Type Selector */}
+                                {/* Locations Checkbox List */}
                                 <Box sx={{ mb: 3 }}>
-                                    <Typography variant="h6" sx={{ mb: 2 }}>Flight Type:</Typography>
+                                    <Typography variant="h6" sx={{ mb: 2 }}>Locations:</Typography>
                                     <FormGroup row>
-                                        <FormControlLabel control={<Checkbox checked={selectedFlightTypes.includes('private')} onChange={(e) => { if (e.target.checked) setSelectedFlightTypes(prev => [...prev, 'private']); else setSelectedFlightTypes(prev => prev.filter(t => t !== 'private')); }} />} label="Private" />
-                                        <FormControlLabel control={<Checkbox checked={selectedFlightTypes.includes('shared')} onChange={(e) => { if (e.target.checked) setSelectedFlightTypes(prev => [...prev, 'shared']); else setSelectedFlightTypes(prev => prev.filter(t => t !== 'shared')); }} />} label="Shared" />
-                                    </FormGroup>
-                                </Box>
-                                {/* Voucher Type Selector */}
-                                <Box sx={{ mb: 3 }}>
-                                    <Typography variant="h6" sx={{ mb: 2 }}>Voucher Type:</Typography>
-                                    <FormGroup row>
-                                        <FormControlLabel control={<Checkbox checked={selectedVoucherTypes.includes('weekday morning')} onChange={(e) => { if (e.target.checked) setSelectedVoucherTypes(prev => [...prev, 'weekday morning']); else setSelectedVoucherTypes(prev => prev.filter(t => t !== 'weekday morning')); }} />} label="Weekday Morning" />
-                                        <FormControlLabel control={<Checkbox checked={selectedVoucherTypes.includes('flexible weekday')} onChange={(e) => { if (e.target.checked) setSelectedVoucherTypes(prev => [...prev, 'flexible weekday']); else setSelectedVoucherTypes(prev => prev.filter(t => t !== 'flexible weekday')); }} />} label="Flexible Weekday" />
-                                        <FormControlLabel control={<Checkbox checked={selectedVoucherTypes.includes('any day flight')} onChange={(e) => { if (e.target.checked) setSelectedVoucherTypes(prev => [...prev, 'any day flight']); else setSelectedVoucherTypes(prev => prev.filter(t => t !== 'any day flight')); }} />} label="Any Day Flight" />
+                                        {availableLocations.map((loc) => (
+                                            <FormControlLabel
+                                                key={loc}
+                                                control={
+                                                    <Checkbox
+                                                        checked={flightVoucherSelectedLocations.includes(loc)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setFlightVoucherSelectedLocations(prev => [...prev, loc]);
+                                                            } else {
+                                                                setFlightVoucherSelectedLocations(prev => prev.filter(l => l !== loc));
+                                                            }
+                                                        }}
+                                                    />
+                                                }
+                                                label={loc}
+                                            />
+                                        ))}
                                     </FormGroup>
                                 </Box>
                             </>
                         )}
 
-                        {/* Gift Voucher: Purchaser Information */}
+                        {/* Gift Voucher: Locations Checkbox List and Calendar */}
                         {isGiftVoucherDetails && (
                             <>
-                                {/* Flight Type Selector */}
+                                {/* Locations Checkbox List */}
                                 <Box sx={{ mb: 3 }}>
-                                    <Typography variant="h6" sx={{ mb: 2 }}>Flight Type:</Typography>
+                                    <Typography variant="h6" sx={{ mb: 2 }}>Locations:</Typography>
                                     <FormGroup row>
-                                        <FormControlLabel control={<Checkbox checked={selectedFlightTypes.includes('private')} onChange={(e) => { if (e.target.checked) setSelectedFlightTypes(prev => [...prev, 'private']); else setSelectedFlightTypes(prev => prev.filter(t => t !== 'private')); }} />} label="Private" />
-                                        <FormControlLabel control={<Checkbox checked={selectedFlightTypes.includes('shared')} onChange={(e) => { if (e.target.checked) setSelectedFlightTypes(prev => [...prev, 'shared']); else setSelectedFlightTypes(prev => prev.filter(t => t !== 'shared')); }} />} label="Shared" />
+                                        {availableLocations.map((loc) => (
+                                            <FormControlLabel
+                                                key={loc}
+                                                control={
+                                                    <Checkbox
+                                                        checked={selectedLocations.includes(loc)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setSelectedLocations(prev => [...prev, loc]);
+                                                            } else {
+                                                                setSelectedLocations(prev => prev.filter(l => l !== loc));
+                                                            }
+                                                        }}
+                                                    />
+                                                }
+                                                label={loc}
+                                            />
+                                        ))}
                                     </FormGroup>
                                 </Box>
-                                {/* Voucher Type Selector */}
-                                <Box sx={{ mb: 3 }}>
-                                    <Typography variant="h6" sx={{ mb: 2 }}>Voucher Type:</Typography>
-                                    <FormGroup row>
-                                        <FormControlLabel control={<Checkbox checked={selectedVoucherTypes.includes('weekday morning')} onChange={(e) => { if (e.target.checked) setSelectedVoucherTypes(prev => [...prev, 'weekday morning']); else setSelectedVoucherTypes(prev => prev.filter(t => t !== 'weekday morning')); }} />} label="Weekday Morning" />
-                                        <FormControlLabel control={<Checkbox checked={selectedVoucherTypes.includes('flexible weekday')} onChange={(e) => { if (e.target.checked) setSelectedVoucherTypes(prev => [...prev, 'flexible weekday']); else setSelectedVoucherTypes(prev => prev.filter(t => t !== 'flexible weekday')); }} />} label="Flexible Weekday" />
-                                        <FormControlLabel control={<Checkbox checked={selectedVoucherTypes.includes('any day flight')} onChange={(e) => { if (e.target.checked) setSelectedVoucherTypes(prev => [...prev, 'any day flight']); else setSelectedVoucherTypes(prev => prev.filter(t => t !== 'any day flight')); }} />} label="Any Day Flight" />
-                                    </FormGroup>
+                                
+                                {/* Calendar for Gift Voucher */}
+                                {giftVoucherLoading ? (
+                                    <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                                        <CircularProgress />
+                                    </Box>
+                                ) : selectedLocations.length > 0 ? (
+                                    <>
+                                        {/* Live Availability style calendar */}
+                                        <Box sx={{ mb: 2 }} key={`calendar-gift-${selectedDate ? dayjs(selectedDate).format('YYYY-MM-DD') : 'no-date'}`}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                                                <IconButton onClick={() => setCurrentMonth(prev => prev.subtract(1, 'month'))} size="small"><ChevronLeftIcon fontSize="small" /></IconButton>
+                                                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 18 }}>{monthLabel}</Typography>
+                                                <IconButton onClick={() => setCurrentMonth(prev => prev.add(1, 'month'))} size="small"><ChevronRightIcon fontSize="small" /></IconButton>
+                                            </Box>
+                                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', mb: 1 }}>
+                                                {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(w => (
+                                                    <div key={w} style={{ textAlign: 'center', fontWeight: 700, color: '#64748b', fontSize: 12 }}>{w}</div>
+                                                ))}
+                                            </Box>
+                                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
+                                                {buildDayCells(true)}
+                                            </Box>
                                 </Box>
 
-                                {/* Purchaser Information */}
-                                <Box sx={{ mb: 3, mt: 3, p: 3, border: '1px solid #e0e0e0', borderRadius: 2, backgroundColor: '#fafafa' }}>
-                                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>Your Details — The Purchaser</Typography>
+                                        {selectedDate && (
+                                            <>
+                                                <Typography variant="h6" sx={{ mb: 2, fontSize: 18, fontWeight: 600 }}>Available Times for {dayjs(selectedDate).format('DD/MM/YYYY')}:</Typography>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+                                                    {getTimesForDate(selectedDate, true).length === 0 && (
+                                                        <Box sx={{ p: 2, textAlign: 'center', width: '100%' }}>
+                                                            <Typography color="text.secondary" sx={{ fontSize: 16, fontWeight: 500 }}>
+                                                                No available times for this date
+                                                            </Typography>
+                                                            <Typography color="text.secondary" sx={{ fontSize: 14, mt: 1 }}>
+                                                                Please select a different date or contact us for availability
+                                                            </Typography>
+                                                        </Box>
+                                                    )}
+                                                    {getTimesForDate(selectedDate, true).map(slot => {
+                                                        const isAvailable = slot.available > 0;
+                                                        // Format time: "09:00:00" -> "09:00"
+                                                        const timeDisplay = slot.time ? (slot.time.includes(':') ? slot.time.substring(0, 5) : slot.time) : '';
+                                                        const timeForComparison = slot.time ? (slot.time.includes(':') ? slot.time.substring(0, 5) : slot.time) : '';
+                                                        const isSelected = selectedTime === slot.time || selectedTime === timeForComparison;
+                                                        const slotDateTime = dayjs(`${dayjs(selectedDate).format('YYYY-MM-DD')} ${slot.time}`);
+                                                        const isPastTime = slotDateTime.isBefore(dayjs());
+                                                        const isDisabled = !isAvailable || isPastTime;
+                                                        return (
+                                                            <Button
+                                                                key={slot.id}
+                                                                variant="outlined"
+                                                                disabled={isDisabled}
+                                                                onClick={() => {
+                                                                    if (!isDisabled) {
+                                                                        // Store the full time format for consistency
+                                                                        setSelectedTime(slot.time);
+                                                                        console.log('Time selected:', slot.time, 'for date:', dayjs(selectedDate).format('YYYY-MM-DD'));
+                                                                    }
+                                                                }}
+                                                                sx={{
+                                                                    opacity: isDisabled ? 0.5 : 1,
+                                                                    backgroundColor: isDisabled 
+                                                                        ? '#f5f5f5' 
+                                                                        : isSelected 
+                                                                            ? '#56C1FF' 
+                                                                            : '#22c55e',
+                                                                    color: isDisabled 
+                                                                        ? '#999' 
+                                                                        : isSelected 
+                                                                            ? '#fff' 
+                                                                            : '#fff',
+                                                                    borderColor: isDisabled 
+                                                                        ? '#ddd' 
+                                                                        : isSelected 
+                                                                            ? '#56C1FF' 
+                                                                            : '#22c55e',
+                                                                    cursor: isDisabled ? 'not-allowed' : 'pointer',
+                                                                    fontSize: 16,
+                                                                    fontWeight: 600,
+                                                                    padding: '12px 20px',
+                                                                    minWidth: '140px',
+                                                                    height: '50px',
+                                                                    '&:hover': {
+                                                                        backgroundColor: isDisabled 
+                                                                            ? '#f5f5f5' 
+                                                                            : isSelected 
+                                                                                ? '#4AB5FF' 
+                                                                                : '#16a34a',
+                                                                        borderColor: isDisabled 
+                                                                            ? '#ddd' 
+                                                                            : isSelected 
+                                                                                ? '#4AB5FF' 
+                                                                                : '#16a34a'
+                                                                    }
+                                                                }}
+                                                            >
+                                                                {timeDisplay} ({slot.available}/{slot.capacity})
+                                                            </Button>
+                                                        );
+                                                    })}
+                                                </div>
+                                                
+                                                {/* Passenger Information Forms - Only show when date and time are selected */}
+                                                {selectedDate && selectedTime && (
+                                                    <Box sx={{ mt: 4 }}>
+                                                        <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>Passenger Information</Typography>
+                                                        {passengerData.map((passenger, index) => (
+                                                        <Box 
+                                                            key={index} 
+                                                            sx={{ 
+                                                                mb: 3, 
+                                                                p: 3, 
+                                                                border: '1px solid #e0e0e0', 
+                                                                borderRadius: 2, 
+                                                                backgroundColor: '#fafafa' 
+                                                            }}
+                                                        >
+                                                            <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                                                                Passenger {index + 1}
+                                                            </Typography>
                                     <Grid container spacing={2}>
                                         <Grid item xs={12} sm={6}>
                                             <TextField
                                                 fullWidth
                                                 label="First Name"
                                                 placeholder="First Name"
-                                                value={purchaserFirstName}
-                                                onChange={(e) => setPurchaserFirstName(e.target.value)}
+                                                                        value={passenger.firstName}
+                                                                        onChange={(e) => {
+                                                                            const updated = [...passengerData];
+                                                                            updated[index].firstName = e.target.value;
+                                                                            setPassengerData(updated);
+                                                                        }}
                                                 required
                                                 variant="outlined"
                                             />
@@ -535,10 +867,30 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                 fullWidth
                                                 label="Last Name"
                                                 placeholder="Last Name"
-                                                value={purchaserLastName}
-                                                onChange={(e) => setPurchaserLastName(e.target.value)}
+                                                                        value={passenger.lastName}
+                                                                        onChange={(e) => {
+                                                                            const updated = [...passengerData];
+                                                                            updated[index].lastName = e.target.value;
+                                                                            setPassengerData(updated);
+                                                                        }}
                                                 required
                                                 variant="outlined"
+                                            />
+                                        </Grid>
+                                                                <Grid item xs={12} sm={6}>
+                                                                    <TextField
+                                                                        fullWidth
+                                                                        label="Weight (Kg)"
+                                                                        placeholder="Max 18 Stone / 114Kg"
+                                                                        type="number"
+                                                                        value={passenger.weight}
+                                                                        onChange={(e) => {
+                                                                            const updated = [...passengerData];
+                                                                            updated[index].weight = e.target.value;
+                                                                            setPassengerData(updated);
+                                                                        }}
+                                                                        variant="outlined"
+                                                                        inputProps={{ min: 0, max: 114 }}
                                             />
                                         </Grid>
                                         <Grid item xs={12} sm={6}>
@@ -546,26 +898,47 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                 fullWidth
                                                 label="Mobile Number"
                                                 placeholder="Mobile Number"
-                                                value={purchaserMobile}
-                                                onChange={(e) => setPurchaserMobile(e.target.value)}
+                                                                        value={passenger.mobile}
+                                                                        onChange={(e) => {
+                                                                            const updated = [...passengerData];
+                                                                            updated[index].mobile = e.target.value;
+                                                                            setPassengerData(updated);
+                                                                        }}
                                                 required
                                                 variant="outlined"
                                             />
                                         </Grid>
-                                        <Grid item xs={12} sm={6}>
+                                                                <Grid item xs={12}>
                                             <TextField
                                                 fullWidth
                                                 label="Email"
                                                 placeholder="Email"
                                                 type="email"
-                                                value={purchaserEmail}
-                                                onChange={(e) => setPurchaserEmail(e.target.value)}
+                                                                        value={passenger.email}
+                                                                        onChange={(e) => {
+                                                                            const updated = [...passengerData];
+                                                                            updated[index].email = e.target.value;
+                                                                            setPassengerData(updated);
+                                                                        }}
                                                 required
                                                 variant="outlined"
                                             />
                                         </Grid>
                                     </Grid>
                                 </Box>
+                                                        ))}
+                                                    </Box>
+                                                )}
+                                            </>
+                                        )}
+                                    </>
+                                ) : (
+                                    <Box sx={{ p: 2, textAlign: 'center' }}>
+                                        <Typography color="text.secondary" sx={{ fontSize: 16, fontWeight: 500 }}>
+                                            Please select at least one location to view available dates
+                                        </Typography>
+                                </Box>
+                                )}
                             </>
                         )}
 
@@ -685,7 +1058,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                 ))}
                                             </Box>
                                             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
-                                                {buildDayCells()}
+                                                {buildDayCells(false)}
                                             </Box>
                                         </Box>
 
@@ -770,33 +1143,62 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                 <Button onClick={onClose}>Cancel</Button>
                 <Button
                     onClick={() => {
+                        // For Gift Voucher, find activity ID from selected location
+                        let finalActivityId = activityId;
+                        let finalSelectedLocation = selectedLocation;
+                        
+                        if (isGiftVoucherDetails && selectedLocations.length > 0 && giftVoucherActivities.length > 0) {
+                            const firstSelectedLocation = selectedLocations[0];
+                            const activityForLocation = giftVoucherActivities.find(a => a.location === firstSelectedLocation && a.status === 'Live');
+                            if (activityForLocation) {
+                                finalActivityId = activityForLocation.id;
+                                finalSelectedLocation = firstSelectedLocation;
+                            }
+                        } else if (isFlightVoucherDetails && flightVoucherSelectedLocations.length > 0 && flightVoucherActivities.length > 0) {
+                            // For Flight Voucher, find activity ID from selected location
+                            const firstSelectedLocation = flightVoucherSelectedLocations[0];
+                            const activityForLocation = flightVoucherActivities.find(a => a.location === firstSelectedLocation && a.status === 'Live');
+                            if (activityForLocation) {
+                                finalActivityId = activityForLocation.id;
+                                finalSelectedLocation = firstSelectedLocation;
+                            }
+                        }
+                        
                         onSlotSelect(
                             selectedDate, 
                             selectedTime, 
-                            activityId, 
+                            finalActivityId, 
                             selectedActivity, 
-                            selectedLocation, 
+                            finalSelectedLocation, 
                             selectedFlightTypes, 
                             selectedVoucherTypes,
-                            // Pass purchaser info for Gift Vouchers
+                            // Pass purchaser info and passenger data for Gift Vouchers
                             {
                                 firstName: purchaserFirstName,
                                 lastName: purchaserLastName,
                                 mobile: purchaserMobile,
-                                email: purchaserEmail
+                                email: purchaserEmail,
+                                selectedLocations: isGiftVoucherDetails ? selectedLocations : flightVoucherSelectedLocations, // Pass selected locations
+                                passengerData: passengerData, // Pass passenger data for Gift Vouchers
+                                activityId: finalActivityId // Pass activity ID
                             }
                         );
                     }}
                     disabled={
                         isGiftVoucherDetails
-                            ? // Gift Voucher: Require purchaser info and at least one flight type and voucher type
-                              !purchaserFirstName || 
-                              !purchaserLastName || 
-                              !purchaserMobile || 
-                              !purchaserEmail || 
-                              selectedFlightTypes.length === 0 || 
-                              selectedVoucherTypes.length === 0
-                            : // Regular/Flight Voucher: Require date, time, activity, location
+                            ? // Gift Voucher: Require at least one location, date, time, and all passenger information
+                              selectedLocations.length === 0 || 
+                              !selectedDate || 
+                              !selectedTime ||
+                              !passengerData || 
+                              passengerData.length === 0 ||
+                              passengerData.some(p => !p.firstName || !p.lastName || !p.mobile || !p.email)
+                            : isFlightVoucherDetails
+                            ? // Flight Voucher: Require at least one location, date, and time
+                              flightVoucherSelectedLocations.length === 0 ||
+                              !selectedDate || 
+                              !selectedTime
+                            : // Regular booking: Require date, time, activity, location
                               !selectedDate || 
                               !selectedTime || 
                               !selectedActivity || 
