@@ -1,7 +1,16 @@
 import dayjs from 'dayjs';
 
-const HERO_IMAGE_URL =
-    'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=80';
+// Use emailImage.jpg from uploads/email folder
+const getBaseUrl = () => {
+    if (typeof window !== 'undefined') {
+        // Client-side: use current origin
+        return window.location.origin;
+    }
+    // Server-side: use environment variable or default
+    return process.env.REACT_APP_API_URL || process.env.BASE_URL || 'http://localhost:3002';
+};
+
+const HERO_IMAGE_URL = `${getBaseUrl()}/uploads/email/emailImage.jpg`;
 const PERSONAL_NOTE_PLACEHOLDER = '<!--PERSONAL_NOTE-->';
 
 const normalizeTemplateName = (name = '') => (name || '').trim();
@@ -111,15 +120,13 @@ const buildEmailLayout = ({
                 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px; background:#ffffff; border-radius:24px; overflow:hidden; box-shadow:0 12px 35px rgba(20,23,38,0.12);">
                     <tr>
                         <td>
-                            <img src="${heroImage}" alt="Fly Away Ballooning" style="width:100%; height:220px; object-fit:cover; display:block;" />
+                            <img src="${heroImage}" alt="Fly Away Ballooning" style="width:100%; max-width:640px; height:auto; min-height:220px; object-fit:cover; display:block; border-radius:24px 24px 0 0;" />
                         </td>
                     </tr>
                     <tr>
                         <td style="padding:32px;">
-                            <div style="font-size:15px; text-transform:uppercase; letter-spacing:0.08em; color:#6366f1; font-weight:700; margin-bottom:8px;">${emoji} Fly Away Ballooning</div>
-                            <div style="font-size:26px; line-height:1.35; font-weight:700; color:#111827; margin-bottom:20px;">${headline}</div>
+                            ${headline ? `<div style="font-size:26px; line-height:1.35; font-weight:700; color:#111827; margin-bottom:20px;">${headline}</div>` : ''}
                             ${highlightSection}
-                            <div style="font-size:16px; line-height:1.7; color:#1f2937; margin-bottom:18px;">Dear ${safeName},</div>
                             ${PERSONAL_NOTE_PLACEHOLDER}
                             <div style="font-size:16px; line-height:1.7; color:#1f2937;">
                                 ${bodyHtml}
@@ -208,7 +215,7 @@ const getBookingConfirmationReceiptHtml = (booking = {}) => {
             </div>
             <div style="min-width:220px; background:#f8fafc; border-radius:12px; padding:16px;">
                 <div style="font-weight:700; margin-bottom:8px;">Questions?</div>
-                <div style="font-size:13px;">Questions? We're here to help! Contact us by calling <a href="tel:+441823778127" style="color:#2563eb; text-decoration:none;">+44 1823 778 127</a></div>
+                <div style="font-size:13px;">Contact us by calling <a href="tel:+441823778127" style="color:#2563eb; text-decoration:none;">+44 1823 778 127</a></div>
             </div>
         </div>
         <div style="margin-top:24px;">
@@ -321,15 +328,16 @@ const DEFAULT_TEMPLATE_BUILDERS = {
     'Follow up': ({ template, booking }) => {
         const customerName = booking?.name || booking?.customer_name || 'Guest';
         const subject = '🎈 Thank you';
-        const highlightHtml =
-            'This sends automatically a few hours after the flight. It can also be cancelled beforehand from the Tripworks customer profile email section.';
         const defaultBodyHtml = getFollowUpMessageHtml(booking);
+        const bodyHtml = resolveBodyHtml(template, defaultBodyHtml);
+        // Replace prompts in the message
+        const bodyHtmlWithPrompts = replacePrompts(bodyHtml, booking);
 
         return buildEmailLayout({
             subject,
             headline: 'Thank you for flying with us!',
-            highlightHtml,
-            bodyHtml: resolveBodyHtml(template, defaultBodyHtml),
+            highlightHtml: '',
+            bodyHtml: bodyHtmlWithPrompts,
             customerName,
             signatureLines: ['Hugo Hall', 'Chief Pilot'],
             footerLinks: [
@@ -346,11 +354,13 @@ const DEFAULT_TEMPLATE_BUILDERS = {
             ? extractMessageFromTemplateBody(template.body)
             : '';
         const messageHtml = customMessageHtml || getBookingConfirmationMessageHtml(booking);
-        const bodyHtml = `${messageHtml}${getBookingConfirmationReceiptHtml(booking)}`;
+        // Replace prompts in the message
+        const messageWithPrompts = replacePrompts(messageHtml, booking);
+        const bodyHtml = `${messageWithPrompts}${getBookingConfirmationReceiptHtml(booking)}`;
 
         return buildEmailLayout({
             subject,
-            headline: 'Your balloon flight is booked!',
+            headline: '',
             bodyHtml,
             customerName,
             signatureLines: ['Fly Away Ballooning Team'],
@@ -362,18 +372,21 @@ const DEFAULT_TEMPLATE_BUILDERS = {
     },
     'Booking Rescheduled': ({ template, booking }) => {
         const customerName = booking?.name || booking?.customer_name || 'Guest';
-        const subject = '✈️ Your flight is rescheduled';
+        const subject = '🎈 Your flight is rescheduled';
         const defaultBodyHtml = getBookingRescheduledMessageHtml(booking);
+        const bodyHtml = resolveBodyHtml(template, defaultBodyHtml);
+        // Replace prompts in the message
+        const bodyHtmlWithPrompts = replacePrompts(bodyHtml, booking);
 
         return buildEmailLayout({
             subject,
-            headline: 'We’ve updated your booking details.',
-            bodyHtml: resolveBodyHtml(template, defaultBodyHtml),
+            headline: '',
+            bodyHtml: bodyHtmlWithPrompts,
             customerName,
-            signatureLines: ['Operations Team', 'Fly Away Ballooning'],
+            signatureLines: ['Fly Away Ballooning Team'],
             footerLinks: [
-                { label: 'Reschedule options', url: 'https://flyawayballooning.com/rebook' },
-                { label: 'Call us', url: 'tel:+441234567890' }
+                { label: 'View FAQs', url: 'https://flyawayballooning.com/faq' },
+                { label: 'Contact us', url: 'mailto:hello@flyawayballooning.com' }
             ]
         });
     },
@@ -560,17 +573,75 @@ export const getPreviewHtml = (message, personalNote = '') => {
     ).replace(/\n/g, '<br>')}</div>`;
 };
 
+// Replace prompt placeholders with actual booking data
+export const replacePrompts = (html = '', booking = {}) => {
+    if (!html || !booking) return html;
+    
+    // Extract first name from booking name (e.g., "te te" -> "te")
+    const bookingName = booking.name || booking.customer_name || '';
+    const nameParts = bookingName.trim().split(/\s+/);
+    const firstName = nameParts.length > 0 ? nameParts[0] : bookingName;
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+    const fullName = bookingName || 'Guest';
+    
+    // Replace prompts (case-insensitive)
+    let result = html;
+    
+    // Replace [First Name] or [first name] or [FIRST NAME]
+    result = result.replace(/\[First Name\]/gi, escapeHtml(firstName));
+    
+    // Replace [Last Name] or [last name] or [LAST NAME]
+    result = result.replace(/\[Last Name\]/gi, escapeHtml(lastName));
+    
+    // Replace [Full Name] or [full name] or [FULL NAME]
+    result = result.replace(/\[Full Name\]/gi, escapeHtml(fullName));
+    
+    // Replace [Email] or [email] or [EMAIL]
+    result = result.replace(/\[Email\]/gi, escapeHtml(booking.email || booking.customer_email || ''));
+    
+    // Replace [Phone] or [phone] or [PHONE]
+    result = result.replace(/\[Phone\]/gi, escapeHtml(booking.phone || booking.customer_phone || ''));
+    
+    // Replace [Booking ID] or [booking id] or [BOOKING ID]
+    result = result.replace(/\[Booking ID\]/gi, escapeHtml(booking.id ? String(booking.id) : ''));
+    
+    // Replace [Flight Date] or [flight date] or [FLIGHT DATE]
+    const flightDate = booking.flight_date || booking.flightDate || '';
+    if (flightDate) {
+        try {
+            const formattedDate = dayjs(flightDate).format('DD/MM/YYYY');
+            result = result.replace(/\[Flight Date\]/gi, escapeHtml(formattedDate));
+        } catch (e) {
+            result = result.replace(/\[Flight Date\]/gi, escapeHtml(flightDate));
+        }
+    } else {
+        result = result.replace(/\[Flight Date\]/gi, '');
+    }
+    
+    // Replace [Location] or [location] or [LOCATION]
+    result = result.replace(/\[Location\]/gi, escapeHtml(booking.location || ''));
+    
+    // Replace [Voucher Code] or [voucher code] or [VOUCHER CODE]
+    result = result.replace(/\[Voucher Code\]/gi, escapeHtml(booking.voucher_code || booking.voucherCode || ''));
+    
+    return result;
+};
+
 export const buildEmailHtml = ({ templateName, messageHtml, booking, personalNote }) => {
     const effectiveTemplateName = templateName || 'Custom Message';
     const baseMessage = messageHtml && messageHtml.trim() !== ''
         ? sanitizeTemplateHtml(messageHtml)
         : getDefaultTemplateMessageHtml(effectiveTemplateName, booking);
     const messageWithNote = applyPersonalNote(baseMessage, personalNote);
+    
+    // Replace prompts in the message
+    const messageWithPromptsReplaced = replacePrompts(messageWithNote, booking);
+    
     const layout = getDefaultEmailTemplateContent(
-        { name: effectiveTemplateName, body: messageWithNote, edited: true },
+        { name: effectiveTemplateName, body: messageWithPromptsReplaced, edited: true },
         booking
     );
-    return layout?.body || messageWithNote;
+    return layout?.body || messageWithPromptsReplaced;
 };
 
 export const PERSONAL_NOTE_TOKEN = PERSONAL_NOTE_PLACEHOLDER;
