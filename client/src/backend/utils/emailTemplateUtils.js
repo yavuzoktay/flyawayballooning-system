@@ -130,8 +130,20 @@ const buildEmailLayout = ({
             <td align="center" style="padding:32px 16px;">
                 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px; background:#ffffff; border-radius:24px; overflow:hidden; box-shadow:0 12px 35px rgba(20,23,38,0.12);">
                     <tr>
-                        <td>
-                            <img src="${heroImage}" alt="Fly Away Ballooning" style="width:100%; max-width:640px; height:auto; min-height:220px; max-height:400px; object-fit:cover; display:block; border-radius:24px 24px 0 0; background-color:#f3f4f6;" />
+                        <td style="padding:0; margin:0; line-height:0; font-size:0; width:100%;">
+                            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="width:100%;">
+                                <tr>
+                                    <td style="padding:0; margin:0; line-height:0; font-size:0; width:100%;">
+                                        <!--[if mso]>
+                                        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" style="height:300px; v-text-anchor:middle; width:640px;" arcsize="8%" stroke="false">
+                                        <v:fill type="frame" src="${heroImage}" color="#f3f4f6" />
+                                        <w:anchorlock/>
+                                        </v:roundrect>
+                                        <![endif]-->
+                                        <img src="${heroImage}" alt="Fly Away Ballooning" width="640" style="width:100%; max-width:640px; height:auto; display:block; border-radius:24px 24px 0 0; border:0; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; background-color:#f3f4f6; vertical-align:top;" />
+                                    </td>
+                                </tr>
+                            </table>
                         </td>
                     </tr>
                     <tr>
@@ -148,11 +160,6 @@ const buildEmailLayout = ({
                         </td>
                     </tr>
                 </table>
-                ${footerHtml}
-                <div style="font-size:12px; color:#6b7280; margin-top:24px;">
-                    You are receiving this email because you recently interacted with Fly Away Ballooning.<br/>
-                    <a href="https://flyawayballooning.com" style="color:#6b7280; text-decoration:underline;">Visit our website</a>
-                </div>
             </td>
         </tr>
     </table>
