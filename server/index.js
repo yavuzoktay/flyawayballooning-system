@@ -7879,6 +7879,95 @@ const handleFlightAttemptsIncrement = async (booking_id) => {
     }
 };
 
+// Helper to refresh availability counts when a booking changes
+const refreshAvailabilityForBooking = (booking_id) => {
+    try {
+        const infoSql = 'SELECT flight_date, time_slot, activity_id, location FROM all_booking WHERE id = ?';
+        con.query(infoSql, [booking_id], (err, rows) => {
+            if (err) {
+                console.error('refreshAvailabilityForBooking: failed to fetch booking info', err);
+                return;
+            }
+            if (!rows || rows.length === 0) {
+                console.warn('refreshAvailabilityForBooking: booking not found', booking_id);
+                return;
+            }
+            const booking = rows[0];
+            const bookingDate = booking.flight_date;
+            const bookingTime = booking.time_slot || booking.flight_date;
+            const activityId = booking.activity_id;
+            
+            const triggerUpdate = (finalActivityId) => {
+                if (!bookingDate || !bookingTime || !finalActivityId) {
+                    console.warn('refreshAvailabilityForBooking: missing params', { booking_id, bookingDate, bookingTime, finalActivityId });
+                    return;
+                }
+                updateSpecificAvailability(bookingDate, bookingTime, finalActivityId, 1);
+            };
+            
+            if (activityId) {
+                triggerUpdate(activityId);
+            } else if (booking.location) {
+                const locationSql = 'SELECT id FROM activity WHERE location = ? AND status = "Live" LIMIT 1';
+                con.query(locationSql, [booking.location], (locErr, locRows) => {
+                    if (locErr) {
+                        console.error('refreshAvailabilityForBooking: failed to resolve activity by location', locErr);
+                        return;
+                    }
+                    if (locRows && locRows.length > 0) {
+                        triggerUpdate(locRows[0].id);
+                    } else {
+                        console.warn('refreshAvailabilityForBooking: no activity found for location', booking.location);
+                    }
+                });
+            } else {
+                console.warn('refreshAvailabilityForBooking: missing activity/location', { booking_id });
+            }
+        });
+    } catch (error) {
+        console.error('refreshAvailabilityForBooking exception', error);
+    }
+};
+
+// Helper to refresh a specific availability slot using explicit values
+const refreshAvailabilitySlot = (slotInfo = {}) => {
+    try {
+        const bookingDate = slotInfo.flight_date;
+        const bookingTime = slotInfo.time_slot || slotInfo.flight_date;
+        const activityId = slotInfo.activity_id;
+        const location = slotInfo.location;
+        
+        const triggerUpdate = (finalActivityId) => {
+            if (!bookingDate || !bookingTime || !finalActivityId) {
+                console.warn('refreshAvailabilitySlot: missing params', { bookingDate, bookingTime, finalActivityId });
+                return;
+            }
+            updateSpecificAvailability(bookingDate, bookingTime, finalActivityId, 1);
+        };
+        
+        if (activityId) {
+            triggerUpdate(activityId);
+        } else if (location) {
+            const locationSql = 'SELECT id FROM activity WHERE location = ? AND status = "Live" LIMIT 1';
+            con.query(locationSql, [location], (locErr, locRows) => {
+                if (locErr) {
+                    console.error('refreshAvailabilitySlot: failed to resolve activity by location', locErr);
+                    return;
+                }
+                if (locRows && locRows.length > 0) {
+                    triggerUpdate(locRows[0].id);
+                } else {
+                    console.warn('refreshAvailabilitySlot: no activity found for location', location);
+                }
+            });
+        } else {
+            console.warn('refreshAvailabilitySlot: missing activity/location info');
+        }
+    } catch (error) {
+        console.error('refreshAvailabilitySlot exception', error);
+    }
+};
+
 app.patch('/api/updateBookingField', (req, res) => {
     const { booking_id, field, value } = req.body;
     
@@ -7891,17 +7980,20 @@ app.patch('/api/updateBookingField', (req, res) => {
         return res.status(400).json({ success: false, message: 'Invalid request' });
     }
     
+    const slotFields = new Set(['flight_date', 'activity_id', 'time_slot', 'location']);
+    let previousSlot = null;
     let sql;
     let params;
-    if (field === 'weight') {
-        // passenger tablosunda ana yolcunun weight bilgisini güncelle
-        sql = `UPDATE passenger SET weight = ? WHERE booking_id = ? LIMIT 1`;
-        params = [value, booking_id];
-    } else {
-        // Normalize status values to proper capitalization
-        let normalizedValue = value;
-        if (field === 'status') {
-            if (typeof value === 'string') {
+    let normalizedValue = value;
+    
+    const performUpdate = () => {
+        if (field === 'weight') {
+            // passenger tablosunda ana yolcunun weight bilgisini güncelle
+            sql = `UPDATE passenger SET weight = ? WHERE booking_id = ? LIMIT 1`;
+            params = [value, booking_id];
+        } else {
+            // Normalize status values to proper capitalization
+            if (field === 'status' && typeof value === 'string') {
                 const statusLower = value.toLowerCase();
                 if (statusLower === 'cancelled') {
                     normalizedValue = 'Cancelled';
@@ -7913,48 +8005,83 @@ app.patch('/api/updateBookingField', (req, res) => {
                     normalizedValue = 'Pending';
                 }
             }
+            
+            sql = `UPDATE all_booking SET ${field} = ? WHERE id = ?`;
+            params = [normalizedValue, booking_id];
         }
         
-        sql = `UPDATE all_booking SET ${field} = ? WHERE id = ?`;
-        params = [normalizedValue, booking_id];
-    }
-    
-    // normalizedValue'yu her durumda tanımla
-    if (typeof normalizedValue === 'undefined') {
-        normalizedValue = value;
-    }
-    
-    console.log('updateBookingField - SQL:', sql);
-    console.log('updateBookingField - Params:', params);
-    
-    con.query(sql, params, (err, result) => {
-        if (err) {
-            console.error('Error updating booking field:', err);
-            return res.status(500).json({ success: false, message: 'Database error' });
+        if (typeof normalizedValue === 'undefined') {
+            normalizedValue = value;
         }
         
-        console.log('updateBookingField - Database güncelleme başarılı:', { field, value, affectedRows: result.affectedRows });
+        console.log('updateBookingField - SQL:', sql);
+        console.log('updateBookingField - Params:', params);
         
-        // If status is updated, also insert into booking_status_history and handle flight attempts
-        if (field === 'status') {
-            const historySql = 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
-            console.log('updateBookingField - Status history ekleniyor:', { booking_id, status: normalizedValue });
-            con.query(historySql, [booking_id, normalizedValue], (err2) => {
-                if (err2) console.error('History insert error:', err2);
-                else console.log('updateBookingField - Status history başarıyla eklendi');
-                
-                // Handle flight attempts increment for voucher cancellations
-                if (normalizedValue === 'Cancelled') {
-                    handleFlightAttemptsIncrement(booking_id);
+        con.query(sql, params, (err, result) => {
+            if (err) {
+                console.error('Error updating booking field:', err);
+                return res.status(500).json({ success: false, message: 'Database error' });
+            }
+            
+            console.log('updateBookingField - Database güncelleme başarılı:', { field, value, affectedRows: result.affectedRows });
+            
+            const refreshNewSlot = (field === 'status') || slotFields.has(field);
+            const refreshOldSlot = previousSlot && slotFields.has(field);
+            
+            const finalizeResponse = () => {
+                res.json({ success: true });
+            };
+            
+            if (field === 'status') {
+                const historySql = 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
+                console.log('updateBookingField - Status history ekleniyor:', { booking_id, status: normalizedValue });
+                con.query(historySql, [booking_id, normalizedValue], (err2) => {
+                    if (err2) console.error('History insert error:', err2);
+                    else console.log('updateBookingField - Status history başarıyla eklendi');
+                    
+                    // Handle flight attempts increment for voucher cancellations
+                    if (normalizedValue === 'Cancelled') {
+                        handleFlightAttemptsIncrement(booking_id);
+                    }
+                    
+                    if (refreshOldSlot) {
+                        refreshAvailabilitySlot(previousSlot);
+                    }
+                    if (refreshNewSlot) {
+                        refreshAvailabilityForBooking(booking_id);
+                    }
+                    
+                    finalizeResponse();
+                });
+            } else {
+                if (refreshOldSlot) {
+                    refreshAvailabilitySlot(previousSlot);
+                }
+                if (refreshNewSlot) {
+                    refreshAvailabilityForBooking(booking_id);
                 }
                 
-                // Do not block main response
-                res.json({ success: true });
-            });
-        } else {
-            res.json({ success: true });
-        }
-    });
+                finalizeResponse();
+            }
+        });
+    };
+    
+    if (field === 'weight') {
+        // passenger tablosunda ana yolcunun weight bilgisini güncelle
+        performUpdate();
+    } else if (slotFields.has(field)) {
+        const slotSql = 'SELECT flight_date, time_slot, activity_id, location FROM all_booking WHERE id = ?';
+        con.query(slotSql, [booking_id], (slotErr, slotRows) => {
+            if (slotErr) {
+                console.error('updateBookingField: failed to fetch previous slot info', slotErr);
+            } else if (slotRows && slotRows.length > 0) {
+                previousSlot = slotRows[0];
+            }
+            performUpdate();
+        });
+    } else {
+        performUpdate();
+    }
 });
 
 // Get booking status history for a booking
@@ -8647,6 +8774,7 @@ const optimizedSql = `
                 COALESCE(SUM(ab.pax), 0) as total_booked
             FROM all_booking ab 
             WHERE DATE(ab.flight_date) >= CURDATE() - INTERVAL 30 DAY
+            AND (ab.status IS NULL OR TRIM(LOWER(ab.status)) NOT IN ('cancelled'))
             GROUP BY DATE(ab.flight_date), TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i'), ab.location
         ) as booking_counts 
             ON DATE(aa.date) = booking_counts.flight_date 
@@ -8976,6 +9104,7 @@ app.post('/api/activity/:id/updateAvailabilityStatus', (req, res) => {
                 COUNT(ab.id) as total_booked
             FROM all_booking ab
             WHERE ab.activity_id = ?
+            AND (ab.status IS NULL OR TRIM(LOWER(ab.status)) NOT IN ('cancelled'))
             GROUP BY DATE(ab.flight_date), ab.location, TIME(ab.time_slot)
         ) as booking_counts ON 
             DATE(aa.date) = booking_counts.flight_date AND
@@ -12076,6 +12205,7 @@ function updateSpecificAvailability(bookingDate, bookingTime, activityId, passen
                 WHERE DATE(ab.flight_date) = DATE(?)
                 AND TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i') = TIME_FORMAT(TIME(?), '%H:%i')
                 AND (ab.activity_id = ? OR (ab.activity_id IS NULL AND ab.location = ?))
+                AND (ab.status IS NULL OR TRIM(LOWER(ab.status)) NOT IN ('cancelled'))
             `;
             con.query(sumPaxSql, [bookingDate, bookingTime, activityId, slot.location], (sumErr, sumRows) => {
                 if (sumErr) {
@@ -14172,7 +14302,12 @@ function extractMessageFromTemplateBody(html = '') {
         .replace(/<\/?(html|head|body)[^>]*>/gi, '')
         .trim();
     
-    // Find receipt marker and extract only the message part before it
+    // If [Receipt] prompt exists, return entire body so text after the prompt is kept
+    if (sanitized.toLowerCase().indexOf('[receipt]') !== -1) {
+        return sanitized;
+    }
+    
+    // Legacy behavior: clip at receipt marker comments
     const receiptMarkerStart = '<!-- RECEIPT_SECTION_START -->';
     const markerIndex = sanitized.indexOf(receiptMarkerStart);
     if (markerIndex !== -1) {
@@ -14213,6 +14348,16 @@ function replacePrompts(html = '', booking = {}) {
     
     result = result.replace(/\[Location\]/gi, escapeHtml(booking.location || ''));
     result = result.replace(/\[Voucher Code\]/gi, escapeHtml(booking.voucher_code || booking.voucherCode || ''));
+    
+    // Replace [Receipt] or [receipt] or [RECEIPT] with receipt HTML
+    // Use replace directly with global flag to replace all occurrences
+    const receiptPromptRegex = /\[Receipt\]/gi;
+    // Check if [Receipt] exists using indexOf to avoid regex lastIndex issues
+    if (result.toLowerCase().indexOf('[receipt]') !== -1) {
+        const receiptHtml = getBookingConfirmationReceiptHtml(booking);
+        // Replace all occurrences of [Receipt] (case-insensitive)
+        result = result.replace(receiptPromptRegex, receiptHtml);
+    }
     
     return result;
 }
@@ -14294,14 +14439,15 @@ function generateBookingConfirmationEmail(booking, template = null) {
         messageHtml = getBookingConfirmationMessageHtml(booking);
     }
     
-    // Replace prompts in the message
+    // Replace prompts in the message (including [Receipt] if present)
     const messageWithPrompts = replacePrompts(messageHtml, booking);
     
-    // Get receipt HTML (always include receipt)
-    const receiptHtml = getBookingConfirmationReceiptHtml(booking);
-    
-    // Combine message and receipt
-    const bodyHtml = `${messageWithPrompts}${receiptHtml}`;
+    // Check if [Receipt] prompt was already replaced by replacePrompts
+    // If not, add receipt at the end (for backward compatibility with old templates)
+    const hasReceiptPrompt = (messageHtml || '').toLowerCase().indexOf('[receipt]') !== -1;
+    const bodyHtml = hasReceiptPrompt 
+        ? messageWithPrompts 
+        : `${messageWithPrompts}${getBookingConfirmationReceiptHtml(booking)}`;
     
     // Build email layout (matches frontend buildEmailLayout)
     return buildEmailLayout({
@@ -14309,7 +14455,7 @@ function generateBookingConfirmationEmail(booking, template = null) {
         headline: '',
         bodyHtml,
         customerName,
-        signatureLines: ['Fly Away Ballooning Team'],
+        signatureLines: [],
         footerLinks: [
             { label: 'View FAQs', url: 'https://flyawayballooning.com/faq' },
             { label: 'Contact us', url: 'mailto:hello@flyawayballooning.com' }
