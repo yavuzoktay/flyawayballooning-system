@@ -62,6 +62,18 @@ const textToParagraphHtml = (text = '') =>
 export const extractMessageFromTemplateBody = (html = '') => {
     const sanitized = sanitizeTemplateHtml(html);
     if (!sanitized) return '';
+    
+    // Check if [Receipt] prompt exists (new way)
+    // Use indexOf instead of test() to avoid regex lastIndex issues
+    const hasReceiptPrompt = sanitized.toLowerCase().indexOf('[receipt]') !== -1;
+    if (hasReceiptPrompt) {
+        // If [Receipt] prompt exists, return the entire sanitized HTML
+        // The [Receipt] prompt will be replaced by replacePrompts function
+        // This ensures text after [Receipt] is preserved
+        return sanitized;
+    }
+    
+    // Check for old receipt markers (backward compatibility)
     const markerIndex = sanitized.indexOf(RECEIPT_MARKER_START);
     if (markerIndex !== -1) {
         return sanitized.slice(0, markerIndex).trim();
@@ -87,17 +99,22 @@ const buildEmailLayout = ({
     highlightHtml = '',
     bodyHtml = '',
     customerName = 'Guest',
-    signatureLines = ['Fly Away Ballooning Team'],
+    signatureLines = [],
     footerLinks = [],
     emoji = '🎈'
 }) => {
     const safeName = escapeHtml(customerName || 'Guest');
-    const signatureHtml = signatureLines
-        .map(
-            (line) =>
-                `<div style="font-size:16px; line-height:1.6; color:#1f2937; margin:0;">${line}</div>`
-        )
-        .join('');
+    const filteredSignatureLines = Array.isArray(signatureLines)
+        ? signatureLines.filter((line) => typeof line === 'string' && line.trim() !== '')
+        : [];
+    const signatureHtml = filteredSignatureLines.length
+        ? filteredSignatureLines
+              .map(
+                  (line) =>
+                      `<div style="font-size:16px; line-height:1.6; color:#1f2937; margin:0;">${line}</div>`
+              )
+              .join('')
+        : '';
 
     const footerHtml =
         footerLinks.length > 0
@@ -372,16 +389,24 @@ const DEFAULT_TEMPLATE_BUILDERS = {
             ? extractMessageFromTemplateBody(template.body)
             : '';
         const messageHtml = customMessageHtml || getBookingConfirmationMessageHtml(booking);
-        // Replace prompts in the message
+        
+        // Replace prompts in the message (including [Receipt] if present)
         const messageWithPrompts = replacePrompts(messageHtml, booking);
-        const bodyHtml = `${messageWithPrompts}${getBookingConfirmationReceiptHtml(booking)}`;
+        
+        // Check if [Receipt] prompt was already replaced by replacePrompts
+        // If not, and if it's the default message (not custom template), add receipt at the end
+        // Use indexOf instead of test() to avoid regex lastIndex issues
+        const hasReceiptPrompt = messageHtml.toLowerCase().indexOf('[receipt]') !== -1;
+        const bodyHtml = hasReceiptPrompt 
+            ? messageWithPrompts 
+            : `${messageWithPrompts}${getBookingConfirmationReceiptHtml(booking)}`;
 
         return buildEmailLayout({
             subject,
             headline: '',
             bodyHtml,
             customerName,
-            signatureLines: ['Fly Away Ballooning Team'],
+            signatureLines: [],
             footerLinks: [
                 { label: 'View FAQs', url: 'https://flyawayballooning.com/faq' },
                 { label: 'Contact us', url: 'mailto:hello@flyawayballooning.com' }
@@ -401,7 +426,7 @@ const DEFAULT_TEMPLATE_BUILDERS = {
             headline: '',
             bodyHtml: bodyHtmlWithPrompts,
             customerName,
-            signatureLines: ['Fly Away Ballooning Team'],
+            signatureLines: [],
             footerLinks: [
                 { label: 'View FAQs', url: 'https://flyawayballooning.com/faq' },
                 { label: 'Contact us', url: 'mailto:hello@flyawayballooning.com' }
@@ -418,7 +443,7 @@ const DEFAULT_TEMPLATE_BUILDERS = {
             headline: 'Your gift experience is all set!',
             bodyHtml: resolveBodyHtml(template, defaultBodyHtml),
             customerName: purchaserName,
-            signatureLines: ['Fly Away Ballooning Team'],
+            signatureLines: [],
             footerLinks: [
                 { label: 'Download voucher', url: 'https://flyawayballooning.com/account/vouchers' },
                 { label: 'Gift FAQs', url: 'https://flyawayballooning.com/gift-faqs' }
@@ -449,10 +474,10 @@ const DEFAULT_TEMPLATE_BUILDERS = {
 
         return buildEmailLayout({
             subject,
-            headline: 'We can’t wait to see you!',
+            headline: '',
             bodyHtml: resolveBodyHtml(template, defaultBodyHtml),
             customerName,
-            signatureLines: ['Operations Team', 'Fly Away Ballooning'],
+            signatureLines: [],
             footerLinks: [
                 { label: 'Manage booking', url: 'https://flyawayballooning.com/manage' },
                 { label: 'Weather FAQs', url: 'https://flyawayballooning.com/weather' }
@@ -466,10 +491,10 @@ const DEFAULT_TEMPLATE_BUILDERS = {
 
         return buildEmailLayout({
             subject,
-            headline: 'We’re on it!',
+            headline: '',
             bodyHtml: resolveBodyHtml(template, defaultBodyHtml),
             customerName,
-            signatureLines: ['Fly Away Ballooning Team'],
+            signatureLines: [],
             footerLinks: [
                 { label: 'Contact support', url: 'mailto:hello@flyawayballooning.com' }
             ]
@@ -642,6 +667,16 @@ export const replacePrompts = (html = '', booking = {}) => {
     // Replace [Voucher Code] or [voucher code] or [VOUCHER CODE]
     result = result.replace(/\[Voucher Code\]/gi, escapeHtml(booking.voucher_code || booking.voucherCode || ''));
     
+    // Replace [Receipt] or [receipt] or [RECEIPT] with receipt HTML
+    // Use replace directly with global flag to replace all occurrences
+    const receiptPromptRegex = /\[Receipt\]/gi;
+    // Check if [Receipt] exists using indexOf to avoid regex lastIndex issues
+    if (result.toLowerCase().indexOf('[receipt]') !== -1) {
+        const receiptHtml = getBookingConfirmationReceiptHtml(booking);
+        // Replace all occurrences of [Receipt] (case-insensitive)
+        result = result.replace(receiptPromptRegex, receiptHtml);
+    }
+    
     return result;
 };
 
@@ -652,13 +687,16 @@ export const buildEmailHtml = ({ templateName, messageHtml, booking, personalNot
         : getDefaultTemplateMessageHtml(effectiveTemplateName, booking);
     const messageWithNote = applyPersonalNote(baseMessage, personalNote);
     
-    // Replace prompts in the message
+    // Replace prompts in the message (including [Receipt] if present)
     const messageWithPromptsReplaced = replacePrompts(messageWithNote, booking);
     
+    // Use template builder to get the email layout
+    // The template builder will handle [Receipt] prompt correctly
     const layout = getDefaultEmailTemplateContent(
         { name: effectiveTemplateName, body: messageWithPromptsReplaced, edited: true },
         booking
     );
+    
     return layout?.body || messageWithPromptsReplaced;
 };
 
