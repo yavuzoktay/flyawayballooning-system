@@ -148,16 +148,19 @@ const buildEmailLayout = ({
                 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px; background:#ffffff; border-radius:24px; overflow:hidden; box-shadow:0 12px 35px rgba(20,23,38,0.12);">
                     <tr>
                         <td style="padding:0; margin:0; line-height:0; font-size:0; width:100%;">
-                            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="width:100%;">
+                            <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="width:100%; border-collapse:collapse;">
                                 <tr>
                                     <td style="padding:0; margin:0; line-height:0; font-size:0; width:100%;">
                                         <!--[if mso]>
-                                        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" style="height:300px; v-text-anchor:middle; width:640px;" arcsize="8%" stroke="false">
-                                        <v:fill type="frame" src="${heroImage}" color="#f3f4f6" />
+                                        <v:rect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" style="height:auto; width:640px;" stroke="false">
+                                        <v:fill type="frame" src="${heroImage}" color="#ffffff" />
                                         <w:anchorlock/>
-                                        </v:roundrect>
+                                        <v:textbox inset="0,0,0,0" style="mso-fit-shape-to-text:true;">
+                                        <div style="font-size:1px; line-height:1px;">&nbsp;</div>
+                                        </v:textbox>
+                                        </v:rect>
                                         <![endif]-->
-                                        <img src="${heroImage}" alt="Fly Away Ballooning" width="640" style="width:100%; max-width:640px; height:auto; display:block; border-radius:24px 24px 0 0; border:0; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; background-color:#f3f4f6; vertical-align:top;" />
+                                        <img src="${heroImage}" alt="Fly Away Ballooning" width="640" style="width:100%; height:auto; min-height:220px; display:block; border:0; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; background-color:#ffffff; vertical-align:top; object-fit:cover; object-position:center; border-radius:24px 24px 0 0;" />
                                     </td>
                                 </tr>
                             </table>
@@ -233,8 +236,30 @@ const getBookingConfirmationReceiptHtml = (booking = {}) => {
     const location = escapeHtml(booking?.location || 'Bath');
     const experience = escapeHtml(booking?.flight_type || 'Flight Experience');
     const guestCount = receiptItems.length;
+    
+    // Format flight date and time for receipt (DD/MM/YYYY HH:mm format)
+    let flightDateTime = null;
+    if (booking?.flight_date) {
+        try {
+            // If flight_date contains time, use it directly
+            const flightDateObj = dayjs(booking.flight_date);
+            if (flightDateObj.isValid()) {
+                // Check if time_slot is separate or included in flight_date
+                if (booking?.time_slot && !booking.flight_date.includes(' ')) {
+                    // Combine date and time_slot
+                    const combinedDateTime = `${booking.flight_date} ${booking.time_slot}`;
+                    flightDateTime = dayjs(combinedDateTime).format('DD/MM/YYYY HH:mm');
+                } else {
+                    // flight_date already contains time or use default time
+                    flightDateTime = flightDateObj.format('DD/MM/YYYY HH:mm');
+                }
+            }
+        } catch (e) {
+            console.warn('Error formatting flight date for receipt:', e);
+        }
+    }
 
-    return `${RECEIPT_MARKER_START}<div style="margin:32px 0; padding:24px; background:#f9fafb; border-radius:16px; border:1px solid #e2e8f0;">
+    return `<div style="margin:32px 0; padding:24px; background:#f9fafb; border-radius:16px; border:1px solid #e2e8f0;">
         <div style="font-size:12px; letter-spacing:0.2em; color:#64748b; text-transform:uppercase; margin-bottom:12px;">Receipt</div>
         <div style="display:flex; flex-wrap:wrap; gap:16px; font-size:14px; color:#475569;">
             <div style="min-width:220px;">
@@ -265,13 +290,16 @@ const getBookingConfirmationReceiptHtml = (booking = {}) => {
                 </thead>
                 <tbody>
                     <tr>
-                        <td style="padding:12px 0; border-bottom:1px solid #f1f5f9; font-weight:600;">${experience}</td>
+                        <td style="padding:12px 0; border-bottom:1px solid #f1f5f9; font-weight:600;">
+                            ${experience}
+                            ${flightDateTime ? `<div style="margin-top:4px; font-size:12px; color:#64748b; font-weight:400;">Booked For: ${escapeHtml(flightDateTime)}</div>` : ''}
+                        </td>
                         <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;">
                             ${location}
                             ${guestCount > 0 ? `<div style="margin-top:4px; font-size:12px; color:#64748b;">Guests: ${guestCount}</div>` : ''}
                         </td>
                         <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;" align="right">
-                            ${guestCount > 0 && subtotal != null ? `£${(subtotal / guestCount).toFixed(2)} × ${guestCount}` : '—'}
+                            £${subtotal != null ? subtotal.toFixed(2) : '—'}
                         </td>
                         <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;" align="right">
                             £${subtotal != null ? subtotal.toFixed(2) : '—'}
@@ -280,16 +308,12 @@ const getBookingConfirmationReceiptHtml = (booking = {}) => {
                 </tbody>
             </table>
         </div>
-        <div style="margin-top:16px; display:flex; flex-direction:column; align-items:flex-end; gap:8px; font-size:13px; color:#475569;">
-            <div><strong>Subtotal:</strong> £${subtotal != null ? subtotal.toFixed(2) : '—'}</div>
-            <div><strong>Total:</strong> £${subtotal != null ? subtotal.toFixed(2) : '—'}</div>
-            <div><strong>Paid:</strong> £${paidAmount != null ? paidAmount.toFixed(2) : '—'}</div>
-            <div><strong>Due:</strong> £${dueAmount != null ? dueAmount.toFixed(2) : '—'}</div>
+        <div style="margin-top:16px; font-size:13px; color:#475569;">
+            <div style="text-align:right; margin-bottom:8px;"><strong>Subtotal:</strong> £${subtotal != null ? subtotal.toFixed(2) : '—'}</div>
+            <div style="text-align:right; margin-bottom:8px;"><strong>Total:</strong> £${subtotal != null ? subtotal.toFixed(2) : '—'}</div>
+            <div style="text-align:right; margin-bottom:8px;"><strong>Paid:</strong> £${paidAmount != null ? paidAmount.toFixed(2) : '—'}</div>
+            <div style="text-align:right;"><strong>Due:</strong> £${dueAmount != null ? dueAmount.toFixed(2) : '—'}</div>
         </div>
-    </div>${RECEIPT_MARKER_END}
-    <div style="margin-top:24px; text-align:center;">
-        <a href="https://flyawayballooning.com/faq" style="margin-right:16px; font-size:13px; color:#2563eb; text-decoration:none;">View FAQs</a>
-        <a href="mailto:bookings@tripworks.com" style="font-size:13px; color:#2563eb; text-decoration:none;">Contact us</a>
     </div>`;
 };
 
@@ -393,13 +417,12 @@ const DEFAULT_TEMPLATE_BUILDERS = {
         // Replace prompts in the message (including [Receipt] if present)
         const messageWithPrompts = replacePrompts(messageHtml, booking);
         
-        // Check if [Receipt] prompt was already replaced by replacePrompts
-        // If not, and if it's the default message (not custom template), add receipt at the end
+        // Check if [Receipt] prompt exists in the original message
+        // Only use messageWithPrompts (which already has receipt if prompt was present)
+        // Do NOT add receipt if [Receipt] prompt was not in the template
         // Use indexOf instead of test() to avoid regex lastIndex issues
         const hasReceiptPrompt = messageHtml.toLowerCase().indexOf('[receipt]') !== -1;
-        const bodyHtml = hasReceiptPrompt 
-            ? messageWithPrompts 
-            : `${messageWithPrompts}${getBookingConfirmationReceiptHtml(booking)}`;
+        const bodyHtml = messageWithPrompts;
 
         return buildEmailLayout({
             subject,
