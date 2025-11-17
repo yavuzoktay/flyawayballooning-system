@@ -460,11 +460,15 @@ const DEFAULT_TEMPLATE_BUILDERS = {
         const purchaserName = booking?.name || booking?.customer_name || 'Guest';
         const subject = '🎁 Your Gift Voucher is ready';
         const defaultBodyHtml = getGiftCardMessageHtml(booking);
+        const bodyHtml = resolveBodyHtml(template, defaultBodyHtml);
+        // Replace prompts in the message
+        const bodyHtmlWithPrompts = replacePrompts(bodyHtml, booking);
 
         return buildEmailLayout({
             subject,
-            headline: 'Your gift experience is all set!',
-            bodyHtml: resolveBodyHtml(template, defaultBodyHtml),
+            headline: '',
+            heroImage: HERO_IMAGE_URL,
+            bodyHtml: bodyHtmlWithPrompts,
             customerName: purchaserName,
             signatureLines: [],
             footerLinks: [
