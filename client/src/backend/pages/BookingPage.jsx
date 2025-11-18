@@ -142,6 +142,7 @@ const BookingPage = () => {
     const [emailLogs, setEmailLogs] = useState([]);
     const [emailLogsLoading, setEmailLogsLoading] = useState(false);
     const [emailLogsPollId, setEmailLogsPollId] = useState(null);
+    const [emailLogsContext, setEmailLogsContext] = useState(null);
     const [emailTemplates, setEmailTemplates] = useState([]);
     const [messagesModalOpen, setMessagesModalOpen] = useState(false);
     const [messagesLoading, setMessagesLoading] = useState(false);
@@ -205,11 +206,19 @@ const BookingPage = () => {
         }
     };
 
-    const fetchMessageLogs = async (bookingId) => {
-        if (!bookingId) return;
+    const fetchMessageLogs = async ({ bookingId, recipientEmail, contextId } = {}) => {
+        if (!bookingId && !recipientEmail && !contextId) return;
         setMessagesLoading(true);
         try {
-            const resp = await axios.get(`/api/bookingEmails/${bookingId}`);
+            let url = '';
+            if (bookingId) {
+                url = `/api/bookingEmails/${bookingId}`;
+            } else if (contextId) {
+                url = `/api/voucherEmails/${encodeURIComponent(contextId)}`;
+            } else {
+                url = `/api/recipientEmails?email=${encodeURIComponent(recipientEmail)}`;
+            }
+            const resp = await axios.get(url);
             setMessageLogs(resp.data?.data || []);
         } catch (error) {
             console.error('Error fetching message history:', error);
@@ -224,7 +233,27 @@ const BookingPage = () => {
         setSelectedBookingForEmail(booking);
         setMessagesModalOpen(true);
         setExpandedMessageIds({});
-        fetchMessageLogs(booking.id);
+        fetchMessageLogs({ bookingId: booking.id });
+    };
+
+    const handleVoucherMessagesClick = (voucher) => {
+        const fauxBooking = {
+            id: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`,
+            name: voucher.name || 'Voucher Recipient',
+            email: voucher.recipient_email || voucher.email || '',
+            phone: voucher.recipient_phone || voucher.phone || '',
+            voucher_type: voucher.voucher_type || '',
+            voucher_code: voucher.voucher_ref || voucher.voucher_code || '',
+            flight_type: voucher.flight_type || voucher.voucher_type || '',
+            location: voucher.location || voucher.preferred_location || ''
+        };
+
+        setSelectedBookingForEmail(fauxBooking);
+        setMessagesModalOpen(true);
+        setExpandedMessageIds({});
+        fetchMessageLogs({
+            contextId: fauxBooking.id
+        });
     };
 
     const toggleMessageExpand = (id) => {
@@ -331,38 +360,8 @@ const BookingPage = () => {
 
     // Email handlers
     const handleEmailClick = (booking) => {
-        setSelectedBookingForEmail(booking);
-        setEmailForm({
-            to: booking.email || '',
-            subject: `Regarding your Fly Away Ballooning booking - ${booking.name}`,
-            message: '',
-            template: 'custom'
-        });
-        setEmailModalOpen(true);
-        // Fetch existing email logs for this booking
-        (async () => {
-            try {
-                setEmailLogsLoading(true);
-                const resp = await axios.get(`/api/bookingEmails/${booking.id}`);
-                setEmailLogs(resp.data?.data || []);
-            } catch (e) {
-                setEmailLogs([]);
-            } finally {
-                setEmailLogsLoading(false);
-            }
-        })();
-
-        // Start polling every 15s while modal is open to reflect opens/clicks from webhook
-        if (emailLogsPollId) {
-            clearInterval(emailLogsPollId);
-        }
-        const pollId = setInterval(async () => {
-            try {
-                const resp = await axios.get(`/api/bookingEmails/${booking.id}`);
-                setEmailLogs(resp.data?.data || []);
-            } catch {}
-        }, 15000);
-        setEmailLogsPollId(pollId);
+        if (!booking) return;
+        openEmailModalForBooking(booking, { contextType: 'booking', contextId: String(booking.id || '') });
     };
 
     // Clear polling when modal closes
@@ -425,11 +424,8 @@ const BookingPage = () => {
                 setEmailModalOpen(false);
                 setEmailForm({ to: '', subject: '', message: '', template: 'custom' });
                 setPersonalNote('');
-                if (selectedBookingForEmail?.id) {
-                    try {
-                        const resp = await axios.get(`/api/bookingEmails/${selectedBookingForEmail.id}`);
-                        setEmailLogs(resp.data?.data || []);
-                    } catch {}
+                if (emailLogsContext) {
+                    fetchEmailLogsForParams(emailLogsContext);
                 }
             } else {
                 alert('Failed to send email: ' + response.data.message);
@@ -2111,39 +2107,102 @@ setBookingDetail(finalVoucherDetail);
         }
     };
 
-    const handleEmailBooking = () => {
-        if (!bookingDetail?.booking) return;
+    const getEmailLogParamsForEntity = (entity) => {
+        if (!entity) return null;
+        if (entity.contextType === 'voucher') {
+            return { type: 'voucher', id: entity.contextId || entity.id };
+        }
+        if (entity.contextType === 'booking') {
+            return { type: 'booking', id: entity.id };
+        }
+        if (entity.email) {
+            return { type: 'email', email: entity.email };
+        }
+        return null;
+    };
+
+    const fetchEmailLogsForParams = async (params) => {
+        if (!params) return;
+        setEmailLogsLoading(true);
+        try {
+            let url = '';
+            if (params.type === 'voucher') {
+                url = `/api/voucherEmails/${encodeURIComponent(params.id)}`;
+            } else if (params.type === 'booking') {
+                url = `/api/bookingEmails/${params.id}`;
+            } else if (params.type === 'email') {
+                url = `/api/recipientEmails?email=${encodeURIComponent(params.email)}`;
+            } else {
+                return;
+            }
+            const resp = await axios.get(url);
+            setEmailLogs(resp.data?.data || []);
+        } catch (error) {
+            console.error('Error fetching email logs:', error);
+            setEmailLogs([]);
+        } finally {
+            setEmailLogsLoading(false);
+        }
+    };
+
+    const startEmailLogPolling = (params) => {
+        if (emailLogsPollId) {
+            clearInterval(emailLogsPollId);
+        }
+        if (!params) return;
+        const pollId = setInterval(() => {
+            fetchEmailLogsForParams(params);
+        }, 15000);
+        setEmailLogsPollId(pollId);
+    };
+
+    const openEmailModalForBooking = (booking, options = {}) => {
+        if (!booking) return;
+        const contextType = options.contextType || booking.contextType || 'booking';
+        const contextId = options.contextId || booking.contextId || (booking.id ? String(booking.id) : '');
+        const bookingWithContext = { ...booking, contextType, contextId };
         
-        const booking = bookingDetail.booking;
-        
-        setSelectedBookingForEmail(booking);
+        setSelectedBookingForEmail(bookingWithContext);
         
         console.log('📧 Opening email modal...');
         console.log('📚 Available emailTemplates:', emailTemplates);
         
-        const firstTemplate = emailTemplates.length > 0 ? emailTemplates[0] : null;
+        const preferredTemplateName = options.preferredTemplateName?.trim().toLowerCase();
+        let selectedTemplate = null;
+
+        if (preferredTemplateName) {
+            selectedTemplate = emailTemplates.find(
+                (t) => t.name?.trim().toLowerCase() === preferredTemplateName
+            );
+        }
+
+        if (!selectedTemplate && emailTemplates.length > 0) {
+            selectedTemplate = emailTemplates[0];
+        }
         
         let subject = '';
         let message = '';
         let templateValue = 'custom';
         
-        if (firstTemplate) {
-            templateValue = firstTemplate.id;
-            subject = firstTemplate.subject || '';
-            message = extractMessageFromTemplateBody(firstTemplate.body) || getDefaultTemplateMessageHtml(firstTemplate.name, booking);
+        if (selectedTemplate) {
+            templateValue = selectedTemplate.id;
+            subject = selectedTemplate.subject || '';
+            message =
+                extractMessageFromTemplateBody(selectedTemplate.body) ||
+                getDefaultTemplateMessageHtml(selectedTemplate.name, bookingWithContext);
             console.log('✅ Email form populated with template body:', {
                 subject,
                 bodyLength: (message || '').length,
-                templateId: firstTemplate.id
+                templateId: selectedTemplate.id
             });
         } else {
-            subject = `Regarding your Fly Away Ballooning booking - ${booking.name || ''}`;
-            message = getDefaultTemplateMessageHtml('Custom Message', booking) || '';
+            subject = `Regarding your Fly Away Ballooning booking - ${bookingWithContext.name || ''}`;
+            message = getDefaultTemplateMessageHtml('Custom Message', bookingWithContext) || '';
             console.log('⚠️ No templates available, using fallback');
         }
         
         setEmailForm({
-            to: booking.email || '',
+            to: bookingWithContext.email || '',
             subject,
             message,
             template: templateValue
@@ -2151,6 +2210,102 @@ setBookingDetail(finalVoucherDetail);
         
         setPersonalNote('');
         setEmailModalOpen(true);
+
+        const params = getEmailLogParamsForEntity(bookingWithContext);
+        setEmailLogsContext(params);
+        fetchEmailLogsForParams(params);
+        startEmailLogPolling(params);
+    };
+
+    const handleEmailBooking = () => {
+        if (!bookingDetail?.booking) return;
+        openEmailModalForBooking(bookingDetail.booking, { contextType: 'booking', contextId: String(bookingDetail.booking.id || '') });
+    };
+
+    const handleRecipientEmail = (voucher) => {
+        if (!voucher || !voucher.recipient_email) {
+            alert('Recipient email is not available.');
+            return;
+        }
+
+        const fauxBooking = {
+            id: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`,
+            name: voucher.recipient_name || voucher.name || 'Recipient',
+            email: voucher.recipient_email,
+            phone: voucher.recipient_phone || '',
+            voucher_type: voucher.voucher_type || '',
+            voucher_code: voucher.voucher_ref || voucher.voucher_code || '',
+            flight_type: voucher.experience_type || voucher.flight_type || '',
+            location: voucher.location || voucher.preferred_location || '',
+            contextType: 'voucher',
+            contextId: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`
+        };
+
+        openEmailModalForBooking(fauxBooking, {
+            preferredTemplateName: 'Gift Voucher Confirmation',
+            contextType: 'voucher',
+            contextId: fauxBooking.contextId
+        });
+    };
+
+    const handleGiftVoucherEmail = () => {
+        const voucher = bookingDetail?.voucher;
+        if (!voucher) return;
+
+        // Always target the purchaser for the main Email button inside Gift Voucher Details
+        const purchaserEmail = voucher.purchaser_email || voucher.email || bookingDetail?.booking?.email;
+        if (!purchaserEmail) {
+            alert('No purchaser email available for this voucher.');
+            return;
+        }
+
+        const fauxBooking = {
+            id: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`,
+            name: voucher.purchaser_name || voucher.name || bookingDetail?.booking?.name || 'Guest',
+            email: purchaserEmail,
+            phone: voucher.purchaser_phone || voucher.phone || bookingDetail?.booking?.phone || '',
+            flight_type: voucher.flight_type || voucher.voucher_type || '',
+            location: voucher.location || voucher.preferred_location || '',
+            voucher_type: voucher.voucher_type || '',
+            voucher_code: voucher.voucher_ref || voucher.voucher_code || '',
+            contextType: 'voucher',
+            contextId: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`
+        };
+
+        openEmailModalForBooking(fauxBooking, {
+            preferredTemplateName: 'Gift Voucher Confirmation',
+            contextType: 'voucher',
+            contextId: fauxBooking.contextId
+        });
+    };
+
+    const handleEmailFlightVoucher = () => {
+        const voucher = bookingDetail?.voucher;
+        if (!voucher) return;
+        const email = voucher.email || bookingDetail?.booking?.email;
+        if (!email) {
+            alert('Voucher email is not available.');
+            return;
+        }
+
+        const fauxBooking = {
+            id: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`,
+            name: voucher.name || bookingDetail?.booking?.name || 'Guest',
+            email,
+            phone: voucher.phone || bookingDetail?.booking?.phone || '',
+            flight_type: voucher.flight_type || voucher.voucher_type || '',
+            location: voucher.location || voucher.preferred_location || '',
+            voucher_type: voucher.voucher_type || '',
+            voucher_code: voucher.voucher_ref || voucher.voucher_code || '',
+            contextType: 'voucher',
+            contextId: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`
+        };
+
+        openEmailModalForBooking(fauxBooking, {
+            preferredTemplateName: 'Flight Voucher Confirmation',
+            contextType: 'voucher',
+            contextId: fauxBooking.contextId
+        });
     };
 
     const handleRebook = () => {
@@ -4113,16 +4268,67 @@ setBookingDetail(finalVoucherDetail);
                                                     })()}
                                                     <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleAddGuestClick}>Add Guest</Button>
                                                     <Button variant="contained" color="info" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d' }} onClick={handleCancelFlight}>Cancel Flight</Button>
-                                                    <Button variant="contained" color="success" sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#28a745' }} onClick={handleEmailBooking}>Email</Button>
+                                                    {(() => {
+                                                        const v = bookingDetail?.voucher || {};
+                                                        const isGiftVoucher = v?.book_flight === 'Gift Voucher';
+                                                        const isFlightVoucher =
+                                                            !isGiftVoucher &&
+                                                            v?.voucher_type &&
+                                                            typeof v.voucher_type === 'string' &&
+                                                            v.voucher_type.toLowerCase().includes('flight');
+
+                                                    const emailHandler = isGiftVoucher
+                                                        ? handleGiftVoucherEmail
+                                                        : isFlightVoucher
+                                                                ? handleEmailFlightVoucher
+                                                                : handleEmailBooking;
+
+                                                    const hasGiftEmail =
+                                                        v?.recipient_email ||
+                                                        v?.email ||
+                                                        bookingDetail?.booking?.email;
+
+                                                        return (
+                                                            <Button
+                                                                variant="contained"
+                                                                color="success"
+                                                                sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#28a745' }}
+                                                                onClick={emailHandler}
+                                                                disabled={
+                                                                    (isFlightVoucher && !v?.email && !bookingDetail?.booking?.email) ||
+                                                                    (isGiftVoucher && !hasGiftEmail)
+                                                                }
+                                                            >
+                                                                Email
+                                                            </Button>
+                                                        );
+                                                    })()}
+                                                    {(() => {
+                                                        const v = bookingDetail?.voucher || {};
+                                                        const isGiftVoucher = v?.book_flight === 'Gift Voucher';
+                                                        const isFlightVoucher =
+                                                            !isGiftVoucher &&
+                                                            v?.voucher_type &&
+                                                            typeof v.voucher_type === 'string' &&
+                                                            v.voucher_type.toLowerCase().includes('flight');
+                                                        const messageHandler = (isGiftVoucher || isFlightVoucher) && bookingDetail?.voucher
+                                                            ? handleVoucherMessagesClick
+                                                            : handleMessagesClick;
+                                                        const target = (isGiftVoucher || isFlightVoucher) && bookingDetail?.voucher
+                                                            ? bookingDetail.voucher
+                                                            : bookingDetail?.booking;
+                                                        return (
                                                     <Button
                                                         variant="contained"
                                                         color="secondary"
                                                         sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#17a2b8' }}
-                                                        onClick={() => bookingDetail?.booking && handleMessagesClick(bookingDetail.booking)}
-                                                        disabled={!bookingDetail?.booking}
+                                                                onClick={() => target && messageHandler(target)}
+                                                                disabled={!target}
                                                     >
                                                         Messages
                                                     </Button>
+                                                        );
+                                                    })()}
                                                 </Box>
                                             </Box>
                                             <Divider sx={{ my: 2 }} />
@@ -4420,6 +4626,15 @@ setBookingDetail(finalVoucherDetail);
                                                                     <Typography><b>Email:</b> {v.recipient_email || '-'}</Typography>
                                                                     <Typography><b>Phone:</b> {v.recipient_phone || '-'}</Typography>
                                                                     <Typography><b>Gift Date:</b> {v.recipient_gift_date ? dayjs(v.recipient_gift_date).format('DD/MM/YYYY') : '-'}</Typography>
+                                                                <Button
+                                                                    variant="contained"
+                                                                    color="primary"
+                                                                    sx={{ mt: 2, textTransform: 'none' }}
+                                                                    onClick={() => handleRecipientEmail(v)}
+                                                                    disabled={!v.recipient_email}
+                                                                >
+                                                                    Email Recipient
+                                                                </Button>
                                                                 </Box>
                                                             </Box>
                                                         </>
@@ -5195,10 +5410,10 @@ setBookingDetail(finalVoucherDetail);
                                     </Typography>
                                     
                                     {/* Email Body Preview */}
-                                    <div
-                                        style={{ lineHeight: 1.6, color: '#333' }}
-                                        dangerouslySetInnerHTML={{ __html: previewHtml }}
-                                    />
+                                        <div
+                                            style={{ lineHeight: 1.6, color: '#333' }}
+                                            dangerouslySetInnerHTML={{ __html: previewHtml }}
+                                        />
                                 </Box>
                             </Grid>
                             {/* Hidden fields for backend */}
