@@ -839,6 +839,46 @@ export const replacePrompts = (html = '', booking = {}) => {
     // Replace [Voucher Code] or [voucher code] or [VOUCHER CODE]
     result = result.replace(/\[Voucher Code\]/gi, escapeHtml(booking.voucher_code || booking.voucherCode || ''));
     
+    // Replace [Experience Data] or [experience data] or [EXPERIENCE DATA]
+    // Format: "20/11/2025 09:00" (DD/MM/YYYY HH:mm) - matches "Booked For" format
+    let experienceData = '';
+    const expFlightDate = booking.flight_date || booking.flightDate || '';
+    const expTimeSlot = booking.time_slot || booking.timeSlot || '';
+    
+    if (expFlightDate) {
+        try {
+            // Parse flight_date
+            const dateObj = dayjs(expFlightDate);
+            
+            // Get time from time_slot if available, otherwise from flight_date
+            let timeStr = '';
+            if (expTimeSlot) {
+                // time_slot format: "HH:mm" or "HH:mm:ss"
+                timeStr = expTimeSlot.split(':').slice(0, 2).join(':');
+            } else if (expFlightDate.includes(' ') || expFlightDate.includes('T')) {
+                // Extract time from flight_date if it contains time
+                const timeMatch = expFlightDate.match(/(\d{1,2}):(\d{2})/);
+                if (timeMatch) {
+                    timeStr = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
+                }
+            }
+            
+            // Format date as DD/MM/YYYY
+            const formattedDate = dateObj.format('DD/MM/YYYY');
+            
+            // Combine date and time
+            if (timeStr) {
+                experienceData = `${formattedDate} ${timeStr}`;
+            } else {
+                experienceData = formattedDate;
+            }
+        } catch (e) {
+            // Fallback: use raw flight_date if parsing fails
+            experienceData = expFlightDate;
+        }
+    }
+    result = result.replace(/\[Experience Data\]/gi, escapeHtml(experienceData));
+    
     // Replace [Receipt] or [receipt] or [RECEIPT] with receipt HTML
     // Use replace directly with global flag to replace all occurrences
     const receiptPromptRegex = /\[Receipt\]/gi;

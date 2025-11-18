@@ -5254,6 +5254,15 @@ app.post('/api/createBooking', (req, res) => {
     function insertBookingAndPassengers(expiresDateFinal) {
         const nowDate = moment().format('YYYY-MM-DD HH:mm:ss');
         const mainPassenger = passengerData[0] || {};
+        
+        // Ensure email is set - try passenger email first, then booking email field
+        const bookingEmail = mainPassenger.email || (passengerData.find(p => p.email && p.email.trim())?.email) || null;
+        if (!bookingEmail) {
+            console.warn('⚠️ [createBooking] No email found in passenger data for booking creation');
+            console.warn('⚠️ [createBooking] Passenger data:', passengerData.map(p => ({ name: `${p.firstName} ${p.lastName}`, email: p.email })));
+        } else {
+            console.log('✅ [createBooking] Email found for booking:', bookingEmail);
+        }
         // Eğer selectedTime varsa, selectedDate ile birleştir
         let bookingDateTime = selectedDate;
         if (selectedTime && selectedDate) {
@@ -5370,7 +5379,7 @@ app.post('/api/createBooking', (req, res) => {
                 ? Object.keys(additionalInfo.prefer).filter(k => additionalInfo.prefer[k]).join(', ')
                 : (typeof additionalInfo?.prefer === 'string' && additionalInfo.prefer ? additionalInfo.prefer : null)),
             mainPassenger.weight || null,
-            mainPassenger.email || null,
+            bookingEmail || mainPassenger.email || null, // Use bookingEmail (from any passenger) or fallback to mainPassenger.email
             mainPassenger.phone || null,
             choose_add_on_str,
             preferred_location || null,
@@ -5489,11 +5498,21 @@ app.post('/api/createBooking', (req, res) => {
                     p.ticketType || null,
                     p.weatherRefund ? 1 : 0
                 ]);
+                
+                // Log passenger emails before inserting
+                console.log('📧 [createBooking] Passenger emails being saved:', passengerValues.map((pv, idx) => ({
+                    passenger: idx + 1,
+                    name: `${passengerData[idx].firstName} ${passengerData[idx].lastName}`,
+                    email: pv[4] || 'NO EMAIL'
+                })));
+                
                 con.query(passengerSql, [passengerValues], (err, result) => {
                     if (err) {
-                        console.error('Error creating passengers:', err);
+                        console.error('❌ [createBooking] Error creating passengers:', err);
                         return res.status(500).json({ success: false, error: 'Database query failed to create passengers' });
                     }
+                    
+                    console.log('✅ [createBooking] Passengers created successfully:', result.affectedRows, 'passengers');
                     // Availability is already updated by updateSpecificAvailability function
                     // No need to call updateAvailabilityStatus() here
                     
@@ -5547,7 +5566,22 @@ app.post('/api/createBooking', (req, res) => {
                     }
                     
                     // Send automatic booking confirmation email
-                    sendAutomaticBookingConfirmationEmail(bookingId);
+                    // Always try to send email - function will handle missing email gracefully
+                    console.log('========================================');
+                    console.log('📧 [createBooking] EMAIL SEND PROCESS STARTING');
+                    console.log('📧 [createBooking] Booking ID:', bookingId);
+                    console.log('📧 [createBooking] Booking email from database:', bookingEmail || mainPassenger.email || 'NOT SET');
+                    console.log('📧 [createBooking] Passenger emails:', passengerData.map(p => p.email).filter(Boolean));
+                    console.log('📧 [createBooking] Calling sendAutomaticBookingConfirmationEmail...');
+                    console.log('========================================');
+                    
+                    // Call email function immediately and log the call
+                    try {
+                        sendAutomaticBookingConfirmationEmail(bookingId);
+                        console.log('✅ [createBooking] sendAutomaticBookingConfirmationEmail function called successfully');
+                    } catch (emailError) {
+                        console.error('❌ [createBooking] Error calling sendAutomaticBookingConfirmationEmail:', emailError);
+                    }
                     
                     res.status(201).json({ success: true, message: 'Booking created successfully!', bookingId: bookingId, created_at: createdAt });
                 });
@@ -8872,6 +8906,15 @@ app.get('/api/availabilities/filter', (req, res) => {
         }
     });
     
+    const parseList = (value) => {
+        if (!value) return [];
+        if (Array.isArray(value)) return value;
+        const str = String(value).trim();
+        if (!str) return [];
+        if (str.toLowerCase() === 'all') return ['All'];
+        return str.split(',').map(item => item.trim()).filter(Boolean);
+    };
+
     let sql = `
         SELECT aa.*, a.location, a.flight_type, a.voucher_type as activity_voucher_types
         FROM activity_availability aa 
@@ -8937,12 +8980,17 @@ app.get('/api/availabilities/filter', (req, res) => {
                 }
             }
             
+            const voucherTypesArray = parseList(row.voucher_types);
+            const flightTypesArray = parseList(row.flight_types);
+            
             return {
                 ...row,
                 date: localDateString,
                 available: Math.max(0, row.available - heldSeats),
                 actualAvailable: row.available,
-                heldSeats: heldSeats
+                heldSeats: heldSeats,
+                voucher_types_array: voucherTypesArray,
+                flight_types_array: flightTypesArray
             };
         });
         
@@ -10915,6 +10963,18 @@ async function createVoucherFromWebhook(voucherData) {
                             }
                         });
                     }
+                }
+                
+                // Send automatic flight voucher confirmation email for Flight Voucher type
+                if (normalizedBookFlight === 'Flight Voucher') {
+                    console.log('📧 Sending automatic Flight Voucher Confirmation email for voucher ID:', result.insertId);
+                    sendAutomaticFlightVoucherConfirmationEmail(result.insertId);
+                }
+                
+                // Send automatic gift voucher confirmation email for Gift Voucher type
+                if (normalizedBookFlight === 'Gift Voucher') {
+                    console.log('📧 Sending automatic Gift Voucher Confirmation email for voucher ID:', result.insertId);
+                    sendAutomaticGiftVoucherConfirmationEmail(result.insertId);
                 }
                 
                 resolve(result.insertId);
@@ -14127,6 +14187,33 @@ function getBookingConfirmationMessageHtml(booking = {}) {
     ]);
 }
 
+// Helper function to generate flight voucher confirmation message HTML (matches frontend getFlightVoucherMessageHtml)
+function getFlightVoucherMessageHtml(voucher = {}) {
+    const name = escapeHtml(voucher.name || voucher.customer_name || 'Guest');
+    return wrapParagraphs([
+        `Dear ${name},`,
+        'Thank you for choosing Fly Away Ballooning!',
+        'Your hot air balloon experience voucher has been purchased. What an extraordinary gift — the experience awaits you or your lucky recipient!',
+        '<strong>Next Steps:</strong>',
+        'If you provided recipient details during checkout, we\'ll be sending your personalised voucher shortly. We will also contact the recipient directly 24 hours after the gifted date you selected to welcome them and provide instructions on how to book their flight.',
+        'If you skipped the recipient details section, simply reply to this email with their information, and we\'ll create their voucher and send it to you.',
+        'Should you have any questions in the meantime, please don\'t hesitate to reach out.',
+        'Warm regards,',
+        'Fly Away Ballooning Team'
+    ]);
+}
+
+// Helper function to generate gift voucher confirmation message HTML (matches frontend getGiftCardMessageHtml)
+function getGiftVoucherMessageHtml(voucher = {}) {
+    const recipient = escapeHtml(voucher.recipient_name || 'your recipient');
+    return wrapParagraphs([
+        'Thanks for choosing Fly Away Ballooning — your gift voucher is confirmed and ready to deliver!',
+        `🎁 <strong>Recipient:</strong> ${recipient}`,
+        '📬 We\'ll email the voucher directly, and you\'ll also receive a printable copy in your account.',
+        'If you\'d prefer to add a personal note or change the delivery date, just reply to this message and our team will help right away.'
+    ]);
+}
+
 // Helper function to generate booking confirmation receipt HTML (matches frontend getBookingConfirmationReceiptHtml)
 function getBookingConfirmationReceiptHtml(booking = {}) {
     const receiptItems = Array.isArray(booking.passengers) ? booking.passengers : [];
@@ -14379,6 +14466,46 @@ function replacePrompts(html = '', booking = {}) {
     result = result.replace(/\[Location\]/gi, escapeHtml(booking.location || ''));
     result = result.replace(/\[Voucher Code\]/gi, escapeHtml(booking.voucher_code || booking.voucherCode || ''));
     
+    // Replace [Experience Data] or [experience data] or [EXPERIENCE DATA]
+    // Format: "20/11/2025 09:00" (DD/MM/YYYY HH:mm) - matches "Booked For" format
+    let experienceData = '';
+    const flightDateForExp = booking.flight_date || booking.flightDate || '';
+    const timeSlotForExp = booking.time_slot || booking.timeSlot || '';
+    
+    if (flightDateForExp) {
+        try {
+            // Parse flight_date using moment
+            const dateObj = moment(flightDateForExp);
+            
+            // Get time from time_slot if available, otherwise from flight_date
+            let timeStr = '';
+            if (timeSlotForExp) {
+                // time_slot format: "HH:mm" or "HH:mm:ss"
+                timeStr = timeSlotForExp.split(':').slice(0, 2).join(':');
+            } else if (flightDateForExp.includes(' ') || flightDateForExp.includes('T')) {
+                // Extract time from flight_date if it contains time
+                const timeMatch = flightDateForExp.match(/(\d{1,2}):(\d{2})/);
+                if (timeMatch) {
+                    timeStr = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
+                }
+            }
+            
+            // Format date as DD/MM/YYYY
+            const formattedDate = dateObj.format('DD/MM/YYYY');
+            
+            // Combine date and time
+            if (timeStr) {
+                experienceData = `${formattedDate} ${timeStr}`;
+            } else {
+                experienceData = formattedDate;
+            }
+        } catch (e) {
+            // Fallback: use raw flight_date if parsing fails
+            experienceData = flightDateForExp;
+        }
+    }
+    result = result.replace(/\[Experience Data\]/gi, escapeHtml(experienceData));
+    
     // Replace [Receipt] or [receipt] or [RECEIPT] with receipt HTML
     // Use replace directly with global flag to replace all occurrences
     const receiptPromptRegex = /\[Receipt\]/gi;
@@ -14492,8 +14619,207 @@ function generateBookingConfirmationEmail(booking, template = null) {
     });
 }
 
+// Helper function to generate flight voucher confirmation email HTML
+function generateFlightVoucherConfirmationEmail(voucher, template = null) {
+    const customerName = voucher.name || voucher.customer_name || 'Guest';
+    const subject = template?.subject || '🎈 Your Flight Voucher is ready';
+    
+    // Get message HTML from template if available, otherwise use default
+    let messageHtml = '';
+    if (template && template.body && template.body.trim() !== '') {
+        const rawBody = String(template.body).trim();
+        
+        // Template body from Settings page is already HTML from RichTextEditor
+        messageHtml = sanitizeTemplateHtml(rawBody);
+        
+        // If sanitization removed everything, use raw body
+        if (!messageHtml || messageHtml.trim() === '') {
+            console.warn('⚠️ Template body became empty after sanitization, using raw body');
+            messageHtml = rawBody;
+        }
+        
+        console.log('📧 Using Flight Voucher Confirmation template body from database:', {
+            templateName: template.name,
+            templateId: template.id,
+            rawBodyLength: rawBody.length,
+            rawBodyPreview: rawBody.substring(0, 150),
+            messageHtmlLength: messageHtml.length,
+            messageHtmlPreview: messageHtml.substring(0, 150)
+        });
+    }
+    
+    // If no template message, use default
+    if (!messageHtml || messageHtml.trim() === '') {
+        console.log('📧 Using default Flight Voucher Confirmation message HTML (template body is empty or not found)');
+        messageHtml = getFlightVoucherMessageHtml(voucher);
+    }
+    
+    // Replace prompts in the message
+    const messageWithPrompts = replacePrompts(messageHtml, voucher);
+    const bodyHtml = messageWithPrompts;
+    
+    // Build email layout (matches frontend buildEmailLayout)
+    return buildEmailLayout({
+        subject,
+        headline: '',
+        bodyHtml,
+        customerName,
+        signatureLines: [],
+        footerLinks: [
+            { label: 'Download voucher', url: 'https://flyawayballooning.com/account/vouchers' },
+            { label: 'Gift FAQs', url: 'https://flyawayballooning.com/gift-faqs' }
+        ]
+    });
+}
+
+// Helper function to generate gift voucher confirmation email HTML
+function generateGiftVoucherConfirmationEmail(voucher, template = null) {
+    const customerName = voucher.name || voucher.customer_name || 'Guest';
+    const subject = template?.subject || '🎁 Your Gift Voucher is ready';
+    
+    // Get message HTML from template if available, otherwise use default
+    let messageHtml = '';
+    if (template && template.body && template.body.trim() !== '') {
+        const rawBody = String(template.body).trim();
+        
+        // Template body from Settings page is already HTML from RichTextEditor
+        messageHtml = sanitizeTemplateHtml(rawBody);
+        
+        // If sanitization removed everything, use raw body
+        if (!messageHtml || messageHtml.trim() === '') {
+            console.warn('⚠️ Template body became empty after sanitization, using raw body');
+            messageHtml = rawBody;
+        }
+        
+        console.log('📧 Using Gift Voucher Confirmation template body from database:', {
+            templateName: template.name,
+            templateId: template.id,
+            rawBodyLength: rawBody.length,
+            rawBodyPreview: rawBody.substring(0, 150),
+            messageHtmlLength: messageHtml.length,
+            messageHtmlPreview: messageHtml.substring(0, 150)
+        });
+    }
+    
+    // If no template message, use default
+    if (!messageHtml || messageHtml.trim() === '') {
+        console.log('📧 Using default Gift Voucher Confirmation message HTML (template body is empty or not found)');
+        messageHtml = getGiftVoucherMessageHtml(voucher);
+    }
+    
+    // Replace prompts in the message
+    const messageWithPrompts = replacePrompts(messageHtml, voucher);
+    const bodyHtml = messageWithPrompts;
+    
+    // Build email layout (matches frontend buildEmailLayout)
+    return buildEmailLayout({
+        subject,
+        headline: '',
+        bodyHtml,
+        customerName,
+        signatureLines: [],
+        footerLinks: [
+            { label: 'Download voucher', url: 'https://flyawayballooning.com/account/vouchers' },
+            { label: 'Gift FAQs', url: 'https://flyawayballooning.com/gift-faqs' }
+        ]
+    });
+}
+
 // Helper function to send automatic booking confirmation email
 async function sendAutomaticBookingConfirmationEmail(bookingId) {
+    console.log('========================================');
+    console.log('📧 [sendAutomaticBookingConfirmationEmail] FUNCTION CALLED');
+    console.log('📧 [sendAutomaticBookingConfirmationEmail] Booking ID:', bookingId);
+    console.log('📧 [sendAutomaticBookingConfirmationEmail] Timestamp:', new Date().toISOString());
+    console.log('========================================');
+    
+    try {
+        console.log('📧 [sendAutomaticBookingConfirmationEmail] Starting email send for booking ID:', bookingId);
+        
+        // Check if SendGrid is configured
+        if (!process.env.SENDGRID_API_KEY) {
+            console.warn('⚠️ [sendAutomaticBookingConfirmationEmail] SendGrid API key not configured, skipping automatic email');
+            console.warn('⚠️ [sendAutomaticBookingConfirmationEmail] SENDGRID_API_KEY exists:', !!process.env.SENDGRID_API_KEY);
+            return;
+        }
+        
+        console.log('✅ [sendAutomaticBookingConfirmationEmail] SendGrid API key is configured');
+        
+        // Fetch booking details
+        const bookingQuery = `SELECT * FROM all_booking WHERE id = ?`;
+        
+        con.query(bookingQuery, [bookingId], async (err, bookingRows) => {
+            if (err) {
+                console.error('❌ [sendAutomaticBookingConfirmationEmail] Error fetching booking for email:', err);
+                return;
+            }
+            
+            if (!bookingRows || bookingRows.length === 0) {
+                console.warn('⚠️ [sendAutomaticBookingConfirmationEmail] Booking not found for email:', bookingId);
+                return;
+            }
+            
+            const booking = bookingRows[0];
+            console.log('📋 [sendAutomaticBookingConfirmationEmail] Booking found:', {
+                id: booking.id,
+                name: booking.name,
+                email: booking.email,
+                flight_date: booking.flight_date
+            });
+            
+            // Fetch passengers for this booking
+            const passengerQuery = `SELECT * FROM passenger WHERE booking_id = ?`;
+            con.query(passengerQuery, [bookingId], (passengerErr, passengerRows) => {
+                if (passengerErr) {
+                    console.error('❌ [sendAutomaticBookingConfirmationEmail] Error fetching passengers for email:', passengerErr);
+                    // Continue without passengers
+                    booking.passengers = [];
+                } else {
+                    booking.passengers = passengerRows || [];
+                    console.log('👥 [sendAutomaticBookingConfirmationEmail] Passengers found:', booking.passengers.length);
+                    if (booking.passengers.length > 0) {
+                        console.log('📧 [sendAutomaticBookingConfirmationEmail] Passenger emails:', booking.passengers.map(p => p.email).filter(Boolean));
+                    }
+                }
+                
+                // If booking.email is empty, try to get email from passengers
+                if (!booking.email || !booking.email.trim()) {
+                    console.log('⚠️ [sendAutomaticBookingConfirmationEmail] Booking email is empty, trying to get from passengers');
+                    if (booking.passengers && booking.passengers.length > 0) {
+                        const firstPassengerWithEmail = booking.passengers.find(p => p.email && p.email.trim());
+                        if (firstPassengerWithEmail) {
+                            booking.email = firstPassengerWithEmail.email.trim();
+                            console.log('✅ [sendAutomaticBookingConfirmationEmail] Using email from passenger:', booking.email);
+                        } else {
+                            console.warn('⚠️ [sendAutomaticBookingConfirmationEmail] No email found in any passenger');
+                            console.warn('⚠️ [sendAutomaticBookingConfirmationEmail] Passenger details:', booking.passengers.map(p => ({
+                                name: `${p.first_name} ${p.last_name}`,
+                                email: p.email
+                            })));
+                        }
+                    } else {
+                        console.warn('⚠️ [sendAutomaticBookingConfirmationEmail] No passengers found for booking');
+                    }
+                } else {
+                    console.log('✅ [sendAutomaticBookingConfirmationEmail] Booking email found:', booking.email);
+                }
+                
+                // Continue with email sending only if email is available
+                if (booking.email && booking.email.trim()) {
+                    sendEmailToCustomerAndOwner(booking, bookingId);
+                } else {
+                    console.error('❌ [sendAutomaticBookingConfirmationEmail] Cannot send email - no email address available for booking:', bookingId);
+                }
+            });
+        });
+    } catch (error) {
+        console.error('❌ [sendAutomaticBookingConfirmationEmail] Error sending automatic booking confirmation email:', error);
+        // Don't throw error - email failure shouldn't break booking creation
+    }
+}
+
+// Helper function to send automatic flight voucher confirmation email
+async function sendAutomaticFlightVoucherConfirmationEmail(voucherId) {
     try {
         // Check if SendGrid is configured
         if (!process.env.SENDGRID_API_KEY) {
@@ -14501,49 +14827,99 @@ async function sendAutomaticBookingConfirmationEmail(bookingId) {
             return;
         }
         
-        // Fetch booking details
-        const bookingQuery = `SELECT * FROM all_booking WHERE id = ?`;
+        // Fetch voucher details
+        const voucherQuery = `SELECT * FROM all_vouchers WHERE id = ?`;
         
-        con.query(bookingQuery, [bookingId], async (err, bookingRows) => {
+        con.query(voucherQuery, [voucherId], async (err, voucherRows) => {
             if (err) {
-                console.error('Error fetching booking for email:', err);
+                console.error('Error fetching voucher for email:', err);
                 return;
             }
             
-            if (!bookingRows || bookingRows.length === 0) {
-                console.warn('Booking not found for email:', bookingId);
+            if (!voucherRows || voucherRows.length === 0) {
+                console.warn('Voucher not found for email:', voucherId);
                 return;
             }
             
-            const booking = bookingRows[0];
+            const voucher = voucherRows[0];
             
-            // Fetch passengers for this booking
-            const passengerQuery = `SELECT * FROM passenger WHERE booking_id = ?`;
-            con.query(passengerQuery, [bookingId], (passengerErr, passengerRows) => {
-                if (passengerErr) {
-                    console.error('Error fetching passengers for email:', passengerErr);
-                    // Continue without passengers
-                    booking.passengers = [];
-                } else {
-                    booking.passengers = passengerRows || [];
-                }
-                
-                // Continue with email sending
-                sendEmailToCustomerAndOwner(booking, bookingId);
-            });
+            // Only send email for Flight Voucher type (not Gift Voucher)
+            if (voucher.book_flight !== 'Flight Voucher') {
+                console.log('Skipping automatic email - not a Flight Voucher:', voucher.book_flight);
+                return;
+            }
+            
+            // Continue with email sending
+            sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId);
         });
     } catch (error) {
-        console.error('Error sending automatic booking confirmation email:', error);
-        // Don't throw error - email failure shouldn't break booking creation
+        console.error('Error sending automatic flight voucher confirmation email:', error);
+        // Don't throw error - email failure shouldn't break voucher creation
+    }
+}
+
+// Helper function to send automatic gift voucher confirmation email
+async function sendAutomaticGiftVoucherConfirmationEmail(voucherId) {
+    try {
+        // Check if SendGrid is configured
+        if (!process.env.SENDGRID_API_KEY) {
+            console.warn('SendGrid API key not configured, skipping automatic email');
+            return;
+        }
+        
+        // Fetch voucher details
+        const voucherQuery = `SELECT * FROM all_vouchers WHERE id = ?`;
+        
+        con.query(voucherQuery, [voucherId], async (err, voucherRows) => {
+            if (err) {
+                console.error('Error fetching voucher for email:', err);
+                return;
+            }
+            
+            if (!voucherRows || voucherRows.length === 0) {
+                console.warn('Voucher not found for email:', voucherId);
+                return;
+            }
+            
+            const voucher = voucherRows[0];
+            
+            // Only send email for Gift Voucher type (not Flight Voucher)
+            if (voucher.book_flight !== 'Gift Voucher') {
+                console.log('Skipping automatic email - not a Gift Voucher:', voucher.book_flight);
+                return;
+            }
+            
+            // Continue with email sending
+            sendGiftVoucherEmailToCustomerAndOwner(voucher, voucherId);
+        });
+    } catch (error) {
+        console.error('Error sending automatic gift voucher confirmation email:', error);
+        // Don't throw error - email failure shouldn't break voucher creation
     }
 }
 
 // Helper function to send email to both customer and owner
 async function sendEmailToCustomerAndOwner(booking, bookingId) {
     try {
+        console.log('📧 [sendEmailToCustomerAndOwner] Starting email send process for booking ID:', bookingId);
+        console.log('📧 [sendEmailToCustomerAndOwner] Booking email:', booking.email);
+        
         // Check if email is provided
-        if (!booking.email) {
-            console.warn('No email address for booking:', bookingId);
+        if (!booking.email || !booking.email.trim()) {
+            console.warn('⚠️ [sendEmailToCustomerAndOwner] No email address for booking:', bookingId);
+            console.warn('⚠️ [sendEmailToCustomerAndOwner] Booking details:', {
+                id: booking.id,
+                name: booking.name,
+                email: booking.email,
+                passengerCount: booking.passengers ? booking.passengers.length : 0
+            });
+            return;
+        }
+        
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(booking.email.trim())) {
+            console.warn('⚠️ [sendEmailToCustomerAndOwner] Invalid email format for booking:', bookingId, 'Email:', booking.email);
             return;
         }
         
@@ -14617,14 +14993,24 @@ async function sendEmailToCustomerAndOwner(booking, bookingId) {
             (async () => {
                 try {
                     // Send email to customer
-                    console.log('📧 Sending automatic booking confirmation email to customer:', booking.email);
+                    console.log('📧 [sendEmailToCustomerAndOwner] Sending automatic booking confirmation email to customer:', booking.email);
+                    console.log('📧 [sendEmailToCustomerAndOwner] Email content:', {
+                        to: customerEmailContent.to,
+                        subject: customerEmailContent.subject,
+                        hasHtml: !!customerEmailContent.html,
+                        htmlLength: customerEmailContent.html ? customerEmailContent.html.length : 0
+                    });
+                    
                     const customerResponse = await sgMail.send(customerEmailContent);
-                    console.log('✅ Automatic booking confirmation email sent to customer successfully:', customerResponse[0].statusCode);
+                    console.log('✅ [sendEmailToCustomerAndOwner] Automatic booking confirmation email sent to customer successfully');
+                    console.log('✅ [sendEmailToCustomerAndOwner] Response status:', customerResponse[0].statusCode);
+                    console.log('✅ [sendEmailToCustomerAndOwner] Response headers:', customerResponse[0].headers);
                     
                     // Send email to business owner
-                    console.log('📧 Sending automatic booking confirmation email to business owner: info@flyawayballooning.com');
+                    console.log('📧 [sendEmailToCustomerAndOwner] Sending automatic booking confirmation email to business owner: info@flyawayballooning.com');
                     const ownerResponse = await sgMail.send(ownerEmailContent);
-                    console.log('✅ Automatic booking confirmation email sent to business owner successfully:', ownerResponse[0].statusCode);
+                    console.log('✅ [sendEmailToCustomerAndOwner] Automatic booking confirmation email sent to business owner successfully');
+                    console.log('✅ [sendEmailToCustomerAndOwner] Owner response status:', ownerResponse[0].statusCode);
                     
                     // Log email activity for customer
                     const logSql = `
@@ -14684,13 +15070,335 @@ async function sendEmailToCustomerAndOwner(booking, bookingId) {
                         }
                     });
                 } catch (emailErr) {
+                    console.error('❌ [sendEmailToCustomerAndOwner] Error sending emails:', emailErr);
+                    console.error('❌ [sendEmailToCustomerAndOwner] Error details:', {
+                        message: emailErr.message,
+                        code: emailErr.code,
+                        response: emailErr.response ? {
+                            statusCode: emailErr.response.statusCode,
+                            body: emailErr.response.body,
+                            headers: emailErr.response.headers
+                        } : null
+                    });
+                }
+            })();
+        });
+    } catch (error) {
+        console.error('❌ [sendEmailToCustomerAndOwner] Error sending email to customer and owner:', error);
+        console.error('❌ [sendEmailToCustomerAndOwner] Error stack:', error.stack);
+        // Don't throw error - email failure shouldn't break booking creation
+    }
+}
+
+// Helper function to send flight voucher email to both customer and owner
+async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
+    try {
+        // Check if email is provided
+        if (!voucher.email) {
+            console.warn('No email address for voucher:', voucherId);
+            return;
+        }
+        
+        // Fetch "Flight Voucher Confirmation" template from database
+        const templateQuery = `SELECT * FROM email_templates WHERE name = 'Flight Voucher Confirmation' LIMIT 1`;
+        con.query(templateQuery, (templateErr, templateRows) => {
+            if (templateErr) {
+                console.error('❌ Error fetching Flight Voucher Confirmation template:', templateErr);
+                // Continue with default template if fetch fails
+            }
+            
+            const template = templateRows && templateRows.length > 0 ? templateRows[0] : null;
+            
+            // Debug logging
+            if (template) {
+                console.log('✅ Found Flight Voucher Confirmation template:', {
+                    id: template.id,
+                    name: template.name,
+                    subject: template.subject,
+                    bodyLength: template.body ? template.body.length : 0,
+                    bodyPreview: template.body ? template.body.substring(0, 200) : 'empty',
+                    edited: template.edited
+                });
+            } else {
+                console.log('⚠️ Flight Voucher Confirmation template not found in database, using default');
+            }
+            
+            // Generate email HTML using database template (or default if template not found)
+            const htmlBody = generateFlightVoucherConfirmationEmail(voucher, template);
+            const textBody = `Thank you for choosing Fly Away Ballooning! Your hot air balloon experience voucher has been purchased. What an extraordinary gift — the experience awaits you or your lucky recipient!`;
+            
+            const subject = template?.subject || '🎈 Your Flight Voucher is ready';
+            
+            // Prepare email content for customer
+            const customerEmailContent = {
+                to: voucher.email,
+                from: {
+                    email: 'info@flyawayballooning.com',
+                    name: 'Fly Away Ballooning'
+                },
+                subject: subject,
+                text: textBody,
+                html: htmlBody,
+                custom_args: {
+                    voucher_id: voucherId.toString(),
+                    template_type: 'flight_voucher_confirmation_automatic'
+                }
+            };
+            
+            // Prepare email content for business owner (same content, different recipient)
+            const ownerEmailContent = {
+                to: 'info@flyawayballooning.com',
+                from: {
+                    email: 'info@flyawayballooning.com',
+                    name: 'Fly Away Ballooning'
+                },
+                subject: `📧 New Flight Voucher Confirmation - ${voucher.name || 'Guest'} (Voucher ID: ${voucherId})`,
+                text: `New flight voucher confirmation sent to customer.\n\n${textBody}`,
+                html: `<div style="padding:16px; background:#f0f9ff; border-left:4px solid #3b82f6; margin-bottom:24px;">
+                    <p style="margin:0; font-weight:600; color:#1e40af;">New Flight Voucher Confirmation</p>
+                    <p style="margin:8px 0 0 0; color:#1e3a8a;">This flight voucher confirmation was automatically sent to: ${escapeHtml(voucher.email || 'N/A')}</p>
+                    <p style="margin:8px 0 0 0; color:#1e3a8a;">Voucher ID: ${voucherId}</p>
+                </div>${htmlBody}`,
+                custom_args: {
+                    voucher_id: voucherId.toString(),
+                    template_type: 'flight_voucher_confirmation_automatic_owner'
+                }
+            };
+            
+            // Send emails asynchronously
+            (async () => {
+                try {
+                    // Send email to customer
+                    console.log('📧 Sending automatic flight voucher confirmation email to customer:', voucher.email);
+                    const customerResponse = await sgMail.send(customerEmailContent);
+                    console.log('✅ Automatic flight voucher confirmation email sent to customer successfully:', customerResponse[0].statusCode);
+                    
+                    // Send email to business owner
+                    console.log('📧 Sending automatic flight voucher confirmation email to business owner: info@flyawayballooning.com');
+                    const ownerResponse = await sgMail.send(ownerEmailContent);
+                    console.log('✅ Automatic flight voucher confirmation email sent to business owner successfully:', ownerResponse[0].statusCode);
+                    
+                    // Log email activity for customer
+                    const logSql = `
+                        INSERT INTO email_logs (
+                            booking_id,
+                            recipient_email,
+                            subject,
+                            template_type,
+                            message_html,
+                            message_text,
+                            sent_at,
+                            status,
+                            message_id,
+                            opens,
+                            clicks,
+                            last_event,
+                            last_event_at,
+                            context_type,
+                            context_id
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, NOW(), 'sent', ?, 0, 0, 'sent', NOW(), ?, ?)
+                    `;
+                    const customerMessageId = customerResponse[0]?.headers?.['x-message-id'];
+                    const contextType = 'voucher';
+                    const contextId = voucherId ? String(voucherId) : null;
+                    con.query(logSql, [
+                        null, // booking_id is null for vouchers
+                        voucher.email,
+                        customerEmailContent.subject,
+                        'flight_voucher_confirmation_automatic',
+                        htmlBody,
+                        textBody,
+                        customerMessageId,
+                        contextType,
+                        contextId
+                    ], (logErr) => {
+                        if (logErr) {
+                            console.error('Error logging automatic customer email:', logErr);
+                        }
+                    });
+                    
+                    // Log email activity for business owner
+                    const ownerMessageId = ownerResponse[0]?.headers?.['x-message-id'];
+                    con.query(logSql, [
+                        null, // booking_id is null for vouchers
+                        'info@flyawayballooning.com',
+                        ownerEmailContent.subject,
+                        'flight_voucher_confirmation_automatic_owner',
+                        ownerEmailContent.html,
+                        ownerEmailContent.text,
+                        ownerMessageId,
+                        contextType,
+                        contextId
+                    ], (logErr) => {
+                        if (logErr) {
+                            console.error('Error logging automatic owner email:', logErr);
+                        }
+                    });
+                } catch (emailErr) {
                     console.error('Error sending emails:', emailErr);
                 }
             })();
         });
     } catch (error) {
-        console.error('Error sending email to customer and owner:', error);
-        // Don't throw error - email failure shouldn't break booking creation
+        console.error('Error sending flight voucher email to customer and owner:', error);
+        // Don't throw error - email failure shouldn't break voucher creation
+    }
+}
+
+// Helper function to send gift voucher email to both customer and owner
+async function sendGiftVoucherEmailToCustomerAndOwner(voucher, voucherId) {
+    try {
+        // Check if email is provided
+        if (!voucher.email) {
+            console.warn('No email address for voucher:', voucherId);
+            return;
+        }
+        
+        // Fetch "Gift Voucher Confirmation" template from database
+        const templateQuery = `SELECT * FROM email_templates WHERE name = 'Gift Voucher Confirmation' LIMIT 1`;
+        con.query(templateQuery, (templateErr, templateRows) => {
+            if (templateErr) {
+                console.error('❌ Error fetching Gift Voucher Confirmation template:', templateErr);
+                // Continue with default template if fetch fails
+            }
+            
+            const template = templateRows && templateRows.length > 0 ? templateRows[0] : null;
+            
+            // Debug logging
+            if (template) {
+                console.log('✅ Found Gift Voucher Confirmation template:', {
+                    id: template.id,
+                    name: template.name,
+                    subject: template.subject,
+                    bodyLength: template.body ? template.body.length : 0,
+                    bodyPreview: template.body ? template.body.substring(0, 200) : 'empty',
+                    edited: template.edited
+                });
+            } else {
+                console.log('⚠️ Gift Voucher Confirmation template not found in database, using default');
+            }
+            
+            // Generate email HTML using database template (or default if template not found)
+            const htmlBody = generateGiftVoucherConfirmationEmail(voucher, template);
+            const textBody = `Thanks for choosing Fly Away Ballooning — your gift voucher is confirmed and ready to deliver!`;
+            
+            const subject = template?.subject || '🎁 Your Gift Voucher is ready';
+            
+            // Prepare email content for customer
+            const customerEmailContent = {
+                to: voucher.email,
+                from: {
+                    email: 'info@flyawayballooning.com',
+                    name: 'Fly Away Ballooning'
+                },
+                subject: subject,
+                text: textBody,
+                html: htmlBody,
+                custom_args: {
+                    voucher_id: voucherId.toString(),
+                    template_type: 'gift_voucher_confirmation_automatic'
+                }
+            };
+            
+            // Prepare email content for business owner (same content, different recipient)
+            const ownerEmailContent = {
+                to: 'info@flyawayballooning.com',
+                from: {
+                    email: 'info@flyawayballooning.com',
+                    name: 'Fly Away Ballooning'
+                },
+                subject: `📧 New Gift Voucher Confirmation - ${voucher.name || 'Guest'} (Voucher ID: ${voucherId})`,
+                text: `New gift voucher confirmation sent to customer.\n\n${textBody}`,
+                html: `<div style="padding:16px; background:#f0f9ff; border-left:4px solid #3b82f6; margin-bottom:24px;">
+                    <p style="margin:0; font-weight:600; color:#1e40af;">New Gift Voucher Confirmation</p>
+                    <p style="margin:8px 0 0 0; color:#1e3a8a;">This gift voucher confirmation was automatically sent to: ${escapeHtml(voucher.email || 'N/A')}</p>
+                    <p style="margin:8px 0 0 0; color:#1e3a8a;">Voucher ID: ${voucherId}</p>
+                </div>${htmlBody}`,
+                custom_args: {
+                    voucher_id: voucherId.toString(),
+                    template_type: 'gift_voucher_confirmation_automatic_owner'
+                }
+            };
+            
+            // Send emails asynchronously
+            (async () => {
+                try {
+                    // Send email to customer
+                    console.log('📧 Sending automatic gift voucher confirmation email to customer:', voucher.email);
+                    const customerResponse = await sgMail.send(customerEmailContent);
+                    console.log('✅ Automatic gift voucher confirmation email sent to customer successfully:', customerResponse[0].statusCode);
+                    
+                    // Send email to business owner
+                    console.log('📧 Sending automatic gift voucher confirmation email to business owner: info@flyawayballooning.com');
+                    const ownerResponse = await sgMail.send(ownerEmailContent);
+                    console.log('✅ Automatic gift voucher confirmation email sent to business owner successfully:', ownerResponse[0].statusCode);
+                    
+                    // Log email activity for customer
+                    const logSql = `
+                        INSERT INTO email_logs (
+                            booking_id,
+                            recipient_email,
+                            subject,
+                            template_type,
+                            message_html,
+                            message_text,
+                            sent_at,
+                            status,
+                            message_id,
+                            opens,
+                            clicks,
+                            last_event,
+                            last_event_at,
+                            context_type,
+                            context_id
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, NOW(), 'sent', ?, 0, 0, 'sent', NOW(), ?, ?)
+                    `;
+                    const customerMessageId = customerResponse[0]?.headers?.['x-message-id'];
+                    const contextType = 'voucher';
+                    const contextId = voucherId ? String(voucherId) : null;
+                    con.query(logSql, [
+                        null, // booking_id is null for vouchers
+                        voucher.email,
+                        customerEmailContent.subject,
+                        'gift_voucher_confirmation_automatic',
+                        htmlBody,
+                        textBody,
+                        customerMessageId,
+                        contextType,
+                        contextId
+                    ], (logErr) => {
+                        if (logErr) {
+                            console.error('Error logging automatic customer email:', logErr);
+                        }
+                    });
+                    
+                    // Log email activity for business owner
+                    const ownerMessageId = ownerResponse[0]?.headers?.['x-message-id'];
+                    con.query(logSql, [
+                        null, // booking_id is null for vouchers
+                        'info@flyawayballooning.com',
+                        ownerEmailContent.subject,
+                        'gift_voucher_confirmation_automatic_owner',
+                        ownerEmailContent.html,
+                        ownerEmailContent.text,
+                        ownerMessageId,
+                        contextType,
+                        contextId
+                    ], (logErr) => {
+                        if (logErr) {
+                            console.error('Error logging automatic owner email:', logErr);
+                        }
+                    });
+                } catch (emailErr) {
+                    console.error('Error sending emails:', emailErr);
+                }
+            })();
+        });
+    } catch (error) {
+        console.error('Error sending gift voucher email to customer and owner:', error);
+        // Don't throw error - email failure shouldn't break voucher creation
     }
 }
 
