@@ -1685,22 +1685,40 @@ const Manifest = () => {
             const currentAttempts = parseInt(bookingDetail.booking.flight_attempts || 0, 10);
             const newAttempts = currentAttempts + 1;
             
+            // Prepare passenger data for new booking
+            const existingPassengers = bookingDetail.passengers || [];
+            let passengerData = [];
+            if (existingPassengers.length > 0) {
+                // Use existing passenger data
+                passengerData = existingPassengers.map(p => ({
+                    firstName: p.first_name || '',
+                    lastName: p.last_name || '',
+                    weight: p.weight || '',
+                    email: p.email || bookingDetail.booking.email || '',
+                    phone: p.phone || bookingDetail.booking.phone || '',
+                    ticketType: flightType,
+                    weatherRefund: p.weather_refund || false
+                }));
+            } else {
+                // Fallback to booking name if no passengers
+                const nameParts = (bookingDetail.booking.name || '').split(' ');
+                passengerData = [{
+                    firstName: nameParts[0] || '',
+                    lastName: nameParts.slice(1).join(' ') || '',
+                    weight: '',
+                    email: bookingDetail.booking.email || '',
+                    phone: bookingDetail.booking.phone || '',
+                    ticketType: flightType,
+                    weatherRefund: false
+                }];
+            }
+
             const payload = {
                 activitySelect: flightType,
                 chooseLocation: selectedLocation || bookingDetail.booking.location,
                 chooseFlightType: { type: flightType, passengerCount: passengerCount },
                 activity_id: activityId,
-                passengerData: [
-                    {
-                        firstName: bookingDetail.booking.name?.split(' ')[0] || '',
-                        lastName: bookingDetail.booking.name?.split(' ').slice(1).join(' ') || '',
-                        weight: bookingDetail.passengers?.[0]?.weight || '',
-                        email: bookingDetail.booking.email || '',
-                        phone: bookingDetail.booking.phone || '',
-                        ticketType: flightType,
-                        weatherRefund: bookingDetail.passengers?.[0]?.weather_refund || false
-                    }
-                ],
+                passengerData: passengerData,
                 selectedDate: dayjs(date).format('YYYY-MM-DD') + ' ' + time,
                 totalPrice: totalPrice,
                 additionalInfo: { notes: bookingDetail.booking.additional_notes || '' },
@@ -1709,7 +1727,7 @@ const Manifest = () => {
             };
             // First delete the old booking
             await axios.delete(`/api/deleteBooking/${bookingDetail.booking.id}`);
-            // Then create the new booking
+            // Then create the new booking (this will automatically send the confirmation email)
             const createResponse = await axios.post('/api/createBooking', payload);
             
             // Clear all states
@@ -1740,7 +1758,7 @@ const Manifest = () => {
             }, 500);
             
             // Show success message
-            alert('Booking successfully rebooked!');
+            alert('Booking successfully rebooked! Confirmation email has been sent.');
         } catch (err) {
             alert('Rebooking failed!');
         } finally {

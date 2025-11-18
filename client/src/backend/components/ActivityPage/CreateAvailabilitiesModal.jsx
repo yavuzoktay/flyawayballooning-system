@@ -19,6 +19,8 @@ const visibilityOptions = [
     { value: 'closed', label: 'Closed' },
 ];
 
+const sharedVoucherTypeOptions = ['Weekday Morning', 'Flexible Weekday', 'Any Day Flight'];
+
 const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, onCreated }) => {
     const navigate = useNavigate();
     const [activities, setActivities] = useState([]);
@@ -70,6 +72,47 @@ const CreateAvailabilitiesModal = ({ open, onClose, activityName, activityId, on
             setSelectedActivity(activityId);
         }
     }, [open, activityId]);
+
+    // Ensure voucher types stay aligned with selected flight types
+    useEffect(() => {
+        if (!open) return;
+        setVoucherTypes(prev => {
+            let updated = [...prev];
+            
+            // Remove voucher types that no longer correspond to selected flight types
+            updated = updated.filter(type => {
+                const isSharedType = sharedVoucherTypeOptions.includes(type);
+                const isPrivateType = privateCharterVoucherTypes.some(pt => pt.title === type);
+                if (!flightTypes.includes('Shared') && isSharedType) return false;
+                if (!flightTypes.includes('Private') && isPrivateType) return false;
+                return true;
+            });
+
+            const ensureSharedSelection = () => {
+                if (!flightTypes.includes('Shared')) return;
+                const hasSharedSelection = updated.some(type => sharedVoucherTypeOptions.includes(type));
+                if (!hasSharedSelection) {
+                    updated.push('Any Day Flight');
+                }
+            };
+
+            const ensurePrivateSelection = () => {
+                if (!flightTypes.includes('Private')) return;
+                if (!privateCharterVoucherTypes || privateCharterVoucherTypes.length === 0) return;
+                const hasPrivateSelection = updated.some(type =>
+                    privateCharterVoucherTypes.some(pt => pt.title === type)
+                );
+                if (!hasPrivateSelection) {
+                    updated.push(privateCharterVoucherTypes[0].title);
+                }
+            };
+
+            ensureSharedSelection();
+            ensurePrivateSelection();
+
+            return Array.from(new Set(updated));
+        });
+    }, [open, flightTypes, privateCharterVoucherTypes]);
 
     // Calculate how many availabilities will be created
     useEffect(() => {

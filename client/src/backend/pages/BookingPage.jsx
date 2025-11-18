@@ -2389,6 +2389,9 @@ setBookingDetail(finalVoucherDetail);
                         }
                     }
                     
+                    // Get recipient email from voucher if available (for Gift Voucher)
+                    const recipientEmail = voucher.recipient_email || '';
+                    
                     // Prepare booking payload
                     const bookingPayload = {
                         activitySelect: 'Redeem Voucher',
@@ -2397,11 +2400,12 @@ setBookingDetail(finalVoucherDetail);
                             type: flightType,
                             passengerCount: passengers.length
                         },
-                        passengerData: passengers.map(p => ({
+                        passengerData: passengers.map((p, index) => ({
                             firstName: p.firstName || '',
                             lastName: p.lastName || '',
                             weight: p.weight || '',
-                            email: p.email || '',
+                            // Use recipient_email for first passenger if available, otherwise use passenger email
+                            email: (index === 0 && recipientEmail) ? recipientEmail : (p.email || ''),
                             phone: p.mobile || '',
                             ticketType: flightType
                         })),
@@ -2471,7 +2475,7 @@ setBookingDetail(finalVoucherDetail);
                         setFilteredData(voucherResponse.data.data || []);
                     }
                     
-                    alert('Gift Voucher successfully redeemed and booking created!');
+                    alert('Gift Voucher successfully redeemed and booking created! Confirmation email has been sent.');
                     setRebookLoading(false);
                     return;
                 } catch (error) {
@@ -2660,7 +2664,7 @@ setBookingDetail(finalVoucherDetail);
                         setFilteredData(voucherResponse.data.data || []);
                     }
                     
-                    alert('Flight Voucher successfully redeemed and booking created!');
+                    alert('Flight Voucher successfully redeemed and booking created! Confirmation email has been sent.');
                     setRebookLoading(false);
                     return;
                 } catch (error) {
@@ -2701,8 +2705,10 @@ setBookingDetail(finalVoucherDetail);
                 }
             }
 
-            // Determine passenger count
-            const passengerCount = bookingDetail.booking.pax || 1;
+            // Determine passenger count from existing passengers or booking
+            const existingPassengers = bookingDetail.passengers || [];
+            const passengerCount = existingPassengers.length > 0 ? existingPassengers.length : (bookingDetail.booking.pax || 1);
+            
             // Calculate price based on flight type
             let totalPrice = bookingDetail.booking.paid || 0;
             if (activity) {
@@ -2714,52 +2720,77 @@ setBookingDetail(finalVoucherDetail);
                 }
             }
 
-            // Yeni tarih ve saat
-            const newFlightDate = dayjs(date).format('YYYY-MM-DD') + ' ' + time;
-
-            // PATCH isteklerinden önce payload'u konsola yazdır
-            const patchPayloads = [
-                { booking_id: bookingDetail.booking.id, field: 'activity_id', value: activityId }, // GERİ ALINDI: activity -> activity_id
-                { booking_id: bookingDetail.booking.id, field: 'location', value: selectedLocation || bookingDetail.booking.location },
-                { booking_id: bookingDetail.booking.id, field: 'flight_type', value: flightType },
-                { booking_id: bookingDetail.booking.id, field: 'flight_date', value: newFlightDate },
-                { booking_id: bookingDetail.booking.id, field: 'paid', value: totalPrice }
-            ];
-            patchPayloads.forEach(payload => {
-                console.log('PATCH /api/updateBookingField payload:', payload);
-            });
-
-            // 1. activity_id güncelle
-            await axios.patch('/api/updateBookingField', patchPayloads[0]);
-            // 2. location güncelle
-            await axios.patch('/api/updateBookingField', patchPayloads[1]);
-            // 3. flight_type güncelle
-            await axios.patch('/api/updateBookingField', patchPayloads[2]);
-            // 4. flight_date güncelle
-            await axios.patch('/api/updateBookingField', patchPayloads[3]);
-            // 5. paid güncelle
-            await axios.patch('/api/updateBookingField', patchPayloads[4]);
-            // 6. Eğer status Cancelled ise, Scheduled yap
-            if (bookingDetail.booking.status === 'Cancelled') {
-                const statusPayload = { booking_id: bookingDetail.booking.id, field: 'status', value: 'Scheduled' };
-                console.log('PATCH /api/updateBookingField payload:', statusPayload);
-                await axios.patch('/api/updateBookingField', statusPayload);
-            }
-            // 7. Flight Attempts'ı +1 artır
+            // Get current flight_attempts before deleting
             const currentAttempts = parseInt(bookingDetail.booking.flight_attempts || 0, 10);
             const newAttempts = currentAttempts + 1;
-            const flightAttemptsPayload = { booking_id: bookingDetail.booking.id, field: 'flight_attempts', value: newAttempts.toString() };
-            console.log('PATCH /api/updateBookingField payload (flight_attempts):', flightAttemptsPayload);
-            await axios.patch('/api/updateBookingField', flightAttemptsPayload);
+
+            // Prepare passenger data for new booking
+            let passengerData = [];
+            if (existingPassengers.length > 0) {
+                // Use existing passenger data
+                passengerData = existingPassengers.map(p => ({
+                    firstName: p.first_name || '',
+                    lastName: p.last_name || '',
+                    weight: p.weight || '',
+                    email: p.email || bookingDetail.booking.email || '',
+                    phone: p.phone || bookingDetail.booking.phone || '',
+                    ticketType: flightType,
+                    weatherRefund: p.weather_refund || false
+                }));
+            } else {
+                // Fallback to booking name if no passengers
+                const nameParts = (bookingDetail.booking.name || '').split(' ');
+                passengerData = [{
+                    firstName: nameParts[0] || '',
+                    lastName: nameParts.slice(1).join(' ') || '',
+                    weight: '',
+                    email: bookingDetail.booking.email || '',
+                    phone: bookingDetail.booking.phone || '',
+                    ticketType: flightType,
+                    weatherRefund: false
+                }];
+            }
+
+            const payload = {
+                activitySelect: flightType,
+                chooseLocation: selectedLocation || bookingDetail.booking.location,
+                chooseFlightType: { type: flightType, passengerCount: passengerCount },
+                activity_id: activityId,
+                passengerData: passengerData,
+                selectedDate: dayjs(date).format('YYYY-MM-DD') + ' ' + time,
+                totalPrice: totalPrice,
+                additionalInfo: { notes: bookingDetail.booking.additional_notes || '' },
+                voucher_code: bookingDetail.booking.voucher_code || null,
+                flight_attempts: newAttempts // Add incremented flight_attempts to new booking
+            };
+
+            // First delete the old booking
+            await axios.delete(`/api/deleteBooking/${bookingDetail.booking.id}`);
+            
+            // Then create the new booking (this will automatically send the confirmation email)
+            const createResponse = await axios.post('/api/createBooking', payload);
+            
+            // Clear all states
             setRebookModalOpen(false);
             setDetailDialogOpen(false);
-            // Tabloyu güncelle
+            setSelectedBookingId(null);
+            setBookingDetail(null);
+            setBookingHistory([]);
+            
+            // Refresh all data
             if (activeTab === 'bookings') {
                 const response = await axios.get(`/api/getAllBookingData`, { params: filters });
                 setBooking(response.data.data || []);
+                setFilteredBookingData(response.data.data || []);
                 setFilteredData(response.data.data || []);
             }
-            alert('Rebooking successful!');
+            
+            // Refresh voucher data
+            const voucherResponse = await axios.get(`/api/getAllVoucherData`, { params: filters });
+            setVoucher(voucherResponse.data.data || []);
+            setFilteredVoucherData(voucherResponse.data.data || []);
+            
+            alert('Booking successfully rebooked! Confirmation email has been sent.');
         } catch (err) {
             console.error('Rebooking error:', err);
             alert('Rebooking failed!');
