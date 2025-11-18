@@ -47,6 +47,58 @@ export const sanitizeTemplateHtml = (html = '') => {
         .trim();
 };
 
+// Normalize template body HTML to match Booking Confirmation template styles
+// This ensures consistent font-size, font-family, and line-height across all templates
+const normalizeTemplateBodyStyles = (html = '') => {
+    if (!html) return html;
+    
+    // Remove font-size, font-family, and line-height from inline styles
+    // This allows the wrapper styles in buildEmailLayout to take precedence
+    // Use a more robust approach: replace style attributes and rebuild them
+    let normalized = html.replace(/style="([^"]*)"/gi, (match, styleContent) => {
+        if (!styleContent) return '';
+        
+        // Split style content by semicolons and filter out font-size, font-family, line-height
+        const styles = styleContent.split(';')
+            .map(s => s.trim())
+            .filter(s => {
+                const lower = s.toLowerCase();
+                return s && 
+                       !lower.startsWith('font-size') && 
+                       !lower.startsWith('font-family') && 
+                       !lower.startsWith('line-height');
+            });
+        
+        // Rebuild style attribute if there are remaining styles
+        if (styles.length > 0) {
+            return `style="${styles.join('; ')}"`;
+        }
+        return '';
+    });
+    
+    // Also handle single quotes
+    normalized = normalized.replace(/style='([^']*)'/gi, (match, styleContent) => {
+        if (!styleContent) return '';
+        
+        const styles = styleContent.split(';')
+            .map(s => s.trim())
+            .filter(s => {
+                const lower = s.toLowerCase();
+                return s && 
+                       !lower.startsWith('font-size') && 
+                       !lower.startsWith('font-family') && 
+                       !lower.startsWith('line-height');
+            });
+        
+        if (styles.length > 0) {
+            return `style="${styles.join('; ')}"`;
+        }
+        return '';
+    });
+    
+    return normalized;
+};
+
 const textToParagraphHtml = (text = '') =>
     text
         .split(/\n{2,}/)
@@ -63,29 +115,34 @@ export const extractMessageFromTemplateBody = (html = '') => {
     const sanitized = sanitizeTemplateHtml(html);
     if (!sanitized) return '';
     
+    // Normalize styles to match Booking Confirmation template
+    const normalized = normalizeTemplateBodyStyles(sanitized);
+    
     // Check if [Receipt] prompt exists (new way)
     // Use indexOf instead of test() to avoid regex lastIndex issues
-    const hasReceiptPrompt = sanitized.toLowerCase().indexOf('[receipt]') !== -1;
+    const hasReceiptPrompt = normalized.toLowerCase().indexOf('[receipt]') !== -1;
     if (hasReceiptPrompt) {
-        // If [Receipt] prompt exists, return the entire sanitized HTML
+        // If [Receipt] prompt exists, return the entire normalized HTML
         // The [Receipt] prompt will be replaced by replacePrompts function
         // This ensures text after [Receipt] is preserved
-        return sanitized;
+        return normalized;
     }
     
     // Check for old receipt markers (backward compatibility)
-    const markerIndex = sanitized.indexOf(RECEIPT_MARKER_START);
+    const markerIndex = normalized.indexOf(RECEIPT_MARKER_START);
     if (markerIndex !== -1) {
-        return sanitized.slice(0, markerIndex).trim();
+        return normalized.slice(0, markerIndex).trim();
     }
-    return sanitized;
+    return normalized;
 };
 
 const resolveBodyHtml = (template = {}, fallbackParagraphsHtml = '') => {
     const raw = template?.body;
     if (raw && raw.trim() !== '') {
         if (isHtmlContent(raw)) {
-            return sanitizeTemplateHtml(raw);
+            const sanitized = sanitizeTemplateHtml(raw);
+            // Normalize styles to match Booking Confirmation template
+            return normalizeTemplateBodyStyles(sanitized);
         }
         return textToParagraphHtml(raw);
     }
@@ -344,6 +401,38 @@ const getGiftCardMessageHtml = (booking = {}) => {
     ]);
 };
 
+const getFlightVoucherMessageHtml = (booking = {}) => {
+    const name = escapeHtml(booking?.name || booking?.customer_name || 'Guest');
+    return wrapParagraphs([
+        `Dear ${name},`,
+        'Thank you for choosing Fly Away Ballooning!',
+        'Your hot air balloon experience voucher has been purchased. What an extraordinary gift — the experience awaits you or your lucky recipient!',
+        '<strong>Next Steps:</strong>',
+        'If you provided recipient details during checkout, we’ll be sending your personalised voucher shortly. We will also contact the recipient directly 24 hours after the gifted date you selected to welcome them and provide instructions on how to book their flight.',
+        'If you skipped the recipient details section, simply reply to this email with their information, and we’ll create their voucher and send it to you.',
+        'Should you have any questions in the meantime, please don’t hesitate to reach out.',
+        'Warm regards,',
+        'Fly Away Ballooning Team'
+    ]);
+};
+
+const buildStandardTemplateLayout = (template = {}, booking = {}) => {
+    const subject = template?.subject || '🎈 Fly Away Ballooning';
+    const bodyHtmlRaw = resolveBodyHtml(template, template?.body || '');
+    const bodyWithPrompts = replacePrompts(bodyHtmlRaw, booking);
+    const customerName = booking?.name || booking?.customer_name || 'Guest';
+
+    return buildEmailLayout({
+        subject,
+        headline: '',
+        heroImage: HERO_IMAGE_URL,
+        bodyHtml: bodyWithPrompts,
+        customerName,
+        signatureLines: [],
+        footerLinks: []
+    });
+};
+
 const getPaymentRequestMessageHtml = (booking = {}) => {
     const amountDue = booking?.due != null ? `£${Number(booking?.due).toFixed(2)}` : 'the remaining balance';
     return wrapParagraphs([
@@ -398,10 +487,35 @@ const DEFAULT_TEMPLATE_BUILDERS = {
             highlightHtml: '',
             bodyHtml: bodyHtmlWithPrompts,
             customerName,
-            signatureLines: ['Hugo Hall', 'Chief Pilot'],
+            signatureLines: [],
             footerLinks: [
                 { label: 'Instagram', url: 'https://www.instagram.com/flyawayballooning' },
                 { label: 'Facebook', url: 'https://www.facebook.com/flyawayballooning' }
+            ]
+        });
+    },
+    'Flight Voucher Confirmation': ({ template, booking }) => {
+        const customerName = booking?.name || booking?.customer_name || 'Guest';
+        const subject = '🎈 Your Flight Voucher is ready';
+
+        const customMessageHtml = template?.body
+            ? extractMessageFromTemplateBody(template.body)
+            : '';
+        const messageHtml = customMessageHtml || getFlightVoucherMessageHtml(booking);
+
+        // Replace prompts in the message
+        const messageWithPrompts = replacePrompts(messageHtml, booking);
+
+        return buildEmailLayout({
+            subject,
+            headline: '',
+            heroImage: HERO_IMAGE_URL,
+            bodyHtml: messageWithPrompts,
+            customerName,
+            signatureLines: [],
+            footerLinks: [
+                { label: 'Download voucher', url: 'https://flyawayballooning.com/account/vouchers' },
+                { label: 'Gift FAQs', url: 'https://flyawayballooning.com/gift-faqs' }
             ]
         });
     },
@@ -427,6 +541,7 @@ const DEFAULT_TEMPLATE_BUILDERS = {
         return buildEmailLayout({
             subject,
             headline: '',
+            heroImage: HERO_IMAGE_URL,
             bodyHtml,
             customerName,
             signatureLines: [],
@@ -459,16 +574,45 @@ const DEFAULT_TEMPLATE_BUILDERS = {
     'Gift Card Confirmation': ({ template, booking }) => {
         const purchaserName = booking?.name || booking?.customer_name || 'Guest';
         const subject = '🎁 Your Gift Voucher is ready';
-        const defaultBodyHtml = getGiftCardMessageHtml(booking);
-        const bodyHtml = resolveBodyHtml(template, defaultBodyHtml);
-        // Replace prompts in the message
-        const bodyHtmlWithPrompts = replacePrompts(bodyHtml, booking);
+
+        const customMessageHtml = template?.body
+            ? extractMessageFromTemplateBody(template.body)
+            : '';
+        const messageHtml = customMessageHtml || getGiftCardMessageHtml(booking);
+        
+        // Replace prompts in the message (including [Receipt] if present)
+        const messageWithPrompts = replacePrompts(messageHtml, booking);
 
         return buildEmailLayout({
             subject,
             headline: '',
             heroImage: HERO_IMAGE_URL,
-            bodyHtml: bodyHtmlWithPrompts,
+            bodyHtml: messageWithPrompts,
+            customerName: purchaserName,
+            signatureLines: [],
+            footerLinks: [
+                { label: 'Download voucher', url: 'https://flyawayballooning.com/account/vouchers' },
+                { label: 'Gift FAQs', url: 'https://flyawayballooning.com/gift-faqs' }
+            ]
+        });
+    },
+    'Gift Voucher Confirmation': ({ template, booking }) => {
+        const purchaserName = booking?.name || booking?.customer_name || 'Guest';
+        const subject = '🎁 Your Gift Voucher is ready';
+
+        const customMessageHtml = template?.body
+            ? extractMessageFromTemplateBody(template.body)
+            : '';
+        const messageHtml = customMessageHtml || getGiftCardMessageHtml(booking);
+        
+        // Replace prompts in the message (including [Receipt] if present)
+        const messageWithPrompts = replacePrompts(messageHtml, booking);
+
+        return buildEmailLayout({
+            subject,
+            headline: '',
+            heroImage: HERO_IMAGE_URL,
+            bodyHtml: messageWithPrompts,
             customerName: purchaserName,
             signatureLines: [],
             footerLinks: [
@@ -487,7 +631,7 @@ const DEFAULT_TEMPLATE_BUILDERS = {
             headline: 'Almost there — complete your booking',
             bodyHtml: resolveBodyHtml(template, defaultBodyHtml),
             customerName,
-            signatureLines: ['Accounts Team', 'Fly Away Ballooning'],
+            signatureLines: [],
             footerLinks: [
                 { label: 'Pay online', url: 'https://flyawayballooning.com/pay' },
                 { label: 'Call us', url: 'tel:+441234567890' }
@@ -551,6 +695,8 @@ export const getDefaultTemplateMessageHtml = (templateName, booking = DEFAULT_ED
             return getBookingRescheduledMessageHtml(booking);
         case 'gift card confirmation':
             return getGiftCardMessageHtml(booking);
+        case 'flight voucher confirmation':
+            return getFlightVoucherMessageHtml(booking);
         case 'request for payment/deposit':
             return getPaymentRequestMessageHtml(booking);
         case 'upcoming flight reminder':
@@ -575,9 +721,8 @@ export const getDefaultEmailTemplateContent = (template, booking = {}) => {
     const isEdited = template.edited === 1 || template.edited === true;
 
     if (!builder) {
-        return templateBody
-            ? { subject: template.subject, body: resolveBodyHtml(template, '') }
-            : null;
+        if (!templateBody) return null;
+        return buildStandardTemplateLayout(template, booking);
     }
 
     return builder({ template, booking });
@@ -710,7 +855,7 @@ export const replacePrompts = (html = '', booking = {}) => {
 export const buildEmailHtml = ({ templateName, messageHtml, booking, personalNote }) => {
     const effectiveTemplateName = templateName || 'Custom Message';
     const baseMessage = messageHtml && messageHtml.trim() !== ''
-        ? sanitizeTemplateHtml(messageHtml)
+        ? normalizeTemplateBodyStyles(sanitizeTemplateHtml(messageHtml))
         : getDefaultTemplateMessageHtml(effectiveTemplateName, booking);
     const messageWithNote = applyPersonalNote(baseMessage, personalNote);
     
