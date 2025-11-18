@@ -14030,10 +14030,13 @@ function ensureEmailLogsSchema(callback) {
             clicks INT DEFAULT 0,
             last_event VARCHAR(50),
             last_event_at TIMESTAMP NULL DEFAULT NULL,
+            context_type VARCHAR(50) DEFAULT 'booking',
+            context_id VARCHAR(100),
             INDEX idx_booking_id (booking_id),
             INDEX idx_recipient (recipient_email),
             INDEX idx_sent_at (sent_at),
-            INDEX idx_message_id (message_id)
+            INDEX idx_message_id (message_id),
+            INDEX idx_context (context_type, context_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `;
 
@@ -14046,7 +14049,10 @@ function ensureEmailLogsSchema(callback) {
         "ALTER TABLE email_logs MODIFY COLUMN status VARCHAR(50) DEFAULT 'sent'",
         "ALTER TABLE email_logs ADD INDEX idx_message_id (message_id)",
         "ALTER TABLE email_logs ADD COLUMN message_html MEDIUMTEXT",
-        "ALTER TABLE email_logs ADD COLUMN message_text MEDIUMTEXT"
+        "ALTER TABLE email_logs ADD COLUMN message_text MEDIUMTEXT",
+        "ALTER TABLE email_logs ADD COLUMN context_type VARCHAR(50) DEFAULT 'booking'",
+        "ALTER TABLE email_logs ADD COLUMN context_id VARCHAR(100)",
+        "ALTER TABLE email_logs ADD INDEX idx_context (context_type, context_id)"
     ];
 
     con.query(createTableSql, (err) => {
@@ -14635,11 +14641,15 @@ async function sendEmailToCustomerAndOwner(booking, bookingId) {
                             opens,
                             clicks,
                             last_event,
-                            last_event_at
+                            last_event_at,
+                            context_type,
+                            context_id
                         )
-                        VALUES (?, ?, ?, ?, ?, ?, NOW(), 'sent', ?, 0, 0, 'sent', NOW())
+                        VALUES (?, ?, ?, ?, ?, ?, NOW(), 'sent', ?, 0, 0, 'sent', NOW(), ?, ?)
                     `;
                     const customerMessageId = customerResponse[0]?.headers?.['x-message-id'];
+                    const contextType = 'booking';
+                    const contextId = bookingId ? String(bookingId) : null;
                     con.query(logSql, [
                         bookingId,
                         booking.email,
@@ -14647,7 +14657,9 @@ async function sendEmailToCustomerAndOwner(booking, bookingId) {
                         'booking_confirmation_automatic',
                         htmlBody,
                         textBody,
-                        customerMessageId
+                        customerMessageId,
+                        contextType,
+                        contextId
                     ], (logErr) => {
                         if (logErr) {
                             console.error('Error logging automatic customer email:', logErr);
@@ -14663,7 +14675,9 @@ async function sendEmailToCustomerAndOwner(booking, bookingId) {
                         'booking_confirmation_automatic_owner',
                         ownerEmailContent.html,
                         ownerEmailContent.text,
-                        ownerMessageId
+                        ownerMessageId,
+                        contextType,
+                        contextId
                     ], (logErr) => {
                         if (logErr) {
                             console.error('Error logging automatic owner email:', logErr);
@@ -14770,20 +14784,28 @@ app.post('/api/sendBookingEmail', async (req, res) => {
                     opens,
                     clicks,
                     last_event,
-                    last_event_at
+                    last_event_at,
+                    context_type,
+                    context_id
                 )
-                VALUES (?, ?, ?, ?, ?, ?, NOW(), 'sent', ?, 0, 0, 'sent', NOW())
+                VALUES (?, ?, ?, ?, ?, ?, NOW(), 'sent', ?, 0, 0, 'sent', NOW(), ?, ?)
             `;
             ensureEmailLogsSchema(() => {
+                const isNumericBooking = bookingId && !isNaN(Number(bookingId));
+                const contextType = isNumericBooking ? 'booking' : 'voucher';
+                const contextId = bookingId ? String(bookingId) : (to || '');
+                const bookingIdValue = isNumericBooking ? Number(bookingId) : null;
                 const messageId = response[0]?.headers?.['x-message-id'] || null;
                 con.query(logSql, [
-                    bookingId || null,
+                    bookingIdValue,
                     to,
                     subject,
                     template || 'custom',
                     htmlBody,
                     textBody,
-                    messageId
+                    messageId,
+                    contextType,
+                    contextId
                 ], (err) => {
                     if (err) {
                         console.error('Error logging email activity:', err);
@@ -14827,11 +14849,12 @@ app.get('/api/bookingEmails/:bookingId', (req, res) => {
     
     const sql = `
         SELECT * FROM email_logs 
-        WHERE booking_id = ? 
+        WHERE (booking_id = ? AND context_type = 'booking')
+           OR (context_type = 'booking' AND context_id = ?)
         ORDER BY sent_at DESC
     `;
     
-    con.query(sql, [bookingId], (err, result) => {
+    con.query(sql, [bookingId, String(bookingId)], (err, result) => {
         if (err) {
             console.error('Error fetching email logs:', err);
             return res.status(500).json({
@@ -14848,13 +14871,33 @@ app.get('/api/bookingEmails/:bookingId', (req, res) => {
     });
 });
 
-// Fetch email logs by recipient email (for vouchers/no-booking)
+// Fetch email logs by recipient email (legacy fallback)
 app.get('/api/recipientEmails', (req, res) => {
     const { email } = req.query || {};
     if (!email) return res.status(400).json({ success: false, message: 'email is required' });
     const sql = `SELECT * FROM email_logs WHERE recipient_email = ? ORDER BY sent_at DESC`;
     con.query(sql, [email], (err, rows) => {
         if (err) return res.status(500).json({ success: false, message: err.message });
+        res.json({ success: true, data: rows || [] });
+    });
+});
+
+// Fetch email logs by voucher context id
+app.get('/api/voucherEmails/:contextId', (req, res) => {
+    const { contextId } = req.params;
+    if (!contextId) {
+        return res.status(400).json({ success: false, message: 'contextId is required' });
+    }
+    const sql = `
+        SELECT * FROM email_logs
+        WHERE context_type = 'voucher' AND context_id = ?
+        ORDER BY sent_at DESC
+    `;
+    con.query(sql, [contextId], (err, rows) => {
+        if (err) {
+            console.error('Error fetching voucher email logs:', err);
+            return res.status(500).json({ success: false, message: err.message });
+        }
         res.json({ success: true, data: rows || [] });
     });
 });
