@@ -997,6 +997,11 @@ const Manifest = () => {
 
     // Function to automatically update flight status based on passenger count
     const autoUpdateFlightStatus = async (flight) => {
+        if (!flight) return;
+        if (flight.status === 'Cancelled') {
+            console.log('autoUpdateFlightStatus - Skipping cancelled flight', flight.id);
+            return;
+        }
         try {
             // Calculate total passengers for this flight group
             const totalPassengers = flights.filter(f => 
@@ -1598,12 +1603,6 @@ const Manifest = () => {
             setFlights(prev => prev.filter(f => f.id !== bookingDetail.booking.id));
             
             console.log('Cancel Flight - Local state güncellemeleri tamamlandı');
-            
-            // Auto-update flight status based on new passenger count (cancelled passengers don't count)
-            const updatedFlight = flights.find(f => f.id === bookingDetail.booking.id);
-            if (updatedFlight) {
-                await autoUpdateFlightStatus(updatedFlight);
-            }
             
             // Success message
             alert('Flight successfully cancelled! Flight attempts: ' + newAttempts);
