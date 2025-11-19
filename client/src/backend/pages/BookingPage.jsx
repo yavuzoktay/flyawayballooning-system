@@ -2237,12 +2237,21 @@ setBookingDetail(finalVoucherDetail);
             voucher_code: voucher.voucher_ref || voucher.voucher_code || '',
             flight_type: voucher.experience_type || voucher.flight_type || '',
             location: voucher.location || voucher.preferred_location || '',
+            recipient_name: voucher.recipient_name || '',
+            recipient_email: voucher.recipient_email || '',
+            recipientPhone: voucher.recipient_phone || '',
+            recipientName: voucher.recipient_name || '',
+            recipient: {
+                name: voucher.recipient_name || '',
+                email: voucher.recipient_email || '',
+                phone: voucher.recipient_phone || ''
+            },
             contextType: 'voucher',
             contextId: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`
         };
 
         openEmailModalForBooking(fauxBooking, {
-            preferredTemplateName: 'Gift Voucher Confirmation',
+            preferredTemplateName: 'Received GV',
             contextType: 'voucher',
             contextId: fauxBooking.contextId
         });
@@ -4221,9 +4230,9 @@ setBookingDetail(finalVoucherDetail);
                                                                 <Typography><b>Redeemed:</b> {v.redeemed || '-'}</Typography>
                                                                 <Typography><b>Offer Code:</b> {v.offer_code || '-'}</Typography>
                                                                 <Typography><b>Voucher Ref:</b> {v.voucher_ref || '-'}</Typography>
-                                                                {/* Number of Vouchers should come from API's numberOfVouchers; fallback to passengers/pax */}
+                                                                {/* Number of Passengers should come from API's numberOfVouchers; fallback to passengers/pax */}
                                                                 <Typography>
-                                                                    <b>Number of Vouchers:</b>{' '}
+                                                                    <b>Number of Passengers:</b>{' '}
                                                                     {(() => {
                                                                         const fromApi = v.numberOfVouchers;
                                                                         const fromVoucher = v.numberOfPassengers;

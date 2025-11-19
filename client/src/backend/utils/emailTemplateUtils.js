@@ -483,7 +483,7 @@ const DEFAULT_TEMPLATE_BUILDERS = {
 
         return buildEmailLayout({
             subject,
-            headline: 'Thank you for flying with us!',
+            headline: '',
             highlightHtml: '',
             bodyHtml: bodyHtmlWithPrompts,
             customerName,
@@ -799,6 +799,9 @@ export const replacePrompts = (html = '', booking = {}) => {
     const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
     const fullName = bookingName || 'Guest';
     
+    const recipientNameRaw = booking.recipient_name || booking.recipientName || booking.recipient?.name || '';
+    const recipientFirstName = recipientNameRaw.trim() ? recipientNameRaw.trim().split(/\s+/)[0] : '';
+    
     // Replace prompts (case-insensitive)
     let result = html;
     
@@ -810,6 +813,9 @@ export const replacePrompts = (html = '', booking = {}) => {
     
     // Replace [Full Name] or [full name] or [FULL NAME]
     result = result.replace(/\[Full Name\]/gi, escapeHtml(fullName));
+    
+    // Replace [First Name of Recipient]
+    result = result.replace(/\[First Name of Recipient\]/gi, escapeHtml(recipientFirstName || ''));
     
     // Replace [Email] or [email] or [EMAIL]
     result = result.replace(/\[Email\]/gi, escapeHtml(booking.email || booking.customer_email || ''));
