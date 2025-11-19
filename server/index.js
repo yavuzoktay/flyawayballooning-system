@@ -10973,8 +10973,14 @@ async function createVoucherFromWebhook(voucherData) {
                 
                 // Send automatic gift voucher confirmation email for Gift Voucher type
                 if (normalizedBookFlight === 'Gift Voucher') {
+                    const webhookRecipientEmail = (recipient_email || '').trim();
                     console.log('📧 Sending automatic Gift Voucher Confirmation email for voucher ID:', result.insertId);
                     sendAutomaticGiftVoucherConfirmationEmail(result.insertId);
+                    if (webhookRecipientEmail) {
+                        scheduleReceivedGiftVoucherEmail(result.insertId, webhookRecipientEmail).catch((err) => {
+                            console.error('Error scheduling Received GV email:', err);
+                        });
+                    }
                 }
                 
                 resolve(result.insertId);
@@ -14268,7 +14274,7 @@ function getBookingConfirmationReceiptHtml(booking = {}) {
             </div>
         </div>
         <div style="margin-top:24px;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; font-size:13px; color:#475569;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="receipt-table" style="border-collapse:collapse; font-size:13px; color:#475569;">
                 <thead>
                     <tr>
                         <th align="left" style="padding:8px 0; border-bottom:1px solid #e2e8f0; text-transform:uppercase; letter-spacing:0.08em;">Item</th>
@@ -14279,25 +14285,25 @@ function getBookingConfirmationReceiptHtml(booking = {}) {
                 </thead>
                 <tbody>
                     <tr>
-                        <td style="padding:12px 0; border-bottom:1px solid #f1f5f9; font-weight:600;">
+                        <td data-label="Item" style="padding:12px 0; border-bottom:1px solid #f1f5f9; font-weight:600;">
                             ${experience}
                             ${flightDateTime ? `<div style="margin-top:4px; font-size:12px; color:#64748b; font-weight:400;">Booked For: ${escapeHtml(flightDateTime)}</div>` : ''}
                         </td>
-                        <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;">
+                        <td data-label="Description" style="padding:12px 0; border-bottom:1px solid #f1f5f9;">
                             ${location}
                             ${guestCount > 0 ? `<div style="margin-top:4px; font-size:12px; color:#64748b;">Guests: ${guestCount}</div>` : ''}
                         </td>
-                        <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;" align="right">
+                        <td data-label="Amount" style="padding:12px 0; border-bottom:1px solid #f1f5f9;" align="right">
                             £${subtotal != null ? subtotal.toFixed(2) : '—'}
                         </td>
-                        <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;" align="right">
+                        <td data-label="Total" style="padding:12px 0; border-bottom:1px solid #f1f5f9;" align="right">
                             £${subtotal != null ? subtotal.toFixed(2) : '—'}
                         </td>
                     </tr>
                 </tbody>
             </table>
         </div>
-        <div style="margin-top:16px; font-size:13px; color:#475569;">
+        <div class="receipt-summary" style="margin-top:16px; font-size:13px; color:#475569;">
             <div style="text-align:right; margin-bottom:8px;"><strong>Subtotal:</strong> £${subtotal != null ? subtotal.toFixed(2) : '—'}</div>
             <div style="text-align:right; margin-bottom:8px;"><strong>Total:</strong> £${subtotal != null ? subtotal.toFixed(2) : '—'}</div>
             <div style="text-align:right; margin-bottom:8px;"><strong>Paid:</strong> £${paidAmount != null ? paidAmount.toFixed(2) : '—'}</div>
@@ -14356,12 +14362,54 @@ function buildEmailLayout({ subject, headline = '', heroImage, highlightHtml = '
         env: process.env.NODE_ENV
     });
 
+    const responsiveStyles = `
+    <style>
+        @media only screen and (max-width: 520px) {
+            .receipt-table,
+            .receipt-table tbody,
+            .receipt-table tr,
+            .receipt-table td {
+                display: block !important;
+                width: 100% !important;
+            }
+            .receipt-table thead {
+                display: none !important;
+            }
+            .receipt-table tr {
+                margin-bottom: 16px !important;
+                border-bottom: 1px solid #e2e8f0 !important;
+                padding-bottom: 12px !important;
+            }
+            .receipt-table td {
+                border: none !important;
+                padding: 6px 0 !important;
+                text-align: left !important;
+                font-size: 14px !important;
+                color: #1f2937 !important;
+            }
+            .receipt-table td::before {
+                content: attr(data-label);
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                color: #94a3b8;
+                display: block;
+                margin-bottom: 4px;
+            }
+            .receipt-summary {
+                text-align: left !important;
+            }
+        }
+    </style>
+    `;
+
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${escapeHtml(subject)}</title>
+    ${responsiveStyles}
 </head>
 <body style="margin:0; padding:0; background-color:#f5f5f5; font-family:'Helvetica Neue', Arial, sans-serif;">
     <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
@@ -14443,10 +14491,15 @@ function replacePrompts(html = '', booking = {}) {
     const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
     const fullName = bookingName || 'Guest';
     
+    const recipientNameRaw = booking.recipient_name || booking.recipientName || (booking.recipient && booking.recipient.name) || '';
+    const recipientFirstName = recipientNameRaw && recipientNameRaw.trim() ? recipientNameRaw.trim().split(/\s+/)[0] : '';
+    
     let result = html;
     result = result.replace(/\[First Name\]/gi, escapeHtml(firstName));
     result = result.replace(/\[Last Name\]/gi, escapeHtml(lastName));
     result = result.replace(/\[Full Name\]/gi, escapeHtml(fullName));
+    
+    result = result.replace(/\[First Name of Recipient\]/gi, escapeHtml(recipientFirstName || ''));
     result = result.replace(/\[Email\]/gi, escapeHtml(booking.email || booking.customer_email || ''));
     result = result.replace(/\[Phone\]/gi, escapeHtml(booking.phone || booking.customer_phone || ''));
     result = result.replace(/\[Booking ID\]/gi, escapeHtml(booking.id ? String(booking.id) : ''));
@@ -14526,6 +14579,21 @@ function sanitizeTemplateHtml(html = '') {
     return raw
         .replace(/<!DOCTYPE[^>]*>/gi, '')
         .replace(/<\/?(html|head|body)[^>]*>/gi, '')
+        .trim();
+}
+
+function convertHtmlToText(html) {
+    const sanitizeComments = (input) =>
+        input ? input.replace(/<!--[\s\S]*?-->/g, '') : input;
+    const normalized = sanitizeComments(html || '');
+    return normalized
+        .replace(/<\s*br\s*\/?>/gi, '\n')
+        .replace(/<\/p>/gi, '\n\n')
+        .replace(/<\/div>/gi, '\n')
+        .replace(/<\/li>/gi, '\n')
+        .replace(/<li>/gi, '• ')
+        .replace(/<[^>]+>/g, '')
+        .replace(/\n{3,}/g, '\n\n')
         .trim();
 }
 
@@ -14723,6 +14791,130 @@ function generateGiftVoucherConfirmationEmail(voucher, template = null) {
             { label: 'Gift FAQs', url: 'https://flyawayballooning.com/gift-faqs' }
         ]
     });
+}
+
+async function scheduleReceivedGiftVoucherEmail(voucherId, recipientEmail, delayHours = 24) {
+    try {
+        if (!process.env.SENDGRID_API_KEY) {
+            console.warn('⚠️ [scheduleReceivedGiftVoucherEmail] SendGrid API key not configured, skipping scheduled email.');
+            return;
+        }
+        
+        const delaySeconds = Math.max(1, Math.floor(delayHours * 3600));
+        const sendAtUnix = Math.floor(Date.now() / 1000) + delaySeconds;
+        
+        const voucher = await new Promise((resolve, reject) => {
+            con.query('SELECT * FROM all_vouchers WHERE id = ?', [voucherId], (err, rows) => {
+                if (err) return reject(err);
+                resolve(rows && rows[0] ? rows[0] : null);
+            });
+        });
+        
+        if (!voucher) {
+            console.warn('[scheduleReceivedGiftVoucherEmail] Voucher not found for ID:', voucherId);
+            return;
+        }
+        
+        const finalRecipientEmail = (recipientEmail || voucher.recipient_email || '').trim();
+        if (!finalRecipientEmail) {
+            console.warn('[scheduleReceivedGiftVoucherEmail] No recipient email found for voucher ID:', voucherId);
+            return;
+        }
+        
+        const template = await new Promise((resolve) => {
+            con.query(`SELECT * FROM email_templates WHERE name = 'Received GV' LIMIT 1`, (err, rows) => {
+                if (err) {
+                    console.error('Error fetching Received GV template:', err);
+                    return resolve(null);
+                }
+                resolve(rows && rows[0] ? rows[0] : null);
+            });
+        });
+        
+        const defaultSubject = '🎁 You’ve received a Fly Away Ballooning gift voucher!';
+        let messageHtml = '';
+        if (template && template.body && template.body.trim() !== '') {
+            const rawBody = String(template.body).trim();
+            messageHtml = sanitizeTemplateHtml(rawBody) || rawBody;
+        } else {
+            messageHtml = `<p>Hello ${escapeHtml(voucher.recipient_name || 'there')},</p>
+                <p>This is a friendly reminder that you’ve received a Fly Away Ballooning gift voucher. We’ll be in touch with more details shortly, but feel free to reply to this message if you have any questions.</p>
+                <p>Voucher Reference: <strong>${escapeHtml(voucher.voucher_ref || '—')}</strong></p>
+                <p>We can’t wait to welcome you on board!</p>`;
+        }
+        
+        const messageWithPrompts = replacePrompts(messageHtml, voucher);
+        const bodyHtml = buildEmailLayout({
+            subject: template?.subject || defaultSubject,
+            bodyHtml: messageWithPrompts,
+            customerName: voucher.recipient_name || voucher.name || 'Guest',
+            signatureLines: ['Fly Away Ballooning Team']
+        });
+        const textBody = convertHtmlToText(bodyHtml);
+        
+        const emailPayload = {
+            to: finalRecipientEmail,
+            from: {
+                email: 'info@flyawayballooning.com',
+                name: 'Fly Away Ballooning'
+            },
+            subject: template?.subject || defaultSubject,
+            html: bodyHtml,
+            text: textBody,
+            sendAt: sendAtUnix,
+            custom_args: {
+                voucher_id: voucherId ? String(voucherId) : null,
+                template_type: 'received_gv_automatic',
+                context_type: 'voucher',
+                context_id: voucherId ? String(voucherId) : finalRecipientEmail
+            }
+        };
+        
+        console.log('📧 [scheduleReceivedGiftVoucherEmail] Scheduling Received GV email for voucher:', voucherId, 'sendAt (unix):', sendAtUnix);
+        const response = await sgMail.send(emailPayload);
+        const messageId = response[0]?.headers?.['x-message-id'] || null;
+        
+        ensureEmailLogsSchema(() => {
+            const logSql = `
+                INSERT INTO email_logs (
+                    booking_id,
+                    recipient_email,
+                    subject,
+                    template_type,
+                    message_html,
+                    message_text,
+                    sent_at,
+                    status,
+                    message_id,
+                    opens,
+                    clicks,
+                    last_event,
+                    last_event_at,
+                    context_type,
+                    context_id
+                )
+                VALUES (?, ?, ?, ?, ?, ?, NOW(), 'scheduled', ?, 0, 0, 'scheduled', NOW(), 'voucher', ?)
+            `;
+            con.query(logSql, [
+                null,
+                finalRecipientEmail,
+                template?.subject || defaultSubject,
+                'received_gv_automatic',
+                bodyHtml,
+                textBody,
+                messageId,
+                voucherId ? String(voucherId) : finalRecipientEmail
+            ], (err) => {
+                if (err) {
+                    console.error('Error logging scheduled Received GV email:', err);
+                } else {
+                    console.log('📧 [scheduleReceivedGiftVoucherEmail] Scheduled email logged successfully');
+                }
+            });
+        });
+    } catch (error) {
+        console.error('❌ [scheduleReceivedGiftVoucherEmail] Failed to schedule Received GV email:', error);
+    }
 }
 
 // Helper function to send automatic booking confirmation email
@@ -15435,19 +15627,9 @@ app.post('/api/sendBookingEmail', async (req, res) => {
         }
 
         const containsHtml = typeof message === 'string' && /<\/?[a-z][\s\S]*>/i.test(message);
-        const sanitizeComments = (html) =>
-            html ? html.replace(/<!--[\s\S]*?-->/g, '') : html;
+        const sanitizeComments = (input) =>
+            input ? input.replace(/<!--[\s\S]*?-->/g, '') : input;
         const normalizeHtml = (html) => sanitizeComments(html || '');
-        const convertHtmlToText = (html) =>
-            sanitizeComments(html || '')
-                .replace(/<\s*br\s*\/?>/gi, '\n')
-                .replace(/<\/p>/gi, '\n\n')
-                .replace(/<\/div>/gi, '\n')
-                .replace(/<\/li>/gi, '\n')
-                .replace(/<li>/gi, '• ')
-                .replace(/<[^>]+>/g, '')
-                .replace(/\n{3,}/g, '\n\n')
-                .trim();
 
         const htmlBody = containsHtml ? normalizeHtml(message) : (message || '').replace(/\n/g, '<br>');
         const textBody = containsHtml ? convertHtmlToText(message) : message;

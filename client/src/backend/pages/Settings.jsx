@@ -320,6 +320,7 @@ const Settings = () => {
                     <button type="button" className="btn btn-secondary" onClick={() => insertPrompt('[Email]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Email]</button>
                     <button type="button" className="btn btn-secondary" onClick={() => insertPrompt('[Phone]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Phone]</button>
                     <button type="button" className="btn btn-secondary" onClick={() => insertPrompt('[Booking ID]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Booking ID]</button>
+                    <button type="button" className="btn btn-secondary" onClick={() => insertPrompt('[First Name of Recipient]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[First Name of Recipient]</button>
                     <button type="button" className="btn btn-secondary" onClick={() => insertPrompt('[Experience Data]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Experience Data]</button>
                     <button type="button" className="btn btn-secondary" onClick={() => insertPrompt('[Receipt]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Receipt]</button>
                 </div>

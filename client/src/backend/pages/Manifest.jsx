@@ -54,6 +54,32 @@ import {
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
+const resolveTemplateName = (templateValue, dbTemplate) => {
+    const dbName = dbTemplate?.name ? dbTemplate.name.trim() : '';
+    if (dbName) return dbName;
+    switch (templateValue) {
+        case 'confirmation':
+            return 'Booking Confirmation';
+        case 'reminder':
+            return 'Upcoming Flight Reminder';
+        case 'reschedule':
+            return 'Booking Rescheduled';
+        case 'to_be_updated':
+            return 'To Be Updated';
+        case 'custom':
+            return 'Custom Message';
+        default:
+            return dbName || 'Custom Message';
+    }
+};
+
+const MemoizedEmailPreview = React.memo(
+    ({ html }) => (
+        <Box sx={{ lineHeight: 1.6, color: '#333' }} dangerouslySetInnerHTML={{ __html: html }} />
+    ),
+    (prev, next) => prev.html === next.html
+);
+
 const Manifest = () => {
     // Hook'lar her zaman bir dizi döndürsün, yoksa boş dizi olsun
     const bookingHook = useBooking() || {};
@@ -140,8 +166,7 @@ const Manifest = () => {
     // Add state for the current group's flights
     const [globalMenuGroupFlights, setGlobalMenuGroupFlights] = useState([]);
     // Confirm cancel-all dialog state
-    const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
-    const [confirmCancelLoading, setConfirmCancelLoading] = useState(false);
+    const [groupActionMode, setGroupActionMode] = useState('message');
     const handleGlobalMenuOpen = (event, group, groupFlights) => {
       setGlobalMenuAnchorEl(event.currentTarget);
       setGlobalMenuGroup(group);
@@ -151,54 +176,58 @@ const Manifest = () => {
       setGlobalMenuAnchorEl(null);
       setGlobalMenuGroup(null);
     };
-    const handleGlobalMenuAction = async (action) => {
-      if (action === 'cancelAllGuests') {
-        setConfirmCancelOpen(true);
-        return;
-      }
-
-      if (action === 'sendMessageAllGuests') {
+    const openGroupMessageModalForAction = (mode = 'message') => {
         handleGlobalMenuClose();
         if (!globalMenuGroupFlights || globalMenuGroupFlights.length === 0) {
-          alert('No guests found for this flight.');
-          return;
+            alert('No guests found for this flight.');
+            return;
         }
 
         const recipients = Array.from(
-          new Set(
-            globalMenuGroupFlights
-              .map(flight => (flight.email || '').trim())
-              .filter(Boolean)
-          )
+            new Set(
+                globalMenuGroupFlights
+                    .map(flight => (flight.email || '').trim())
+                    .filter(Boolean)
+            )
         );
 
         if (recipients.length === 0) {
-          alert('No email addresses available for the guests on this flight.');
-          return;
+            alert('No email addresses available for the guests on this flight.');
+            return;
         }
 
         const firstTemplate = emailTemplates.length > 0 ? emailTemplates[0].id : 'custom';
         const primaryBooking = globalMenuGroupFlights[0] || null;
 
+        setGroupActionMode(mode);
         setGroupSelectedBookings([...globalMenuGroupFlights]);
         setGroupMessagePreviewBooking(primaryBooking);
         setGroupMessageForm({
-          to: recipients,
-          subject: '',
-          message: '',
-          template: firstTemplate
+            to: recipients,
+            subject: '',
+            message: '',
+            template: firstTemplate
         });
         setGroupPersonalNote('');
         setGroupMessageModalOpen(true);
 
         if (firstTemplate && emailTemplates.length > 0) {
-          setTimeout(() => handleGroupTemplateChange(firstTemplate), 0);
+            setTimeout(() => handleGroupTemplateChange(firstTemplate), 0);
+        }
+    };
+
+    const handleGlobalMenuAction = async (action) => {
+        if (action === 'cancelAllGuests') {
+            openGroupMessageModalForAction('cancel');
+            return;
         }
 
-        return;
-      }
+        if (action === 'sendMessageAllGuests') {
+            openGroupMessageModalForAction('message');
+            return;
+        }
 
-      handleGlobalMenuClose();
+        handleGlobalMenuClose();
     };
 
     const handleGroupTemplateChange = (templateValue) => {
@@ -244,50 +273,39 @@ const Manifest = () => {
         }));
     };
 
-    // Confirm cancel all - update status to cancelled and increment flight_attempts
-    const handleConfirmCancelAll = async () => {
-      if (!globalMenuGroup?.id) { setConfirmCancelOpen(false); return; }
-      setConfirmCancelLoading(true);
-      try {
-        const groupBookingIds = globalMenuGroupFlights.map(f => f.id);
-        
-        // Update each booking: set status to 'cancelled' and increment flight_attempts
-        await Promise.all(groupBookingIds.map(async (id) => {
-          // First, get current flight_attempts
-          const currentBooking = globalMenuGroupFlights.find(f => f.id === id);
-          const currentAttempts = currentBooking?.flight_attempts || 0;
-          const newAttempts = currentAttempts + 1;
-          
-          // Update status to cancelled
-          await axios.patch('/api/updateBookingField', {
-            booking_id: id,
-            field: 'status',
-            value: 'Cancelled'
-          });
-          
-          // Increment flight_attempts
-          await axios.patch('/api/updateBookingField', {
-            booking_id: id,
-            field: 'flight_attempts',
-            value: newAttempts
-          });
+    const cancelGroupBookings = async (bookings) => {
+        if (!bookings || bookings.length === 0) return;
+        const bookingIds = bookings.map(b => b.id);
+
+        await Promise.all(bookings.map(async (booking) => {
+            const newAttempts = (booking.flight_attempts || 0) + 1;
+            await axios.patch('/api/updateBookingField', {
+                booking_id: booking.id,
+                field: 'status',
+                value: 'Cancelled'
+            });
+            await axios.patch('/api/updateBookingField', {
+                booking_id: booking.id,
+                field: 'flight_attempts',
+                value: newAttempts
+            });
         }));
-        
-        // Remove from manifest view only (not from database)
-        setFlights(prev => prev.filter(f => !groupBookingIds.includes(f.id)));
-        setConfirmCancelOpen(false);
-        handleGlobalMenuClose();
-        
-        // Show success message
-        alert(`Successfully cancelled ${groupBookingIds.length} booking(s) and incremented flight attempts.`);
-      } catch (err) {
-        alert('Failed to cancel all guests: ' + (err?.response?.data?.message || err.message || 'Unknown error'));
-      } finally {
-        setConfirmCancelLoading(false);
-      }
+
+        setFlights(prev => prev.filter(f => !bookingIds.includes(f.id)));
     };
-    const handleConfirmCancelClose = () => {
-      setConfirmCancelOpen(false);
+
+    const closeGroupMessageModal = () => {
+        setGroupMessageModalOpen(false);
+        setGroupMessageForm({
+            to: [],
+            subject: '',
+            message: '',
+            template: 'custom'
+        });
+        setGroupPersonalNote('');
+        setGroupSelectedBookings([]);
+        setGroupMessagePreviewBooking(null);
+        setGroupActionMode('message');
     };
 
     // Email handlers
@@ -604,18 +622,18 @@ const Manifest = () => {
             summary += `\nFailed: ${failures.length}`;
         }
 
+        if (failures.length === 0 && groupActionMode === 'cancel') {
+            try {
+                await cancelGroupBookings(groupSelectedBookings);
+                summary += `\nCancelled ${groupSelectedBookings.length} booking(s).`;
+            } catch (cancelErr) {
+                summary += `\nFailed to cancel bookings: ${cancelErr?.response?.data?.message || cancelErr.message || 'Unknown error'}`;
+            }
+        }
+
         alert(summary);
         if (failures.length === 0) {
-            setGroupMessageModalOpen(false);
-            setGroupMessageForm({
-                to: [],
-                subject: '',
-                message: getDefaultTemplateMessageHtml(resolveTemplateName(groupMessageForm.template, null), groupMessagePreviewBooking),
-                template: groupMessageForm.template
-            });
-            setGroupPersonalNote('');
-            setGroupSelectedBookings([]);
-            setGroupMessagePreviewBooking(null);
+            closeGroupMessageModal();
         }
     };
 
@@ -633,25 +651,6 @@ const Manifest = () => {
     const stripHtml = (input = '') => {
         if (!input) return '';
         return input.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    };
-
-    const resolveTemplateName = (templateValue, dbTemplate) => {
-        const dbName = dbTemplate?.name ? dbTemplate.name.trim() : '';
-        if (dbName) return dbName;
-        switch (templateValue) {
-            case 'confirmation':
-                return 'Booking Confirmation';
-            case 'reminder':
-                return 'Upcoming Flight Reminder';
-            case 'reschedule':
-                return 'Booking Rescheduled';
-            case 'to_be_updated':
-                return 'To Be Updated';
-            case 'custom':
-                return 'Custom Message';
-            default:
-                return dbName || 'Custom Message';
-        }
     };
 
     const fetchMessageLogs = async (bookingId) => {
@@ -3942,22 +3941,6 @@ const Manifest = () => {
                 <Button onClick={() => setBookingModalOpen(false)}>Close</Button>
               </DialogActions>
             </Dialog>
-            {/* Confirm Cancel All Guests Dialog */}
-            <Dialog open={confirmCancelOpen} onClose={handleConfirmCancelClose} maxWidth="xs" fullWidth>
-              <DialogTitle>Confirm Cancellation</DialogTitle>
-              <DialogContent>
-                <Typography sx={{ mt: 1 }}>
-                  Are you sure you want to cancel all guests on this flight?
-                </Typography>
-              </DialogContent>
-              <DialogActions>
-                <Button onClick={handleConfirmCancelClose} disabled={confirmCancelLoading}>No</Button>
-                <Button color="error" variant="contained" onClick={handleConfirmCancelAll} disabled={confirmCancelLoading}>
-                  {confirmCancelLoading ? 'Cancelling...' : 'Yes, Cancel All'}
-                </Button>
-              </DialogActions>
-            </Dialog>
-
             {/* Messages Modal */}
             <Dialog 
                 open={messagesModalOpen}
@@ -4108,18 +4091,7 @@ const Manifest = () => {
             {/* Group Message Modal */}
             <Dialog
                 open={groupMessageModalOpen}
-                onClose={() => {
-                    setGroupMessageModalOpen(false);
-                    setGroupMessageForm({
-                        to: [],
-                        subject: '',
-                        message: getDefaultTemplateMessageHtml('Booking Confirmation', groupMessagePreviewBooking),
-                        template: groupMessageForm.template || 'custom'
-                    });
-                    setGroupPersonalNote('');
-                    setGroupSelectedBookings([]);
-                    setGroupMessagePreviewBooking(null);
-                }}
+                onClose={closeGroupMessageModal}
                 maxWidth="md"
                 fullWidth
             >
@@ -4245,41 +4217,22 @@ const Manifest = () => {
                                     {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
                                 </Typography>
 
-                <Typography sx={{
-                    color: '#d32f2f',
-                    fontWeight: 600,
-                    mb: 2,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1
-                }}>
-                    <span style={{ fontSize: 20 }}>🎈</span> {groupMessageForm.subject || 'Flight update'}
-                </Typography>
+                                <Typography sx={{
+                                    color: '#d32f2f',
+                                    fontWeight: 600,
+                                    mb: 2
+                                }}>
+                                    {groupMessageForm.subject || 'Flight update'}
+                                </Typography>
 
-                <Box sx={{
-                    backgroundColor: '#fff',
-                    p: 3,
-                    borderRadius: 2,
-                    minHeight: 200
-                }}>
-                    <Box sx={{
-                        width: '100%',
-                        height: 200,
-                        backgroundColor: '#e3f2fd',
-                        borderRadius: 2,
-                        mb: 3,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundImage: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                    }}>
-                        <Typography sx={{ color: '#fff', fontSize: 48 }}>🎈</Typography>
-                    </Box>
-                    <Box
-                        sx={{ lineHeight: 1.6, color: '#333' }}
-                        dangerouslySetInnerHTML={{ __html: groupPreviewHtml }}
-                    />
-                </Box>
+                                <Box sx={{
+                                    backgroundColor: '#fff',
+                                    p: 3,
+                                    borderRadius: 2,
+                                    minHeight: 200
+                                }}>
+                                    <MemoizedEmailPreview html={groupPreviewHtml} />
+                                </Box>
             </Box>
                         </Grid>
     </Grid>
@@ -4433,10 +4386,7 @@ const Manifest = () => {
                                 </Typography>
                                 
                                 {/* Email Body Preview */}
-                                <div
-                                    style={{ lineHeight: 1.6, color: '#333' }}
-                                    dangerouslySetInnerHTML={{ __html: previewHtml }}
-                                />
+                                <MemoizedEmailPreview html={previewHtml} />
                             </Box>
                         </Grid>
                         {/* Hidden fields for backend */}
