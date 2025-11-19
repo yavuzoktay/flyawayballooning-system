@@ -1133,8 +1133,40 @@ app.post('/api/createRedeemBooking', (req, res) => {
     console.log('selectedTime:', selectedTime);
     console.log('Final bookingDateTime:', bookingDateTime);
     
-    // Get the original voucher price from voucher_codes table
+    // Get voucher information (created_at, voucher_type, experience_type) and price
     if (cleanVoucherCode) {
+        // First, get voucher info from all_vouchers table
+        const getVoucherInfoSql = `
+            SELECT created_at, voucher_type, experience_type, book_flight
+            FROM all_vouchers 
+            WHERE UPPER(voucher_ref) = UPPER(?)
+            LIMIT 1
+        `;
+        
+        con.query(getVoucherInfoSql, [cleanVoucherCode], (voucherInfoErr, voucherInfoResult) => {
+            if (voucherInfoErr) {
+                console.warn('Warning: Could not fetch voucher info:', voucherInfoErr.message);
+                // Voucher bilgisi alınamazsa, sadece fiyat bilgisini al
+                getVoucherPriceOnly();
+                return;
+            }
+            
+            let voucherCreatedAt = null;
+            let voucherType = null;
+            let experienceType = null;
+            
+            if (voucherInfoResult.length > 0) {
+                voucherCreatedAt = voucherInfoResult[0].created_at;
+                voucherType = voucherInfoResult[0].voucher_type;
+                experienceType = voucherInfoResult[0].experience_type;
+                console.log('✅ Voucher info found:', {
+                    created_at: voucherCreatedAt,
+                    voucher_type: voucherType,
+                    experience_type: experienceType
+                });
+            }
+            
+            // Now get price from voucher_codes table
         const getVoucherPriceSql = `
             SELECT paid_amount 
             FROM voucher_codes 
@@ -1152,18 +1184,94 @@ app.post('/api/createRedeemBooking', (req, res) => {
                 console.log('⚠️ Could not find voucher price, using totalPrice:', voucherOriginalPrice);
             }
             
-            // Continue with booking creation using the original voucher price
-            createBookingWithPrice(voucherOriginalPrice);
+                // Calculate expire date based on voucher type and created_at
+                let expiresDate = null;
+                if (voucherCreatedAt) {
+                    // Voucher türüne göre expire süresini belirle
+                    let durationMonths = 24; // Default
+                    
+                    if (experienceType === 'Private Charter') {
+                        durationMonths = 18;
+                    } else if (experienceType === 'Shared Flight') {
+                        // Shared Flight: Any Day Flight = 24 ay, diğerleri = 18 ay
+                        if (voucherType === 'Any Day Flight') {
+                            durationMonths = 24;
+                        } else {
+                            durationMonths = 18;
+                        }
+                    }
+                    
+                    // Voucher'ın created_at tarihinden itibaren hesapla
+                    expiresDate = moment(voucherCreatedAt).add(durationMonths, 'months').format('YYYY-MM-DD HH:mm:ss');
+                    console.log('✅ Expire date calculated:', {
+                        voucherCreatedAt,
+                        durationMonths,
+                        expiresDate
         });
     } else {
-        // No voucher code, use totalPrice
-        createBookingWithPrice(totalPrice || 0);
+                    // Voucher bilgisi yoksa, bugünden itibaren hesapla
+                    if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
+                        expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
+                    } else if (chooseFlightType && chooseFlightType.type === 'Shared Flight') {
+                        // Shared Flight için voucher_type bilgisi yoksa, default 18 ay
+                        expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
+                    } else {
+                        expiresDate = moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+                    }
+                    console.log('⚠️ Voucher info not found, using current date for expire calculation');
+                }
+                
+                // Continue with booking creation using the original voucher price and expire date
+                createBookingWithPrice(voucherOriginalPrice, expiresDate);
+            });
+        });
+        
+        // Fallback function to get only price if voucher info query fails
+        function getVoucherPriceOnly() {
+            const getVoucherPriceSql = `
+                SELECT paid_amount 
+                FROM voucher_codes 
+                WHERE UPPER(code) = UPPER(?)
+                LIMIT 1
+            `;
+            
+            con.query(getVoucherPriceSql, [cleanVoucherCode], (priceErr, priceResult) => {
+                let voucherOriginalPrice = totalPrice || 0;
+                
+                if (!priceErr && priceResult.length > 0 && priceResult[0].paid_amount) {
+                    voucherOriginalPrice = priceResult[0].paid_amount;
+                }
+                
+                // Voucher bilgisi yoksa, bugünden itibaren hesapla
+                let expiresDate = null;
+                if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
+                    expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
+                } else if (chooseFlightType && chooseFlightType.type === 'Shared Flight') {
+                    expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
+                } else {
+                    expiresDate = moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+                }
+                
+                createBookingWithPrice(voucherOriginalPrice, expiresDate);
+            });
+        }
+    } else {
+        // No voucher code, use totalPrice and calculate expire from now
+        let expiresDate = null;
+        if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
+            expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
+        } else if (chooseFlightType && chooseFlightType.type === 'Shared Flight') {
+            expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
+        } else {
+            expiresDate = moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+        }
+        createBookingWithPrice(totalPrice || 0, expiresDate);
     }
     
-    function createBookingWithPrice(paidAmount) {
-        console.log('=== CREATING BOOKING WITH PAID AMOUNT:', paidAmount, '===');
+    function createBookingWithPrice(paidAmount, expiresDateFinal) {
+        console.log('=== CREATING BOOKING WITH PAID AMOUNT:', paidAmount, 'AND EXPIRE DATE:', expiresDateFinal, '===');
 
-    // Simple SQL with only essential columns
+    // Simple SQL with only essential columns (including expires)
     const bookingSql = `
         INSERT INTO all_booking (
             name,
@@ -1176,11 +1284,12 @@ app.post('/api/createRedeemBooking', (req, res) => {
             due,
             voucher_code,
             created_at,
+            expires,
             email,
                 phone,
                 activity_id,
                 redeemed_voucher
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     // Use actual passenger count from passengerData array
@@ -1204,6 +1313,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
         0,
             cleanVoucherCode,
         now, // created_at
+        expiresDateFinal || null, // expires - calculated from voucher created_at
         passengerData[0].email || null,
             passengerData[0].phone || null,
             activity_id || null,
@@ -5635,7 +5745,7 @@ app.post('/api/createBooking', (req, res) => {
                     
                     // Call email function immediately and log the call
                     try {
-                        sendAutomaticBookingConfirmationEmail(bookingId);
+                    sendAutomaticBookingConfirmationEmail(bookingId);
                         console.log('✅ [createBooking] sendAutomaticBookingConfirmationEmail function called successfully');
                     } catch (emailError) {
                         console.error('❌ [createBooking] Error calling sendAutomaticBookingConfirmationEmail:', emailError);
@@ -8408,22 +8518,140 @@ app.get('/api/analytics', async (req, res) => {
             sixthPlus: pct(sixthPlus)
         };
         // 2. Sales by Source
-        const sourceSql = `
+        // First, find the question_id for "How did you hear about us?" question
+        const findQuestionSql = `
+            SELECT id FROM additional_information_questions 
+            WHERE question_text LIKE '%hear about us%' OR question_text LIKE '%hear about%'
+            AND is_active = 1
+            LIMIT 1
+        `;
+        con.query(findQuestionSql, [], (errFindQ, questionRows) => {
+            if (errFindQ) {
+                console.warn('Could not find "hear about us" question:', errFindQ);
+            }
+            
+            const hearAboutUsQuestionId = questionRows && questionRows.length > 0 ? questionRows[0].id : null;
+            console.log('Found "hear about us" question_id:', hearAboutUsQuestionId);
+            
+            // Get source data from multiple sources:
+            // 1. Legacy hear_about_us column from all_booking
+            // 2. additional_information_answers table for bookings
+            // 3. all_vouchers table (additional_information_json and legacy fields)
+            
+            const sourceDataMap = {};
+            // Declare variables in upper scope so they're accessible in all callbacks
+            let salesBySource = [];
+            let nonRedemption = { value: 0, percent: 0 };
+            let addOns = [];
+            
+            // 1. Get from legacy hear_about_us column in all_booking
+            const legacySourceSql = `
             SELECT hear_about_us, COUNT(*) as count
             FROM all_booking
             WHERE flight_date IS NOT NULL
             AND status IN ('Flown', 'Confirmed', 'Scheduled')
+                AND hear_about_us IS NOT NULL AND hear_about_us != ''
             ${dateFilter()}
             GROUP BY hear_about_us
         `;
-        con.query(sourceSql, [], (err2, srcRows) => {
-            if (err2) return res.status(500).json({ error: 'Failed to fetch sales by source' });
-            const totalSrc = srcRows.reduce((sum, r) => sum + r.count, 0);
-            const salesBySource = srcRows.map(r => ({
-                source: r.hear_about_us || 'Other',
-                percent: totalSrc ? Math.round((r.count/totalSrc)*100) : 0
-            }));
-            // 3. Non Redemption (expired, not flown or not redeemed)
+            
+            con.query(legacySourceSql, [], (errLegacy, legacyRows) => {
+                if (errLegacy) {
+                    console.warn('Error fetching legacy hear_about_us:', errLegacy);
+                } else {
+                    legacyRows.forEach(row => {
+                        const source = (row.hear_about_us || '').trim();
+                        if (source) {
+                            sourceDataMap[source] = (sourceDataMap[source] || 0) + row.count;
+                        }
+                    });
+                }
+                
+                // 2. Get from additional_information_answers for bookings
+                if (hearAboutUsQuestionId) {
+                    const answersSourceSql = `
+                        SELECT aia.answer, COUNT(*) as count
+                        FROM additional_information_answers aia
+                        INNER JOIN all_booking ab ON aia.booking_id = ab.id
+                        WHERE aia.question_id = ?
+                        AND ab.flight_date IS NOT NULL
+                        AND ab.status IN ('Flown', 'Confirmed', 'Scheduled')
+                        AND aia.answer IS NOT NULL AND aia.answer != ''
+                        ${dateFilter('ab.flight_date')}
+                        GROUP BY aia.answer
+                    `;
+                    
+                    con.query(answersSourceSql, [hearAboutUsQuestionId], (errAnswers, answerRows) => {
+                        if (errAnswers) {
+                            console.warn('Error fetching answers from additional_information_answers:', errAnswers);
+                        } else {
+                            answerRows.forEach(row => {
+                                const source = (row.answer || '').trim();
+                                if (source) {
+                                    sourceDataMap[source] = (sourceDataMap[source] || 0) + row.count;
+                                }
+                            });
+                        }
+                        
+                        // 3. Get from all_vouchers (both additional_information_json and legacy fields)
+                        // For vouchers, we count each voucher that has source information
+                        const vouchersSourceSql = `
+                            SELECT 
+                                v.additional_information_json,
+                                v.hear_about_us,
+                                v.created_at
+                            FROM all_vouchers v
+                            WHERE v.created_at IS NOT NULL
+                            ${dateFilter('v.created_at')}
+                        `;
+                        
+                        con.query(vouchersSourceSql, [], (errVouchers, voucherRows) => {
+                            if (errVouchers) {
+                                console.warn('Error fetching vouchers source data:', errVouchers);
+                            } else {
+                                voucherRows.forEach(row => {
+                                    let source = null;
+                                    
+                                    // First try additional_information_json
+                                    if (row.additional_information_json) {
+                                        try {
+                                            const jsonData = typeof row.additional_information_json === 'string' 
+                                                ? JSON.parse(row.additional_information_json) 
+                                                : row.additional_information_json;
+                                            
+                                            if (hearAboutUsQuestionId && jsonData[`question_${hearAboutUsQuestionId}`]) {
+                                                source = jsonData[`question_${hearAboutUsQuestionId}`];
+                                            }
+                                        } catch (e) {
+                                            console.warn('Error parsing voucher additional_information_json:', e);
+                                        }
+                                    }
+                                    
+                                    // Fallback to legacy hear_about_us
+                                    if (!source && row.hear_about_us) {
+                                        source = row.hear_about_us;
+                                    }
+                                    
+                                    if (source && source.trim()) {
+                                        source = source.trim();
+                                        sourceDataMap[source] = (sourceDataMap[source] || 0) + 1;
+                                    }
+                                });
+                            }
+                            
+                            // Calculate totals and percentages
+                            const totalSrc = Object.values(sourceDataMap).reduce((sum, count) => sum + count, 0);
+                            salesBySource = Object.entries(sourceDataMap)
+                                .map(([source, count]) => ({
+                                    source: source || 'Other',
+                                    percent: totalSrc ? Math.round((count / totalSrc) * 100) : 0,
+                                    count: count
+                                }))
+                                .sort((a, b) => b.count - a.count); // Sort by count descending
+                            
+                            console.log('Sales by Source calculated:', salesBySource);
+                            
+                            // Continue with next query (Non Redemption)
             const nonRedemptionSql = `
                 SELECT COUNT(*) as total, SUM(CASE WHEN status = 'Expired' THEN 1 ELSE 0 END) as expired
                 FROM all_booking
@@ -8433,7 +8661,7 @@ app.get('/api/analytics', async (req, res) => {
                 if (err3) return res.status(500).json({ error: 'Failed to fetch non redemption' });
                 const total = nonRows[0]?.total || 0;
                 const expired = nonRows[0]?.expired || 0;
-                const nonRedemption = {
+                                nonRedemption = {
                     value: expired,
                     percent: total ? Math.round((expired/total)*100) : 0
                 };
@@ -8467,21 +8695,92 @@ app.get('/api/analytics', async (req, res) => {
                             }
                         } catch (e) { console.error('AddOn JSON parse error:', e); }
                     });
-                    const addOns = Object.entries(addOnMap).map(([name, value]) => ({ name, value: Math.round(value) }));
+                                    addOns = Object.entries(addOnMap).map(([name, value]) => ({ name, value: Math.round(value) }));
                     // 5. Sales by Location
-                    const locSql = `
+                                    // Get location data from multiple sources:
+                                    // 1. all_booking table (for Book Flight Date and Redeem Voucher bookings)
+                                    // 2. all_vouchers table (for Buy Flight Voucher and Buy Gift Voucher)
+                                    const locationDataMap = {};
+                                    
+                                    // 1. Get from all_booking table
+                                    const bookingLocSql = `
                         SELECT location, COUNT(*) as count
                         FROM all_booking
-                        WHERE flight_date IS NOT NULL AND status IN ('Flown', 'Confirmed', 'Scheduled') ${dateFilter()}
+                                        WHERE flight_date IS NOT NULL AND status IN ('Flown', 'Confirmed', 'Scheduled')
+                                        AND location IS NOT NULL AND location != ''
+                                        ${dateFilter()}
                         GROUP BY location
                     `;
-                    con.query(locSql, [], (err5, locRows) => {
-                        if (err5) return res.status(500).json({ error: 'Failed to fetch sales by location' });
-                        const totalLoc = locRows.reduce((sum, r) => sum + r.count, 0);
-                        const salesByLocation = locRows.map(r => ({
-                            location: r.location || 'Other',
-                            percent: totalLoc ? Math.round((r.count/totalLoc)*100) : 0
-                        }));
+                                    
+                                    con.query(bookingLocSql, [], (errBookingLoc, bookingLocRows) => {
+                                if (errBookingLoc) {
+                                    console.warn('Error fetching booking locations:', errBookingLoc);
+                                } else {
+                                    bookingLocRows.forEach(row => {
+                                        const location = (row.location || '').trim();
+                                        if (location) {
+                                            locationDataMap[location] = (locationDataMap[location] || 0) + row.count;
+                                        }
+                                    });
+                                }
+                                
+                                // 2. Get from all_vouchers table (preferred_location)
+                                const voucherLocSql = `
+                                    SELECT preferred_location, COUNT(*) as count
+                                    FROM all_vouchers
+                                    WHERE created_at IS NOT NULL
+                                    AND preferred_location IS NOT NULL AND preferred_location != ''
+                                    ${dateFilter('created_at')}
+                                    GROUP BY preferred_location
+                                `;
+                                
+                                con.query(voucherLocSql, [], (errVoucherLoc, voucherLocRows) => {
+                                    if (errVoucherLoc) {
+                                        console.warn('Error fetching voucher locations:', errVoucherLoc);
+                                    } else {
+                                        voucherLocRows.forEach(row => {
+                                            const location = (row.preferred_location || '').trim();
+                                            if (location) {
+                                                locationDataMap[location] = (locationDataMap[location] || 0) + row.count;
+                                            }
+                                        });
+                                    }
+                                    
+                                    // Also check all_vouchers.location field if it exists
+                                    const voucherLocSql2 = `
+                                        SELECT location, COUNT(*) as count
+                                        FROM all_vouchers
+                                        WHERE created_at IS NOT NULL
+                                        AND location IS NOT NULL AND location != ''
+                                        AND (preferred_location IS NULL OR preferred_location = '')
+                                        ${dateFilter('created_at')}
+                                        GROUP BY location
+                                    `;
+                                    
+                                    con.query(voucherLocSql2, [], (errVoucherLoc2, voucherLocRows2) => {
+                                        if (errVoucherLoc2) {
+                                            console.warn('Error fetching voucher locations (location field):', errVoucherLoc2);
+                                        } else {
+                                            voucherLocRows2.forEach(row => {
+                                                const location = (row.location || '').trim();
+                                                if (location) {
+                                                    locationDataMap[location] = (locationDataMap[location] || 0) + row.count;
+                                                }
+                                            });
+                                        }
+                                        
+                                        // Calculate totals and percentages
+                                        const totalLoc = Object.values(locationDataMap).reduce((sum, count) => sum + count, 0);
+                                        const salesByLocation = Object.entries(locationDataMap)
+                                            .map(([location, count]) => ({
+                                                location: location || 'Other',
+                                                percent: totalLoc ? Math.round((count / totalLoc) * 100) : 0,
+                                                count: count
+                                            }))
+                                            .sort((a, b) => b.count - a.count); // Sort by count descending
+                                        
+                                        console.log('Sales by Location calculated:', salesByLocation);
+                                        
                         // 6. Sales by Booking Type
                         const typeSql = `
                             SELECT flight_type, COUNT(*) as count
@@ -8588,6 +8887,12 @@ app.get('/api/analytics', async (req, res) => {
                         });
                     });
                 });
+            });
+        });
+                    });
+                    });
+                    });
+                }
             });
         });
     });
@@ -15056,7 +15361,7 @@ async function sendAutomaticBookingConfirmationEmail(bookingId) {
                 
                 // Continue with email sending only if email is available
                 if (booking.email && booking.email.trim()) {
-                    sendEmailToCustomerAndOwner(booking, bookingId);
+                sendEmailToCustomerAndOwner(booking, bookingId);
                 } else {
                     console.error('❌ [sendAutomaticBookingConfirmationEmail] Cannot send email - no email address available for booking:', bookingId);
                 }
