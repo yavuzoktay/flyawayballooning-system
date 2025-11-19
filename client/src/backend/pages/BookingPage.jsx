@@ -2547,7 +2547,13 @@ setBookingDetail(finalVoucherDetail);
                     }
                     
                     // Get passenger data from voucher (use existing passenger details)
-                    const existingPassengers = bookingDetail.passengers || [];
+                    const voucherPassengers = Array.isArray(bookingDetail?.voucher?.passenger_details)
+                        ? bookingDetail.voucher.passenger_details
+                        : (Array.isArray(bookingDetail?.voucher?.voucher_passenger_details)
+                            ? bookingDetail.voucher.voucher_passenger_details
+                            : []);
+                    const bookingPassengers = Array.isArray(bookingDetail.passengers) ? bookingDetail.passengers : [];
+                    const existingPassengers = voucherPassengers.length > 0 ? voucherPassengers : bookingPassengers;
                     let passengers = [];
                     
                     if (existingPassengers.length > 0) {
