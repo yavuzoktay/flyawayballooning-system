@@ -4817,9 +4817,49 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     console.log(`Voucher ${row.id} - add_to_booking_items is null/undefined`);
                 }
 
-                // Parse passenger details JSON (from booking or voucher fallback)
+                // Parse passenger details JSON
+                // For Flight Vouchers, prioritize voucher_passenger_details (original passenger data)
+                // For Gift Vouchers, use booking passenger_details if available
                 let passengerDetails = [];
-                if (row.passenger_details) {
+                
+                // Determine if this is a Flight Voucher (using same logic as normalizedBookFlight calculation)
+                const vtLowerCheck = (row.actual_voucher_type || row.voucher_type || '').toLowerCase();
+                const hasRecipientSignalsCheck = !!(row.recipient_name || row.recipient_email || row.recipient_phone || row.recipient_gift_date);
+                const bookFlightLowerCheck = (row.book_flight || '').toLowerCase();
+                const isFlightVoucher = !hasRecipientSignalsCheck && 
+                    !vtLowerCheck.includes('gift') && 
+                    !bookFlightLowerCheck.includes('gift') &&
+                    bookFlightLowerCheck !== 'buy gift';
+                
+                if (isFlightVoucher && row.voucher_passenger_details) {
+                    // For Flight Vouchers, use voucher_passenger_details as primary source
+                    try {
+                        const voucherPassengers = typeof row.voucher_passenger_details === 'string'
+                            ? JSON.parse(row.voucher_passenger_details)
+                            : row.voucher_passenger_details;
+                        
+                        // Normalize voucher_passenger_details to match passenger_details structure
+                        if (Array.isArray(voucherPassengers)) {
+                            passengerDetails = voucherPassengers.map((vp, index) => ({
+                                id: vp.id || null, // May not have id if not yet in booking
+                                first_name: vp.first_name || vp.firstName || '',
+                                last_name: vp.last_name || vp.lastName || '',
+                                weight: vp.weight || '',
+                                email: vp.email || null,
+                                phone: vp.phone || null,
+                                ticket_type: vp.ticket_type || vp.ticketType || null,
+                                weather_refund: vp.weather_refund || vp.weatherRefund || false,
+                                price: vp.price || null
+                            }));
+                        } else {
+                            passengerDetails = [];
+                        }
+                    } catch (e) {
+                        console.warn('Failed to parse voucher_passenger_details for Flight Voucher', row.id, ':', e);
+                        passengerDetails = [];
+                    }
+                } else if (row.passenger_details) {
+                    // For Gift Vouchers or if no voucher_passenger_details, use booking passenger_details
                     try {
                         passengerDetails = typeof row.passenger_details === 'string' 
                             ? JSON.parse(row.passenger_details) 
@@ -4829,10 +4869,28 @@ app.get('/api/getAllVoucherData', (req, res) => {
                         passengerDetails = [];
                     }
                 } else if (row.voucher_passenger_details) {
+                    // Fallback: use voucher_passenger_details if passenger_details is not available
                     try {
-                        passengerDetails = typeof row.voucher_passenger_details === 'string'
+                        const voucherPassengers = typeof row.voucher_passenger_details === 'string'
                             ? JSON.parse(row.voucher_passenger_details)
                             : row.voucher_passenger_details;
+                        
+                        // Normalize voucher_passenger_details to match passenger_details structure
+                        if (Array.isArray(voucherPassengers)) {
+                            passengerDetails = voucherPassengers.map((vp, index) => ({
+                                id: vp.id || null,
+                                first_name: vp.first_name || vp.firstName || '',
+                                last_name: vp.last_name || vp.lastName || '',
+                                weight: vp.weight || '',
+                                email: vp.email || null,
+                                phone: vp.phone || null,
+                                ticket_type: vp.ticket_type || vp.ticketType || null,
+                                weather_refund: vp.weather_refund || vp.weatherRefund || false,
+                                price: vp.price || null
+                            }));
+                        } else {
+                            passengerDetails = [];
+                        }
                     } catch (e) {
                         console.warn('Failed to parse voucher_passenger_details for voucher', row.id, ':', e);
                         passengerDetails = [];
