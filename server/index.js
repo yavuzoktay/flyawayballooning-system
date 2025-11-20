@@ -3923,7 +3923,8 @@ const inferPrivateCharterPassengersFromPrice = (voucherTitle, location, totalPri
     return null;
 };
 
-function derivePassengerCount(source = {}) {
+function derivePassengerCount(source = {}, options = {}) {
+    const preferStoredCount = options.preferStoredCount !== false;
     const payload = typeof source === 'string' ? tryParseJson(source) || {} : (source || {});
     const selectedVoucherType = tryParseJson(payload.selectedVoucherType) || {};
     const chooseFlightType = tryParseJson(payload.chooseFlightType) || {};
@@ -3934,17 +3935,20 @@ function derivePassengerCount(source = {}) {
         safeArrayLength(payload.add_to_booking_items?.passengers)
     ];
 
-    const candidateValues = [
-        payload.numberOfPassengers,
+    const storedCandidates = [payload.numberOfPassengers];
+    const inferredCandidates = [
         payload.passenger_count,
         payload.passengerCount,
-        payload.numberOfVouchers,
         selectedVoucherType?.quantity,
         selectedVoucherType?.passengers,
         selectedVoucherType?.passengerCount,
+        payload.numberOfVouchers,
         chooseFlightType?.passengerCount,
         ...passengerLengths
     ];
+    const candidateValues = preferStoredCount
+        ? storedCandidates.concat(inferredCandidates)
+        : inferredCandidates.concat(storedCandidates);
 
     for (const candidate of candidateValues) {
         const parsed = parsePositiveInt(candidate);
@@ -5300,7 +5304,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     paid: row.paid,
                     preferred_location: row.preferred_location || row.location || null,
                     chooseLocation: row.preferred_location || row.location || null
-                });
+                }, { preferStoredCount: false });
                 row.numberOfPassengers = normalizedPassengerCount;
                 const computedVoucherCount = Math.max(numFromCodes || 0, normalizedPassengerCount);
                 const pricePerPassenger = !isPrivateCharterVoucher
