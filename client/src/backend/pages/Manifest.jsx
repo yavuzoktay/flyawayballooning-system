@@ -1680,9 +1680,8 @@ const Manifest = () => {
                 }
             }
             
-            // Get current flight_attempts before deleting
+            // Keep the existing flight_attempts value. It is incremented only when a flight is cancelled.
             const currentAttempts = parseInt(bookingDetail.booking.flight_attempts || 0, 10);
-            const newAttempts = currentAttempts + 1;
             
             // Prepare passenger data for new booking
             const existingPassengers = bookingDetail.passengers || [];
@@ -1722,7 +1721,7 @@ const Manifest = () => {
                 totalPrice: totalPrice,
                 additionalInfo: { notes: bookingDetail.booking.additional_notes || '' },
                 voucher_code: bookingDetail.booking.voucher_code || null,
-                flight_attempts: newAttempts // Add incremented flight_attempts to new booking
+                flight_attempts: currentAttempts // Preserve attempts value during rebook
             };
             // First delete the old booking
             await axios.delete(`/api/deleteBooking/${bookingDetail.booking.id}`);
