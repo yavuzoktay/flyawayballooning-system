@@ -1721,7 +1721,9 @@ const Manifest = () => {
                 totalPrice: totalPrice,
                 additionalInfo: { notes: bookingDetail.booking.additional_notes || '' },
                 voucher_code: bookingDetail.booking.voucher_code || null,
-                flight_attempts: currentAttempts // Preserve attempts value during rebook
+                flight_attempts: currentAttempts, // Preserve attempts value during rebook
+                email_template_override: 'Passenger Rescheduling Information',
+                email_template_type_override: 'passenger_reschedule_information_automatic'
             };
             // First delete the old booking
             await axios.delete(`/api/deleteBooking/${bookingDetail.booking.id}`);
