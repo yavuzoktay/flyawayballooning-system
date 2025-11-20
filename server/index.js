@@ -21,8 +21,29 @@ const { parsePassengerList, derivePaidAmount } = require('./lib/voucherMetrics')
 dotenv.config();
 
 // Configure SendGrid
-if (process.env.SENDGRID_API_KEY) {
-    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+const resolveSendGridApiKey = () => {
+    const candidates = [
+        process.env.SENDGRID_API_KEY,
+        process.env.SENDGRID_PRIMARY_API_KEY,
+        process.env.SENDGRID_API_KEY_LIVE,
+        process.env.SENDGRID_API_KEY_PROD,
+        process.env.SENDGRID_BACKUP_API_KEY
+    ];
+    for (const candidate of candidates) {
+        if (candidate && candidate.trim()) {
+            return candidate.trim();
+        }
+    }
+    return null;
+};
+
+const resolvedSendGridApiKey = resolveSendGridApiKey();
+if (resolvedSendGridApiKey) {
+    if (!process.env.SENDGRID_API_KEY || process.env.SENDGRID_API_KEY.trim() !== resolvedSendGridApiKey) {
+        process.env.SENDGRID_API_KEY = resolvedSendGridApiKey;
+    }
+    sgMail.setApiKey(resolvedSendGridApiKey);
+    console.log('SendGrid API key configured (masked):', `${resolvedSendGridApiKey.slice(0, 8)}***`);
 } else {
     console.warn('SENDGRID_API_KEY not found in environment variables');
 }
@@ -240,6 +261,18 @@ app.post('/api/generate-voucher-code', async (req, res) => {
             return result;
         };
         
+        // Helper to normalize currency inputs to float for comparisons
+        const normalizePaidAmount = (value) => {
+            if (typeof value === 'number' && !Number.isNaN(value)) {
+                return value;
+            }
+            if (typeof value === 'string') {
+                const numeric = parseFloat(value.replace(/[^0-9.-]/g, ''));
+                return Number.isNaN(numeric) ? 0 : numeric;
+            }
+            return 0;
+        };
+
         // Generate unique voucher code
         let voucherCode;
         let isUnique = false;
@@ -390,39 +423,113 @@ app.post('/api/generate-voucher-code', async (req, res) => {
                 } else {
                     // For Gift Vouchers, update the voucher record
                     console.log('Updating voucher record with voucher code');
-                    const findSql = `
-                        SELECT id FROM all_vouchers 
-                        WHERE name = ? AND email = ? AND paid = ? 
-                        AND (voucher_ref IS NULL OR voucher_ref = '') 
-                        ORDER BY created_at DESC 
-                        LIMIT 1
-                    `;
-                    
-                    con.query(findSql, [customer_name, customer_email, paid_amount], (err, findResult) => {
-                        if (err) {
-                            reject(err);
-                            return;
-                        }
-                        
-                        if (findResult.length === 0) {
-                            reject(new Error('No voucher found to update with code'));
-                            return;
-                        }
-                        
-                        const voucherId = findResult[0].id;
-                        console.log('Found voucher ID to update:', voucherId);
-                        
-                        // Update the voucher with the generated code
-                        const updateSql = 'UPDATE all_vouchers SET voucher_ref = ? WHERE id = ?';
-                        con.query(updateSql, [voucherCode, voucherId], (updateErr, updateResult) => {
-                            if (updateErr) {
-                                reject(updateErr);
+                    const normalizedPaidAmount = normalizePaidAmount(paid_amount);
+                    const normalizedName = (customer_name || '').trim();
+                    const normalizedEmail = (customer_email || '').trim();
+
+                    const queryAsync = (sql, params) => new Promise((resolveQuery, rejectQuery) => {
+                        con.query(sql, params, (queryErr, result) => {
+                            if (queryErr) {
+                                rejectQuery(queryErr);
                             } else {
-                                console.log('Voucher updated with code:', voucherCode);
-                                resolve({ recordId: voucherId, voucherCode });
+                                resolveQuery(result);
                             }
                         });
                     });
+
+                    const updateGiftVoucher = async () => {
+                        console.log('Gift voucher lookup payload:', {
+                            normalizedName,
+                            normalizedEmail,
+                            normalizedPaidAmount
+                        });
+
+                        const strictSql = `
+                            SELECT id, name, email, purchaser_name, purchaser_email, paid, created_at
+                            FROM all_vouchers 
+                            WHERE (voucher_ref IS NULL OR voucher_ref = '' OR voucher_ref = '-')
+                              AND ABS(COALESCE(paid, 0) - ?) <= 1
+                              AND (
+                                    name = ? OR purchaser_name = ?
+                                )
+                              AND (
+                                    email = ? OR purchaser_email = ?
+                                )
+                            ORDER BY created_at DESC 
+                            LIMIT 5
+                        `;
+
+                        let candidates = await queryAsync(strictSql, [
+                            normalizedPaidAmount,
+                            normalizedName,
+                            normalizedName,
+                            normalizedEmail,
+                            normalizedEmail
+                        ]);
+
+                        if (!candidates.length) {
+                            console.log('No voucher found with strict lookup; trying fallback search ignoring paid amount.');
+                            const fallbackSql = `
+                                SELECT id, name, email, purchaser_name, purchaser_email, paid, created_at
+                                FROM all_vouchers 
+                                WHERE (voucher_ref IS NULL OR voucher_ref = '' OR voucher_ref = '-')
+                                  AND (
+                                        (name = ? OR purchaser_name = ?) OR
+                                        (email = ? OR purchaser_email = ?)
+                                    )
+                                  AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
+                                ORDER BY created_at DESC 
+                                LIMIT 5
+                            `;
+                            candidates = await queryAsync(fallbackSql, [
+                                normalizedName,
+                                normalizedName,
+                                normalizedEmail,
+                                normalizedEmail
+                            ]);
+                        }
+
+                        if (!candidates.length && normalizedEmail) {
+                            console.log('No voucher found with fallback search; trying latest voucher by email only.');
+                            const looseSql = `
+                                SELECT id, name, email, purchaser_name, purchaser_email, paid, created_at
+                                FROM all_vouchers 
+                                WHERE (voucher_ref IS NULL OR voucher_ref = '' OR voucher_ref = '-')
+                                  AND (email = ? OR purchaser_email = ?)
+                                ORDER BY created_at DESC 
+                                LIMIT 5
+                            `;
+                            candidates = await queryAsync(looseSql, [
+                                normalizedEmail,
+                                normalizedEmail
+                            ]);
+                        }
+
+                        if (!candidates.length) {
+                            throw new Error('No voucher found to update with code');
+                        }
+
+                        console.log('Voucher lookup candidates:', candidates.map(candidate => ({
+                            id: candidate.id,
+                            name: candidate.name,
+                            purchaser_name: candidate.purchaser_name,
+                            email: candidate.email,
+                            purchaser_email: candidate.purchaser_email,
+                            paid: candidate.paid,
+                            created_at: candidate.created_at
+                        })));
+
+                        const voucherId = candidates[0].id;
+                        console.log('Found voucher ID to update:', voucherId);
+
+                        await queryAsync('UPDATE all_vouchers SET voucher_ref = ? WHERE id = ?', [voucherCode, voucherId]);
+                        console.log('Voucher updated with code:', voucherCode);
+                        return { recordId: voucherId, voucherCode };
+                    };
+
+                    updateGiftVoucher()
+                        .then(resolve)
+                        .catch(reject);
                 }
             });
         };
@@ -5683,7 +5790,9 @@ app.post('/api/createBooking', (req, res) => {
         flight_attempts, // frontend'den geliyorsa, yoksa undefined
         preferred_location,
         preferred_time,
-        preferred_day
+        preferred_day,
+        email_template_override,
+        email_template_type_override
     } = req.body;
 
     // Unify add-on field: always use choose_add_on as array of {name, price}
@@ -5717,6 +5826,40 @@ app.post('/api/createBooking', (req, res) => {
     const passengerName = `${passengerData[0].firstName} ${passengerData[0].lastName}`;
     const now = moment();
     let expiresDate = null;
+
+    function deriveEmailOptionsForAutoSend() {
+        if (!email_template_override || typeof email_template_override !== 'string') {
+            return null;
+        }
+        
+        if (email_template_override === 'Passenger Rescheduling Information') {
+            const baseType = email_template_type_override || 'passenger_reschedule_information_automatic';
+            return {
+                templateName: 'Passenger Rescheduling Information',
+                templateType: baseType,
+                ownerTemplateType: `${baseType}_owner`,
+                subjectFallback: '🎈 Reschedule your flight',
+                ownerSubjectPrefix: '📧 Booking Rescheduled - ',
+                ownerBannerTitle: 'Booking Rescheduled',
+                ownerTextIntro: 'This reschedule confirmation was automatically sent to:',
+                ownerMessageLead: 'Booking reschedule confirmation sent to customer.',
+                textBodyFallback: (bookingRecord) => {
+                    const formattedDate = bookingRecord.flight_date
+                        ? moment(bookingRecord.flight_date).format('MMMM D, YYYY [at] h:mm A')
+                        : 'TBD';
+                    const locationLabel = bookingRecord.location || 'our launch site';
+                    return `Your flight has been rescheduled for ${formattedDate} at ${locationLabel}. We'll be in touch closer to the day with weather updates and check-in details.`;
+                }
+            };
+        }
+        
+        const fallbackType = email_template_type_override || 'booking_confirmation_automatic';
+        return {
+            templateName: email_template_override,
+            templateType: fallbackType,
+            ownerTemplateType: `${fallbackType}_owner`
+        };
+    }
 
     function insertBookingAndPassengers(expiresDateFinal) {
         const nowDate = moment().format('YYYY-MM-DD HH:mm:ss');
@@ -6044,7 +6187,8 @@ app.post('/api/createBooking', (req, res) => {
                     
                     // Call email function immediately and log the call
                     try {
-                    sendAutomaticBookingConfirmationEmail(bookingId);
+                        const emailOptions = deriveEmailOptionsForAutoSend();
+                        sendAutomaticBookingConfirmationEmail(bookingId, emailOptions || undefined);
                         console.log('✅ [createBooking] sendAutomaticBookingConfirmationEmail function called successfully');
                     } catch (emailError) {
                         console.error('❌ [createBooking] Error calling sendAutomaticBookingConfirmationEmail:', emailError);
@@ -6656,6 +6800,18 @@ app.post('/api/createVoucher', (req, res) => {
             } else {
                 // Send response for other voucher types (Gift Voucher, etc.)
                 res.status(201).json({ success: true, message: 'Voucher created successfully!', voucherId: result.insertId });
+                if ((voucher_type && voucher_type.toLowerCase().includes('gift')) || (book_flight && book_flight.toLowerCase().includes('gift'))) {
+                    try {
+                        sendAutomaticGiftVoucherConfirmationEmail(result.insertId, {
+                            purchaser_email: finalPurchaserEmail,
+                            purchaser_name: finalPurchaserName,
+                            purchaser_phone: finalPurchaserPhone,
+                            purchaser_mobile: finalPurchaserMobile
+                        });
+                    } catch (emailErr) {
+                        console.error('Error sending automatic Gift Voucher Confirmation email:', emailErr?.message || emailErr);
+                    }
+                }
             }
         });
     }
@@ -8399,7 +8555,8 @@ const handleFlightAttemptsIncrement = async (booking_id) => {
 // Helper to refresh availability counts when a booking changes
 const refreshAvailabilityForBooking = (booking_id) => {
     try {
-        const infoSql = 'SELECT flight_date, time_slot, activity_id, location FROM all_booking WHERE id = ?';
+        console.log('🔄 refreshAvailabilityForBooking called for booking_id:', booking_id);
+        const infoSql = 'SELECT flight_date, time_slot, activity_id, location, status, pax FROM all_booking WHERE id = ?';
         con.query(infoSql, [booking_id], (err, rows) => {
             if (err) {
                 console.error('refreshAvailabilityForBooking: failed to fetch booking info', err);
@@ -8413,13 +8570,37 @@ const refreshAvailabilityForBooking = (booking_id) => {
             const bookingDate = booking.flight_date;
             const bookingTime = booking.time_slot || booking.flight_date;
             const activityId = booking.activity_id;
+            const bookingStatus = booking.status;
+            
+            console.log('🔄 refreshAvailabilityForBooking booking info:', {
+                booking_id,
+                bookingDate,
+                bookingTime,
+                activityId,
+                location: booking.location,
+                status: bookingStatus,
+                pax: booking.pax
+            });
+            
+            // Only refresh if booking has a flight_date (scheduled booking)
+            if (!bookingDate) {
+                console.log('🔄 refreshAvailabilityForBooking: skipping - no flight_date');
+                return;
+            }
             
             const triggerUpdate = (finalActivityId) => {
                 if (!bookingDate || !bookingTime || !finalActivityId) {
                     console.warn('refreshAvailabilityForBooking: missing params', { booking_id, bookingDate, bookingTime, finalActivityId });
                     return;
                 }
-                updateSpecificAvailability(bookingDate, bookingTime, finalActivityId, 1);
+                console.log('🔄 refreshAvailabilityForBooking: triggering updateSpecificAvailability', {
+                    bookingDate,
+                    bookingTime,
+                    activityId: finalActivityId,
+                    status: bookingStatus
+                });
+                // updateSpecificAvailability will recalculate from all bookings, excluding cancelled ones
+                updateSpecificAvailability(bookingDate, bookingTime, finalActivityId, booking.pax || 1);
             };
             
             if (activityId) {
@@ -8561,10 +8742,25 @@ app.patch('/api/updateBookingField', (req, res) => {
                         handleFlightAttemptsIncrement(booking_id);
                     }
                     
-                    if (refreshOldSlot) {
+                    // Always refresh availability when status changes (especially for Cancelled)
+                    // This ensures availability is updated when a booking is cancelled
+                    console.log('🔄 updateBookingField - Status changed to:', normalizedValue, '- refreshing availability');
+                    
+                    // If we have previous slot info, refresh it first (in case flight_date changed)
+                    if (refreshOldSlot && previousSlot) {
+                        console.log('🔄 updateBookingField - Refreshing old slot:', previousSlot);
                         refreshAvailabilitySlot(previousSlot);
                     }
+                    
+                    // Always refresh current booking's availability slot
+                    // This is critical for cancelled bookings to free up availability
                     if (refreshNewSlot) {
+                        console.log('🔄 updateBookingField - Refreshing new slot for booking:', booking_id);
+                        refreshAvailabilityForBooking(booking_id);
+                    } else if (!previousSlot) {
+                        // Even if refreshNewSlot is false, refresh if we don't have previous slot info
+                        // This handles the case where status is changed but slotFields check failed
+                        console.log('🔄 updateBookingField - Force refreshing availability (no previous slot):', booking_id);
                         refreshAvailabilityForBooking(booking_id);
                     }
                     
@@ -9487,6 +9683,7 @@ const optimizedSql = `
             FROM all_booking ab 
             WHERE DATE(ab.flight_date) >= CURDATE() - INTERVAL 30 DAY
             AND (ab.status IS NULL OR TRIM(LOWER(ab.status)) NOT IN ('cancelled'))
+            AND (ab.manual_status_override IS NULL OR TRIM(LOWER(ab.manual_status_override)) NOT IN ('cancelled'))
             GROUP BY DATE(ab.flight_date), TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i'), ab.location
         ) as booking_counts 
             ON DATE(aa.date) = booking_counts.flight_date 
@@ -11432,9 +11629,15 @@ async function createVoucherFromWebhook(voucherData) {
                 // If only purchaser fields exist but no recipient fields, this is Flight Voucher (self-purchase)
                 normalizedBookFlight = 'Flight Voucher';
             }
-        } else if (normalizedBookFlight.toLowerCase().includes('gift') || normalizedBookFlight === 'Buy Gift') {
-            // Normalize variations to 'Gift Voucher'
-            normalizedBookFlight = 'Gift Voucher';
+        } else {
+            const normalizedBookFlightLower = normalizedBookFlight.toLowerCase();
+            if (normalizedBookFlightLower.includes('gift') || normalizedBookFlightLower === 'buy gift') {
+                // Normalize variations to 'Gift Voucher'
+                normalizedBookFlight = 'Gift Voucher';
+            } else if (normalizedBookFlightLower.includes('flight voucher') || normalizedBookFlightLower === 'buy flight voucher') {
+                // Normalize variations (e.g., Buy Flight Voucher) to standard Flight Voucher label
+                normalizedBookFlight = 'Flight Voucher';
+            }
         }
         
         console.log('=== BOOK_FLIGHT NORMALIZATION IN WEBHOOK ===');
@@ -12287,7 +12490,6 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                         // Create voucher only if not already created
                         result = await createVoucherFromWebhook(storeData.voucherData);
                         console.log('Voucher created successfully, ID:', result);
-                        
                         // Voucher code generation is now handled by frontend only
                         // Webhook only creates the voucher entry
                         console.log('Voucher code generation skipped - will be handled by frontend');
@@ -12963,6 +13165,7 @@ function updateSpecificAvailability(bookingDate, bookingTime, activityId, passen
             }
             const slot = slotRows[0];
             // Sum pax for this date/time and location; include bookings that may not have activity_id
+            // IMPORTANT: Exclude cancelled bookings from availability calculations
             const sumPaxSql = `
                 SELECT COALESCE(SUM(ab.pax), 0) as total_booked
                 FROM all_booking ab
@@ -12970,6 +13173,7 @@ function updateSpecificAvailability(bookingDate, bookingTime, activityId, passen
                 AND TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i') = TIME_FORMAT(TIME(?), '%H:%i')
                 AND (ab.activity_id = ? OR (ab.activity_id IS NULL AND ab.location = ?))
                 AND (ab.status IS NULL OR TRIM(LOWER(ab.status)) NOT IN ('cancelled'))
+                AND (ab.manual_status_override IS NULL OR TRIM(LOWER(ab.manual_status_override)) NOT IN ('cancelled'))
             `;
             con.query(sumPaxSql, [bookingDate, bookingTime, activityId, slot.location], (sumErr, sumRows) => {
                 if (sumErr) {
@@ -15616,7 +15820,7 @@ async function scheduleReceivedGiftVoucherEmail(voucherId, recipientEmail, delay
 }
 
 // Helper function to send automatic booking confirmation email
-async function sendAutomaticBookingConfirmationEmail(bookingId) {
+async function sendAutomaticBookingConfirmationEmail(bookingId, options = {}) {
     console.log('========================================');
     console.log('📧 [sendAutomaticBookingConfirmationEmail] FUNCTION CALLED');
     console.log('📧 [sendAutomaticBookingConfirmationEmail] Booking ID:', bookingId);
@@ -15696,7 +15900,7 @@ async function sendAutomaticBookingConfirmationEmail(bookingId) {
                 
                 // Continue with email sending only if email is available
                 if (booking.email && booking.email.trim()) {
-                sendEmailToCustomerAndOwner(booking, bookingId);
+                sendEmailToCustomerAndOwner(booking, bookingId, options);
                 } else {
                     console.error('❌ [sendAutomaticBookingConfirmationEmail] Cannot send email - no email address available for booking:', bookingId);
                 }
@@ -15749,7 +15953,7 @@ async function sendAutomaticFlightVoucherConfirmationEmail(voucherId) {
 }
 
 // Helper function to send automatic gift voucher confirmation email
-async function sendAutomaticGiftVoucherConfirmationEmail(voucherId) {
+async function sendAutomaticGiftVoucherConfirmationEmail(voucherId, purchasingContactOverride = {}) {
     try {
         // Check if SendGrid is configured
         if (!process.env.SENDGRID_API_KEY) {
@@ -15773,10 +15977,29 @@ async function sendAutomaticGiftVoucherConfirmationEmail(voucherId) {
             
             const voucher = voucherRows[0];
             
-            // Only send email for Gift Voucher type (not Flight Voucher)
-            if (voucher.book_flight !== 'Gift Voucher') {
-                console.log('Skipping automatic email - not a Gift Voucher:', voucher.book_flight);
+            const lowerBookFlight = (voucher.book_flight || '').toLowerCase();
+            const lowerVoucherType = (voucher.voucher_type || '').toLowerCase();
+            if (!(lowerBookFlight.includes('gift') || lowerVoucherType.includes('gift'))) {
+                console.log('Skipping automatic email - voucher is not a Gift Voucher flow:', {
+                    book_flight: voucher.book_flight,
+                    voucher_type: voucher.voucher_type
+                });
                 return;
+            }
+
+            const overrideEmail = purchasingContactOverride.purchaser_email || voucher.purchaser_email;
+            const overrideName = purchasingContactOverride.purchaser_name || voucher.purchaser_name;
+
+            if (overrideEmail && overrideEmail.trim()) {
+                console.log('Overriding voucher email with purchaser email for Gift Voucher Confirmation:', overrideEmail);
+                voucher.email = overrideEmail.trim();
+            }
+            if ((!overrideEmail || !overrideEmail.trim()) && !voucher.email) {
+                console.warn('Gift voucher has no purchaser email; cannot send automatic email. Voucher ID:', voucherId);
+                return;
+            }
+            if (overrideName && overrideName.trim()) {
+                voucher.name = overrideName.trim();
             }
             
             // Continue with email sending
@@ -15789,10 +16012,22 @@ async function sendAutomaticGiftVoucherConfirmationEmail(voucherId) {
 }
 
 // Helper function to send email to both customer and owner
-async function sendEmailToCustomerAndOwner(booking, bookingId) {
+async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
     try {
         console.log('📧 [sendEmailToCustomerAndOwner] Starting email send process for booking ID:', bookingId);
         console.log('📧 [sendEmailToCustomerAndOwner] Booking email:', booking.email);
+        
+        const {
+            templateName = 'Booking Confirmation',
+            templateType = 'booking_confirmation_automatic',
+            ownerTemplateType = 'booking_confirmation_automatic_owner',
+            subjectFallback = '🎈 Your flight is confirmed',
+            ownerSubjectPrefix = '📧 New Booking Confirmation - ',
+            ownerBannerTitle = 'New Booking Confirmation',
+            ownerTextIntro = 'This booking confirmation was automatically sent to:',
+            ownerMessageLead = 'New booking confirmation sent to customer.',
+            textBodyFallback = null
+        } = options || {};
         
         // Check if email is provided
         if (!booking.email || !booking.email.trim()) {
@@ -15813,11 +16048,11 @@ async function sendEmailToCustomerAndOwner(booking, bookingId) {
             return;
         }
         
-        // Fetch "Booking Confirmation" template from database
-        const templateQuery = `SELECT * FROM email_templates WHERE name = 'Booking Confirmation' LIMIT 1`;
-        con.query(templateQuery, (templateErr, templateRows) => {
+        // Fetch template from database
+        const templateQuery = `SELECT * FROM email_templates WHERE name = ? LIMIT 1`;
+        con.query(templateQuery, [templateName], (templateErr, templateRows) => {
             if (templateErr) {
-                console.error('❌ Error fetching Booking Confirmation template:', templateErr);
+                console.error(`❌ Error fetching ${templateName} template:`, templateErr);
                 // Continue with default template if fetch fails
             }
             
@@ -15825,7 +16060,7 @@ async function sendEmailToCustomerAndOwner(booking, bookingId) {
             
             // Debug logging
             if (template) {
-                console.log('✅ Found Booking Confirmation template:', {
+                console.log(`✅ Found ${templateName} template:`, {
                     id: template.id,
                     name: template.name,
                     subject: template.subject,
@@ -15834,14 +16069,21 @@ async function sendEmailToCustomerAndOwner(booking, bookingId) {
                     edited: template.edited
                 });
             } else {
-                console.log('⚠️ Booking Confirmation template not found in database, using default');
+                console.log(`⚠️ ${templateName} template not found in database, using default`);
             }
             
             // Generate email HTML using database template (or default if template not found)
             const htmlBody = generateBookingConfirmationEmail(booking, template);
-            const textBody = `Thank you for choosing Fly Away Ballooning! Your flight is confirmed for ${booking.flight_date ? moment(booking.flight_date).format('MMMM D, YYYY [at] h:mm A') : 'TBD'} at ${booking.location || 'Bath'}. We'll be in touch closer to the flight with weather updates.`;
+            const defaultTextBody = `Thank you for choosing Fly Away Ballooning! Your flight is confirmed for ${booking.flight_date ? moment(booking.flight_date).format('MMMM D, YYYY [at] h:mm A') : 'TBD'} at ${booking.location || 'Bath'}. We'll be in touch closer to the flight with weather updates.`;
+            const fallbackText = typeof textBodyFallback === 'function'
+                ? textBodyFallback(booking)
+                : textBodyFallback;
+            const normalizedFallbackText = (fallbackText !== undefined && fallbackText !== null)
+                ? String(fallbackText)
+                : '';
+            const textBody = normalizedFallbackText.trim() !== '' ? normalizedFallbackText : defaultTextBody;
             
-            const subject = template?.subject || '🎈 Your flight is confirmed';
+            const subject = template?.subject || subjectFallback;
             
             // Prepare email content for customer
             const customerEmailContent = {
@@ -15855,27 +16097,28 @@ async function sendEmailToCustomerAndOwner(booking, bookingId) {
                 html: htmlBody,
                 custom_args: {
                     booking_id: bookingId.toString(),
-                    template_type: 'booking_confirmation_automatic'
+                    template_type: templateType
                 }
             };
             
             // Prepare email content for business owner (same content, different recipient)
+            const ownerSubject = `${ownerSubjectPrefix}${booking.name || 'Guest'} (Booking ID: ${bookingId})`;
             const ownerEmailContent = {
                 to: 'info@flyawayballooning.com',
                 from: {
                     email: 'info@flyawayballooning.com',
                     name: 'Fly Away Ballooning'
                 },
-                subject: `📧 New Booking Confirmation - ${booking.name || 'Guest'} (Booking ID: ${bookingId})`,
-                text: `New booking confirmation sent to customer.\n\n${textBody}`,
+                subject: ownerSubject,
+                text: `${ownerMessageLead}\n\n${textBody}`,
                 html: `<div style="padding:16px; background:#f0f9ff; border-left:4px solid #3b82f6; margin-bottom:24px;">
-                    <p style="margin:0; font-weight:600; color:#1e40af;">New Booking Confirmation</p>
-                    <p style="margin:8px 0 0 0; color:#1e3a8a;">This booking confirmation was automatically sent to: ${escapeHtml(booking.email || 'N/A')}</p>
+                    <p style="margin:0; font-weight:600; color:#1e40af;">${escapeHtml(ownerBannerTitle)}</p>
+                    <p style="margin:8px 0 0 0; color:#1e3a8a;">${escapeHtml(ownerTextIntro)} ${escapeHtml(booking.email || 'N/A')}</p>
                     <p style="margin:8px 0 0 0; color:#1e3a8a;">Booking ID: ${bookingId}</p>
                 </div>${htmlBody}`,
                 custom_args: {
                     booking_id: bookingId.toString(),
-                    template_type: 'booking_confirmation_automatic_owner'
+                    template_type: ownerTemplateType
                 }
             };
             
@@ -15930,7 +16173,7 @@ async function sendEmailToCustomerAndOwner(booking, bookingId) {
                         bookingId,
                         booking.email,
                         customerEmailContent.subject,
-                        'booking_confirmation_automatic',
+                        templateType,
                         htmlBody,
                         textBody,
                         customerMessageId,
@@ -15948,7 +16191,7 @@ async function sendEmailToCustomerAndOwner(booking, bookingId) {
                         bookingId,
                         'info@flyawayballooning.com',
                         ownerEmailContent.subject,
-                        'booking_confirmation_automatic_owner',
+                        ownerTemplateType,
                         ownerEmailContent.html,
                         ownerEmailContent.text,
                         ownerMessageId,

@@ -2790,7 +2790,9 @@ setBookingDetail(finalVoucherDetail);
                 totalPrice: totalPrice,
                 additionalInfo: { notes: bookingDetail.booking.additional_notes || '' },
                 voucher_code: bookingDetail.booking.voucher_code || null,
-                flight_attempts: currentAttempts // Preserve attempts count when rebooking
+                flight_attempts: currentAttempts, // Preserve attempts count when rebooking
+                email_template_override: 'Passenger Rescheduling Information',
+                email_template_type_override: 'passenger_reschedule_information_automatic'
             };
 
             // First delete the old booking
