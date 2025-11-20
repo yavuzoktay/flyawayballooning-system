@@ -3700,6 +3700,296 @@ const con = mysql.createPool({
     multipleStatements: true
 });
 
+// ===== Activity pricing cache (used for passenger inference) =====
+const DEFAULT_LOCATION_KEY = '__default__';
+const ACTIVITY_PRICING_REFRESH_INTERVAL = 5 * 60 * 1000;
+const SHARED_VOUCHER_ALIAS_MAP = {
+    'weekday morning': 'weekday_morning_price',
+    'weekday morning flight': 'weekday_morning_price',
+    'weekday morning voucher': 'weekday_morning_price',
+    'flexible weekday': 'flexible_weekday_price',
+    'flexible weekday flight': 'flexible_weekday_price',
+    'flexible weekday voucher': 'flexible_weekday_price',
+    'flexible weekday (shared flight)': 'flexible_weekday_price',
+    'any day flight': 'any_day_flight_price',
+    'any day': 'any_day_flight_price'
+};
+
+let sharedVoucherPriceCache = {};
+let privateCharterPriceCache = {};
+let lastActivityPricingRefresh = 0;
+
+const parsePositiveInt = (value) => {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+const tryParseJson = (raw) => {
+    if (!raw || typeof raw !== 'string') return raw;
+    try {
+        return JSON.parse(raw);
+    } catch (_) {
+        return raw;
+    }
+};
+
+const safeArrayLength = (value) => {
+    if (!value) return null;
+    const maybeArray = tryParseJson(value);
+    if (Array.isArray(maybeArray)) {
+        return maybeArray.filter(item => item !== undefined && item !== null).length || maybeArray.length;
+    }
+    return null;
+};
+
+const toNumberOrNull = (value) => {
+    if (value === undefined || value === null) return null;
+    if (typeof value === 'number') {
+        return Number.isFinite(value) ? value : null;
+    }
+    if (typeof value === 'string') {
+        const normalized = value.replace(',', '.');
+        const parsed = Number(normalized);
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+};
+
+const normalizeLocationKey = (location) => {
+    if (!location || typeof location !== 'string') return DEFAULT_LOCATION_KEY;
+    const trimmed = location.trim();
+    return trimmed ? trimmed.toLowerCase() : DEFAULT_LOCATION_KEY;
+};
+
+const normalizeVoucherTitle = (title) => {
+    if (!title) return '';
+    return String(title).trim().toLowerCase();
+};
+
+const buildSharedPricingEntry = (row) => {
+    const entry = {};
+    Object.entries(SHARED_VOUCHER_ALIAS_MAP).forEach(([alias, column]) => {
+        const price = toNumberOrNull(row[column]);
+        if (price) {
+            entry[alias] = price;
+        }
+    });
+    return entry;
+};
+
+const parsePrivateCharterPricing = (raw) => {
+    if (!raw) return null;
+    let data = raw;
+    try {
+        if (typeof data === 'string') {
+            data = JSON.parse(data);
+        }
+    } catch (err) {
+        console.warn('Failed to parse private_charter_pricing:', err?.message || err);
+        return null;
+    }
+    if (!data || typeof data !== 'object') return null;
+    const normalized = {};
+    Object.entries(data).forEach(([title, value]) => {
+        const normalizedTitle = normalizeVoucherTitle(title);
+        if (!normalizedTitle) return;
+        if (value && typeof value === 'object') {
+            const paxMap = {};
+            Object.entries(value).forEach(([pax, groupPrice]) => {
+                const parsed = toNumberOrNull(groupPrice);
+                if (parsed) {
+                    paxMap[String(pax)] = parsed;
+                }
+            });
+            if (Object.keys(paxMap).length > 0) {
+                normalized[normalizedTitle] = paxMap;
+            }
+        } else {
+            const parsedSingle = toNumberOrNull(value);
+            if (parsedSingle) {
+                normalized[normalizedTitle] = { '2': parsedSingle };
+            }
+        }
+    });
+    return Object.keys(normalized).length > 0 ? normalized : null;
+};
+
+const refreshActivityPricingCache = (force = false) => {
+    const now = Date.now();
+    if (!force && now - lastActivityPricingRefresh < ACTIVITY_PRICING_REFRESH_INTERVAL) {
+        return Promise.resolve();
+    }
+    return new Promise((resolve, reject) => {
+        const sql = `
+            SELECT location, weekday_morning_price, flexible_weekday_price, any_day_flight_price, private_charter_pricing
+            FROM activity
+            WHERE status = 'Live'
+        `;
+        con.query(sql, (err, rows) => {
+            if (err) {
+                console.error('Failed to refresh activity pricing cache:', err);
+                return reject(err);
+            }
+            const nextShared = {};
+            const nextPrivate = {};
+            const aggregateShared = {};
+            const aggregatePrivate = {};
+            rows.forEach((row) => {
+                const locationKey = normalizeLocationKey(row.location);
+                const sharedEntry = buildSharedPricingEntry(row);
+                if (Object.keys(sharedEntry).length > 0) {
+                    nextShared[locationKey] = sharedEntry;
+                    Object.entries(sharedEntry).forEach(([alias, price]) => {
+                        if (aggregateShared[alias] == null) {
+                            aggregateShared[alias] = price;
+                        }
+                    });
+                }
+                const privateEntry = parsePrivateCharterPricing(row.private_charter_pricing);
+                if (privateEntry) {
+                    nextPrivate[locationKey] = privateEntry;
+                    Object.entries(privateEntry).forEach(([title, paxMap]) => {
+                        if (!aggregatePrivate[title]) {
+                            aggregatePrivate[title] = paxMap;
+                        }
+                    });
+                }
+            });
+            if (Object.keys(aggregateShared).length > 0) {
+                nextShared[DEFAULT_LOCATION_KEY] = aggregateShared;
+            }
+            if (Object.keys(aggregatePrivate).length > 0) {
+                nextPrivate[DEFAULT_LOCATION_KEY] = aggregatePrivate;
+            }
+            sharedVoucherPriceCache = nextShared;
+            privateCharterPriceCache = nextPrivate;
+            lastActivityPricingRefresh = Date.now();
+            resolve();
+        });
+    });
+};
+
+// Warm the cache on startup and refresh periodically
+refreshActivityPricingCache(true).catch((err) => {
+    console.error('Initial activity pricing cache load failed:', err?.message || err);
+});
+const pricingRefreshInterval = setInterval(() => {
+    refreshActivityPricingCache().catch((err) => {
+        console.error('Activity pricing cache refresh failed:', err?.message || err);
+    });
+}, ACTIVITY_PRICING_REFRESH_INTERVAL);
+if (pricingRefreshInterval && pricingRefreshInterval.unref) {
+    pricingRefreshInterval.unref();
+}
+
+const getSharedVoucherPriceFromCache = (voucherTitle, location) => {
+    const normalizedTitle = normalizeVoucherTitle(voucherTitle);
+    if (!normalizedTitle) return null;
+    const locationKey = normalizeLocationKey(location);
+    const locationPrices = sharedVoucherPriceCache[locationKey];
+    if (locationPrices && locationPrices[normalizedTitle]) {
+        return locationPrices[normalizedTitle];
+    }
+    const fallback = sharedVoucherPriceCache[DEFAULT_LOCATION_KEY];
+    return fallback ? fallback[normalizedTitle] || null : null;
+};
+
+const getPrivateCharterPricingFromCache = (voucherTitle, location) => {
+    const normalizedTitle = normalizeVoucherTitle(voucherTitle);
+    if (!normalizedTitle) return null;
+    const locationKey = normalizeLocationKey(location);
+    const locationPricing = privateCharterPriceCache[locationKey];
+    if (locationPricing && locationPricing[normalizedTitle]) {
+        return locationPricing[normalizedTitle];
+    }
+    const fallback = privateCharterPriceCache[DEFAULT_LOCATION_KEY];
+    return fallback ? fallback[normalizedTitle] || null : null;
+};
+
+const inferPrivateCharterPassengersFromPrice = (voucherTitle, location, totalPrice) => {
+    if (!totalPrice || Number(totalPrice) <= 0) return null;
+    const pricing = getPrivateCharterPricingFromCache(voucherTitle, location);
+    if (!pricing) return null;
+    const normalizedTotal = Number(totalPrice);
+    for (const [pax, price] of Object.entries(pricing)) {
+        const parsedPrice = Number(price);
+        if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) continue;
+        if (Math.abs(parsedPrice - normalizedTotal) < 0.01) {
+            const paxInt = parsePositiveInt(pax);
+            if (paxInt) return paxInt;
+        }
+    }
+    return null;
+};
+
+function derivePassengerCount(source = {}) {
+    const payload = typeof source === 'string' ? tryParseJson(source) || {} : (source || {});
+    const selectedVoucherType = tryParseJson(payload.selectedVoucherType) || {};
+    const chooseFlightType = tryParseJson(payload.chooseFlightType) || {};
+    const passengerLengths = [
+        safeArrayLength(payload.passengerData),
+        safeArrayLength(payload.voucher_passenger_details),
+        safeArrayLength(payload.passenger_details),
+        safeArrayLength(payload.add_to_booking_items?.passengers)
+    ];
+
+    const candidateValues = [
+        payload.numberOfPassengers,
+        payload.passenger_count,
+        payload.passengerCount,
+        payload.numberOfVouchers,
+        selectedVoucherType?.quantity,
+        selectedVoucherType?.passengers,
+        selectedVoucherType?.passengerCount,
+        chooseFlightType?.passengerCount,
+        ...passengerLengths
+    ];
+
+    for (const candidate of candidateValues) {
+        const parsed = parsePositiveInt(candidate);
+        if (parsed) return parsed;
+    }
+
+    const locationHint = payload.chooseLocation || payload.preferred_location || payload.location || null;
+    const voucherTitle =
+        selectedVoucherType?.title ||
+        payload.voucher_type_detail ||
+        payload.actual_voucher_type ||
+        payload.voucher_type ||
+        payload.book_flight;
+    const totalPaid = Number(
+        payload.paid ||
+        payload.totalPrice ||
+        selectedVoucherType?.totalPrice ||
+        0
+    );
+
+    if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
+        const inferredPrivate = inferPrivateCharterPassengersFromPrice(voucherTitle, locationHint, totalPaid);
+        if (inferredPrivate) return inferredPrivate;
+    }
+
+    const explicitPerPersonPrice = (() => {
+        const priceUnit = (selectedVoucherType?.priceUnit || '').toLowerCase();
+        const base = toNumberOrNull(selectedVoucherType?.basePrice);
+        const perPerson = toNumberOrNull(selectedVoucherType?.price);
+        if (priceUnit === 'total') return null;
+        if (perPerson) return perPerson;
+        if (base) return base;
+        return null;
+    })();
+
+    const sharedPriceFallback = getSharedVoucherPriceFromCache(voucherTitle, locationHint);
+    const resolvedPerPersonPrice = explicitPerPersonPrice || sharedPriceFallback;
+
+    if (resolvedPerPersonPrice && totalPaid > 0) {
+        const inferred = Math.round(totalPaid / resolvedPerPersonPrice);
+        if (inferred > 0) return inferred;
+    }
+
+    return 1;
+}
+
 // Create passenger_terms table if not exists (migration)
 con.query(`
     CREATE TABLE IF NOT EXISTS passenger_terms (
@@ -5960,6 +6250,10 @@ app.post('/api/createVoucher', (req, res) => {
         weight = '',
         flight_type = '',
         voucher_type = '',
+        book_flight = '',
+        voucher_type_detail = '',
+        selectedVoucherType = null,
+        chooseFlightType = null,
         email = '',
         phone = '',
         mobile = '',
@@ -5986,6 +6280,18 @@ app.post('/api/createVoucher', (req, res) => {
         purchaser_phone = '',
         purchaser_mobile = ''
     } = req.body;
+
+    const resolvedPassengerCount = derivePassengerCount({
+        numberOfPassengers,
+        selectedVoucherType,
+        chooseFlightType,
+        passengerData,
+        paid,
+        voucher_type_detail,
+        voucher_type,
+        book_flight,
+        flight_type
+    });
 
     // Processing voucher creation request
     console.log('=== BACKEND VOUCHER CREATION DEBUG ===');
@@ -6309,7 +6615,7 @@ app.post('/api/createVoucher', (req, res) => {
             emptyToNull(finalPurchaserEmail), // Use final purchaser values
             emptyToNull(finalPurchaserPhone), // Use final purchaser values
             emptyToNull(finalPurchaserMobile), // Use final purchaser values
-            numberOfPassengers, // Number of passengers
+            resolvedPassengerCount, // Number of passengers
             // Persist additional information answers regardless of which key frontend used
             (additional_information_json || additionalInfo || additional_information) ? JSON.stringify(additional_information_json || additionalInfo || additional_information) : null, // additional_information_json
             add_to_booking_items ? JSON.stringify(add_to_booking_items) : null // add_to_booking_items
@@ -6382,7 +6688,7 @@ app.post('/api/createVoucher', (req, res) => {
             name, // name
             flight_type, // flight_type
             null, // flight_date (null for vouchers)
-            numberOfPassengers, // pax (use the actual number of passengers)
+            resolvedPassengerCount, // pax (use the actual number of passengers)
             null, // location
             'Confirmed', // status
             paid, // paid
@@ -6468,7 +6774,7 @@ app.post('/api/createVoucher', (req, res) => {
             name, // name
             flight_type_redeem, // flight_type
             null, // flight_date (will be set when booking is confirmed)
-            numberOfPassengers || 1, // pax
+            resolvedPassengerCount || 1, // pax
             preferred_location || 'TBD', // location
             'Open', // status
             0, // paid (Redeem Voucher doesn't involve payment)
@@ -6629,8 +6935,8 @@ app.post('/api/createVoucher', (req, res) => {
             const firstName = nameParts[0] || '';
             const lastName = nameParts.slice(1).join(' ') || '';
             
-            // Create passengers based on numberOfPassengers
-            for (let i = 0; i < numberOfPassengers; i++) {
+            // Create passengers based on resolved passenger count
+            for (let i = 0; i < resolvedPassengerCount; i++) {
                 passengersToCreate.push({
                     firstName: i === 0 ? firstName : '', // Only first passenger gets the main contact name
                     lastName: i === 0 ? lastName : '',
@@ -11090,6 +11396,19 @@ async function createVoucherFromWebhook(voucherData) {
             purchaser_phone = '',
             purchaser_mobile = ''
         } = voucherData;
+
+        const resolvedPassengerCount = derivePassengerCount({
+            numberOfPassengers,
+            selectedVoucherType: voucherData.selectedVoucherType,
+            chooseFlightType: voucherData.chooseFlightType,
+            passengerData,
+            paid,
+            voucher_type_detail: voucherData.voucher_type_detail,
+            voucher_type,
+            book_flight,
+            flight_type
+        });
+        voucherData.numberOfPassengers = resolvedPassengerCount;
         
         // Normalize book_flight: prioritize recipient signals (Gift Voucher) vs purchaser-only (Flight Voucher)
         let normalizedBookFlight = book_flight;
@@ -11265,7 +11584,7 @@ async function createVoucherFromWebhook(voucherData) {
                 emptyToNull(preferred_time),
                 emptyToNull(preferred_day),
                 0, // flight_attempts starts at 0 for each created voucher
-                Number.parseInt(numberOfPassengers, 10) || 1,
+                resolvedPassengerCount,
                 // Persist additional information answers regardless of which key frontend used
                 finalAdditionalInfoJson ? JSON.stringify(finalAdditionalInfoJson) : null,
                 add_to_booking_items ? JSON.stringify(add_to_booking_items) : null,
@@ -11458,6 +11777,9 @@ app.post('/api/create-checkout-session', async (req, res) => {
             // Persist the amount paid from checkout into voucherData so webhook creation stores it
             paid: Number(totalPrice) || 0
         } : null;
+        if (normalizedVoucherData) {
+            normalizedVoucherData.numberOfPassengers = derivePassengerCount(normalizedVoucherData);
+        }
         stripeSessionStore[session_id] = {
             type: type || (voucherData ? 'voucher' : 'booking'),
             bookingData,
@@ -11750,6 +12072,9 @@ app.post('/api/createBookingFromSession', async (req, res) => {
         }
         
         console.log('Found session data:', storeData);
+        if (storeData.voucherData) {
+            storeData.voucherData.numberOfPassengers = derivePassengerCount(storeData.voucherData);
+        }
         
         // If already processed by webhook or previous call, short-circuit
         if (storeData.processed) {
@@ -11978,7 +12303,8 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                                 let flightCategory = storeData.voucherData.voucher_type_detail || 'Any Day Flight';
                                 
                                 // For Buy Gift Voucher, generate multiple voucher codes based on passenger count
-                                const passengerCount = Number.parseInt(storeData.voucherData.numberOfPassengers, 10) || 1;
+                                const passengerCount = derivePassengerCount(storeData.voucherData);
+                                storeData.voucherData.numberOfPassengers = passengerCount;
                                 // If passengerCount > 1, always generate multiple codes regardless of labels
                                 const isBuyGiftVoucher = (passengerCount > 1) ||
                                                        storeData.voucherData.book_flight === 'Gift Voucher' || 
