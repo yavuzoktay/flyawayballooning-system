@@ -2735,9 +2735,8 @@ setBookingDetail(finalVoucherDetail);
                 }
             }
 
-            // Get current flight_attempts before deleting
+            // Keep current flight_attempts value. Attempts only increment when a flight is cancelled.
             const currentAttempts = parseInt(bookingDetail.booking.flight_attempts || 0, 10);
-            const newAttempts = currentAttempts + 1;
 
             // Prepare passenger data for new booking
             let passengerData = [];
@@ -2776,7 +2775,7 @@ setBookingDetail(finalVoucherDetail);
                 totalPrice: totalPrice,
                 additionalInfo: { notes: bookingDetail.booking.additional_notes || '' },
                 voucher_code: bookingDetail.booking.voucher_code || null,
-                flight_attempts: newAttempts // Add incremented flight_attempts to new booking
+                flight_attempts: currentAttempts // Preserve attempts count when rebooking
             };
 
             // First delete the old booking
