@@ -3262,6 +3262,130 @@ app.delete('/api/crew/:id', (req, res) => {
     });
 });
 
+// ==================== PILOT MANAGEMENT API ENDPOINTS ====================
+
+// Get all pilots
+app.get('/api/pilots', (req, res) => {
+    const sql = 'SELECT * FROM pilots ORDER BY last_name ASC, first_name ASC';
+    con.query(sql, (err, result) => {
+        if (err) {
+            console.error('Error fetching pilots:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        res.json({ success: true, data: result });
+    });
+});
+
+// Get pilot by ID
+app.get('/api/pilots/:id', (req, res) => {
+    const { id } = req.params;
+    const sql = 'SELECT * FROM pilots WHERE id = ?';
+    con.query(sql, [id], (err, result) => {
+        if (err) {
+            console.error('Error fetching pilot:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        if (result.length === 0) {
+            return res.status(404).json({ success: false, message: 'Pilot not found' });
+        }
+        res.json({ success: true, data: result[0] });
+    });
+});
+
+// Create new pilot
+app.post('/api/pilots', (req, res) => {
+    const { first_name, last_name, is_active } = req.body;
+    
+    // Validation
+    if (!first_name || !last_name) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: first_name and last_name' });
+    }
+    
+    const sql = 'INSERT INTO pilots (first_name, last_name, is_active) VALUES (?, ?, ?)';
+    const values = [
+        first_name.trim(),
+        last_name.trim(),
+        is_active !== undefined ? is_active : true
+    ];
+    
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error creating pilot:', err);
+            if (err.code === 'ER_DUP_ENTRY') {
+                return res.status(400).json({ success: false, message: 'A pilot with this name already exists' });
+            }
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Pilot created successfully',
+            id: result.insertId
+        });
+    });
+});
+
+// Update pilot
+app.put('/api/pilots/:id', (req, res) => {
+    const { id } = req.params;
+    const { first_name, last_name, is_active } = req.body;
+    
+    // Validation
+    if (!first_name || !last_name) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: first_name and last_name' });
+    }
+    
+    const sql = 'UPDATE pilots SET first_name = ?, last_name = ?, is_active = ? WHERE id = ?';
+    const values = [
+        first_name.trim(),
+        last_name.trim(),
+        is_active !== undefined ? is_active : true,
+        id
+    ];
+    
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error updating pilot:', err);
+            if (err.code === 'ER_DUP_ENTRY') {
+                return res.status(400).json({ success: false, message: 'A pilot with this name already exists' });
+            }
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Pilot not found' });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Pilot updated successfully'
+        });
+    });
+});
+
+// Delete pilot
+app.delete('/api/pilots/:id', (req, res) => {
+    const { id } = req.params;
+    
+    const sql = 'DELETE FROM pilots WHERE id = ?';
+    
+    con.query(sql, [id], (err, result) => {
+        if (err) {
+            console.error('Error deleting pilot:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Pilot not found' });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Pilot deleted successfully'
+        });
+    });
+});
+
 // ==================== TERMS & CONDITIONS API ENDPOINTS ====================
 
 // Get all terms and conditions
@@ -4406,12 +4530,14 @@ app.get('/api/getAllBookingData', (req, res) => {
     }
     
     // Optimized query with better indexing hints
+    // Include voucher_type from all_vouchers if booking's voucher_type is null
+    // Note: all_vouchers table has voucher_type column, actual_voucher_type is just an alias in getAllVoucherData
     const sql = `
         SELECT 
             ab.*, 
             ab.name as passenger_name,
-            ab.voucher_type as voucher_type,
-            COALESCE(ab.voucher_code, vc.code, vcu_map.code) as voucher_code,
+            COALESCE(ab.voucher_type, v.voucher_type) as voucher_type,
+            COALESCE(ab.voucher_code, vc.code, vcu_map.code, v.voucher_ref) as voucher_code,
             DATE_FORMAT(ab.created_at, '%Y-%m-%d') as created_at_display,
             DATE_FORMAT(ab.expires, '%d/%m/%Y') as expires_display
         FROM all_booking ab
@@ -4421,6 +4547,8 @@ app.get('/api/getAllBookingData', (req, res) => {
             ON vcu.booking_id = ab.id OR (vcu.customer_email IS NOT NULL AND vcu.customer_email = ab.email)
         LEFT JOIN voucher_codes vcu_map
             ON vcu_map.id = vcu.voucher_code_id
+        LEFT JOIN all_vouchers v
+            ON v.voucher_ref = COALESCE(ab.voucher_code, vc.code, vcu_map.code)
         ${whereClause}
         ORDER BY ab.created_at DESC
         LIMIT 1000
@@ -5999,7 +6127,7 @@ app.post('/api/createBooking', (req, res) => {
             req.body.activity_id || null, // activity_id
             selectedTime || null, // time_slot
             experience || chooseFlightType.type, // experience (use from req.body if provided, otherwise use flight type)
-            voucher_type || chooseFlightType.type, // voucher_type (use from req.body if provided, otherwise use flight type)
+            (voucher_type && voucher_type.trim() !== '') ? voucher_type : (chooseFlightType.type || null), // voucher_type (use from req.body if provided and not empty, otherwise use flight type or null)
             0, // voucher_discount
             base_original_amount, // original_amount (base price excluding add-ons and weather refund)
             add_on_total_price, // add_to_booking_items_total_price
@@ -7310,11 +7438,30 @@ app.get('/api/getBookingDetail', async (req, res) => {
         }
         const booking = bookingRows[0];
         
+        // If voucher_type is null or empty, try to get it from voucher
+        if ((!booking.voucher_type || booking.voucher_type.trim() === '') && booking.voucher_code) {
+            try {
+                const [voucherRows] = await new Promise((resolve, reject) => {
+                    con.query('SELECT voucher_type FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [booking.voucher_code], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
+                });
+                if (voucherRows && voucherRows.length > 0 && voucherRows[0].voucher_type) {
+                    booking.voucher_type = voucherRows[0].voucher_type;
+                    console.log('✅ getBookingDetail - voucher_type fetched from voucher:', booking.voucher_type);
+                }
+            } catch (voucherErr) {
+                console.warn('⚠️ getBookingDetail - Could not fetch voucher_type from voucher:', voucherErr.message);
+            }
+        }
+        
         // DEBUG: Log flight_date to diagnose "Invalid Date" issue
         console.log('=== GET BOOKING DETAIL DEBUG ===');
         console.log('Booking ID:', booking_id);
         console.log('flight_date from DB:', booking.flight_date, 'Type:', typeof booking.flight_date);
         console.log('time_slot from DB:', booking.time_slot);
+        console.log('voucher_type:', booking.voucher_type);
         
         // Ensure preferred fields are always present and not null
         booking.preferred_location = booking.preferred_location || '';
@@ -14058,6 +14205,30 @@ function runCrewAssignmentMigrations() {
 }
 runCrewAssignmentMigrations();
 
+// Pilot Assignment Migrations
+function runPilotAssignmentMigrations() {
+    const createPilotAssignments = `
+        CREATE TABLE IF NOT EXISTS flight_pilot_assignments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            activity_id INT NOT NULL,
+            date DATE NOT NULL,
+            time TIME NOT NULL,
+            pilot_id INT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_slot (activity_id, date, time)
+        ) COMMENT 'Assigned pilots per activity/date/time slot';
+    `;
+    con.query(createPilotAssignments, (err) => {
+        if (err) {
+            console.error('Error creating flight_pilot_assignments table:', err);
+        } else {
+            console.log('✅ flight_pilot_assignments table ready');
+        }
+    });
+}
+runPilotAssignmentMigrations();
+
 // Update existing date_request table with missing columns
 const updateDateRequestTable = () => {
     console.log('Checking date_request table structure...');
@@ -14263,6 +14434,94 @@ app.post('/api/crew-assignment', (req, res) => {
                 success: true, 
                 message: 'Crew assignment saved',
                 data: { activity_id, date, time, crew_id }
+            });
+        });
+    });
+});
+
+// Get all pilot assignments for a date
+app.get('/api/pilot-assignments', (req, res) => {
+    const { date } = req.query;
+    if (!date) return res.status(400).json({ success: false, message: 'date is required (YYYY-MM-DD)' });
+    
+    console.log('Fetching pilot assignments for date:', date);
+    
+    const sql = `
+        SELECT fpa.*, p.first_name, p.last_name 
+        FROM flight_pilot_assignments fpa
+        JOIN pilots p ON fpa.pilot_id = p.id
+        WHERE fpa.date = ?
+        ORDER BY fpa.time ASC
+    `;
+    
+    con.query(sql, [date], (err, result) => {
+        if (err) {
+            console.error('Error fetching pilot assignments:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        console.log('Pilot assignments found for date', date, ':', result);
+        res.json({ success: true, data: result });
+    });
+});
+
+// Upsert pilot assignment for a slot
+app.post('/api/pilot-assignment', (req, res) => {
+    const { activity_id, date, time, pilot_id } = req.body;
+    if (!activity_id || !date || !time) {
+        return res.status(400).json({ success: false, message: 'activity_id, date, time are required' });
+    }
+    
+    console.log('Saving pilot assignment:', { activity_id, date, time, pilot_id });
+    
+    // If pilot_id is null, delete the assignment
+    if (pilot_id === null || pilot_id === undefined) {
+        const deleteSql = 'DELETE FROM flight_pilot_assignments WHERE activity_id = ? AND date = ? AND time = ?';
+        con.query(deleteSql, [activity_id, date, time], (err, result) => {
+            if (err) {
+                console.error('Error deleting pilot assignment:', err);
+                return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+            }
+            console.log('Pilot assignment deleted successfully:', result);
+            res.json({ 
+                success: true, 
+                message: 'Pilot assignment cleared',
+                data: { activity_id, date, time, pilot_id: null }
+            });
+        });
+        return;
+    }
+    
+    // Validate that the pilot exists
+    const validatePilotSql = 'SELECT id FROM pilots WHERE id = ? AND is_active = 1';
+    con.query(validatePilotSql, [pilot_id], (validateErr, validateResult) => {
+        if (validateErr) {
+            console.error('Error validating pilot:', validateErr);
+            return res.status(500).json({ success: false, message: 'Database error', error: validateErr.message });
+        }
+        
+        if (validateResult.length === 0) {
+            return res.status(400).json({ success: false, message: 'Invalid pilot ID' });
+        }
+        
+        const sql = `
+            INSERT INTO flight_pilot_assignments (activity_id, date, time, pilot_id)
+            VALUES (?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE pilot_id = VALUES(pilot_id), updated_at = CURRENT_TIMESTAMP
+        `;
+        
+        con.query(sql, [activity_id, date, time, pilot_id], (err, result) => {
+            if (err) {
+                console.error('Error upserting pilot assignment:', err);
+                return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+            }
+            console.log('Pilot assignment saved successfully:', result);
+            
+            // Return the saved assignment data
+            res.json({ 
+                success: true, 
+                message: 'Pilot assignment saved',
+                data: { activity_id, date, time, pilot_id }
             });
         });
     });
@@ -15332,7 +15591,7 @@ function buildEmailLayout({ subject, headline = '', heroImage, highlightHtml = '
                                         </v:textbox>
                                         </v:rect>
                                         <![endif]-->
-                                        <img src="${heroImageUrl}" alt="Fly Away Ballooning" width="640" style="width:100%; max-width:640px; height:auto; min-height:220px; display:block; border:0; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; background-color:#ffffff; vertical-align:top; object-fit:cover; object-position:center; border-radius:24px 24px 0 0;" />
+                                        <img src="${heroImageUrl}" alt="Fly Away Ballooning" width="640" style="width:100%; height:auto; min-height:220px; display:block; border:0; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; background-color:#ffffff; vertical-align:top; object-fit:cover; object-position:center; border-radius:24px 24px 0 0;" />
                                     </td>
                                 </tr>
                             </table>

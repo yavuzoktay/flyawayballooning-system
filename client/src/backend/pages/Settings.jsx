@@ -141,6 +141,17 @@ const Settings = () => {
         is_active: true
     });
     
+    // Pilot Management state
+    const [pilots, setPilots] = useState([]);
+    const [showPilotForm, setShowPilotForm] = useState(false);
+    const [showEditPilotForm, setShowEditPilotForm] = useState(false);
+    const [selectedPilot, setSelectedPilot] = useState(null);
+    const [pilotFormData, setPilotFormData] = useState({
+        first_name: '',
+        last_name: '',
+        is_active: true
+    });
+    
     // Terms & Conditions state
     const [termsAndConditions, setTermsAndConditions] = useState([]);
     const [showTermsForm, setShowTermsForm] = useState(false);
@@ -416,6 +427,7 @@ const Settings = () => {
         fetchAdditionalInfoQuestions();
         fetchTermsAndConditions();
         fetchCrewMembers();
+        fetchPilots();
         fetchPassengerTerms();
         fetchResources();
         fetchResourceGroups();
@@ -535,6 +547,17 @@ const Settings = () => {
             }
         } catch (error) {
             console.error('Error fetching crew members:', error);
+        }
+    };
+
+    const fetchPilots = async () => {
+        try {
+            const response = await axios.get('/api/pilots');
+            if (response.data.success) {
+                setPilots(response.data.data);
+            }
+        } catch (error) {
+            console.error('Error fetching pilots:', error);
         }
     };
 
@@ -1087,6 +1110,64 @@ const Settings = () => {
             is_active: true
         });
         setSelectedCrewMember(null);
+    };
+
+    // Pilot Management form handling
+    const handlePilotSubmit = async (e) => {
+        e.preventDefault();
+        
+        // Form validation
+        if (!pilotFormData.first_name || !pilotFormData.last_name) {
+            alert('Please fill in all required fields: First Name and Last Name');
+            return;
+        }
+        
+        try {
+            if (showEditPilotForm) {
+                await axios.put(`/api/pilots/${selectedPilot.id}`, pilotFormData);
+            } else {
+                await axios.post('/api/pilots', pilotFormData);
+            }
+            
+            fetchPilots();
+            resetPilotForm();
+            setShowPilotForm(false);
+            setShowEditPilotForm(false);
+        } catch (error) {
+            console.error('Error saving pilot:', error);
+            alert(error.response?.data?.message || 'Error saving pilot');
+        }
+    };
+
+    const handleEditPilot = (pilot) => {
+        setSelectedPilot(pilot);
+        setPilotFormData({
+            first_name: pilot.first_name,
+            last_name: pilot.last_name,
+            is_active: pilot.is_active
+        });
+        setShowEditPilotForm(true);
+    };
+
+    const handleDeletePilot = async (id) => {
+        if (window.confirm('Are you sure you want to delete this pilot?')) {
+            try {
+                await axios.delete(`/api/pilots/${id}`);
+                fetchPilots();
+            } catch (error) {
+                console.error('Error deleting pilot:', error);
+                alert(error.response?.data?.message || 'Error deleting pilot');
+            }
+        }
+    };
+
+    const resetPilotForm = () => {
+        setPilotFormData({
+            first_name: '',
+            last_name: '',
+            is_active: true
+        });
+        setSelectedPilot(null);
     };
 
     // Add to Booking Items form handling
@@ -2945,17 +3026,30 @@ const Settings = () => {
                         </p>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <button 
-                            className="btn btn-primary"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setShowCrewForm(true);
-                            }}
-                            style={{ margin: 0 }}
-                        >
-                            <Plus size={20} />
-                            Add Crew Member
-                        </button>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <button 
+                                className="btn btn-primary"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowCrewForm(true);
+                                }}
+                                style={{ margin: 0 }}
+                            >
+                                <Plus size={20} />
+                                Add Crew Member
+                            </button>
+                            <button 
+                                className="btn btn-primary"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowPilotForm(true);
+                                }}
+                                style={{ margin: 0 }}
+                            >
+                                <Plus size={20} />
+                                Add Pilot Member
+                            </button>
+                        </div>
                         {crewExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
                     </div>
                 </div>
@@ -3055,6 +3149,107 @@ const Settings = () => {
                                 </table>
                             </div>
                         )}
+                        
+                        {/* Pilots Table */}
+                        <div style={{ marginTop: '32px', paddingTop: '32px', borderTop: '2px solid #e2e8f0' }}>
+                            <h3 style={{ margin: '0 0 20px 0', color: '#1f2937', fontSize: '18px', fontWeight: '600' }}>
+                                Pilots
+                            </h3>
+                            
+                            <div className="crew-stats" style={{ 
+                                display: 'flex', 
+                                gap: '20px', 
+                                marginBottom: '20px',
+                                padding: '16px',
+                                background: '#f8fafc',
+                                borderRadius: '8px',
+                                border: '1px solid #e2e8f0'
+                            }}>
+                                <div style={{ textAlign: 'center' }}>
+                                    <div style={{ fontSize: '24px', fontWeight: '600', color: '#1f2937' }}>
+                                        {pilots.length}
+                                    </div>
+                                    <div style={{ fontSize: '14px', color: '#6b7280' }}>Total Pilots</div>
+                                </div>
+                                <div style={{ textAlign: 'center' }}>
+                                    <div style={{ fontSize: '24px', fontWeight: '600', color: '#10b981' }}>
+                                        {pilots.filter(p => p.is_active).length}
+                                    </div>
+                                    <div style={{ fontSize: '14px', color: '#6b7280' }}>Active</div>
+                                </div>
+                            </div>
+                            
+                            {pilots.length === 0 ? (
+                                <div className="no-crew-message">
+                                    <div style={{ textAlign: 'center', padding: '40px' }}>
+                                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>✈️</div>
+                                        <h3 style={{ color: '#6b7280', marginBottom: '8px' }}>No Pilots Yet</h3>
+                                        <p style={{ color: '#9ca3af', marginBottom: '20px' }}>
+                                            Add your first pilot to manage balloon flight operations.
+                                        </p>
+                                        <button 
+                                            className="btn btn-primary"
+                                            onClick={() => setShowPilotForm(true)}
+                                        >
+                                            <Plus size={20} />
+                                            Add First Pilot
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="crew-table-container">
+                                    <table className="crew-table">
+                                        <thead>
+                                            <tr>
+                                                <th>NAME</th>
+                                                <th>STATUS</th>
+                                                <th>CREATED</th>
+                                                <th>ACTIONS</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {pilots.map((pilot) => (
+                                                <tr key={pilot.id}>
+                                                    <td>
+                                                        <div style={{ fontWeight: '500', color: '#1f2937' }}>
+                                                            {pilot.first_name} {pilot.last_name}
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <span className={`status-badge ${pilot.is_active ? 'active' : 'inactive'}`}>
+                                                            {pilot.is_active ? 'Active' : 'Inactive'}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span style={{ color: '#6b7280', fontSize: '14px' }}>
+                                                            {new Date(pilot.created_at).toLocaleDateString()}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div className="action-buttons">
+                                                            <button
+                                                                className="action-btn edit"
+                                                                onClick={() => handleEditPilot(pilot)}
+                                                                title="Edit"
+                                                            >
+                                                                <Edit size={16} />
+                                                            </button>
+                                                            <button
+                                                                className="action-btn delete"
+                                                                onClick={() => handleDeletePilot(pilot.id)}
+                                                                title="Delete"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
                     </>
                 )}
             </div>
@@ -6309,6 +6504,77 @@ const Settings = () => {
                                 </button>
                                 <button type="submit" className="btn btn-primary">
                                     {showEditCrewForm ? 'Update Crew Member' : 'Add Crew Member'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Pilot Form Modal */}
+            {(showPilotForm || showEditPilotForm) && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h3>{showEditPilotForm ? 'Edit Pilot Member' : 'Add New Pilot Member'}</h3>
+                            <button 
+                                className="close-btn"
+                                onClick={() => {
+                                    setShowPilotForm(false);
+                                    setShowEditPilotForm(false);
+                                    resetPilotForm();
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        
+                        <form onSubmit={handlePilotSubmit} className="crew-form">
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>First Name *</label>
+                                    <input
+                                        type="text"
+                                        value={pilotFormData.first_name}
+                                        onChange={(e) => setPilotFormData({...pilotFormData, first_name: e.target.value})}
+                                        placeholder="e.g., John"
+                                        required
+                                    />
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label>Last Name *</label>
+                                    <input
+                                        type="text"
+                                        value={pilotFormData.last_name}
+                                        onChange={(e) => setPilotFormData({...pilotFormData, last_name: e.target.value})}
+                                        placeholder="e.g., Smith"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="form-group">
+                                <label>Status</label>
+                                <select
+                                    value={pilotFormData.is_active}
+                                    onChange={(e) => setPilotFormData({...pilotFormData, is_active: e.target.value === 'true'})}
+                                >
+                                    <option value={true}>Active</option>
+                                    <option value={false}>Inactive</option>
+                                </select>
+                            </div>
+                            
+                            <div className="form-actions">
+                                <button type="button" className="btn btn-secondary" onClick={() => {
+                                    setShowPilotForm(false);
+                                    setShowEditPilotForm(false);
+                                    resetPilotForm();
+                                }}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn btn-primary">
+                                    {showEditPilotForm ? 'Update Pilot Member' : 'Add Pilot Member'}
                                 </button>
                             </div>
                         </form>
