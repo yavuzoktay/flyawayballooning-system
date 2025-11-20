@@ -2317,6 +2317,16 @@ setBookingDetail(finalVoucherDetail);
         });
     };
 
+    const isGiftVoucherDetails = (voucher) => {
+        if (!voucher) return false;
+        const value = (voucher.book_flight || voucher.voucher_type || '').toLowerCase();
+        return value.includes('gift');
+    };
+
+    const getVoucherDetailsTitle = (voucher) => {
+        return isGiftVoucherDetails(voucher) ? 'Gift Voucher Details' : 'Flight Voucher Details';
+    };
+
     const handleRebook = () => {
         setRebookModalOpen(true);
     };
@@ -3759,27 +3769,14 @@ setBookingDetail(finalVoucherDetail);
                         {activeTab === 'vouchers' ? 
                             (() => {
                                 const voucher = bookingDetail?.voucher;
+                                const title = getVoucherDetailsTitle(voucher);
                                 console.log('🎯 Dialog title check:', {
                                     book_flight: voucher?.book_flight,
                                     voucher_type: voucher?.voucher_type,
-                                    isGiftVoucher: voucher?.book_flight === 'Gift Voucher'
+                                    isGiftVoucher: isGiftVoucherDetails(voucher),
+                                    resolvedTitle: title
                                 });
-                                
-                                // Check if it's a Gift Voucher
-                                if (voucher?.book_flight === 'Gift Voucher') {
-                                    console.log('✅ Dialog: Gift Voucher Details');
-                                    return 'Gift Voucher Details';
-                                }
-                                // Check if it's a Flight Voucher
-                                else if (voucher?.voucher_type?.toLowerCase().includes('flight')) {
-                                    console.log('✅ Dialog: Flight Voucher Details');
-                                    return 'Flight Voucher Details';
-                                }
-                                // Default to Voucher Details
-                                else {
-                                    console.log('✅ Dialog: Voucher Details (default)');
-                                    return 'Voucher Details';
-                                }
+                                return title;
                             })()
                             : 'Booking Details'}
                     </DialogTitle>
@@ -3801,27 +3798,14 @@ setBookingDetail(finalVoucherDetail);
                                         <Typography variant="h5" sx={{ mb: 3, fontWeight: 700 }}>
                                             {(() => {
                                                 const voucher = bookingDetail?.voucher;
+                                                const title = getVoucherDetailsTitle(voucher);
                                                 console.log('🎯 Voucher title check:', {
                                                     book_flight: voucher?.book_flight,
                                                     voucher_type: voucher?.voucher_type,
-                                                    isGiftVoucher: voucher?.book_flight === 'Gift Voucher'
+                                                    isGiftVoucher: isGiftVoucherDetails(voucher),
+                                                    resolvedTitle: title
                                                 });
-                                                
-                                                // Check if it's a Gift Voucher
-                                                if (voucher?.book_flight === 'Gift Voucher') {
-                                                    console.log('✅ Showing Gift Voucher Details');
-                                                    return 'Gift Voucher Details';
-                                                }
-                                                // Check if it's a Flight Voucher
-                                                else if (voucher?.voucher_type?.toLowerCase().includes('flight')) {
-                                                    console.log('✅ Showing Flight Voucher Details');
-                                                    return 'Flight Voucher Details';
-                                                }
-                                                // Default to Voucher Details
-                                                else {
-                                                    console.log('✅ Showing Voucher Details (default)');
-                                                    return 'Voucher Details';
-                                                }
+                                                return title;
                                             })()}
                                         </Typography>
                                         
