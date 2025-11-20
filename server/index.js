@@ -17,6 +17,7 @@ const axios = require('axios');
 const sgMail = require('@sendgrid/mail');
 const { EventWebhook, EventWebhookHeader } = require('@sendgrid/eventwebhook');
 const Twilio = require('twilio');
+const { parsePassengerList, derivePassengerCounts, derivePaidAmount } = require('./lib/voucherMetrics');
 dotenv.config();
 
 // Configure SendGrid
@@ -5221,6 +5222,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
                 // For Flight Vouchers, prioritize voucher_passenger_details (original passenger data)
                 // For Gift Vouchers, use booking passenger_details if available
                 let passengerDetails = [];
+                const voucherPassengerListRaw = parsePassengerList(row.voucher_passenger_details);
                 
                 // Determine if this is a Flight Voucher (using same logic as normalizedBookFlight calculation)
                 const vtLowerCheck = (row.actual_voucher_type || row.voucher_type || '').toLowerCase();
@@ -5231,33 +5233,19 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     !bookFlightLowerCheck.includes('gift') &&
                     bookFlightLowerCheck !== 'buy gift';
                 
-                if (isFlightVoucher && row.voucher_passenger_details) {
+                if (isFlightVoucher && voucherPassengerListRaw.length > 0) {
                     // For Flight Vouchers, use voucher_passenger_details as primary source
-                    try {
-                        const voucherPassengers = typeof row.voucher_passenger_details === 'string'
-                            ? JSON.parse(row.voucher_passenger_details)
-                            : row.voucher_passenger_details;
-                        
-                        // Normalize voucher_passenger_details to match passenger_details structure
-                        if (Array.isArray(voucherPassengers)) {
-                            passengerDetails = voucherPassengers.map((vp, index) => ({
-                                id: vp.id || null, // May not have id if not yet in booking
-                                first_name: vp.first_name || vp.firstName || '',
-                                last_name: vp.last_name || vp.lastName || '',
-                                weight: vp.weight || '',
-                                email: vp.email || null,
-                                phone: vp.phone || null,
-                                ticket_type: vp.ticket_type || vp.ticketType || null,
-                                weather_refund: vp.weather_refund || vp.weatherRefund || false,
-                                price: vp.price || null
-                            }));
-                        } else {
-                            passengerDetails = [];
-                        }
-                    } catch (e) {
-                        console.warn('Failed to parse voucher_passenger_details for Flight Voucher', row.id, ':', e);
-                        passengerDetails = [];
-                    }
+                    passengerDetails = voucherPassengerListRaw.map((vp) => ({
+                        id: vp.id || null, // May not have id if not yet in booking
+                        first_name: vp.first_name || vp.firstName || '',
+                        last_name: vp.last_name || vp.lastName || '',
+                        weight: vp.weight || '',
+                        email: vp.email || null,
+                        phone: vp.phone || null,
+                        ticket_type: vp.ticket_type || vp.ticketType || null,
+                        weather_refund: vp.weather_refund || vp.weatherRefund || false,
+                        price: vp.price || null
+                    }));
                 } else if (row.passenger_details) {
                     // For Gift Vouchers or if no voucher_passenger_details, use booking passenger_details
                     try {
@@ -5268,51 +5256,54 @@ app.get('/api/getAllVoucherData', (req, res) => {
                         console.warn('Failed to parse passenger_details for voucher', row.id, ':', e);
                         passengerDetails = [];
                     }
-                } else if (row.voucher_passenger_details) {
+                } else if (voucherPassengerListRaw.length > 0) {
                     // Fallback: use voucher_passenger_details if passenger_details is not available
-                    try {
-                        const voucherPassengers = typeof row.voucher_passenger_details === 'string'
-                            ? JSON.parse(row.voucher_passenger_details)
-                            : row.voucher_passenger_details;
-                        
-                        // Normalize voucher_passenger_details to match passenger_details structure
-                        if (Array.isArray(voucherPassengers)) {
-                            passengerDetails = voucherPassengers.map((vp, index) => ({
-                                id: vp.id || null,
-                                first_name: vp.first_name || vp.firstName || '',
-                                last_name: vp.last_name || vp.lastName || '',
-                                weight: vp.weight || '',
-                                email: vp.email || null,
-                                phone: vp.phone || null,
-                                ticket_type: vp.ticket_type || vp.ticketType || null,
-                                weather_refund: vp.weather_refund || vp.weatherRefund || false,
-                                price: vp.price || null
-                            }));
-                        } else {
-                            passengerDetails = [];
-                        }
-                    } catch (e) {
-                        console.warn('Failed to parse voucher_passenger_details for voucher', row.id, ':', e);
-                        passengerDetails = [];
-                    }
+                    passengerDetails = voucherPassengerListRaw.map((vp) => ({
+                        id: vp.id || null,
+                        first_name: vp.first_name || vp.firstName || '',
+                        last_name: vp.last_name || vp.lastName || '',
+                        weight: vp.weight || '',
+                        email: vp.email || null,
+                        phone: vp.phone || null,
+                        ticket_type: vp.ticket_type || vp.ticketType || null,
+                        weather_refund: vp.weather_refund || vp.weatherRefund || false,
+                        price: vp.price || null
+                    }));
                 }
 
                 const numFromCodes = (row.all_voucher_codes && typeof row.all_voucher_codes === 'string')
                     ? row.all_voucher_codes.split(',').map(s => s.trim()).filter(Boolean).length
                     : null;
-                // numberOfPassengers: prefer explicit column if valid; for Private Charter variants, derive from purchaser intent if missing
-                let passengersFromColumn = Number.parseInt(row.numberOfPassengers, 10);
-                if (!passengersFromColumn || passengersFromColumn < 1) passengersFromColumn = null;
-                let passengersFromPrivateCharter = null;
-                if (!passengersFromColumn && row.voucher_type && row.voucher_type.toLowerCase().includes('private')) {
-                    try {
-                        const details = typeof row.voucher_passenger_details === 'string' ? JSON.parse(row.voucher_passenger_details) : (row.voucher_passenger_details || []);
-                        if (Array.isArray(details) && details.length > 0) {
-                            passengersFromPrivateCharter = details.length;
-                        }
-                    } catch (e) { /* noop */ }
-                }
-                const computedVoucherCount = numFromCodes || passengersFromColumn || passengersFromPrivateCharter || Number.parseInt(row.passenger_count, 10) || 1;
+                const storedPassengerCount = Number.parseInt(row.numberOfPassengers, 10);
+                const bookingPassengerCount = Number.parseInt(row.passenger_count, 10);
+                const isPrivateCharterVoucher = (row.voucher_type || '').toLowerCase().includes('private');
+                const passengersFromPrivateCharter = isPrivateCharterVoucher && voucherPassengerListRaw.length > 0
+                    ? voucherPassengerListRaw.length
+                    : null;
+                const { passengerCount: normalizedPassengerCount, voucherCount: computedVoucherCount } = derivePassengerCounts({
+                    storedCount: storedPassengerCount,
+                    passengerDetailsCount: Array.isArray(passengerDetails) ? passengerDetails.length : 0,
+                    voucherPassengerCount: voucherPassengerListRaw.length,
+                    privateCharterCount: passengersFromPrivateCharter,
+                    bookingPassengerCount,
+                    voucherCodeCount: numFromCodes
+                });
+                row.numberOfPassengers = normalizedPassengerCount;
+                const pricePerPassenger = !isPrivateCharterVoucher
+                    ? getSharedVoucherPriceFromCache(
+                        row.actual_voucher_type || row.voucher_type || '',
+                        row.preferred_location || row.location || row.choose_location || null
+                    )
+                    : null;
+                const paidNumber = derivePaidAmount({
+                    paidValue: row.paid,
+                    passengerDetails,
+                    voucherPassengerDetails: voucherPassengerListRaw,
+                    passengerCount: normalizedPassengerCount,
+                    pricePerPassenger,
+                    includePriceFallback: !isPrivateCharterVoucher
+                });
+                const paidDisplay = paidNumber > 0 ? paidNumber.toFixed(2) : '0.00';
 
                 // Normalize book_flight again at response-build stage to ensure correct labeling
                 // Priority: recipient signals (Gift Voucher) > voucher_type > stored book_flight
@@ -5374,7 +5365,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
                         return expiresMoment.isValid() ? expiresMoment.format('DD/MM/YYYY') : '';
                     })() : '',
                     redeemed: row.redeemed ?? '',
-                    paid: row.paid ?? '',
+                    paid: paidDisplay,
                     offer_code: row.offer_code ?? '',
                     // Use all_voucher_codes if available (for multiple vouchers), otherwise use single voucher_ref
                     voucher_ref: (row.all_voucher_codes || voucher_ref || ''),
