@@ -2325,6 +2325,9 @@ setBookingDetail(finalVoucherDetail);
         if (!bookingDetail) return;
         setRebookLoading(true);
         try {
+            const voucherAttemptCount = bookingDetail?.voucher
+                ? parseInt(bookingDetail.voucher.flight_attempts ?? 0, 10)
+                : null;
             // Check if this is a Gift Voucher redemption
             const isGiftVoucher = bookingDetail?.voucher && 
                                  (bookingDetail.voucher.book_flight || '').toLowerCase().includes('gift');
@@ -2423,6 +2426,7 @@ setBookingDetail(finalVoucherDetail);
                         totalPrice: totalPrice,
                         paid: paidAmount, // Add paid amount from Gift Voucher Details
                         voucher_code: voucherCode,
+                        flight_attempts: Number.isNaN(voucherAttemptCount) ? 0 : (voucherAttemptCount ?? 0),
                         additionalInfo: {},
                         choose_add_on: [],
                         activity_id: finalActivityId, // Add activity_id for backend
@@ -2618,6 +2622,7 @@ setBookingDetail(finalVoucherDetail);
                         totalPrice: totalPrice,
                         paid: paidAmount, // Add paid amount from Flight Voucher Details
                         voucher_code: voucherCode,
+                        flight_attempts: Number.isNaN(voucherAttemptCount) ? 0 : (voucherAttemptCount ?? 0),
                         additionalInfo: {},
                         choose_add_on: [],
                         activity_id: finalActivityId, // Add activity_id for backend
