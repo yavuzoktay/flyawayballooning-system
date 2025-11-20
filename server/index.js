@@ -17,7 +17,7 @@ const axios = require('axios');
 const sgMail = require('@sendgrid/mail');
 const { EventWebhook, EventWebhookHeader } = require('@sendgrid/eventwebhook');
 const Twilio = require('twilio');
-const { parsePassengerList, derivePassengerCounts, derivePaidAmount } = require('./lib/voucherMetrics');
+const { parsePassengerList, derivePaidAmount } = require('./lib/voucherMetrics');
 dotenv.config();
 
 // Configure SendGrid
@@ -4932,7 +4932,18 @@ app.get('/api/getAllVoucherData', (req, res) => {
                    'weather_refund', p.weather_refund,
                    'price', p.price
                )) FROM passenger p WHERE p.booking_id = b.id) as passenger_details,
-               NULL as all_voucher_codes
+               (
+                    SELECT GROUP_CONCAT(v2.voucher_ref SEPARATOR ', ')
+                    FROM all_vouchers v2
+                    WHERE
+                        v2.voucher_ref IS NOT NULL
+                        AND v2.voucher_ref NOT IN ('', '-', ' ')
+                        AND COALESCE(v2.purchaser_email, v2.email, '') = COALESCE(v.purchaser_email, v.email, '')
+                        AND COALESCE(v2.purchaser_name, v2.name, '') = COALESCE(v.purchaser_name, v.name, '')
+                        AND v2.paid = v.paid
+                        AND ABS(TIMESTAMPDIFF(SECOND, v2.created_at, v.created_at)) <= 300
+                    ORDER BY v2.created_at ASC
+               ) as all_voucher_codes
         FROM all_vouchers v
         LEFT JOIN all_booking b ON v.voucher_ref = b.voucher_code
         ${vc_code || voucher_ref ? 'WHERE v.voucher_ref = ?' : ''}
@@ -5271,24 +5282,27 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     }));
                 }
 
-                const numFromCodes = (row.all_voucher_codes && typeof row.all_voucher_codes === 'string')
-                    ? row.all_voucher_codes.split(',').map(s => s.trim()).filter(Boolean).length
-                    : null;
-                const storedPassengerCount = Number.parseInt(row.numberOfPassengers, 10);
-                const bookingPassengerCount = Number.parseInt(row.passenger_count, 10);
-                const isPrivateCharterVoucher = (row.voucher_type || '').toLowerCase().includes('private');
-                const passengersFromPrivateCharter = isPrivateCharterVoucher && voucherPassengerListRaw.length > 0
-                    ? voucherPassengerListRaw.length
-                    : null;
-                const { passengerCount: normalizedPassengerCount, voucherCount: computedVoucherCount } = derivePassengerCounts({
-                    storedCount: storedPassengerCount,
-                    passengerDetailsCount: Array.isArray(passengerDetails) ? passengerDetails.length : 0,
-                    voucherPassengerCount: voucherPassengerListRaw.length,
-                    privateCharterCount: passengersFromPrivateCharter,
-                    bookingPassengerCount,
-                    voucherCodeCount: numFromCodes
+                const voucherCodesList = (row.all_voucher_codes && typeof row.all_voucher_codes === 'string')
+                    ? row.all_voucher_codes.split(',').map(s => s.trim()).filter(Boolean)
+                    : [];
+                const numFromCodes = voucherCodesList.length > 0 ? voucherCodesList.length : null;
+                const isPrivateCharterVoucher = ((row.voucher_type || '').toLowerCase().includes('private') ||
+                    (row.experience_type || '').toLowerCase().includes('private'));
+                const normalizedPassengerCount = derivePassengerCount({
+                    numberOfPassengers: row.numberOfPassengers,
+                    passenger_count: row.passenger_count,
+                    passenger_details: passengerDetails,
+                    voucher_passenger_details: voucherPassengerListRaw,
+                    numberOfVouchers: numFromCodes,
+                    voucher_type: row.actual_voucher_type || row.voucher_type,
+                    book_flight: row.book_flight,
+                    chooseFlightType: { type: row.experience_type },
+                    paid: row.paid,
+                    preferred_location: row.preferred_location || row.location || null,
+                    chooseLocation: row.preferred_location || row.location || null
                 });
                 row.numberOfPassengers = normalizedPassengerCount;
+                const computedVoucherCount = Math.max(numFromCodes || 0, normalizedPassengerCount);
                 const pricePerPassenger = !isPrivateCharterVoucher
                     ? getSharedVoucherPriceFromCache(
                         row.actual_voucher_type || row.voucher_type || '',

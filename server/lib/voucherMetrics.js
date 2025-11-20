@@ -49,26 +49,6 @@ const parsePassengerList = (raw) => {
     return [];
 };
 
-const derivePassengerCounts = ({
-    storedCount,
-    passengerDetailsCount,
-    voucherPassengerCount,
-    privateCharterCount,
-    bookingPassengerCount,
-    voucherCodeCount
-}) => {
-    const candidates = [
-        toPositiveInt(storedCount),
-        toPositiveInt(passengerDetailsCount),
-        toPositiveInt(voucherPassengerCount),
-        toPositiveInt(privateCharterCount),
-        toPositiveInt(bookingPassengerCount)
-    ].filter(Boolean);
-    const passengerCount = candidates.length > 0 ? candidates[0] : 1;
-    const voucherCount = toPositiveInt(voucherCodeCount) || passengerCount;
-    return { passengerCount, voucherCount };
-};
-
 const derivePaidAmount = ({
     paidValue,
     passengerDetails,
@@ -98,7 +78,6 @@ const derivePaidAmount = ({
 
 module.exports = {
     parsePassengerList,
-    derivePassengerCounts,
     derivePaidAmount
 };
 
