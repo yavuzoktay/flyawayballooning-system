@@ -285,11 +285,70 @@ const getBookingConfirmationMessageHtml = (booking = {}) => {
 
 const getBookingConfirmationReceiptHtml = (booking = {}) => {
     const receiptItems = Array.isArray(booking?.passengers) ? booking.passengers : [];
+    
+    // Get paid, due, and subtotal from booking object
+    // If subtotal is already provided, use it; otherwise calculate from paid + due
     const paidAmount = booking?.paid != null ? Number(booking.paid) : null;
     const dueAmount = booking?.due != null ? Number(booking.due) : null;
-    const subtotal = paidAmount != null && dueAmount != null ? paidAmount + dueAmount : null;
+    
+    // Use provided subtotal if available, otherwise calculate
+    let subtotal = booking?.subtotal != null ? Number(booking.subtotal) : null;
+    if (subtotal == null) {
+        // Calculate subtotal from paid + due
+        if (paidAmount != null && dueAmount != null) {
+            subtotal = paidAmount + dueAmount;
+        } else if (paidAmount != null) {
+            subtotal = paidAmount;
+        } else if (dueAmount != null) {
+            subtotal = dueAmount;
+        }
+    }
+    
+    // Fallback to total if subtotal is still null
+    if (subtotal == null && booking?.total != null) {
+        subtotal = Number(booking.total);
+    }
     const receiptId = booking?.receipt_number || booking?.booking_reference || booking?.id || '';
-    const receiptSoldDate = booking?.created_at ? formatDate(booking.created_at) : null;
+    
+    // Format receipt sold date (DD/MM/YYYY format)
+    // Priority: booking.created (if in DD/MM/YYYY format) > booking.created_at
+    let receiptSoldDate = null;
+    const createdValue = booking?.created || booking?.created_at;
+    
+    if (createdValue) {
+        const createdStr = String(createdValue).trim();
+        
+        // Check if it's already in DD/MM/YYYY format (with or without time)
+        if (typeof createdValue === 'string' && createdStr.includes('/')) {
+            // Extract date part (before space if time exists, e.g., "20/11/2025 14:30" -> "20/11/2025")
+            const datePart = createdStr.split(' ')[0];
+            // Check if date part is in DD/MM/YYYY format
+            if (/^\d{2}\/\d{2}\/\d{4}$/.test(datePart)) {
+                // Already in DD/MM/YYYY format, use it directly
+                receiptSoldDate = datePart;
+            } else {
+                // Try to parse with dayjs and format as DD/MM/YYYY
+                try {
+                    const dateObj = dayjs(createdValue);
+                    if (dateObj.isValid()) {
+                        receiptSoldDate = dateObj.format('DD/MM/YYYY');
+                    }
+                } catch (e) {
+                    console.warn('Error formatting created/created_at date for receipt:', e);
+                }
+            }
+        } else {
+            // Try to parse with dayjs and format as DD/MM/YYYY
+            try {
+                const dateObj = dayjs(createdValue);
+                if (dateObj.isValid()) {
+                    receiptSoldDate = dateObj.format('DD/MM/YYYY');
+                }
+            } catch (e) {
+                console.warn('Error formatting created/created_at date for receipt:', e);
+            }
+        }
+    }
     const location = escapeHtml(booking?.location || 'Bath');
     const experience = escapeHtml(booking?.flight_type || 'Flight Experience');
     const guestCount = receiptItems.length;

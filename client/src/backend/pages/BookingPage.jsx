@@ -237,22 +237,35 @@ const BookingPage = () => {
     };
 
     const handleVoucherMessagesClick = (voucher) => {
+        if (!voucher) return;
+        
+        // Flight Voucher için email'i doğru al (recipient_email Gift Voucher için)
+        const isGiftVoucher = voucher?.book_flight === 'Gift Voucher';
+        const email = isGiftVoucher 
+            ? (voucher.recipient_email || voucher.email || '')
+            : (voucher.email || voucher.recipient_email || '');
+        
         const fauxBooking = {
             id: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`,
-            name: voucher.name || 'Voucher Recipient',
-            email: voucher.recipient_email || voucher.email || '',
-            phone: voucher.recipient_phone || voucher.phone || '',
+            name: voucher.name || (isGiftVoucher ? voucher.recipient_name : voucher.purchaser_name) || 'Voucher Recipient',
+            email: email,
+            phone: isGiftVoucher 
+                ? (voucher.recipient_phone || voucher.phone || '')
+                : (voucher.phone || voucher.purchaser_phone || ''),
             voucher_type: voucher.voucher_type || '',
             voucher_code: voucher.voucher_ref || voucher.voucher_code || '',
             flight_type: voucher.flight_type || voucher.voucher_type || '',
-            location: voucher.location || voucher.preferred_location || ''
+            location: voucher.location || voucher.preferred_location || '',
+            contextType: 'voucher',
+            contextId: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`
         };
 
         setSelectedBookingForEmail(fauxBooking);
         setMessagesModalOpen(true);
         setExpandedMessageIds({});
         fetchMessageLogs({
-            contextId: fauxBooking.id
+            contextType: 'voucher',
+            contextId: fauxBooking.contextId
         });
     };
 
@@ -2219,7 +2232,27 @@ setBookingDetail(finalVoucherDetail);
 
     const handleEmailBooking = () => {
         if (!bookingDetail?.booking) return;
-        openEmailModalForBooking(bookingDetail.booking, { contextType: 'booking', contextId: String(bookingDetail.booking.id || '') });
+        
+        const booking = bookingDetail.booking;
+        
+        // Ensure paid, due, subtotal fields are properly set for receipt
+        const paidAmount = booking.paid != null ? parseFloat(booking.paid) : null;
+        const dueAmount = booking.due != null ? parseFloat(booking.due) : null;
+        const subtotal = (paidAmount != null && dueAmount != null) ? paidAmount + dueAmount : 
+                        (paidAmount != null ? paidAmount : (dueAmount != null ? dueAmount : null));
+        
+        // Create booking object with all receipt fields
+        const bookingWithReceipt = {
+            ...booking,
+            paid: paidAmount,
+            due: dueAmount,
+            subtotal: subtotal,
+            total: subtotal,
+            receipt_number: booking.receipt_number || booking.booking_reference || booking.id || '',
+            passengers: bookingDetail.passengers || booking.passengers || []
+        };
+        
+        openEmailModalForBooking(bookingWithReceipt, { contextType: 'booking', contextId: String(booking.id || '') });
     };
 
     const handleRecipientEmail = (voucher) => {
@@ -2227,6 +2260,11 @@ setBookingDetail(finalVoucherDetail);
             alert('Recipient email is not available.');
             return;
         }
+
+        // Get paid amount from voucher
+        const paidAmount = parseFloat(voucher.paid) || 0;
+        const dueAmount = parseFloat(voucher.due) || 0;
+        const subtotal = paidAmount + dueAmount;
 
         const fauxBooking = {
             id: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`,
@@ -2246,6 +2284,17 @@ setBookingDetail(finalVoucherDetail);
                 email: voucher.recipient_email || '',
                 phone: voucher.recipient_phone || ''
             },
+            paid: paidAmount,
+            due: dueAmount,
+            subtotal: subtotal,
+            total: subtotal,
+            receipt_number: voucher.voucher_ref || voucher.voucher_code || '',
+            // Pass created_at field (may be in DD/MM/YYYY or DD/MM/YYYY HH:mm format)
+            // getBookingConfirmationReceiptHtml will handle the formatting
+            created_at: voucher.created_at || voucher.created || null,
+            // Also pass created field directly if it exists (for DD/MM/YYYY format support)
+            created: voucher.created || (voucher.created_at && typeof voucher.created_at === 'string' && voucher.created_at.includes('/') ? voucher.created_at.split(' ')[0] : null),
+            passengers: voucher.passengers || [],
             contextType: 'voucher',
             contextId: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`
         };
@@ -2268,6 +2317,11 @@ setBookingDetail(finalVoucherDetail);
             return;
         }
 
+        // Get paid amount from voucher (Gift Voucher Details'teki paid bilgisi)
+        const paidAmount = parseFloat(voucher.paid) || 0;
+        const dueAmount = parseFloat(voucher.due) || 0;
+        const subtotal = paidAmount + dueAmount;
+
         const fauxBooking = {
             id: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`,
             name: voucher.purchaser_name || voucher.name || bookingDetail?.booking?.name || 'Guest',
@@ -2277,6 +2331,17 @@ setBookingDetail(finalVoucherDetail);
             location: voucher.location || voucher.preferred_location || '',
             voucher_type: voucher.voucher_type || '',
             voucher_code: voucher.voucher_ref || voucher.voucher_code || '',
+            paid: paidAmount,
+            due: dueAmount,
+            subtotal: subtotal,
+            total: subtotal,
+            receipt_number: voucher.voucher_ref || voucher.voucher_code || '',
+            // Pass created_at field (may be in DD/MM/YYYY or DD/MM/YYYY HH:mm format)
+            // getBookingConfirmationReceiptHtml will handle the formatting
+            created_at: voucher.created_at || voucher.created || null,
+            // Also pass created field directly if it exists (for DD/MM/YYYY format support)
+            created: voucher.created || (voucher.created_at && typeof voucher.created_at === 'string' && voucher.created_at.includes('/') ? voucher.created_at.split(' ')[0] : null),
+            passengers: voucher.passengers || [],
             contextType: 'voucher',
             contextId: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`
         };
@@ -2297,6 +2362,11 @@ setBookingDetail(finalVoucherDetail);
             return;
         }
 
+        // Get paid amount from voucher (Flight Voucher Details'teki paid bilgisi)
+        const paidAmount = parseFloat(voucher.paid) || 0;
+        const dueAmount = parseFloat(voucher.due) || 0;
+        const subtotal = paidAmount + dueAmount;
+
         const fauxBooking = {
             id: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`,
             name: voucher.name || bookingDetail?.booking?.name || 'Guest',
@@ -2306,6 +2376,17 @@ setBookingDetail(finalVoucherDetail);
             location: voucher.location || voucher.preferred_location || '',
             voucher_type: voucher.voucher_type || '',
             voucher_code: voucher.voucher_ref || voucher.voucher_code || '',
+            paid: paidAmount,
+            due: dueAmount,
+            subtotal: subtotal,
+            total: subtotal,
+            receipt_number: voucher.voucher_ref || voucher.voucher_code || '',
+            // Pass created_at field (may be in DD/MM/YYYY or DD/MM/YYYY HH:mm format)
+            // getBookingConfirmationReceiptHtml will handle the formatting
+            created_at: voucher.created_at || voucher.created || null,
+            // Also pass created field directly if it exists (for DD/MM/YYYY format support)
+            created: voucher.created || (voucher.created_at && typeof voucher.created_at === 'string' && voucher.created_at.includes('/') ? voucher.created_at.split(' ')[0] : null),
+            passengers: voucher.passengers || [],
             contextType: 'voucher',
             contextId: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`
         };
@@ -2549,8 +2630,21 @@ setBookingDetail(finalVoucherDetail);
                     // Experience: from experience_type field (e.g., "Shared Flight", "Private Charter")
                     const experience = voucher.experience_type || voucher.experience || 'Shared Flight';
                     
-                    // Voucher Type: from voucher_type or actual_voucher_type field (e.g., "Any Day Flight", "Weekday Morning", "Flexible Weekday")
-                    const voucherType = voucher.voucher_type || voucher.actual_voucher_type || 'Any Day Flight';
+                    // Voucher Type: from voucher_type, actual_voucher_type, or book_flight field
+                    // Priority: voucher_type > actual_voucher_type > book_flight (if it's not "Flight Voucher" or "Gift Voucher")
+                    // For Flight Voucher, book_flight is "Flight Voucher", so we need voucher_type field
+                    let voucherType = voucher.voucher_type || voucher.actual_voucher_type || '';
+                    // If voucher_type is still empty and book_flight exists and is not "Flight Voucher" or "Gift Voucher", use it
+                    if (!voucherType && voucher.book_flight && 
+                        voucher.book_flight !== 'Flight Voucher' && 
+                        voucher.book_flight !== 'Gift Voucher' &&
+                        !voucher.book_flight.toLowerCase().includes('gift')) {
+                        voucherType = voucher.book_flight;
+                    }
+                    // Final fallback
+                    if (!voucherType) {
+                        voucherType = 'Any Day Flight';
+                    }
                     
                     // Determine flight type from experience
                     let flightType = experience;
@@ -4307,11 +4401,13 @@ setBookingDetail(finalVoucherDetail);
                                                     {(() => {
                                                         const v = bookingDetail?.voucher || {};
                                                         const isGiftVoucher = v?.book_flight === 'Gift Voucher';
+                                                        // Flight Voucher kontrolü: book_flight === 'Flight Voucher' veya voucher_type 'flight' içeriyorsa
                                                         const isFlightVoucher =
                                                             !isGiftVoucher &&
-                                                            v?.voucher_type &&
+                                                            (v?.book_flight === 'Flight Voucher' ||
+                                                            (v?.voucher_type &&
                                                             typeof v.voucher_type === 'string' &&
-                                                            v.voucher_type.toLowerCase().includes('flight');
+                                                            v.voucher_type.toLowerCase().includes('flight')));
 
                                                     const emailHandler = isGiftVoucher
                                                         ? handleGiftVoucherEmail
@@ -4342,11 +4438,13 @@ setBookingDetail(finalVoucherDetail);
                                                     {(() => {
                                                         const v = bookingDetail?.voucher || {};
                                                         const isGiftVoucher = v?.book_flight === 'Gift Voucher';
+                                                        // Flight Voucher kontrolü: book_flight === 'Flight Voucher' veya voucher_type 'flight' içeriyorsa
                                                         const isFlightVoucher =
                                                             !isGiftVoucher &&
-                                                            v?.voucher_type &&
+                                                            (v?.book_flight === 'Flight Voucher' ||
+                                                            (v?.voucher_type &&
                                                             typeof v.voucher_type === 'string' &&
-                                                            v.voucher_type.toLowerCase().includes('flight');
+                                                            v.voucher_type.toLowerCase().includes('flight')));
                                                         const messageHandler = (isGiftVoucher || isFlightVoucher) && bookingDetail?.voucher
                                                             ? handleVoucherMessagesClick
                                                             : handleMessagesClick;

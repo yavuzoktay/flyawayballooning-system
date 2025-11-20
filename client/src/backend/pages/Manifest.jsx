@@ -2167,6 +2167,12 @@ const Manifest = () => {
     const [crewAssignmentsBySlot, setCrewAssignmentsBySlot] = useState({}); // key: `${activityId}_${date}_${time}` => crew_id
     const lastCrewFetchRef = React.useRef({ date: null, inFlight: false });
     const [crewNotification, setCrewNotification] = useState({ show: false, message: '', type: 'success' });
+    
+    // Pilot state
+    const [pilotList, setPilotList] = useState([]);
+    const [pilotAssignmentsBySlot, setPilotAssignmentsBySlot] = useState({}); // key: `${activityId}_${date}_${time}` => pilot_id
+    const lastPilotFetchRef = React.useRef({ date: null, inFlight: false });
+    const [pilotNotification, setPilotNotification] = useState({ show: false, message: '', type: 'success' });
 
     const slotKey = (activityId, date, time) => `${activityId}_${date}_${time}`;
 
@@ -2202,11 +2208,44 @@ const Manifest = () => {
         }
     };
 
+    const refreshPilotAssignments = async (date) => {
+        if (!date) return;
+        // Prevent duplicate, rapid calls for the same date
+        if (lastPilotFetchRef.current.inFlight && lastPilotFetchRef.current.date === date) return;
+        if (lastPilotFetchRef.current.date === date && Object.keys(pilotAssignmentsBySlot || {}).length > 0) return;
+        try {
+            lastPilotFetchRef.current = { date, inFlight: true };
+            const res = await axios.get('/api/pilot-assignments', { params: { date } });
+            if (res.data?.success && Array.isArray(res.data.data)) {
+                const map = {};
+                for (const row of res.data.data) {
+                    const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
+                    map[key] = row.pilot_id;
+                }
+                setPilotAssignmentsBySlot(map);
+            } else {
+                setPilotAssignmentsBySlot({});
+            }
+        } catch (err) {
+            console.error('Error refreshing pilot assignments:', err);
+            setPilotAssignmentsBySlot({});
+        } finally {
+            lastPilotFetchRef.current.inFlight = false;
+        }
+    };
+
     // Helper function to get crew member name by ID
     const getCrewMemberName = (crewId) => {
         if (!crewId || !crewList.length) return 'None';
         const crewMember = crewList.find(c => c.id == crewId);
         return crewMember ? `${crewMember.first_name} ${crewMember.last_name}` : `ID: ${crewId}`;
+    };
+
+    // Helper function to get pilot name by ID
+    const getPilotName = (pilotId) => {
+        if (!pilotId || !pilotList.length) return 'None';
+        const pilot = pilotList.find(p => p.id == pilotId);
+        return pilot ? `${pilot.first_name} ${pilot.last_name}` : `ID: ${pilotId}`;
     };
 
     // Function to clear crew assignment
@@ -2253,6 +2292,50 @@ const Manifest = () => {
         }
     };
 
+    // Function to clear pilot assignment
+    const clearPilotAssignment = async (activityId, flightDateStr) => {
+        let date = null; let time = null;
+        if (typeof flightDateStr === 'string') {
+            const parts = flightDateStr.split(' ');
+            date = parts[0];
+            time = (parts[1] || '').substring(0,5) + ':00';
+        }
+        if (!date || !time) return;
+        
+        try {
+            // Set pilot_id to null or delete the record
+            await axios.post('/api/pilot-assignment', { 
+                activity_id: activityId, 
+                date, 
+                time, 
+                pilot_id: null 
+            });
+            
+            const slotKeyValue = slotKey(activityId, date, time.substring(0,5));
+            setPilotAssignmentsBySlot(prev => {
+                const updated = { ...prev };
+                delete updated[slotKeyValue];
+                return updated;
+            });
+            
+            setPilotNotification({
+                show: true,
+                message: 'Pilot assignment cleared successfully!',
+                type: 'success'
+            });
+            setTimeout(() => setPilotNotification({ show: false, message: '', type: 'success' }), 3000);
+            
+        } catch (e) {
+            console.error('Failed to clear pilot assignment:', e);
+            setPilotNotification({
+                show: true,
+                message: 'Failed to clear pilot assignment: ' + (e.response?.data?.message || e.message),
+                type: 'error'
+            });
+            setTimeout(() => setPilotNotification({ show: false, message: '', type: 'error' }), 3000);
+        }
+    };
+
     // Fetch crew list once
     useEffect(() => {
         console.log('Fetching crew list...');
@@ -2263,6 +2346,19 @@ const Manifest = () => {
             }
         }).catch((err) => {
             console.error('Error fetching crew list:', err);
+        });
+    }, []);
+
+    // Fetch pilot list once
+    useEffect(() => {
+        console.log('Fetching pilot list...');
+        axios.get('/api/pilots').then(res => {
+            if (res.data?.success) {
+                console.log('Pilot list loaded:', res.data.data);
+                setPilotList(res.data.data || []);
+            }
+        }).catch((err) => {
+            console.error('Error fetching pilot list:', err);
         });
     }, []);
 
@@ -2313,7 +2409,44 @@ const Manifest = () => {
     useEffect(() => {
         if (!selectedDate || flights.length === 0) return;
         refreshCrewAssignments(selectedDate);
+        refreshPilotAssignments(selectedDate);
     }, [selectedDate, flights]);
+
+    // Initialize pilot assignments on mount and when selectedDate changes
+    useEffect(() => {
+        if (selectedDate) {
+            console.log('Initial pilot assignments fetch for date:', selectedDate);
+            refreshPilotAssignments(selectedDate);
+        }
+    }, [selectedDate]); // Run when selectedDate changes
+
+    // Ensure pilot assignments are loaded on initial mount
+    useEffect(() => {
+        if (selectedDate && pilotList.length > 0) {
+            console.log('Component mounted, loading pilot assignments for date:', selectedDate);
+            refreshPilotAssignments(selectedDate);
+        }
+    }, [pilotList.length]); // Run when pilot list is loaded
+
+    // Force refresh pilot assignments on mount
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (selectedDate) {
+                console.log('Force refreshing pilot assignments on mount for date:', selectedDate);
+                refreshPilotAssignments(selectedDate);
+            }
+        }, 1000); // Wait 1 second for everything to load
+        
+        return () => clearTimeout(timer);
+    }, []); // Run once on mount
+
+    // Additional effect to ensure pilot assignments are loaded
+    useEffect(() => {
+        if (selectedDate && pilotList.length > 0 && Object.keys(pilotAssignmentsBySlot).length === 0) {
+            console.log('No pilot assignments loaded, fetching for date:', selectedDate);
+            refreshPilotAssignments(selectedDate);
+        }
+    }, [selectedDate, pilotList.length, pilotAssignmentsBySlot]);
 
     const handleCrewChange = async (activityId, flightDateStr, crewId) => {
         // flightDateStr like 'YYYY-MM-DD HH:mm:ss' or 'YYYY-MM-DD 17:00:00'
@@ -2387,6 +2520,78 @@ const Manifest = () => {
         }
     };
 
+    const handlePilotChange = async (activityId, flightDateStr, pilotId) => {
+        // flightDateStr like 'YYYY-MM-DD HH:mm:ss' or 'YYYY-MM-DD 17:00:00'
+        let date = null; let time = null;
+        if (typeof flightDateStr === 'string') {
+            const parts = flightDateStr.split(' ');
+            date = parts[0];
+            // ensure we have HH:mm:ss
+            const hhmm = (parts[1] || '').substring(0,5);
+            if (hhmm && /^\d{2}:\d{2}$/.test(hhmm)) {
+                time = hhmm + ':00';
+            }
+        }
+        if (!date || !time) {
+            console.error('Invalid flight date string for pilot assignment:', flightDateStr);
+            return;
+        }
+        
+        console.log('Saving pilot assignment:', { activityId, date, time, pilotId });
+        
+        try {
+            console.log('Saving pilot assignment for:', { activityId, date, time, pilotId });
+            
+            const response = await axios.post('/api/pilot-assignment', { 
+                activity_id: activityId, 
+                date, 
+                time, 
+                pilot_id: pilotId 
+            });
+            console.log('Pilot assignment saved:', response.data);
+            
+            const slotKeyValue = slotKey(activityId, date, time.substring(0,5));
+            console.log('Updating local state with key:', slotKeyValue, 'value:', pilotId);
+            
+            // Update local state immediately for instant feedback
+            setPilotAssignmentsBySlot(prev => {
+                const updated = { ...prev, [slotKeyValue]: pilotId };
+                console.log('Updated pilot assignments:', updated);
+                return updated;
+            });
+            
+            // Show success message
+            console.log('Pilot assignment saved successfully!');
+            
+            // Show success notification
+            const pilotName = getPilotName(pilotId);
+            setPilotNotification({
+                show: true,
+                message: `Pilot ${pilotName} assigned successfully!`,
+                type: 'success'
+            });
+            
+            // Hide notification after 3 seconds
+            setTimeout(() => setPilotNotification({ show: false, message: '', type: 'success' }), 3000);
+            
+            // Also refresh from server to ensure consistency
+            await refreshPilotAssignments(date);
+            
+            // Force a re-render to ensure UI updates
+            setTimeout(() => {
+                setPilotAssignmentsBySlot(prev => ({ ...prev }));
+            }, 100);
+        } catch (e) {
+            console.error('Failed to save pilot selection:', e);
+            setPilotNotification({
+                show: true,
+                message: 'Failed to save pilot selection: ' + (e.response?.data?.message || e.message),
+                type: 'error'
+            });
+            setTimeout(() => setPilotNotification({ show: false, message: '', type: 'error' }), 5000);
+        }
+    };
+
     return (
         <div className="final-menifest-wrap">
             <Container maxWidth={false}>
@@ -2414,6 +2619,29 @@ const Manifest = () => {
                                 <IconButton 
                                     size="small" 
                                     onClick={() => setCrewNotification({ show: false, message: '', type: 'success' })}
+                                >
+                                    ×
+                                </IconButton>
+                            </Box>
+                        )}
+                        
+                        {/* Pilot assignment notification */}
+                        {pilotNotification.show && (
+                            <Box sx={{ 
+                                mb: 2, 
+                                p: 2, 
+                                bgcolor: pilotNotification.type === 'success' ? '#f0fdf4' : '#fef2f2',
+                                color: pilotNotification.type === 'success' ? '#166534' : '#dc2626',
+                                borderRadius: 1, 
+                                border: `1px solid ${pilotNotification.type === 'success' ? '#bbf7d0' : '#fecaca'}`,
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                            }}>
+                                <span>{pilotNotification.message}</span>
+                                <IconButton 
+                                    size="small" 
+                                    onClick={() => setPilotNotification({ show: false, message: '', type: 'success' })}
                                 >
                                     ×
                                 </IconButton>
@@ -2872,6 +3100,82 @@ const Manifest = () => {
                                 </>
                             );
                         })()}
+                                                
+                                                {/* Pilot Selection Dropdown */}
+                        {(() => {
+                            const activityIdForSlot = getFlightActivityId(first);
+                            const slotKeyValue = slotKey(activityIdForSlot, (first.flight_date||'').substring(0,10), (first.flight_date||'').substring(11,16));
+                            const currentPilotId = pilotAssignmentsBySlot[slotKeyValue];
+                            
+                            return (
+                                <>
+                                    <Select
+                                        native
+                                        value={currentPilotId || ''}
+                                        onChange={(e) => handlePilotChange(activityIdForSlot, first.flight_date, e.target.value)}
+                                        sx={{ minWidth: 200, mr: 1, background: '#fff' }}
+                                    >
+                                        <option value="">Pilot Selection</option>
+                                        {pilotList.map(p => (
+                                            <option key={p.id} value={p.id}>{`${p.first_name} ${p.last_name}`}</option>
+                                        ))}
+                                    </Select>
+                                    
+                                    {/* Pilot Assignment Status Display */}
+                                    <Box sx={{ 
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'flex-start',
+                                        ml: 1,
+                                        minWidth: 150
+                                    }}>
+                                        <Box sx={{ 
+                                            fontSize: '12px', 
+                                            fontWeight: '500',
+                                            color: currentPilotId ? '#10b981' : '#6b7280',
+                                            mb: 0.5
+                                        }}>
+                                            {currentPilotId ? '✓ Assigned' : '○ Not Assigned'}
+                                        </Box>
+                                        <Box sx={{ 
+                                            fontSize: '11px', 
+                                            color: '#6b7280',
+                                            fontStyle: currentPilotId ? 'normal' : 'italic'
+                                        }}>
+                                            {currentPilotId ? getPilotName(currentPilotId) : 'No pilot selected'}
+                                        </Box>
+                                    </Box>
+                                    
+                                    {/* Show selected pilot name */}
+                                    {currentPilotId && (
+                                        <Box sx={{ 
+                                            fontSize: '12px', 
+                                            color: '#10b981', 
+                                            fontWeight: '500',
+                                            ml: 1,
+                                            p: 0.5,
+                                            bgcolor: '#f0fdf4',
+                                            borderRadius: 1,
+                                            border: '1px solid #bbf7d0',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 1
+                                        }}>
+                                            <span>Pilot: {getPilotName(currentPilotId)}</span>
+                                            <IconButton 
+                                                size="small" 
+                                                onClick={() => clearPilotAssignment(first.activity_id, first.flight_date)}
+                                                sx={{ p: 0, minWidth: 'auto', color: '#dc2626' }}
+                                                title="Clear pilot assignment"
+                                            >
+                                                ×
+                                            </IconButton>
+                                        </Box>
+                                    )}
+                                </>
+                            );
+                        })()}
+                                                
                                                 <Button variant="contained" color="primary" sx={{ minWidth: 90, fontWeight: 600, textTransform: 'none' }} onClick={() => handleOpenBookingModal(first)}>Book</Button>
                                                 <IconButton size="large" onClick={e => handleGlobalMenuOpen(e, first, groupFlights)}>
                                                     <MoreVertIcon />
