@@ -9774,30 +9774,136 @@ app.post('/api/activity/:id/availabilities', (req, res) => {
     if (!id || !availabilities.length) {
         return res.status(400).json({ success: false, message: 'Eksik bilgi!' });
     }
-    const values = availabilities.map(a => [
-        id,
-        a.schedule || null,
-        a.date,
-        a.day_of_week,
-        a.time,
-        a.capacity,
-        a.available,
-        a.flight_types || 'All',
-        a.status,
-        a.channels || 'All',
-        a.voucher_types || 'All'
-    ]);
-    const sql = `
+
+    const normalizeTypeValue = (value) => {
+        if (Array.isArray(value)) {
+            const cleaned = value.map(v => String(v).trim()).filter(Boolean);
+            return cleaned.length ? cleaned.join(',') : 'All';
+        }
+        if (!value && value !== 0) return 'All';
+        const str = String(value).trim();
+        return str ? str : 'All';
+    };
+
+    const splitTypes = (value) => {
+        if (!value) return [];
+        const str = String(value).trim();
+        if (!str || str.toLowerCase() === 'all') return [];
+        return str.split(',').map(s => s.trim()).filter(Boolean);
+    };
+
+    const mergeTypeStrings = (existing, incoming) => {
+        const existingTrimmed = (existing || '').trim();
+        const incomingTrimmed = (incoming || '').trim();
+        if (!existingTrimmed && !incomingTrimmed) return 'All';
+        if (existingTrimmed.toLowerCase() === 'all' || incomingTrimmed.toLowerCase() === 'all') return 'All';
+        const merged = Array.from(new Set([...splitTypes(existingTrimmed), ...splitTypes(incomingTrimmed)]));
+        return merged.length ? merged.join(',') : 'All';
+    };
+
+    const insertSql = `
         INSERT INTO activity_availability
         (activity_id, schedule, date, day_of_week, time, capacity, available, flight_types, status, channels, voucher_types)
-        VALUES ?
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    con.query(sql, [values], (err, result) => {
-        if (err) {
-            return res.status(500).json({ success: false, message: 'Database error', error: err });
-        }
-        res.json({ success: true, data: result });
-    });
+    const selectSql = `
+        SELECT id, flight_types, voucher_types 
+        FROM activity_availability 
+        WHERE activity_id = ? AND date = ? AND time = ?
+        LIMIT 1
+    `;
+    const updateSql = `
+        UPDATE activity_availability 
+        SET flight_types = ?, voucher_types = ? 
+        WHERE id = ?
+    `;
+
+    const processAvailability = (availability) => {
+        return new Promise((resolve, reject) => {
+            const normalized = {
+                ...availability,
+                schedule: availability.schedule || null,
+                date: availability.date,
+                day_of_week: availability.day_of_week || null,
+                time: availability.time,
+                capacity: availability.capacity,
+                available: availability.available,
+                status: availability.status || 'Open',
+                channels: availability.channels || 'All',
+                flight_types: normalizeTypeValue(availability.flight_types || availability.flightTypes),
+                voucher_types: normalizeTypeValue(availability.voucher_types || availability.voucherTypes)
+            };
+
+            con.query(selectSql, [id, normalized.date, normalized.time], (selectErr, rows) => {
+                if (selectErr) return reject(selectErr);
+
+                if (!rows || rows.length === 0) {
+                    const insertValues = [
+                        id,
+                        normalized.schedule,
+                        normalized.date,
+                        normalized.day_of_week,
+                        normalized.time,
+                        normalized.capacity,
+                        normalized.available,
+                        normalized.flight_types,
+                        normalized.status,
+                        normalized.channels,
+                        normalized.voucher_types
+                    ];
+
+                    const handleDuplicateInsert = (callback) => {
+                        con.query(insertSql, insertValues, (insertErr, result) => {
+                            if (insertErr && insertErr.code === 'ER_DUP_ENTRY') {
+                                // Another request inserted concurrently - merge instead
+                                con.query(selectSql, [id, normalized.date, normalized.time], (reSelectErr, reRows) => {
+                                    if (reSelectErr) return reject(reSelectErr);
+                                    if (!reRows || reRows.length === 0) {
+                                        return reject(insertErr);
+                                    }
+                                    const existing = reRows[0];
+                                    const mergedFlightTypes = mergeTypeStrings(existing.flight_types, normalized.flight_types);
+                                    const mergedVoucherTypes = mergeTypeStrings(existing.voucher_types, normalized.voucher_types);
+                                    return con.query(updateSql, [mergedFlightTypes, mergedVoucherTypes, existing.id], (mergeErr) => {
+                                        if (mergeErr) return reject(mergeErr);
+                                        resolve({ action: 'updated', id: existing.id });
+                                    });
+                                });
+                            } else if (insertErr) {
+                                return reject(insertErr);
+                            } else {
+                                resolve({ action: 'inserted', id: result?.insertId || null });
+                            }
+                        });
+                    };
+
+                    return handleDuplicateInsert();
+                }
+
+                const existing = rows[0];
+                const mergedFlightTypes = mergeTypeStrings(existing.flight_types, normalized.flight_types);
+                const mergedVoucherTypes = mergeTypeStrings(existing.voucher_types, normalized.voucher_types);
+
+                if (mergedFlightTypes === existing.flight_types && mergedVoucherTypes === existing.voucher_types) {
+                    return resolve({ action: 'skipped', id: existing.id });
+                }
+
+                con.query(updateSql, [mergedFlightTypes, mergedVoucherTypes, existing.id], (updateErr) => {
+                    if (updateErr) return reject(updateErr);
+                    resolve({ action: 'updated', id: existing.id });
+                });
+            });
+        });
+    };
+
+    Promise.all(availabilities.map(processAvailability))
+        .then(results => {
+            res.json({ success: true, data: results });
+        })
+        .catch(error => {
+            console.error('Error creating availabilities:', error);
+            res.status(500).json({ success: false, message: 'Database error', error });
+        });
 });
 
 // Get Availabilities for an activity
