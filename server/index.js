@@ -15301,6 +15301,8 @@ function ensureEmailLogsSchema(callback) {
     });
 }
 
+const CUSTOMER_PORTAL_BASE_URL = 'https://flyawayballooning-system.com/customerPortal';
+
 // Helper function to escape HTML
 function escapeHtml(unsafe) {
     if (!unsafe) return '';
@@ -15333,6 +15335,48 @@ function wrapParagraphs(paragraphs = []) {
             return `<p style="margin:0 0 ${marginBottom};">${text}</p>`;
         })
         .join('');
+}
+
+function buildCustomerPortalToken(booking = {}) {
+    const explicitToken =
+        booking.customerPortalToken ||
+        booking.customer_portal_token ||
+        booking.portal_token ||
+        booking.portalToken ||
+        booking.portal_link_token;
+    if (explicitToken) return explicitToken;
+
+    const parts = [
+        booking.id ?? booking.booking_id ?? booking.bookingId ?? '',
+        booking.booking_reference ?? booking.bookingReference ?? '',
+        booking.voucher_code ?? booking.voucherCode ?? '',
+        booking.email ?? booking.customer_email ?? '',
+        booking.created_at ?? booking.created ?? '',
+    ]
+        .map((part) => (part == null ? '' : String(part).trim()))
+        .filter((part) => part !== '');
+
+    if (!parts.length) return null;
+    try {
+        return Buffer.from(parts.join('|'), 'utf8').toString('base64');
+    } catch (error) {
+        console.warn('Error encoding customer portal token:', error);
+        return null;
+    }
+}
+
+function getCustomerPortalLink(booking = {}) {
+    const portalUrl =
+        booking.customer_portal_url ||
+        booking.customerPortalUrl ||
+        booking.portal_url ||
+        booking.portalUrl;
+    if (portalUrl) return portalUrl;
+
+    const token = buildCustomerPortalToken(booking);
+    if (!token) return null;
+    const sanitizedToken = token.replace(/[^a-zA-Z0-9+/=_-]/g, '');
+    return `${CUSTOMER_PORTAL_BASE_URL}/${sanitizedToken}/index`;
 }
 
 // Helper function to generate booking confirmation message HTML (matches frontend getBookingConfirmationMessageHtml)
@@ -15679,6 +15723,14 @@ function replacePrompts(html = '', booking = {}) {
     
     result = result.replace(/\[Location\]/gi, escapeHtml(booking.location || ''));
     result = result.replace(/\[Voucher Code\]/gi, escapeHtml(booking.voucher_code || booking.voucherCode || ''));
+    
+    const customerPortalLink = getCustomerPortalLink(booking);
+    result = result.replace(
+        /\[Customer Portal Link\]/gi,
+        customerPortalLink
+            ? `<a href="${customerPortalLink}" target="_blank" rel="noopener noreferrer">${customerPortalLink}</a>`
+            : ''
+    );
     
     // Replace [Experience Data] or [experience data] or [EXPERIENCE DATA]
     // Format: "20/11/2025 09:00" (DD/MM/YYYY HH:mm) - matches "Booked For" format

@@ -23,6 +23,57 @@ const getBaseUrl = () => {
 
 const HERO_IMAGE_URL = `${getBaseUrl()}/uploads/email/emailImage.jpg`;
 const PERSONAL_NOTE_PLACEHOLDER = '<!--PERSONAL_NOTE-->';
+const CUSTOMER_PORTAL_BASE_URL = 'https://flyawayballooning-system.com/customerPortal';
+
+const base64Encode = (value = '') => {
+    try {
+        if (typeof window !== 'undefined' && typeof window.btoa === 'function') {
+            return window.btoa(unescape(encodeURIComponent(String(value))));
+        }
+        if (typeof Buffer !== 'undefined') {
+            return Buffer.from(String(value), 'utf8').toString('base64');
+        }
+    } catch (error) {
+        console.warn('Error encoding portal token:', error);
+    }
+    return null;
+};
+
+const buildCustomerPortalToken = (booking = {}) => {
+    const explicitToken =
+        booking.customerPortalToken ||
+        booking.customer_portal_token ||
+        booking.portal_token ||
+        booking.portalToken ||
+        booking.portal_link_token;
+    if (explicitToken) return explicitToken;
+
+    const sourceParts = [
+        booking.id ?? booking.booking_id ?? booking.bookingId ?? '',
+        booking.booking_reference ?? booking.bookingReference ?? '',
+        booking.voucher_code ?? booking.voucherCode ?? '',
+        booking.email ?? booking.customer_email ?? '',
+        booking.created_at ?? booking.created ?? '',
+    ].map((part) => (part == null ? '' : String(part).trim()))
+     .filter((part) => part !== '');
+
+    if (!sourceParts.length) return null;
+    return base64Encode(sourceParts.join('|'));
+};
+
+const getCustomerPortalLink = (booking = {}) => {
+    const portalUrl =
+        booking.customer_portal_url ||
+        booking.customerPortalUrl ||
+        booking.portal_url ||
+        booking.portalUrl;
+    if (portalUrl) return portalUrl;
+
+    const token = buildCustomerPortalToken(booking);
+    if (!token) return null;
+    const sanitizedToken = token.replace(/[^a-zA-Z0-9+/=_-]/g, '');
+    return `${CUSTOMER_PORTAL_BASE_URL}/${sanitizedToken}/index`;
+};
 
 const normalizeTemplateName = (name = '') => (name || '').trim();
 
@@ -943,6 +994,15 @@ export const replacePrompts = (html = '', booking = {}) => {
         }
     }
     result = result.replace(/\[Experience Data\]/gi, escapeHtml(experienceData));
+    
+    // Replace [Customer Portal Link]
+    const customerPortalLink = getCustomerPortalLink(booking);
+    result = result.replace(
+        /\[Customer Portal Link\]/gi,
+        customerPortalLink
+            ? `<a href="${customerPortalLink}" target="_blank" rel="noopener noreferrer">${customerPortalLink}</a>`
+            : ''
+    );
     
     // Replace [Receipt] or [receipt] or [RECEIPT] with receipt HTML
     // Use replace directly with global flag to replace all occurrences
