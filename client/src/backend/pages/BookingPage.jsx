@@ -867,7 +867,7 @@ const BookingPage = () => {
                     }
                 }
                 
-                return {
+                        return {
                     created: formattedDate,
                     name: item.name || '',
                     flight_type: item.experience_type || '', // Updated field name
@@ -878,7 +878,6 @@ const BookingPage = () => {
                     expires: item.expires || '',
                     redeemed: item.redeemed || '',
                     paid: item.paid || '',
-                    offer_code: item.offer_code || '',
                     voucher_ref: item.voucher_ref || '',
                     flight_attempts: item.flight_attempts ?? 0,
                     booking_id: item.booking_id || null,
@@ -3707,7 +3706,6 @@ setBookingDetail(finalVoucherDetail);
                                             "pax",
                                             "status",
                                             "paid",
-                                            "due",
                                             "voucher_code",
                                             "flight_attempts",
                                             "expires"
@@ -3861,7 +3859,7 @@ setBookingDetail(finalVoucherDetail);
                                         }
                                         return true;
                                     })}
-                                    columns={["created", "name", "voucher_type", "actual_voucher_type", "email", "phone", "expires", "redeemed", "paid", "offer_code", "voucher_ref"]}
+                                    columns={["created", "name", "voucher_type", "actual_voucher_type", "email", "phone", "expires", "redeemed", "paid", "voucher_ref"]}
                                     onNameClick={handleNameClick}
                                     onVoucherRefClick={handleVoucherRefClick}
                                     onEmailClick={(voucher) => {
