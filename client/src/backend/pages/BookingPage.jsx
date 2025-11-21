@@ -2287,6 +2287,10 @@ setBookingDetail(finalVoucherDetail);
         const linkedBookingId = voucher.booking_id || voucher.bookingId || null;
         const syntheticId = voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`;
 
+        const voucherFlightAttempts = Number.isFinite(parseInt(voucher.flight_attempts, 10))
+            ? parseInt(voucher.flight_attempts, 10)
+            : 0;
+
         const fauxBooking = {
             id: linkedBookingId || syntheticId,
             booking_id: linkedBookingId || undefined,
@@ -2321,6 +2325,7 @@ setBookingDetail(finalVoucherDetail);
             passengers: voucher.passengers || [],
             customer_portal_url: voucher.customer_portal_url || voucher.portal_url || '',
             customerPortalToken: voucher.customerPortalToken || voucher.customer_portal_token || voucher.portal_token || '',
+            flight_attempts: bookingDetail?.booking?.flight_attempts ?? voucherFlightAttempts,
             contextType: 'voucher',
             contextId: syntheticId
         };
@@ -2352,6 +2357,10 @@ setBookingDetail(finalVoucherDetail);
         const linkedBookingId = voucher.booking_id || fallbackBookingId || null;
         const syntheticId = voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`;
 
+        const voucherFlightAttempts = Number.isFinite(parseInt(voucher.flight_attempts, 10))
+            ? parseInt(voucher.flight_attempts, 10)
+            : 0;
+
         const fauxBooking = {
             id: linkedBookingId || syntheticId,
             booking_id: linkedBookingId || undefined,
@@ -2375,8 +2384,10 @@ setBookingDetail(finalVoucherDetail);
             // Also pass created field directly if it exists (for DD/MM/YYYY format support)
             created: voucher.created || (voucher.created_at && typeof voucher.created_at === 'string' && voucher.created_at.includes('/') ? voucher.created_at.split(' ')[0] : null),
             passengers: voucher.passengers || [],
+            expires: voucher.expires || bookingDetail?.booking?.expires || null,
             customer_portal_url: voucher.customer_portal_url || voucher.portal_url || '',
             customerPortalToken: voucher.customerPortalToken || voucher.customer_portal_token || voucher.portal_token || '',
+            flight_attempts: bookingDetail?.booking?.flight_attempts ?? voucherFlightAttempts,
             contextType: 'voucher',
             contextId: syntheticId
         };
@@ -2406,6 +2417,10 @@ setBookingDetail(finalVoucherDetail);
         const linkedBookingId = voucher.booking_id || fallbackBookingId || null;
         const syntheticId = voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`;
 
+        const voucherFlightAttempts = Number.isFinite(parseInt(voucher.flight_attempts, 10))
+            ? parseInt(voucher.flight_attempts, 10)
+            : 0;
+
         const fauxBooking = {
             id: linkedBookingId || syntheticId,
             booking_id: linkedBookingId || undefined,
@@ -2429,8 +2444,10 @@ setBookingDetail(finalVoucherDetail);
             // Also pass created field directly if it exists (for DD/MM/YYYY format support)
             created: voucher.created || (voucher.created_at && typeof voucher.created_at === 'string' && voucher.created_at.includes('/') ? voucher.created_at.split(' ')[0] : null),
             passengers: voucher.passengers || [],
+            expires: voucher.expires || bookingDetail?.booking?.expires || null,
             customer_portal_url: voucher.customer_portal_url || voucher.portal_url || '',
             customerPortalToken: voucher.customerPortalToken || voucher.customer_portal_token || voucher.portal_token || '',
+            flight_attempts: bookingDetail?.booking?.flight_attempts ?? voucherFlightAttempts,
             contextType: 'voucher',
             contextId: syntheticId
         };
@@ -2561,7 +2578,7 @@ setBookingDetail(finalVoucherDetail);
                         totalPrice: totalPrice,
                         paid: paidAmount, // Add paid amount from Gift Voucher Details
                         voucher_code: voucherCode,
-                        flight_attempts: Number.isNaN(voucherAttemptCount) ? 0 : (voucherAttemptCount ?? 0),
+                        flight_attempts: 0,
                         additionalInfo: {},
                         choose_add_on: [],
                         activity_id: finalActivityId, // Add activity_id for backend
@@ -2770,7 +2787,7 @@ setBookingDetail(finalVoucherDetail);
                         totalPrice: totalPrice,
                         paid: paidAmount, // Add paid amount from Flight Voucher Details
                         voucher_code: voucherCode,
-                        flight_attempts: Number.isNaN(voucherAttemptCount) ? 0 : (voucherAttemptCount ?? 0),
+                        flight_attempts: 0,
                         additionalInfo: {},
                         choose_add_on: [],
                         activity_id: finalActivityId, // Add activity_id for backend
