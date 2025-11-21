@@ -28,16 +28,27 @@ const CustomerPortal = () => {
                 setError(null);
                 // URL encode the token to handle special characters like =
                 const encodedToken = encodeURIComponent(token);
+                console.log('🔍 Customer Portal - Fetching booking data with token:', token);
+                console.log('🔍 Customer Portal - Encoded token:', encodedToken);
                 const response = await axios.get(`/api/customer-portal-booking/${encodedToken}`);
                 
+                console.log('✅ Customer Portal - Response received:', response.data);
                 if (response.data.success) {
                     setBookingData(response.data.data);
                 } else {
+                    console.error('❌ Customer Portal - API returned error:', response.data);
                     setError(response.data.message || 'Failed to load booking data');
                 }
             } catch (err) {
-                console.error('Error fetching customer portal booking data:', err);
-                setError(err.response?.data?.message || 'Error loading booking data. Please try again later.');
+                console.error('❌ Customer Portal - Error fetching booking data:', err);
+                console.error('❌ Customer Portal - Error response:', err.response);
+                console.error('❌ Customer Portal - Error status:', err.response?.status);
+                console.error('❌ Customer Portal - Error data:', err.response?.data);
+                const errorMessage = err.response?.data?.message || 
+                                   (err.response?.status === 404 ? 'Booking not found. Please check your link.' : 
+                                    err.response?.status === 500 ? 'Server error. Please try again later.' :
+                                    'Error loading booking data. Please try again later.');
+                setError(errorMessage);
             } finally {
                 setLoading(false);
             }

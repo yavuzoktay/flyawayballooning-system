@@ -9192,7 +9192,12 @@ app.get('/api/getBookingHistory', (req, res) => {
 // Customer Portal API - Get booking data by token
 app.get('/api/customer-portal-booking/:token', async (req, res) => {
     let { token } = req.params;
+    console.log('🔑 Customer Portal - Endpoint called with token:', token);
+    console.log('🔑 Customer Portal - Request URL:', req.url);
+    console.log('🔑 Customer Portal - Request method:', req.method);
+    
     if (!token) {
+        console.error('❌ Customer Portal - Token is missing');
         return res.status(400).json({ success: false, message: 'Token is required' });
     }
 
@@ -9426,10 +9431,18 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             }
         };
 
+        console.log('✅ Customer Portal - Sending response for booking:', booking.id);
         res.json(response);
     } catch (error) {
-        console.error('Error fetching customer portal booking:', error);
-        res.status(500).json({ success: false, message: 'Internal server error', error: error.message });
+        console.error('❌ Customer Portal - Error fetching booking:', error);
+        console.error('❌ Customer Portal - Error stack:', error.stack);
+        console.error('❌ Customer Portal - Token that caused error:', req.params.token);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Internal server error', 
+            error: error.message,
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 });
 
