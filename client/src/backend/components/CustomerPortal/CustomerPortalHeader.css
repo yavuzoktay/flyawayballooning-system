@@ -1,0 +1,129 @@
+.customer-portal-header {
+    position: sticky;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    z-index: 2500;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+
+.customer-portal-header .cph-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 12px 20px;
+}
+
+.customer-portal-header .cph-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+}
+
+.customer-portal-header .cph-brand img {
+    height: 40px;
+    width: auto;
+}
+
+.customer-portal-header .cph-brand-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.1;
+}
+
+.customer-portal-header .cph-label {
+    font-weight: 700;
+    font-size: 15px;
+    color: #0f172a;
+}
+
+.customer-portal-header .cph-sub {
+    font-size: 12px;
+    color: #475569;
+}
+
+.customer-portal-header .cph-nav {
+    display: flex;
+    gap: 12px;
+}
+
+.customer-portal-header .cph-link {
+    border: none;
+    background: transparent;
+    font-weight: 600;
+    color: #0f172a;
+    cursor: pointer;
+    padding: 8px 14px;
+    border-radius: 999px;
+    transition: background 0.2s ease, color 0.2s ease;
+    font-size: 14px;
+}
+
+.customer-portal-header .cph-link:hover {
+    background: rgba(0, 235, 91, 0.12);
+    color: #059669;
+}
+
+.customer-portal-header .cph-burger {
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 6px;
+}
+
+.customer-portal-header .cph-burger span {
+    width: 22px;
+    height: 2px;
+    background: #0f172a;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.customer-portal-header .cph-burger.open span:nth-child(1) {
+    transform: translateY(6px) rotate(45deg);
+}
+
+.customer-portal-header .cph-burger.open span:nth-child(2) {
+    opacity: 0;
+}
+
+.customer-portal-header .cph-burger.open span:nth-child(3) {
+    transform: translateY(-6px) rotate(-45deg);
+}
+
+@media (max-width: 768px) {
+    .customer-portal-header .cph-burger {
+        display: flex;
+    }
+
+    .customer-portal-header .cph-nav {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: rgba(255, 255, 255, 0.98);
+        flex-direction: column;
+        padding: 12px 16px;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-10px);
+        transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    .customer-portal-header .cph-nav.open {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0);
+    }
+}
+

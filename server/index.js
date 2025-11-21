@@ -272,7 +272,7 @@ app.post('/api/generate-voucher-code', async (req, res) => {
             }
             return 0;
         };
-
+        
         // Generate unique voucher code
         let voucherCode;
         let isUnique = false;
@@ -455,7 +455,7 @@ app.post('/api/generate-voucher-code', async (req, res) => {
                               AND (
                                     email = ? OR purchaser_email = ?
                                 )
-                            ORDER BY created_at DESC 
+                        ORDER BY created_at DESC 
                             LIMIT 5
                         `;
 
@@ -521,9 +521,9 @@ app.post('/api/generate-voucher-code', async (req, res) => {
 
                         const voucherId = candidates[0].id;
                         console.log('Found voucher ID to update:', voucherId);
-
+                        
                         await queryAsync('UPDATE all_vouchers SET voucher_ref = ? WHERE id = ?', [voucherCode, voucherId]);
-                        console.log('Voucher updated with code:', voucherCode);
+                                console.log('Voucher updated with code:', voucherCode);
                         return { recordId: voucherId, voucherCode };
                     };
 
@@ -4532,6 +4532,81 @@ app.get('/api/getAllBookingData', (req, res) => {
     // Optimized query with better indexing hints
     // Include voucher_type from all_vouchers if booking's voucher_type is null
     // Note: all_vouchers table has voucher_type column, actual_voucher_type is just an alias in getAllVoucherData
+const voucherValidityCache = {
+    data: {},
+    lastFetched: 0
+};
+
+const refreshVoucherValidityCache = async () => {
+    const cacheData = {};
+    const [voucherRows] = await new Promise((resolve, reject) => {
+        const sql = 'SELECT title, validity_months FROM voucher_types WHERE is_active = 1';
+        con.query(sql, (err, rows) => {
+            if (err) reject(err);
+            else resolve([rows]);
+        });
+    });
+    voucherRows.forEach(row => {
+        const key = (row.title || '').trim().toLowerCase();
+        if (key) {
+            cacheData[key] = parseInt(row.validity_months, 10) || 18;
+        }
+    });
+
+    const [privateRows] = await new Promise((resolve, reject) => {
+        const sql = 'SELECT title, validity_months FROM private_charter_voucher_types WHERE is_active = 1';
+        con.query(sql, (err, rows) => {
+            if (err) reject(err);
+            else resolve([rows]);
+        });
+    });
+    privateRows.forEach(row => {
+        const key = (row.title || '').trim().toLowerCase();
+        if (key) {
+            cacheData[key] = parseInt(row.validity_months, 10) || 18;
+        }
+    });
+
+    voucherValidityCache.data = cacheData;
+    voucherValidityCache.lastFetched = Date.now();
+};
+
+const getVoucherValidityMonths = async (title) => {
+    const key = (title || '').trim().toLowerCase();
+    if (!key) return null;
+    const now = Date.now();
+    if (!voucherValidityCache.data || (now - voucherValidityCache.lastFetched) > 5 * 60 * 1000) {
+        try {
+            await refreshVoucherValidityCache();
+        } catch (err) {
+            console.warn('Failed to refresh voucher validity cache:', err.message);
+        }
+    }
+    return voucherValidityCache.data[key] || null;
+};
+
+const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFlight) => {
+    const candidates = [
+        voucherType,
+        voucherType ? voucherType.replace(/flight/gi, '').trim() : '',
+        experienceType,
+        bookFlight
+    ];
+    for (const candidate of candidates) {
+        if (!candidate) continue;
+        const months = await getVoucherValidityMonths(candidate);
+        if (months) return months;
+    }
+
+    const experience = (experienceType || '').toLowerCase();
+    const bookingType = (bookFlight || '').toLowerCase();
+    const type = (voucherType || '').toLowerCase();
+    if (experience.includes('private') || bookingType.includes('private') || type.includes('private')) return 18;
+    if (type.includes('any day')) return 24;
+    if (type.includes('weekday') || type.includes('flexible')) return 18;
+    return 24;
+};
+    
     const sql = `
         SELECT 
             ab.*, 
@@ -4539,7 +4614,13 @@ app.get('/api/getAllBookingData', (req, res) => {
             COALESCE(ab.voucher_type, v.voucher_type) as voucher_type,
             COALESCE(ab.voucher_code, vc.code, vcu_map.code, v.voucher_ref) as voucher_code,
             DATE_FORMAT(ab.created_at, '%Y-%m-%d') as created_at_display,
-            DATE_FORMAT(ab.expires, '%d/%m/%Y') as expires_display
+            DATE_FORMAT(ab.expires, '%d/%m/%Y') as expires_display,
+            v.expires as voucher_expires,
+            DATE_FORMAT(v.expires, '%d/%m/%Y') as voucher_expires_display,
+            v.created_at as voucher_created_at,
+            v.voucher_type as original_voucher_type,
+            v.experience_type as voucher_experience_type,
+            v.book_flight as voucher_book_flight
         FROM all_booking ab
         LEFT JOIN voucher_codes vc 
             ON vc.code = ab.voucher_code
@@ -4564,12 +4645,59 @@ app.get('/api/getAllBookingData', (req, res) => {
         }
         
         // If voucher_code is still null, fallback to joined usage mapping
-        const enriched = result.map(r => {
+        const enriched = await Promise.all(result.map(async (r) => {
             if (!r.voucher_code && r.vcu_map_code) {
                 r.voucher_code = r.vcu_map_code;
             }
-            return r;
-        });
+            
+            const {
+                voucher_expires,
+                voucher_expires_display,
+                voucher_created_at,
+                original_voucher_type,
+                voucher_experience_type,
+                voucher_book_flight,
+                ...rest
+            } = r;
+            
+            let expiresValue = rest.expires;
+            let expiresDisplay = rest.expires_display;
+            
+            const sourceDate = voucher_expires || voucher_created_at;
+            if ((!expiresValue || expiresValue === '' || expiresValue === '0000-00-00' || expiresValue === null) && sourceDate) {
+                const months = await determineVoucherExpiryMonths(
+                    original_voucher_type || rest.voucher_type,
+                    voucher_experience_type || rest.experience,
+                    voucher_book_flight
+                );
+                
+                const baseDate = moment(voucher_expires || sourceDate);
+                if (baseDate.isValid()) {
+                    if (!voucher_expires) {
+                        baseDate.add(months, 'months');
+                    }
+                    const computed = baseDate.format('YYYY-MM-DD HH:mm:ss');
+                    expiresValue = computed;
+                    expiresDisplay = baseDate.format('DD/MM/YYYY');
+                    
+                    if (rest.id) {
+                        con.query('UPDATE all_booking SET expires = ? WHERE id = ?', [computed, rest.id], (updateErr) => {
+                            if (updateErr) {
+                                console.warn('Failed to backfill expires for booking', rest.id, updateErr.message);
+                            }
+                        });
+                    }
+                }
+            } else if (!expiresDisplay && voucher_expires_display) {
+                expiresDisplay = voucher_expires_display;
+            }
+            
+            return {
+                ...rest,
+                expires: expiresValue,
+                expires_display: expiresDisplay
+            };
+        }));
         
         // Fetch additional information and add-on items for all bookings in batch queries (optimized)
         try {
@@ -6097,13 +6225,16 @@ app.post('/api/createBooking', (req, res) => {
         console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
         console.log('actualPaxCount (FINAL):', actualPaxCount);
         
+        // Determine status: use from req.body if provided (for rebook operations), otherwise default to 'Confirmed'
+        const bookingStatus = req.body.status || 'Confirmed';
+        
         const bookingValues = [
             passengerName,
             chooseFlightType.type,
             bookingDateTime, // <-- burada güncelledik
             actualPaxCount, // Use actual passenger count instead of chooseFlightType.passengerCount
             chooseLocation,
-            'Confirmed', // Default status
+            bookingStatus, // Use status from request body or default to 'Confirmed'
             paid || totalPrice, // Use paid amount from Gift Voucher Details if provided, otherwise use totalPrice
             0,
             voucher_code || null,
@@ -6154,6 +6285,56 @@ app.post('/api/createBooking', (req, res) => {
 
             const bookingId = result.insertId;
             const createdAt = nowDate;
+
+            // If this booking was created via a rebook operation, previous history entries
+            // can be passed in history_entries. Copy them to preserve the timeline.
+            const incomingHistoryEntriesRaw = Array.isArray(req.body.history_entries) ? req.body.history_entries : [];
+            if (incomingHistoryEntriesRaw.length > 0) {
+                console.log('📜 Copying history entries to new booking:', {
+                    booking_id: bookingId,
+                    entries: incomingHistoryEntriesRaw.length
+                });
+            }
+            incomingHistoryEntriesRaw
+                .filter(entry => entry && typeof entry.status === 'string' && entry.status.trim() !== '')
+                .forEach((entry, idx) => {
+                    const statusValue = entry.status.trim();
+                    let normalizedChangedAt = null;
+                    if (entry.changed_at) {
+                        const parsed = moment(entry.changed_at);
+                        if (parsed.isValid()) {
+                            normalizedChangedAt = parsed.format('YYYY-MM-DD HH:mm:ss');
+                        }
+                    }
+                    const historySql = normalizedChangedAt
+                        ? 'INSERT INTO booking_status_history (booking_id, status, changed_at) VALUES (?, ?, ?)'
+                        : 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
+                    const params = normalizedChangedAt
+                        ? [bookingId, statusValue, normalizedChangedAt]
+                        : [bookingId, statusValue];
+                    con.query(historySql, params, (copyErr) => {
+                        if (copyErr) {
+                            console.error('Error copying booking history entry', { booking_id: bookingId, entryIndex: idx, error: copyErr });
+                        } else {
+                            console.log('📜 Copied previous history entry for booking', bookingId, statusValue, normalizedChangedAt);
+                        }
+                    });
+                });
+
+            // Add initial status to booking history
+            // Status is at index 5 in bookingValues array (after name, flight_type, flight_date, pax, location)
+            const initialStatus = bookingStatus || bookingValues[5] || 'Open';
+            
+            // Insert initial status into history for new bookings
+            // This ensures every new booking (including rebooks) gets a history entry
+            const initialHistorySql = 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
+            con.query(initialHistorySql, [bookingId, initialStatus], (historyErr) => {
+                if (historyErr) {
+                    console.error('Error inserting initial booking history:', historyErr);
+                } else {
+                    console.log('✅ Initial booking history added:', { booking_id: bookingId, status: initialStatus });
+                }
+            });
 
             // --- Availability güncelleme ---
             // selectedDate ve selectedTime ile availability güncellenir
@@ -8878,17 +9059,8 @@ app.patch('/api/updateBookingField', (req, res) => {
             };
             
             if (field === 'status') {
-                const historySql = 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
-                console.log('updateBookingField - Status history ekleniyor:', { booking_id, status: normalizedValue });
-                con.query(historySql, [booking_id, normalizedValue], (err2) => {
-                    if (err2) console.error('History insert error:', err2);
-                    else console.log('updateBookingField - Status history başarıyla eklendi');
-                    
-                    // Handle flight attempts increment for voucher cancellations
-                    if (normalizedValue === 'Cancelled') {
-                        handleFlightAttemptsIncrement(booking_id);
-                    }
-                    
+                // Helper function to proceed with availability refresh after history update
+                const proceedWithAvailabilityRefresh = () => {
                     // Always refresh availability when status changes (especially for Cancelled)
                     // This ensures availability is updated when a booking is cancelled
                     console.log('🔄 updateBookingField - Status changed to:', normalizedValue, '- refreshing availability');
@@ -8912,7 +9084,69 @@ app.patch('/api/updateBookingField', (req, res) => {
                     }
                     
                     finalizeResponse();
-                });
+                };
+                
+                // If status is Cancelled, update the last Scheduled entry instead of creating a new one
+                if (normalizedValue === 'Cancelled') {
+                    // Find the last Scheduled entry for this booking
+                    const findLastScheduledSql = `
+                        SELECT id FROM booking_status_history 
+                        WHERE booking_id = ? AND status = 'Scheduled' 
+                        ORDER BY changed_at DESC, id DESC 
+                        LIMIT 1
+                    `;
+                    con.query(findLastScheduledSql, [booking_id], (findErr, scheduledRows) => {
+                        if (findErr) {
+                            console.error('Error finding last Scheduled entry:', findErr);
+                            // Fallback to insert if query fails
+                            const historySql = 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
+                            con.query(historySql, [booking_id, normalizedValue], (err2) => {
+                                if (err2) console.error('History insert error:', err2);
+                                else console.log('updateBookingField - Status history başarıyla eklendi');
+                                handleFlightAttemptsIncrement(booking_id);
+                                proceedWithAvailabilityRefresh();
+                            });
+                        } else if (scheduledRows && scheduledRows.length > 0) {
+                            // Update the last Scheduled entry to Cancelled
+                            const updateSql = 'UPDATE booking_status_history SET status = ? WHERE id = ?';
+                            con.query(updateSql, [normalizedValue, scheduledRows[0].id], (updateErr) => {
+                                if (updateErr) {
+                                    console.error('Error updating Scheduled entry to Cancelled:', updateErr);
+                                    // Fallback to insert if update fails
+                                    const historySql = 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
+                                    con.query(historySql, [booking_id, normalizedValue], (err2) => {
+                                        if (err2) console.error('History insert error:', err2);
+                                        else console.log('updateBookingField - Status history başarıyla eklendi');
+                                        handleFlightAttemptsIncrement(booking_id);
+                                        proceedWithAvailabilityRefresh();
+                                    });
+                                } else {
+                                    console.log('updateBookingField - Updated last Scheduled entry to Cancelled:', scheduledRows[0].id);
+                                    handleFlightAttemptsIncrement(booking_id);
+                                    proceedWithAvailabilityRefresh();
+                                }
+                            });
+                        } else {
+                            // No Scheduled entry found, insert new Cancelled entry
+                            const historySql = 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
+                            con.query(historySql, [booking_id, normalizedValue], (err2) => {
+                                if (err2) console.error('History insert error:', err2);
+                                else console.log('updateBookingField - Status history başarıyla eklendi');
+                                handleFlightAttemptsIncrement(booking_id);
+                                proceedWithAvailabilityRefresh();
+                            });
+                        }
+                    });
+                } else {
+                    // For non-Cancelled statuses, insert new entry as before
+                    const historySql = 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
+                    console.log('updateBookingField - Status history ekleniyor:', { booking_id, status: normalizedValue });
+                    con.query(historySql, [booking_id, normalizedValue], (err2) => {
+                        if (err2) console.error('History insert error:', err2);
+                        else console.log('updateBookingField - Status history başarıyla eklendi');
+                        proceedWithAvailabilityRefresh();
+                    });
+                }
             } else {
                 if (refreshOldSlot) {
                     refreshAvailabilitySlot(previousSlot);
@@ -8948,10 +9182,255 @@ app.patch('/api/updateBookingField', (req, res) => {
 app.get('/api/getBookingHistory', (req, res) => {
     const booking_id = req.query.booking_id;
     if (!booking_id) return res.status(400).json({ success: false, message: 'booking_id is required' });
-    con.query('SELECT * FROM booking_status_history WHERE booking_id = ? ORDER BY changed_at ASC', [booking_id], (err, rows) => {
+    // Order by changed_at DESC to show most recent first, but we'll reverse in frontend for chronological display
+    con.query('SELECT * FROM booking_status_history WHERE booking_id = ? ORDER BY changed_at DESC', [booking_id], (err, rows) => {
         if (err) return res.status(500).json({ success: false, message: 'DB error' });
         res.json({ success: true, history: rows });
     });
+});
+
+// Customer Portal API - Get booking data by token
+app.get('/api/customer-portal-booking/:token', async (req, res) => {
+    let { token } = req.params;
+    if (!token) {
+        return res.status(400).json({ success: false, message: 'Token is required' });
+    }
+
+    try {
+        console.log('🔑 Customer Portal - Token received (raw):', token);
+        
+        // URL decode the token first (handles %3D for =, etc.)
+        try {
+            token = decodeURIComponent(token);
+            console.log('🔑 Customer Portal - Token after URL decode:', token);
+        } catch (urlDecodeErr) {
+            console.error('Error URL decoding token:', urlDecodeErr);
+            // Continue with original token if URL decode fails
+        }
+        
+        // Decode the base64 token
+        let decoded;
+        try {
+            decoded = Buffer.from(token, 'base64').toString('utf8');
+            console.log('🔑 Customer Portal - Token decoded:', decoded);
+        } catch (decodeErr) {
+            console.error('Error decoding customer portal token:', decodeErr);
+            console.error('Token received:', token);
+            return res.status(400).json({ success: false, message: 'Invalid token format' });
+        }
+
+        // Parse the decoded string (format: "id|voucher_ref|email|created_at")
+        const parts = decoded.split('|');
+        console.log('🔑 Customer Portal - Token parts:', parts);
+        
+        if (parts.length < 1) {
+            return res.status(400).json({ success: false, message: 'Invalid token content' });
+        }
+
+        const bookingId = parts[0] ? parts[0].trim() : null;
+        const voucherRef = parts.length > 1 && parts[1] ? parts[1].trim() : null;
+        const email = parts.length > 2 && parts[2] ? parts[2].trim() : null;
+        const createdAt = parts.length > 3 && parts[3] ? parts[3].trim() : null;
+        
+        console.log('🔑 Customer Portal - Parsed values:', { bookingId, voucherRef, email, createdAt });
+
+        // Try to find booking by ID first
+        let booking = null;
+        if (bookingId) {
+            // Try multiple ID formats: string, integer, and CAST to handle any type mismatch
+            const [bookingRowsById] = await new Promise((resolve, reject) => {
+                con.query(`
+                    SELECT * FROM all_booking 
+                    WHERE id = ? 
+                       OR id = ? 
+                       OR CAST(id AS CHAR) = ?
+                       OR CAST(id AS UNSIGNED) = ?
+                    LIMIT 1
+                `, [bookingId, parseInt(bookingId), String(bookingId), parseInt(bookingId)], (err, rows) => {
+                    if (err) {
+                        console.error('Error searching by ID:', err);
+                        reject(err);
+                    } else {
+                        resolve([rows]);
+                    }
+                });
+            });
+            console.log('🔍 Customer Portal - Search by ID:', bookingId, 'Found:', bookingRowsById?.length || 0);
+            if (bookingRowsById && bookingRowsById.length > 0) {
+                booking = bookingRowsById[0];
+                console.log('✅ Customer Portal - Booking found by ID:', booking.id);
+            }
+        }
+
+        // If not found by ID, try voucher_code
+        if (!booking && voucherRef) {
+            const [voucherRows] = await new Promise((resolve, reject) => {
+                con.query('SELECT * FROM all_booking WHERE voucher_code = ? ORDER BY created_at DESC LIMIT 1', [voucherRef], (err, rows) => {
+                    if (err) reject(err);
+                    else resolve([rows]);
+                });
+            });
+            console.log('🔍 Customer Portal - Search by voucher code:', voucherRef, 'Found:', voucherRows?.length || 0);
+            if (voucherRows && voucherRows.length > 0) {
+                booking = voucherRows[0];
+                console.log('✅ Customer Portal - Booking found by voucher code:', booking.id);
+            }
+        }
+
+        // If still not found, try email and created_at (more flexible date matching)
+        if (!booking && email && createdAt) {
+            // Try exact match first
+            const [emailRowsExact] = await new Promise((resolve, reject) => {
+                con.query('SELECT * FROM all_booking WHERE email = ? AND DATE(created_at) = DATE(?) ORDER BY created_at DESC LIMIT 1', [email, createdAt], (err, rows) => {
+                    if (err) reject(err);
+                    else resolve([rows]);
+                });
+            });
+            console.log('🔍 Customer Portal - Search by email/date (exact):', email, createdAt, 'Found:', emailRowsExact?.length || 0);
+            
+            if (emailRowsExact && emailRowsExact.length > 0) {
+                booking = emailRowsExact[0];
+                console.log('✅ Customer Portal - Booking found by email/date:', booking.id);
+            } else {
+                // Try just email if exact date match fails
+                const [emailRows] = await new Promise((resolve, reject) => {
+                    con.query('SELECT * FROM all_booking WHERE email = ? ORDER BY created_at DESC LIMIT 1', [email], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
+                });
+                console.log('🔍 Customer Portal - Search by email only:', email, 'Found:', emailRows?.length || 0);
+            if (emailRows && emailRows.length > 0) {
+                booking = emailRows[0];
+                    console.log('✅ Customer Portal - Booking found by email only:', booking.id);
+                }
+            }
+        }
+        
+        // If still not found, try to find by voucher code from all_vouchers table and then find booking
+        if (!booking && voucherRef) {
+            try {
+                const [voucherRows] = await new Promise((resolve, reject) => {
+                    con.query('SELECT id FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [voucherRef], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
+                });
+                if (voucherRows && voucherRows.length > 0) {
+                    // Found voucher, now try to find booking by voucher_code
+                    const [bookingByVoucher] = await new Promise((resolve, reject) => {
+                        con.query('SELECT * FROM all_booking WHERE voucher_code = ? ORDER BY created_at DESC LIMIT 1', [voucherRef], (err, rows) => {
+                            if (err) reject(err);
+                            else resolve([rows]);
+                        });
+                    });
+                    if (bookingByVoucher && bookingByVoucher.length > 0) {
+                        booking = bookingByVoucher[0];
+                        console.log('✅ Customer Portal - Booking found via voucher lookup:', booking.id);
+                    }
+                }
+            } catch (voucherErr) {
+                console.error('Error searching via voucher table:', voucherErr);
+            }
+        }
+
+        if (!booking) {
+            console.log('❌ Customer Portal - Booking not found for:', { bookingId, voucherRef, email, createdAt });
+            // Try to find any booking with this email to help debug
+            if (email) {
+                const [anyBooking] = await new Promise((resolve, reject) => {
+                    con.query('SELECT id, email, created_at, voucher_code FROM all_booking WHERE email = ? ORDER BY created_at DESC LIMIT 5', [email], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
+                });
+                console.log('🔍 Customer Portal - Other bookings with this email:', anyBooking);
+            }
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Booking not found',
+                debug: {
+                    searchedBy: {
+                        bookingId: bookingId || null,
+                        voucherRef: voucherRef || null,
+                        email: email || null,
+                        createdAt: createdAt || null
+                    }
+                }
+            });
+        }
+        
+        console.log('✅ Customer Portal - Booking found:', booking.id);
+
+        // Get passengers for this booking
+        const [passengerRows] = await new Promise((resolve, reject) => {
+            con.query('SELECT * FROM passenger WHERE booking_id = ?', [booking.id], (err, rows) => {
+                if (err) reject(err);
+                else resolve([rows]);
+            });
+        });
+
+        // Get number of flight attempts (count of Scheduled status entries in history)
+        let flightAttemptsCount = 0;
+        try {
+            const [historyRows] = await new Promise((resolve, reject) => {
+                con.query(`
+                    SELECT COUNT(*) as count 
+                    FROM booking_status_history 
+                    WHERE booking_id = ? AND status = 'Scheduled'
+                `, [booking.id], (err, rows) => {
+                    if (err) reject(err);
+                    else resolve([rows]);
+                });
+            });
+            flightAttemptsCount = historyRows && historyRows.length > 0 ? (historyRows[0].count || 0) : 0;
+            
+            // If no history entries found, check if current status is Scheduled
+            if (flightAttemptsCount === 0 && booking.status && booking.status.toLowerCase() === 'scheduled') {
+                flightAttemptsCount = 1;
+            }
+        } catch (historyErr) {
+            console.error('Error counting flight attempts:', historyErr);
+            // Fallback: if booking has Scheduled status, count as 1 attempt
+            if (booking.status && booking.status.toLowerCase() === 'scheduled') {
+                flightAttemptsCount = 1;
+            }
+        }
+
+        // Format the response
+        const response = {
+            success: true,
+            data: {
+                id: booking.id,
+                booking_id: booking.id,
+                booking_reference: booking.id,
+                name: booking.name,
+                email: booking.email,
+                phone: booking.phone,
+                flight_date: booking.flight_date,
+                flight_type: booking.flight_type || booking.experience,
+                experience: booking.experience || booking.flight_type,
+                location: booking.location,
+                status: booking.status,
+                pax: booking.pax,
+                passengers: passengerRows || [],
+                voucher_code: booking.voucher_code,
+                voucher_ref: booking.voucher_code || null,
+                voucher_type: booking.voucher_type,
+                paid: booking.paid,
+                due: booking.due,
+                expires: booking.expires,
+                created_at: booking.created_at,
+                additional_notes: booking.additional_notes,
+                flight_attempts: flightAttemptsCount
+            }
+        };
+
+        res.json(response);
+    } catch (error) {
+        console.error('Error fetching customer portal booking:', error);
+        res.status(500).json({ success: false, message: 'Internal server error', error: error.message });
+    }
 });
 
 // Passenger tablosunda herhangi bir yolcunun weight bilgisini güncellemek için
@@ -9903,7 +10382,7 @@ app.post('/api/activity/:id/availabilities', (req, res) => {
         .catch(error => {
             console.error('Error creating availabilities:', error);
             res.status(500).json({ success: false, message: 'Database error', error });
-        });
+    });
 });
 
 // Get Availabilities for an activity
@@ -11885,8 +12364,8 @@ async function createVoucherFromWebhook(voucherData) {
         } else {
             const normalizedBookFlightLower = normalizedBookFlight.toLowerCase();
             if (normalizedBookFlightLower.includes('gift') || normalizedBookFlightLower === 'buy gift') {
-                // Normalize variations to 'Gift Voucher'
-                normalizedBookFlight = 'Gift Voucher';
+            // Normalize variations to 'Gift Voucher'
+            normalizedBookFlight = 'Gift Voucher';
             } else if (normalizedBookFlightLower.includes('flight voucher') || normalizedBookFlightLower === 'buy flight voucher') {
                 // Normalize variations (e.g., Buy Flight Voucher) to standard Flight Voucher label
                 normalizedBookFlight = 'Flight Voucher';
@@ -17606,3 +18085,4 @@ app.post('/api/fix-flight-dates', (req, res) => {
         });
     });
 });
+
