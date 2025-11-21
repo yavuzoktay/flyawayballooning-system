@@ -29,6 +29,7 @@ function App() {
       <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/customerPortal/:token" element={<CustomerPortal />} />
             <Route path="/customerPortal/:token/*" element={<CustomerPortal />} />
             <Route path='/' element={<RequireAuth><MainLayout /></RequireAuth>}>
                 <Route path="/" element={<Index />} />

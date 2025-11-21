@@ -7,10 +7,13 @@ import CustomerPortalHeader from '../components/CustomerPortal/CustomerPortalHea
 import '../components/CustomerPortal/CustomerPortalHeader.css';
 
 const CustomerPortal = () => {
-    const { token } = useParams();
+    const { token: tokenParam } = useParams();
     const [bookingData, setBookingData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+
+    // Extract token from URL - handle both /customerPortal/:token and /customerPortal/:token/index
+    const token = tokenParam ? tokenParam.split('/')[0] : null;
 
     useEffect(() => {
         if (!token) {
