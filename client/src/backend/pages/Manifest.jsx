@@ -994,6 +994,104 @@ const Manifest = () => {
         }
     };
 
+    const buildDisplayedHistoryRows = () => {
+        const rows = Array.isArray(bookingHistory) ? [...bookingHistory] : [];
+        if (bookingDetail?.booking) {
+            const currentEntry = {
+                status: bookingDetail.booking.status || 'Scheduled',
+                changed_at: bookingDetail.booking.flight_date || bookingDetail.booking.created_at || null
+            };
+            const currentKey = `${currentEntry.status}|${currentEntry.changed_at || ''}`;
+            const exists = rows.some(entry => `${entry.status}|${entry.changed_at || ''}` === currentKey);
+            if (!exists) {
+                rows.push(currentEntry);
+            }
+        }
+        
+        // Process entries: Cancelled entries should overwrite Scheduled entries with the same date
+        // Group entries by date (ignoring time)
+        const entriesByDate = new Map();
+        
+        rows.forEach(entry => {
+            if (!entry || !entry.status) return;
+            
+            const dateKey = entry.changed_at 
+                ? new Date(entry.changed_at).toISOString().split('T')[0] // YYYY-MM-DD
+                : '';
+            
+            if (!dateKey) {
+                // Entry without date, add it directly
+                if (!entriesByDate.has('no-date')) {
+                    entriesByDate.set('no-date', []);
+                }
+                entriesByDate.get('no-date').push(entry);
+                return;
+            }
+            
+            if (!entriesByDate.has(dateKey)) {
+                entriesByDate.set(dateKey, []);
+            }
+            entriesByDate.get(dateKey).push(entry);
+        });
+        
+        // Process each date group: Cancelled entries should NEVER appear as separate rows
+        // Only Scheduled entries appear as separate rows. If Cancelled exists for a Scheduled date,
+        // the Scheduled entry is shown as Cancelled instead.
+        const processedRows = [];
+        
+        entriesByDate.forEach((entries, dateKey) => {
+            if (dateKey === 'no-date') {
+                // Entries without date, add all non-Cancelled entries (Cancelled never shown separately)
+                entries.forEach(entry => {
+                    if (entry.status && entry.status.toLowerCase() !== 'cancelled') {
+                        processedRows.push(entry);
+                    }
+                });
+                return;
+            }
+            
+            const hasScheduled = entries.some(e => e.status && e.status.toLowerCase() === 'scheduled');
+            const hasCancelled = entries.some(e => e.status && e.status.toLowerCase() === 'cancelled');
+            
+            if (hasScheduled && hasCancelled) {
+                // Find the Scheduled entry and convert it to Cancelled (Cancelled overwrites Scheduled)
+                const scheduledEntry = entries.find(e => e.status && e.status.toLowerCase() === 'scheduled');
+                if (scheduledEntry) {
+                    processedRows.push({
+                        ...scheduledEntry,
+                        status: 'Cancelled'
+                    });
+                }
+            } else if (hasScheduled && !hasCancelled) {
+                // Only Scheduled exists, add it
+                const scheduledEntry = entries.find(e => e.status && e.status.toLowerCase() === 'scheduled');
+                if (scheduledEntry) {
+                    processedRows.push(scheduledEntry);
+                }
+            } else if (!hasScheduled && hasCancelled) {
+                // Only Cancelled exists (no Scheduled), DO NOT show it as a separate row
+                // Cancelled entries are never displayed unless they overwrite a Scheduled entry
+                // Skip this entry completely
+            } else {
+                // Other statuses (not Scheduled or Cancelled), add them
+                entries.forEach(entry => {
+                    if (entry.status && entry.status.toLowerCase() !== 'cancelled') {
+                        processedRows.push(entry);
+                    }
+                });
+            }
+        });
+        
+        return processedRows
+            .filter(entry => entry && entry.status)
+            .sort((a, b) => {
+                const dateA = a.changed_at ? new Date(a.changed_at).getTime() : 0;
+                const dateB = b.changed_at ? new Date(b.changed_at).getTime() : 0;
+                return dateA - dateB;
+            });
+    };
+    const historyRows = buildDisplayedHistoryRows();
+
     // Function to automatically update flight status based on passenger count
     const autoUpdateFlightStatus = async (flight) => {
         if (!flight) return;
@@ -1661,6 +1759,39 @@ const Manifest = () => {
         if (!bookingDetail || !bookingDetail.booking) return;
         setRebookLoading(true);
         try {
+            const buildHistoryEntriesPayload = () => {
+                const entries = [];
+                if (Array.isArray(bookingHistory) && bookingHistory.length > 0) {
+                    bookingHistory.forEach(entry => {
+                        if (entry && entry.status) {
+                            entries.push({
+                                status: entry.status,
+                                changed_at: entry.changed_at || null
+                            });
+                        }
+                    });
+                }
+                if (bookingDetail?.booking) {
+                    const currentStatus = bookingDetail.booking.status || 'Scheduled';
+                    const currentFlightDate = bookingDetail.booking.flight_date || bookingDetail.booking.created_at || null;
+                    entries.push({
+                        status: currentStatus,
+                        changed_at: currentFlightDate
+                    });
+                }
+                const deduped = [];
+                const seen = new Set();
+                entries.forEach(entry => {
+                    if (!entry.status) return;
+                    const key = `${entry.status}|${entry.changed_at || ''}`;
+                    if (seen.has(key)) return;
+                    seen.add(key);
+                    deduped.push(entry);
+                });
+                return deduped;
+            };
+            const historyEntriesPayload = buildHistoryEntriesPayload();
+
             // Get activity details to determine flight type and pricing
             const activityResponse = await axios.get(`/api/activity/${activityId}`);
             const activity = activityResponse.data.data;
@@ -1723,7 +1854,8 @@ const Manifest = () => {
                 voucher_code: bookingDetail.booking.voucher_code || null,
                 flight_attempts: currentAttempts, // Preserve attempts value during rebook
                 email_template_override: 'Passenger Rescheduling Information',
-                email_template_type_override: 'passenger_reschedule_information_automatic'
+                email_template_type_override: 'passenger_reschedule_information_automatic',
+                history_entries: historyEntriesPayload
             };
             // First delete the old booking
             await axios.delete(`/api/deleteBooking/${bookingDetail.booking.id}`);
@@ -4029,13 +4161,7 @@ const Manifest = () => {
                                                     </TableRow>
                                                 </TableHead>
                                                 <TableBody>
-                                                    <TableRow>
-                                                        <TableCell>{bookingDetail.booking.flight_date ? dayjs(bookingDetail.booking.flight_date).format('DD/MM/YYYY') : '-'}</TableCell>
-                                                        <TableCell>{bookingDetail.booking.flight_type || '-'}</TableCell>
-                                                        <TableCell>{bookingDetail.booking.location || '-'}</TableCell>
-                                                        <TableCell>Scheduled</TableCell>
-                                                    </TableRow>
-                                                    {bookingHistory.map((h, i) => (
+                                                    {historyRows.map((h, i) => (
                                                         <TableRow key={i}>
                                                             <TableCell>{h.changed_at ? dayjs(h.changed_at).format('DD/MM/YYYY HH:mm') : '-'}</TableCell>
                                                             <TableCell>{bookingDetail.booking.flight_type || '-'}</TableCell>
@@ -4043,6 +4169,11 @@ const Manifest = () => {
                                                             <TableCell>{getStatusWithEmoji(h.status)}</TableCell>
                                                         </TableRow>
                                                     ))}
+                                                    {historyRows.length === 0 && (
+                                                        <TableRow>
+                                                            <TableCell colSpan={4} align="center">No history yet</TableCell>
+                                                        </TableRow>
+                                                    )}
                                                 </TableBody>
                                             </Table>
                                         </Box>

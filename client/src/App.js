@@ -12,6 +12,7 @@ import SpecificActivity from './backend/pages/SpecificActivity';
 import ActivityAvailabilitiesPage from './backend/components/ActivityPage/ActivityAvailabilitiesPage';
 import Settings from './backend/pages/Settings';
 import Login from './backend/pages/Login';
+import CustomerPortal from './backend/pages/CustomerPortal';
 
 function RequireAuth({ children }) {
   const location = useLocation();
@@ -28,6 +29,7 @@ function App() {
       <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/customerPortal/:token/*" element={<CustomerPortal />} />
             <Route path='/' element={<RequireAuth><MainLayout /></RequireAuth>}>
                 <Route path="/" element={<Index />} />
                 <Route path="/booking" element={<BookingPage />} />
