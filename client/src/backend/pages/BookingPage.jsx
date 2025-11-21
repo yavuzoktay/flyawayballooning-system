@@ -881,6 +881,7 @@ const BookingPage = () => {
                     offer_code: item.offer_code || '',
                     voucher_ref: item.voucher_ref || '',
                     flight_attempts: item.flight_attempts ?? 0,
+                    booking_id: item.booking_id || null,
                     _original: item // _original her zaman eklensin
                 };
             }));
@@ -1102,6 +1103,24 @@ setBookingDetail(finalVoucherDetail);
             return;
         }
         setSelectedBookingId(item.id);
+        setDetailDialogOpen(true);
+    };
+
+    const handleVoucherRefClick = (voucherRow) => {
+        const source = voucherRow?._original || voucherRow;
+        const bookingId = source?.booking_id || source?.bookingId || null;
+        if (!bookingId) {
+            alert('No related booking found for this voucher yet.');
+            return;
+        }
+
+        if (activeTab !== 'bookings') {
+            handleTabChange('bookings');
+        }
+
+        setDetailError(null);
+        setBookingDetail(null);
+        setSelectedBookingId(bookingId);
         setDetailDialogOpen(true);
     };
 
@@ -2266,8 +2285,14 @@ setBookingDetail(finalVoucherDetail);
         const dueAmount = parseFloat(voucher.due) || 0;
         const subtotal = paidAmount + dueAmount;
 
+        const linkedBookingId = voucher.booking_id || voucher.bookingId || null;
+        const syntheticId = voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`;
+
         const fauxBooking = {
-            id: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`,
+            id: linkedBookingId || syntheticId,
+            booking_id: linkedBookingId || undefined,
+            bookingId: linkedBookingId || undefined,
+            linked_booking_id: linkedBookingId || undefined,
             name: voucher.recipient_name || voucher.name || 'Recipient',
             email: voucher.recipient_email,
             phone: voucher.recipient_phone || '',
@@ -2295,8 +2320,10 @@ setBookingDetail(finalVoucherDetail);
             // Also pass created field directly if it exists (for DD/MM/YYYY format support)
             created: voucher.created || (voucher.created_at && typeof voucher.created_at === 'string' && voucher.created_at.includes('/') ? voucher.created_at.split(' ')[0] : null),
             passengers: voucher.passengers || [],
+            customer_portal_url: voucher.customer_portal_url || voucher.portal_url || '',
+            customerPortalToken: voucher.customerPortalToken || voucher.customer_portal_token || voucher.portal_token || '',
             contextType: 'voucher',
-            contextId: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`
+            contextId: syntheticId
         };
 
         openEmailModalForBooking(fauxBooking, {
@@ -2322,8 +2349,15 @@ setBookingDetail(finalVoucherDetail);
         const dueAmount = parseFloat(voucher.due) || 0;
         const subtotal = paidAmount + dueAmount;
 
+        const fallbackBookingId = bookingDetail?.booking?.id || null;
+        const linkedBookingId = voucher.booking_id || fallbackBookingId || null;
+        const syntheticId = voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`;
+
         const fauxBooking = {
-            id: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`,
+            id: linkedBookingId || syntheticId,
+            booking_id: linkedBookingId || undefined,
+            bookingId: linkedBookingId || undefined,
+            linked_booking_id: linkedBookingId || undefined,
             name: voucher.purchaser_name || voucher.name || bookingDetail?.booking?.name || 'Guest',
             email: purchaserEmail,
             phone: voucher.purchaser_phone || voucher.phone || bookingDetail?.booking?.phone || '',
@@ -2342,8 +2376,10 @@ setBookingDetail(finalVoucherDetail);
             // Also pass created field directly if it exists (for DD/MM/YYYY format support)
             created: voucher.created || (voucher.created_at && typeof voucher.created_at === 'string' && voucher.created_at.includes('/') ? voucher.created_at.split(' ')[0] : null),
             passengers: voucher.passengers || [],
+            customer_portal_url: voucher.customer_portal_url || voucher.portal_url || '',
+            customerPortalToken: voucher.customerPortalToken || voucher.customer_portal_token || voucher.portal_token || '',
             contextType: 'voucher',
-            contextId: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`
+            contextId: syntheticId
         };
 
         openEmailModalForBooking(fauxBooking, {
@@ -2367,8 +2403,15 @@ setBookingDetail(finalVoucherDetail);
         const dueAmount = parseFloat(voucher.due) || 0;
         const subtotal = paidAmount + dueAmount;
 
+        const fallbackBookingId = bookingDetail?.booking?.id || null;
+        const linkedBookingId = voucher.booking_id || fallbackBookingId || null;
+        const syntheticId = voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`;
+
         const fauxBooking = {
-            id: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`,
+            id: linkedBookingId || syntheticId,
+            booking_id: linkedBookingId || undefined,
+            bookingId: linkedBookingId || undefined,
+            linked_booking_id: linkedBookingId || undefined,
             name: voucher.name || bookingDetail?.booking?.name || 'Guest',
             email,
             phone: voucher.phone || bookingDetail?.booking?.phone || '',
@@ -2387,8 +2430,10 @@ setBookingDetail(finalVoucherDetail);
             // Also pass created field directly if it exists (for DD/MM/YYYY format support)
             created: voucher.created || (voucher.created_at && typeof voucher.created_at === 'string' && voucher.created_at.includes('/') ? voucher.created_at.split(' ')[0] : null),
             passengers: voucher.passengers || [],
+            customer_portal_url: voucher.customer_portal_url || voucher.portal_url || '',
+            customerPortalToken: voucher.customerPortalToken || voucher.customer_portal_token || voucher.portal_token || '',
             contextType: 'voucher',
-            contextId: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`
+            contextId: syntheticId
         };
 
         openEmailModalForBooking(fauxBooking, {
@@ -3818,6 +3863,7 @@ setBookingDetail(finalVoucherDetail);
                                     })}
                                     columns={["created", "name", "voucher_type", "actual_voucher_type", "email", "phone", "expires", "redeemed", "paid", "offer_code", "voucher_ref"]}
                                     onNameClick={handleNameClick}
+                                    onVoucherRefClick={handleVoucherRefClick}
                                     onEmailClick={(voucher) => {
                                         const faux = { id: voucher.id, name: voucher.name, email: voucher.email, flight_type: voucher.flight_type };
                                         handleEmailClick(faux);

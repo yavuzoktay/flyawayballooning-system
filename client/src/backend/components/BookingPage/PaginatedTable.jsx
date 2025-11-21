@@ -1,6 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
 
-const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selectable = false, onSelectionChange, context = 'bookings', onEmailClick, onSmsClick }) => {
+const PaginatedTable = ({
+    data,
+    columns,
+    itemsPerPage = 10,
+    onNameClick,
+    selectable = false,
+    onSelectionChange,
+    context = 'bookings',
+    onEmailClick,
+    onSmsClick,
+    onVoucherRefClick
+}) => {
     const [visibleCount, setVisibleCount] = useState(10); // Start with 10 items
     const [selectedRows, setSelectedRows] = useState([]);
     const [showVoucherModal, setShowVoucherModal] = useState(false);
@@ -67,6 +78,22 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
 
     // Get visible data (infinite scroll)
     const visibleData = data.slice(0, visibleCount);
+
+    const getVoucherBookingId = (item) =>
+        item?.booking_id ??
+        item?.bookingId ??
+        item?._original?.booking_id ??
+        item?._original?.bookingId ??
+        null;
+
+    const isVoucherRedeemed = (item) => {
+        const value = item?.redeemed ?? item?._original?.redeemed;
+        if (value === undefined || value === null) return false;
+        if (typeof value === 'string') {
+            return value.trim().toLowerCase() === 'yes';
+        }
+        return Boolean(value);
+    };
 
     // Build header labels
     var mainHead = [];
@@ -513,6 +540,29 @@ const PaginatedTable = ({ data, columns, itemsPerPage = 10, onNameClick, selecta
                                                 })()
                                             ) : id === 'voucher_type' ? (
                                                 item[id] || ''
+                                            ) : id === 'voucher_ref' ? (
+                                                (() => {
+                                                    if (!item[id]) return '';
+                                                    const hasBooking = Boolean(getVoucherBookingId(item));
+                                                    const isClickable = context === 'vouchers' && hasBooking && isVoucherRedeemed(item) && typeof onVoucherRefClick === 'function';
+                                                    if (!isClickable) {
+                                                        return item[id];
+                                                    }
+                                                    return (
+                                                        <span
+                                                            style={{
+                                                                color: '#3274b4',
+                                                                textDecoration: 'underline',
+                                                                cursor: 'pointer',
+                                                                fontWeight: '600'
+                                                            }}
+                                                            onClick={() => onVoucherRefClick(item)}
+                                                            title="View related booking"
+                                                        >
+                                                            {item[id]}
+                                                        </span>
+                                                    );
+                                                })()
                                             ) : id === 'status' ? (
                                                 item[id] === 'Confirmed' ? 'Scheduled' : 
                                                 item[id] === 'Scheduled' ? 'Scheduled' : 
