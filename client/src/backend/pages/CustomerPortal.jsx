@@ -5,7 +5,7 @@ import { Container, Typography, Box, Paper, CircularProgress, Alert, Button } fr
 import dayjs from 'dayjs';
 import CustomerPortalHeader from '../components/CustomerPortal/CustomerPortalHeader';
 import RescheduleFlightModal from '../components/CustomerPortal/RescheduleFlightModal';
-import { Dialog, DialogTitle, DialogContent, DialogActions, IconButton } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Tooltip } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import '../components/CustomerPortal/CustomerPortalHeader.css';
@@ -273,18 +273,20 @@ const CustomerPortal = () => {
                     </Box>
                 </Box>
                 
-                {/* Reschedule Flight Button - Only show if flight date is more than 120 hours (5 days) away */}
+                {/* Action Buttons - Reschedule, Change Location, Cancel */}
                 {(() => {
                     if (!bookingData.flight_date) return null;
                     
                     const flightDate = dayjs(bookingData.flight_date);
                     const now = dayjs();
                     const hoursUntilFlight = flightDate.diff(now, 'hour');
+                    const canRescheduleOrChange = hoursUntilFlight > 120;
+                    const canCancel = hoursUntilFlight > 120;
                     
-                    // Show button only if more than 120 hours (5 days) remain
-                    if (hoursUntilFlight > 120) {
-                        return (
-                            <Box sx={{ mt: 3, pt: 3, borderTop: '1px solid #e0e0e0' }}>
+                    return (
+                        <Box sx={{ mt: 3, pt: 3, borderTop: '1px solid #e0e0e0' }}>
+                            {/* Reschedule Flight Button - Only show if more than 120 hours remain */}
+                            {canRescheduleOrChange && (
                                 <Button
                                     variant="contained"
                                     color="primary"
@@ -306,8 +308,10 @@ const CustomerPortal = () => {
                                 >
                                     Reschedule Flight
                                 </Button>
-                                
-                                {/* Change Flight Location Button */}
+                            )}
+                            
+                            {/* Change Flight Location Button - Only show if more than 120 hours remain */}
+                            {canRescheduleOrChange && (
                                 <Button
                                     variant="outlined"
                                     color="primary"
@@ -331,36 +335,54 @@ const CustomerPortal = () => {
                                 >
                                     Change Flight Location
                                 </Button>
-                                
-                                {/* Cancel Flight Button */}
-                                <Button
-                                    variant="outlined"
-                                    color="error"
-                                    fullWidth
-                                    onClick={() => setCancelFlightDialogOpen(true)}
-                                    sx={{
-                                        mt: 1.5,
-                                        py: 1.5,
-                                        fontSize: '1rem',
-                                        fontWeight: 600,
-                                        textTransform: 'none',
-                                        borderRadius: 2,
-                                        borderWidth: 2,
-                                        borderColor: '#ef4444',
-                                        color: '#ef4444',
-                                        '&:hover': {
+                            )}
+                            
+                            {/* Cancel Flight Button - Always visible, but disabled if less than 120 hours */}
+                            <Tooltip 
+                                title={!canCancel ? "Uçuşunuza 120 saatten az kaldı" : ""}
+                                arrow
+                            >
+                                <span style={{ display: 'block', width: '100%' }}>
+                                    <Button
+                                        variant="outlined"
+                                        color="error"
+                                        fullWidth
+                                        disabled={!canCancel}
+                                        onClick={() => canCancel && setCancelFlightDialogOpen(true)}
+                                        sx={{
+                                            mt: canRescheduleOrChange ? 1.5 : 0,
+                                            py: 1.5,
+                                            fontSize: '1rem',
+                                            fontWeight: 600,
+                                            textTransform: 'none',
+                                            borderRadius: 2,
                                             borderWidth: 2,
-                                            borderColor: '#dc2626',
-                                            backgroundColor: '#fef2f2',
-                                        }
-                                    }}
-                                >
-                                    Cancel Flight
-                                </Button>
-                            </Box>
-                        );
-                    }
-                    return null;
+                                            borderColor: canCancel ? '#ef4444' : '#d1d5db',
+                                            color: canCancel ? '#ef4444' : '#9ca3af',
+                                            backgroundColor: canCancel ? 'transparent' : '#f3f4f6',
+                                            cursor: canCancel ? 'pointer' : 'not-allowed',
+                                            '&:hover': canCancel ? {
+                                                borderWidth: 2,
+                                                borderColor: '#dc2626',
+                                                backgroundColor: '#fef2f2',
+                                            } : {
+                                                borderWidth: 2,
+                                                borderColor: '#d1d5db',
+                                                backgroundColor: '#f3f4f6',
+                                            },
+                                            '&.Mui-disabled': {
+                                                borderColor: '#d1d5db',
+                                                color: '#9ca3af',
+                                                backgroundColor: '#f3f4f6',
+                                            }
+                                        }}
+                                    >
+                                        Cancel Flight
+                                    </Button>
+                                </span>
+                            </Tooltip>
+                        </Box>
+                    );
                 })()}
             </Paper>
 
