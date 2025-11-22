@@ -4611,7 +4611,8 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
         SELECT 
             ab.*, 
             ab.name as passenger_name,
-            COALESCE(ab.voucher_type, v.voucher_type) as voucher_type,
+            -- Prioritize voucher_type from all_vouchers (for redeem voucher bookings)
+            COALESCE(v.voucher_type, ab.voucher_type) as voucher_type,
             COALESCE(ab.voucher_code, vc.code, vcu_map.code, v.voucher_ref) as voucher_code,
             DATE_FORMAT(ab.created_at, '%Y-%m-%d') as created_at_display,
             DATE_FORMAT(ab.expires, '%d/%m/%Y') as expires_display,
@@ -4663,17 +4664,30 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
             let expiresValue = rest.expires;
             let expiresDisplay = rest.expires_display;
             
-            const sourceDate = voucher_expires || voucher_created_at;
+            // For bookings created from redeem voucher (Gift Voucher), use voucher's created_at + 18 months
+            // Check if this booking was created from a Gift Voucher by checking if voucher exists and book_flight is 'Gift Voucher'
+            const isGiftVoucherRedeemed = voucher_book_flight === 'Gift Voucher' && voucher_created_at;
+            
+            // Determine source date: for Gift Voucher redemptions, use voucher created_at; otherwise use voucher_expires or voucher_created_at
+            const sourceDate = isGiftVoucherRedeemed ? voucher_created_at : (voucher_expires || voucher_created_at);
+            
             if ((!expiresValue || expiresValue === '' || expiresValue === '0000-00-00' || expiresValue === null) && sourceDate) {
-                const months = await determineVoucherExpiryMonths(
-                    original_voucher_type || rest.voucher_type,
-                    voucher_experience_type || rest.experience,
-                    voucher_book_flight
-                );
+                let months;
+                if (isGiftVoucherRedeemed) {
+                    // For Gift Voucher redemptions, always use 18 months from voucher created_at
+                    months = 18;
+                } else {
+                    months = await determineVoucherExpiryMonths(
+                        original_voucher_type || rest.voucher_type,
+                        voucher_experience_type || rest.experience,
+                        voucher_book_flight
+                    );
+                }
                 
-                const baseDate = moment(voucher_expires || sourceDate);
+                const baseDate = moment(sourceDate);
                 if (baseDate.isValid()) {
-                    if (!voucher_expires) {
+                    // For Gift Voucher, always add months from created_at; for others, only add if no voucher_expires
+                    if (isGiftVoucherRedeemed || !voucher_expires) {
                         baseDate.add(months, 'months');
                     }
                     const computed = baseDate.format('YYYY-MM-DD HH:mm:ss');
@@ -4692,10 +4706,26 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                 expiresDisplay = voucher_expires_display;
             }
             
+            // Get voucher_type from all_vouchers (prioritize voucher's voucher_type for redeem voucher bookings)
+            let finalVoucherType = original_voucher_type || rest.voucher_type;
+            
+            // For bookings created from redeem voucher (Gift Voucher), flight_attempts should start from 0, not 1
+            // If booking has voucher_code and it's from a Gift Voucher, and flight_attempts is 1 (default), set it to 0
+            let finalFlightAttempts = rest.flight_attempts;
+            if (isGiftVoucherRedeemed && rest.voucher_code) {
+                // If this booking was created from Gift Voucher redemption, flight_attempts should be 0
+                // Only override if it's 1 (the default value for new bookings)
+                if (finalFlightAttempts === 1 || finalFlightAttempts === null || finalFlightAttempts === undefined) {
+                    finalFlightAttempts = 0;
+                }
+            }
+            
             return {
                 ...rest,
+                voucher_type: finalVoucherType,
                 expires: expiresValue,
-                expires_display: expiresDisplay
+                expires_display: expiresDisplay,
+                flight_attempts: finalFlightAttempts !== null && finalFlightAttempts !== undefined ? finalFlightAttempts : 0
             };
         }));
         
