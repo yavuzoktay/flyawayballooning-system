@@ -366,6 +366,7 @@ const PaginatedTable = ({
                                        id === 'voucher_type' ? '140px' :
                                        id === 'passenger_info' ? '200px' :
                                        id === 'created_at' || id === 'created' ? '120px' :
+                                       id === 'flight_date' ? '200px' :
                                        'auto', 
                                 minWidth: id === 'email' ? '240px' : 
                                          id === 'name' ? '180px' : 
@@ -374,6 +375,7 @@ const PaginatedTable = ({
                                          id === 'voucher_type' ? '140px' :
                                          id === 'passenger_info' ? '200px' :
                                          id === 'created_at' || id === 'created' ? '120px' :
+                                         id === 'flight_date' ? '200px' :
                                          '80px', 
                                 maxWidth: id === 'email' ? '240px' : undefined 
                             }} />
@@ -403,7 +405,8 @@ const PaginatedTable = ({
                                 padding: "8px",
                                 whiteSpace: "nowrap",
                                 overflow: "hidden",
-                                textOverflow: "ellipsis"
+                                textOverflow: "ellipsis",
+                                fontSize: "14px"
                             }}>{col}</th>
                         ))}
                     </tr>
@@ -434,7 +437,8 @@ const PaginatedTable = ({
                                                             whiteSpace: "nowrap",
                                                             overflow: "hidden",
                                                             textOverflow: "ellipsis",
-                                                            maxWidth: "200px"
+                                                            maxWidth: id === 'flight_date' ? "200px" : "200px",
+                                                            fontSize: "14px"
                                                         }}>
                                                             {id === 'name' ? (
                                                                 selectable ? (
@@ -638,15 +642,15 @@ const PaginatedTable = ({
                                             <button
                                                 onClick={() => onEmailClick(item)}
                                                 style={{
-                                                    padding: "3px 6px",
+                                                    padding: "4px 8px",
                                                     backgroundColor: "#28a745",
                                                     color: "white",
                                                     border: "none",
                                                     borderRadius: "4px",
                                                     cursor: "pointer",
-                                                    fontSize: "11px",
+                                                    fontSize: "13px",
                                                     fontWeight: "500",
-                                                    lineHeight: 1
+                                                    lineHeight: 1.2
                                                 }}
                                                 title="Send Email"
                                             >
@@ -656,15 +660,15 @@ const PaginatedTable = ({
                                                 <button
                                                     onClick={() => onSmsClick(item)}
                                                     style={{
-                                                        padding: "3px 6px",
+                                                        padding: "4px 8px",
                                                         backgroundColor: "#17a2b8",
                                                         color: "white",
                                                         border: "none",
                                                         borderRadius: "4px",
                                                         cursor: "pointer",
-                                                        fontSize: "11px",
+                                                        fontSize: "13px",
                                                         fontWeight: "500",
-                                                        lineHeight: 1
+                                                        lineHeight: 1.2
                                                     }}
                                                     title="Send SMS"
                                                 >
