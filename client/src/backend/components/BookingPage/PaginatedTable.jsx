@@ -369,6 +369,7 @@ const PaginatedTable = ({
                                        id === 'flight_date' ? '200px' :
                                        id === 'flight_attempts' ? '150px' :
                                        id === 'expires' ? '140px' :
+                                       id === 'location' ? '140px' :
                                        'auto', 
                                 minWidth: id === 'email' ? '240px' : 
                                          id === 'name' ? '180px' : 
@@ -380,6 +381,7 @@ const PaginatedTable = ({
                                          id === 'flight_date' ? '200px' :
                                          id === 'flight_attempts' ? '150px' :
                                          id === 'expires' ? '140px' :
+                                         id === 'location' ? '140px' :
                                          '80px', 
                                 maxWidth: id === 'email' ? '240px' : undefined 
                             }} />
