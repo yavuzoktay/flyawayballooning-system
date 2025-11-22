@@ -1394,8 +1394,8 @@ app.post('/api/createRedeemBooking', (req, res) => {
             created_at,
             expires,
             email,
-            phone,
-            activity_id,
+                phone,
+                activity_id,
             redeemed_voucher,
             flight_attempts,
             flight_type_source
@@ -4687,10 +4687,10 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                     months = 18;
                 } else {
                     months = await determineVoucherExpiryMonths(
-                        original_voucher_type || rest.voucher_type,
-                        voucher_experience_type || rest.experience,
-                        voucher_book_flight
-                    );
+                    original_voucher_type || rest.voucher_type,
+                    voucher_experience_type || rest.experience,
+                    voucher_book_flight
+                );
                 }
                 
                 const baseDate = moment(sourceDate);
@@ -11071,10 +11071,36 @@ app.get('/api/availabilities/filter', (req, res) => {
         return str.split(',').map(item => item.trim()).filter(Boolean);
     };
 
+    // Use the same booking calculation logic as /api/activity/:id/availabilities
     let sql = `
-        SELECT aa.*, a.location, a.flight_type, a.voucher_type as activity_voucher_types
+        SELECT 
+            aa.*,
+            a.location,
+            a.flight_type,
+            a.voucher_type as activity_voucher_types,
+            COALESCE(booking_counts.total_booked, 0) as total_booked,
+            CASE 
+                WHEN COALESCE(booking_counts.total_booked, 0) >= aa.capacity THEN 'Closed'
+                ELSE aa.status
+            END as calculated_status,
+            GREATEST(0, aa.capacity - COALESCE(booking_counts.total_booked, 0)) as calculated_available
         FROM activity_availability aa 
         JOIN activity a ON aa.activity_id = a.id 
+        LEFT JOIN (
+            SELECT 
+                DATE(ab.flight_date) as flight_date,
+                TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i') as flight_time_min,
+                ab.location as location,
+                COALESCE(SUM(ab.pax), 0) as total_booked
+            FROM all_booking ab 
+            WHERE DATE(ab.flight_date) >= CURDATE() - INTERVAL 30 DAY
+            AND (ab.status IS NULL OR TRIM(LOWER(ab.status)) NOT IN ('cancelled'))
+            AND (ab.manual_status_override IS NULL OR TRIM(LOWER(ab.manual_status_override)) NOT IN ('cancelled'))
+            GROUP BY DATE(ab.flight_date), TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i'), ab.location
+        ) as booking_counts 
+            ON DATE(aa.date) = booking_counts.flight_date 
+            AND TIME_FORMAT(TIME(aa.time), '%H:%i') = booking_counts.flight_time_min
+            AND a.location = booking_counts.location
         WHERE ${activityId ? 'aa.activity_id = ?' : 'a.location = ?'} AND a.status = 'Live'
     `;
     
@@ -11139,12 +11165,23 @@ app.get('/api/availabilities/filter', (req, res) => {
             const voucherTypesArray = parseList(row.voucher_types);
             const flightTypesArray = parseList(row.flight_types);
             
+            // Use calculated values from booking counts (same logic as /api/activity/:id/availabilities)
+            const totalBooked = Number(row.total_booked) || 0;
+            const calculatedAvailable = Number(row.calculated_available) || 0;
+            const calculatedStatus = row.calculated_status || row.status;
+            
+            // Final available = calculated_available - heldSeats
+            const finalAvailable = Math.max(0, calculatedAvailable - heldSeats);
+            
             return {
                 ...row,
                 date: localDateString,
-                available: Math.max(0, row.available - heldSeats),
-                actualAvailable: row.available,
+                available: finalAvailable,
+                booked: totalBooked,
+                actualAvailable: calculatedAvailable,
                 heldSeats: heldSeats,
+                status: calculatedStatus,
+                total_booked: totalBooked,
                 voucher_types_array: voucherTypesArray,
                 flight_types_array: flightTypesArray
             };
@@ -12610,7 +12647,7 @@ async function createBookingFromWebhook(bookingData) {
             
             // For redeem voucher bookings, flight_attempts should start from 0
             const finalFlightAttempts = activitySelect === 'Redeem Voucher' ? 0 : (flight_attempts !== undefined ? flight_attempts : 0);
-            
+
             const bookingSql = `
                 INSERT INTO all_booking (
                     name, flight_type, flight_date, pax, location, status, paid, due,
