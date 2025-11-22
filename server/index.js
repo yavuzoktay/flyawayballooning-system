@@ -9752,6 +9752,8 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
         // Prepare update fields
         const updateFields = ['location = ?', 'activity_id = ?', 'updated_at = NOW()'];
         const updateValues = [location, newActivityId];
+        const timeSlotFields = [];
+        const timeSlotValues = [];
 
         // If flight_date is provided, update it and set status to Scheduled
         if (flight_date) {
@@ -9793,8 +9795,8 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
                         if (timeParts.length >= 2) {
                             // Take only HH:mm part
                             timeValue = `${timeParts[0]}:${timeParts[1]}`;
-                            updateFields.push('time_slot = TIME(?)');
-                            updateValues.push(timeValue);
+                            timeSlotFields.push('time_slot = TIME(?)');
+                            timeSlotValues.push(timeValue);
                             console.log('✅ Time slot will be updated to:', timeValue);
                         } else {
                             console.warn('⚠️ Invalid time format:', timePart);
@@ -9810,25 +9812,27 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
         }
 
         // Update booking location, activity_id, and optionally flight_date
+        // First update without time_slot
         const updateSql = `
             UPDATE all_booking 
             SET ${updateFields.join(', ')}
             WHERE id = ?
         `;
         
-        updateValues.push(bookingId);
+        const finalUpdateValues = [...updateValues];
+        finalUpdateValues.push(bookingId);
         
         console.log('🔍 Update SQL:', updateSql);
-        console.log('🔍 Update Values:', JSON.stringify(updateValues, null, 2));
+        console.log('🔍 Update Values:', JSON.stringify(finalUpdateValues, null, 2));
         
         await new Promise((resolve, reject) => {
-            con.query(updateSql, updateValues, (err, result) => {
+            con.query(updateSql, finalUpdateValues, (err, result) => {
                 if (err) {
                     console.error('❌ Error updating booking location:', err);
                     console.error('❌ Error code:', err.code);
                     console.error('❌ Error sqlMessage:', err.sqlMessage);
                     console.error('❌ SQL:', updateSql);
-                    console.error('❌ Values:', JSON.stringify(updateValues, null, 2));
+                    console.error('❌ Values:', JSON.stringify(finalUpdateValues, null, 2));
                     reject(err);
                 } else {
                     console.log('✅ Successfully updated booking:', bookingId);
@@ -9837,6 +9841,37 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
                 }
             });
         });
+
+        // If time_slot needs to be updated, do it separately
+        if (timeSlotFields.length > 0 && timeSlotValues.length > 0) {
+            try {
+                const timeSlotSql = `
+                    UPDATE all_booking 
+                    SET ${timeSlotFields.join(', ')}
+                    WHERE id = ?
+                `;
+                const timeSlotUpdateValues = [...timeSlotValues, bookingId];
+                
+                console.log('🔍 Time Slot Update SQL:', timeSlotSql);
+                console.log('🔍 Time Slot Update Values:', JSON.stringify(timeSlotUpdateValues, null, 2));
+                
+                await new Promise((resolve, reject) => {
+                    con.query(timeSlotSql, timeSlotUpdateValues, (err, result) => {
+                        if (err) {
+                            console.error('⚠️ Error updating time_slot (non-critical):', err);
+                            // Don't fail the request if time_slot update fails
+                            resolve(result);
+                        } else {
+                            console.log('✅ Successfully updated time_slot:', bookingId);
+                            resolve(result);
+                        }
+                    });
+                });
+            } catch (timeSlotErr) {
+                console.error('⚠️ Error updating time_slot (non-critical):', timeSlotErr);
+                // Continue even if time_slot update fails
+            }
+        }
 
         // Add history entry for location change
         const historySql = `
