@@ -217,6 +217,19 @@ const Settings = () => {
     const [selectedEmailTemplate, setSelectedEmailTemplate] = useState(null);
     const getDefaultTemplateBody = (templateName) => extractMessageFromTemplateBody(getDefaultTemplateMessageHtml(templateName)) || '';
 
+    // Customer Portal Content state
+    const [customerPortalContents, setCustomerPortalContents] = useState([]);
+    const [customerPortalExpanded, setCustomerPortalExpanded] = useState(false);
+    const [showCustomerPortalForm, setShowCustomerPortalForm] = useState(false);
+    const [showEditCustomerPortalForm, setShowEditCustomerPortalForm] = useState(false);
+    const [selectedCustomerPortalContent, setSelectedCustomerPortalContent] = useState(null);
+    const [customerPortalFormData, setCustomerPortalFormData] = useState({
+        header: '',
+        body: '',
+        sort_order: 0,
+        is_active: true
+    });
+
     const RichTextEditor = ({ value, onChange, placeholder }) => {
         const editorRef = useRef(null);
         const inputDebounceRef = useRef(null);
@@ -433,6 +446,7 @@ const Settings = () => {
         fetchResources();
         fetchResourceGroups();
         fetchEmailTemplates();
+        fetchCustomerPortalContents();
     }, []);
 
     const fetchVoucherCodes = async () => {
@@ -605,6 +619,18 @@ const Settings = () => {
         } catch (error) {
             console.error('Error fetching email templates:', error);
             setEmailTemplates([]);
+        }
+    };
+
+    const fetchCustomerPortalContents = async () => {
+        try {
+            const response = await axios.get('/api/customer-portal-contents');
+            if (response.data?.success) {
+                setCustomerPortalContents(response.data.data);
+            }
+        } catch (error) {
+            console.error('Error fetching customer portal contents:', error);
+            setCustomerPortalContents([]);
         }
     };
 
@@ -6809,6 +6835,411 @@ const Settings = () => {
                                 </button>
                                 <button type="submit" className="btn btn-primary" style={{ padding: '8px 20px' }}>
                                     Create Template
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Customer Portal Section */}
+            <div className="settings-card" style={{ marginBottom: '24px' }}>
+                <div 
+                    className="card-header"
+                    onClick={() => setCustomerPortalExpanded(!customerPortalExpanded)}
+                    style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        padding: '20px',
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                    }}
+                >
+                    <div>
+                        <h2 style={{ margin: 0, color: '#1f2937' }}>Customer Portal</h2>
+                        <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
+                            Manage header and body content sections displayed on the Customer Portal page.
+                        </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button 
+                            className="btn btn-primary"
+                            onClick={(e) => { e.stopPropagation(); setShowCustomerPortalForm(true); }}
+                            style={{ margin: 0 }}
+                        >
+                            <Plus size={20} />
+                            New Content
+                        </button>
+                        {customerPortalExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+                    </div>
+                </div>
+
+                {customerPortalExpanded && (
+                    <div style={{ padding: '20px', background: '#f9fafb', borderRadius: '0 0 12px 12px' }}>
+                        {customerPortalContents.length === 0 ? (
+                            <div style={{ 
+                                textAlign: 'center', 
+                                padding: '40px 20px', 
+                                color: '#6b7280',
+                                background: '#fff',
+                                borderRadius: '8px',
+                                border: '1px dashed #d1d5db'
+                            }}>
+                                <p style={{ margin: 0, fontSize: '15px' }}>No customer portal content yet. Create your first content section!</p>
+                            </div>
+                        ) : (
+                            <div style={{ overflowX: 'auto', background: '#fff', borderRadius: '8px', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                                            <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>HEADER</th>
+                                            <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>BODY PREVIEW</th>
+                                            <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ACTIVE</th>
+                                            <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>SORT ORDER</th>
+                                            <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ACTIONS</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {customerPortalContents
+                                            .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+                                            .map((content) => (
+                                            <tr key={content.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                                                <td style={{ padding: '16px' }}>
+                                                    <span style={{ fontWeight: 500, color: '#1f2937' }}>{content.header || 'N/A'}</span>
+                                                </td>
+                                                <td style={{ padding: '16px' }}>
+                                                    <span style={{ color: '#475569' }}>
+                                                        {content.body ? (content.body.length > 100 ? content.body.substring(0, 100) + '...' : content.body) : 'N/A'}
+                                                    </span>
+                                                </td>
+                                                <td style={{ padding: '16px', textAlign: 'center' }}>
+                                                    <div style={{ 
+                                                        width: '24px', 
+                                                        height: '24px', 
+                                                        borderRadius: '50%', 
+                                                        border: '2px solid #d1d5db',
+                                                        margin: '0 auto',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        backgroundColor: content.is_active ? '#10b981' : '#f3f4f6',
+                                                        borderColor: content.is_active ? '#10b981' : '#d1d5db'
+                                                    }}>
+                                                        {content.is_active ? <CheckCircle size={16} color="#fff" /> : <XCircle size={16} color="#9ca3af" />}
+                                                    </div>
+                                                </td>
+                                                <td style={{ padding: '16px', textAlign: 'center' }}>
+                                                    <span style={{ color: '#475569' }}>{content.sort_order || 0}</span>
+                                                </td>
+                                                <td style={{ padding: '16px', textAlign: 'center' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                                                        <button
+                                                            className="btn btn-secondary"
+                                                            onClick={() => {
+                                                                setSelectedCustomerPortalContent(content);
+                                                                setCustomerPortalFormData({
+                                                                    header: content.header || '',
+                                                                    body: content.body || '',
+                                                                    sort_order: content.sort_order || 0,
+                                                                    is_active: content.is_active !== undefined ? content.is_active : true
+                                                                });
+                                                                setShowEditCustomerPortalForm(true);
+                                                            }}
+                                                            style={{ padding: '6px 12px', fontSize: '13px' }}
+                                                        >
+                                                            <Edit size={14} />
+                                                        </button>
+                                                        <button
+                                                            className="btn btn-danger"
+                                                            onClick={async () => {
+                                                                if (window.confirm('Are you sure you want to delete this content?')) {
+                                                                    try {
+                                                                        await axios.delete(`/api/customer-portal-contents/${content.id}`);
+                                                                        fetchCustomerPortalContents();
+                                                                    } catch (error) {
+                                                                        alert('Error deleting content: ' + (error.response?.data?.message || error.message));
+                                                                    }
+                                                                }
+                                                            }}
+                                                            style={{ padding: '6px 12px', fontSize: '13px' }}
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* Create Customer Portal Content Modal */}
+            {showCustomerPortalForm && (
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: '800px', width: '95%', maxHeight: '90vh', overflow: 'auto' }}>
+                        <div className="modal-header">
+                            <h3 style={{ margin: 0, fontSize: '24px', fontWeight: 600 }}>Create Customer Portal Content</h3>
+                            <button
+                                className="close-btn"
+                                onClick={() => {
+                                    setShowCustomerPortalForm(false);
+                                    setCustomerPortalFormData({
+                                        header: '',
+                                        body: '',
+                                        sort_order: 0,
+                                        is_active: true
+                                    });
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <form onSubmit={async (e) => {
+                            e.preventDefault();
+                            try {
+                                const response = await axios.post('/api/customer-portal-contents', customerPortalFormData);
+                                if (response.data?.success) {
+                                    fetchCustomerPortalContents();
+                                    setShowCustomerPortalForm(false);
+                                    setCustomerPortalFormData({
+                                        header: '',
+                                        body: '',
+                                        sort_order: 0,
+                                        is_active: true
+                                    });
+                                    alert('Customer portal content created successfully!');
+                                }
+                            } catch (error) {
+                                alert('Error creating content: ' + (error.response?.data?.message || error.message));
+                            }
+                        }}>
+                            <div style={{ padding: '24px' }}>
+                                <div style={{ marginBottom: '20px' }}>
+                                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>
+                                        Header <span style={{ color: '#ef4444' }}>*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={customerPortalFormData.header}
+                                        onChange={(e) => setCustomerPortalFormData({ ...customerPortalFormData, header: e.target.value })}
+                                        placeholder="Enter header text..."
+                                        required
+                                        style={{
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px'
+                                        }}
+                                    />
+                                </div>
+
+                                <div style={{ marginBottom: '20px' }}>
+                                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>
+                                        Body <span style={{ color: '#ef4444' }}>*</span>
+                                    </label>
+                                    <RichTextEditor
+                                        value={customerPortalFormData.body}
+                                        onChange={(html) => setCustomerPortalFormData({ ...customerPortalFormData, body: html })}
+                                        placeholder="Enter body content..."
+                                    />
+                                </div>
+
+                                <div style={{ marginBottom: '20px', display: 'flex', gap: '20px' }}>
+                                    <div style={{ flex: 1 }}>
+                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>
+                                            Sort Order
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={customerPortalFormData.sort_order}
+                                            onChange={(e) => setCustomerPortalFormData({ ...customerPortalFormData, sort_order: parseInt(e.target.value) || 0 })}
+                                            min="0"
+                                            style={{
+                                                width: '100%',
+                                                padding: '10px 12px',
+                                                border: '1px solid #d1d5db',
+                                                borderRadius: '6px',
+                                                fontSize: '14px'
+                                            }}
+                                        />
+                                    </div>
+                                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', marginTop: '28px' }}>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={customerPortalFormData.is_active}
+                                                onChange={(e) => setCustomerPortalFormData({ ...customerPortalFormData, is_active: e.target.checked })}
+                                                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                            />
+                                            <span style={{ color: '#374151', fontSize: '14px' }}>Active</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="form-actions" style={{ borderTop: '1px solid #e5e7eb', padding: '16px 24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-secondary"
+                                    onClick={() => {
+                                        setShowCustomerPortalForm(false);
+                                        setCustomerPortalFormData({
+                                            header: '',
+                                            body: '',
+                                            sort_order: 0,
+                                            is_active: true
+                                        });
+                                    }}
+                                    style={{ padding: '8px 20px' }}
+                                >
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn btn-primary" style={{ padding: '8px 20px' }}>
+                                    Create Content
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Customer Portal Content Modal */}
+            {showEditCustomerPortalForm && selectedCustomerPortalContent && (
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: '800px', width: '95%', maxHeight: '90vh', overflow: 'auto' }}>
+                        <div className="modal-header">
+                            <h3 style={{ margin: 0, fontSize: '24px', fontWeight: 600 }}>Edit Customer Portal Content</h3>
+                            <button
+                                className="close-btn"
+                                onClick={() => {
+                                    setShowEditCustomerPortalForm(false);
+                                    setSelectedCustomerPortalContent(null);
+                                    setCustomerPortalFormData({
+                                        header: '',
+                                        body: '',
+                                        sort_order: 0,
+                                        is_active: true
+                                    });
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <form onSubmit={async (e) => {
+                            e.preventDefault();
+                            try {
+                                const response = await axios.put(`/api/customer-portal-contents/${selectedCustomerPortalContent.id}`, customerPortalFormData);
+                                if (response.data?.success) {
+                                    fetchCustomerPortalContents();
+                                    setShowEditCustomerPortalForm(false);
+                                    setSelectedCustomerPortalContent(null);
+                                    setCustomerPortalFormData({
+                                        header: '',
+                                        body: '',
+                                        sort_order: 0,
+                                        is_active: true
+                                    });
+                                    alert('Customer portal content updated successfully!');
+                                }
+                            } catch (error) {
+                                alert('Error updating content: ' + (error.response?.data?.message || error.message));
+                            }
+                        }}>
+                            <div style={{ padding: '24px' }}>
+                                <div style={{ marginBottom: '20px' }}>
+                                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>
+                                        Header <span style={{ color: '#ef4444' }}>*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={customerPortalFormData.header}
+                                        onChange={(e) => setCustomerPortalFormData({ ...customerPortalFormData, header: e.target.value })}
+                                        placeholder="Enter header text..."
+                                        required
+                                        style={{
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px'
+                                        }}
+                                    />
+                                </div>
+
+                                <div style={{ marginBottom: '20px' }}>
+                                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>
+                                        Body <span style={{ color: '#ef4444' }}>*</span>
+                                    </label>
+                                    <RichTextEditor
+                                        value={customerPortalFormData.body}
+                                        onChange={(html) => setCustomerPortalFormData({ ...customerPortalFormData, body: html })}
+                                        placeholder="Enter body content..."
+                                    />
+                                </div>
+
+                                <div style={{ marginBottom: '20px', display: 'flex', gap: '20px' }}>
+                                    <div style={{ flex: 1 }}>
+                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>
+                                            Sort Order
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={customerPortalFormData.sort_order}
+                                            onChange={(e) => setCustomerPortalFormData({ ...customerPortalFormData, sort_order: parseInt(e.target.value) || 0 })}
+                                            min="0"
+                                            style={{
+                                                width: '100%',
+                                                padding: '10px 12px',
+                                                border: '1px solid #d1d5db',
+                                                borderRadius: '6px',
+                                                fontSize: '14px'
+                                            }}
+                                        />
+                                    </div>
+                                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', marginTop: '28px' }}>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={customerPortalFormData.is_active}
+                                                onChange={(e) => setCustomerPortalFormData({ ...customerPortalFormData, is_active: e.target.checked })}
+                                                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                            />
+                                            <span style={{ color: '#374151', fontSize: '14px' }}>Active</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="form-actions" style={{ borderTop: '1px solid #e5e7eb', padding: '16px 24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-secondary"
+                                    onClick={() => {
+                                        setShowEditCustomerPortalForm(false);
+                                        setSelectedCustomerPortalContent(null);
+                                        setCustomerPortalFormData({
+                                            header: '',
+                                            body: '',
+                                            sort_order: 0,
+                                            is_active: true
+                                        });
+                                    }}
+                                    style={{ padding: '8px 20px' }}
+                                >
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn btn-primary" style={{ padding: '8px 20px' }}>
+                                    Update Content
                                 </button>
                             </div>
                         </form>

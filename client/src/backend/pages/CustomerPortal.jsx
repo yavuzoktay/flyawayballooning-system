@@ -13,6 +13,7 @@ const CustomerPortal = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+    const [portalContents, setPortalContents] = useState([]);
 
     // Extract token from URL - handle both /customerPortal/:token and /customerPortal/:token/index
     const token = tokenParam ? tokenParam.split('/')[0] : null;
@@ -57,6 +58,25 @@ const CustomerPortal = () => {
         };
 
         fetchBookingData();
+        
+        // Fetch customer portal contents
+        const fetchPortalContents = async () => {
+            try {
+                const response = await axios.get('/api/customer-portal-contents');
+                if (response.data?.success) {
+                    // Filter only active contents and sort by sort_order
+                    const activeContents = response.data.data
+                        .filter(content => content.is_active)
+                        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+                    setPortalContents(activeContents);
+                }
+            } catch (error) {
+                console.error('Error fetching customer portal contents:', error);
+                setPortalContents([]);
+            }
+        };
+        
+        fetchPortalContents();
     }, [token]);
 
     const scrollToSection = (id) => {
@@ -367,6 +387,32 @@ const CustomerPortal = () => {
                     </Typography>
                 </Box>
             </Paper>
+
+            {/* Customer Portal Content Sections */}
+            {portalContents.length > 0 && portalContents.map((content, index) => (
+                <Paper 
+                    key={content.id} 
+                    elevation={2} 
+                    sx={{ p: 3, mb: 3, scrollMarginTop: '100px' }}
+                >
+                    {content.header && (
+                        <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
+                            {content.header}
+                        </Typography>
+                    )}
+                    {content.body && (
+                        <Box 
+                            sx={{ 
+                                color: 'text.secondary',
+                                '& p': { mb: 1.5 },
+                                '& ul, & ol': { pl: 2, mb: 1.5 },
+                                '& li': { mb: 0.5 }
+                            }}
+                            dangerouslySetInnerHTML={{ __html: content.body }}
+                        />
+                    )}
+                </Paper>
+            ))}
             </Container>
 
             {/* Reschedule Flight Modal */}
