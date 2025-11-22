@@ -5,7 +5,7 @@ import { Container, Typography, Box, Paper, CircularProgress, Alert, Button } fr
 import dayjs from 'dayjs';
 import CustomerPortalHeader from '../components/CustomerPortal/CustomerPortalHeader';
 import RescheduleFlightModal from '../components/CustomerPortal/RescheduleFlightModal';
-import { Dialog, DialogTitle, DialogContent, DialogActions, IconButton } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Alert } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import '../components/CustomerPortal/CustomerPortalHeader.css';
@@ -27,6 +27,8 @@ const CustomerPortal = () => {
     const [selectedTime, setSelectedTime] = useState(null);
     const [currentMonth, setCurrentMonth] = useState(dayjs().startOf('month'));
     const [selectedActivityId, setSelectedActivityId] = useState(null);
+    const [cancelFlightDialogOpen, setCancelFlightDialogOpen] = useState(false);
+    const [cancellingFlight, setCancellingFlight] = useState(false);
 
     // Extract token from URL - handle both /customerPortal/:token and /customerPortal/:token/index
     const token = tokenParam ? tokenParam.split('/')[0] : null;
@@ -328,6 +330,32 @@ const CustomerPortal = () => {
                                     }}
                                 >
                                     Change Flight Location
+                                </Button>
+                                
+                                {/* Cancel Flight Button */}
+                                <Button
+                                    variant="outlined"
+                                    color="error"
+                                    fullWidth
+                                    onClick={() => setCancelFlightDialogOpen(true)}
+                                    sx={{
+                                        mt: 1.5,
+                                        py: 1.5,
+                                        fontSize: '1rem',
+                                        fontWeight: 600,
+                                        textTransform: 'none',
+                                        borderRadius: 2,
+                                        borderWidth: 2,
+                                        borderColor: '#ef4444',
+                                        color: '#ef4444',
+                                        '&:hover': {
+                                            borderWidth: 2,
+                                            borderColor: '#dc2626',
+                                            backgroundColor: '#fef2f2',
+                                        }
+                                    }}
+                                >
+                                    Cancel Flight
                                 </Button>
                             </Box>
                         );
@@ -937,6 +965,103 @@ const CustomerPortal = () => {
                             {changingLocation ? <CircularProgress size={20} /> : 'Confirm'}
                         </Button>
                     )}
+                </DialogActions>
+            </Dialog>
+
+            {/* Cancel Flight Confirmation Dialog */}
+            <Dialog
+                open={cancelFlightDialogOpen}
+                onClose={() => setCancelFlightDialogOpen(false)}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle sx={{ fontWeight: 700, fontSize: 20, pb: 1.5, color: '#ef4444' }}>
+                    Cancel Flight
+                </DialogTitle>
+                <DialogContent>
+                    <Alert severity="warning" sx={{ mb: 2 }}>
+                        Are you sure you want to cancel this flight? This action cannot be undone.
+                    </Alert>
+                    <Typography variant="body1" sx={{ mb: 2 }}>
+                        <strong>Booking Reference:</strong> {bookingData?.booking_reference || bookingData?.id || 'N/A'}
+                    </Typography>
+                    {bookingData?.flight_date && (
+                        <Typography variant="body1" sx={{ mb: 2 }}>
+                            <strong>Flight Date:</strong> {dayjs(bookingData.flight_date).format('DD/MM/YYYY HH:mm')}
+                        </Typography>
+                    )}
+                    <Typography variant="body1" sx={{ mb: 2 }}>
+                        <strong>Location:</strong> {bookingData?.location || 'N/A'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        Cancelling this flight will update the booking status to "Cancelled" and increment the flight attempts count.
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ p: 3, pt: 2, justifyContent: 'flex-end' }}>
+                    <Button 
+                        onClick={() => setCancelFlightDialogOpen(false)}
+                        disabled={cancellingFlight}
+                    >
+                        Keep Booking
+                    </Button>
+                    <Button
+                        onClick={async () => {
+                            if (!bookingData?.id) {
+                                setError('Booking ID not found');
+                                return;
+                            }
+
+                            setCancellingFlight(true);
+                            setError(null);
+                            try {
+                                // Get current flight attempts
+                                const currentAttempts = parseInt(bookingData.flight_attempts || 0, 10);
+                                const newAttempts = (currentAttempts + 1).toString();
+
+                                // Update status to Cancelled
+                                await axios.patch('/api/updateBookingField', {
+                                    booking_id: bookingData.id,
+                                    field: 'status',
+                                    value: 'Cancelled'
+                                });
+
+                                // Update flight_attempts
+                                await axios.patch('/api/updateBookingField', {
+                                    booking_id: bookingData.id,
+                                    field: 'flight_attempts',
+                                    value: newAttempts
+                                });
+
+                                // Refresh booking data
+                                const token = encodeURIComponent(tokenParam);
+                                const response = await axios.get(`/api/customer-portal-booking/${token}`);
+                                
+                                if (response.data.success) {
+                                    setBookingData(response.data.data);
+                                    setCancelFlightDialogOpen(false);
+                                } else {
+                                    setError('Failed to refresh booking data. Please reload the page.');
+                                }
+                            } catch (err) {
+                                console.error('Error cancelling flight:', err);
+                                setError(err.response?.data?.message || 'Failed to cancel flight. Please try again later.');
+                            } finally {
+                                setCancellingFlight(false);
+                            }
+                        }}
+                        disabled={cancellingFlight}
+                        variant="contained"
+                        color="error"
+                        sx={{
+                            backgroundColor: '#ef4444',
+                            '&:hover': {
+                                backgroundColor: '#dc2626'
+                            },
+                            fontWeight: 600
+                        }}
+                    >
+                        {cancellingFlight ? <CircularProgress size={20} color="inherit" /> : 'Yes, Cancel Flight'}
+                    </Button>
                 </DialogActions>
             </Dialog>
         </>
