@@ -1008,97 +1008,43 @@ const Manifest = () => {
             }
         }
         
-        // Process entries: Cancelled entries should overwrite Scheduled entries with the same date
-        // Group entries by date (ignoring time)
-        const entriesByDate = new Map();
-        
-        rows.forEach(entry => {
-            if (!entry || !entry.status) return;
-            
-            const dateKey = entry.changed_at 
-                ? new Date(entry.changed_at).toISOString().split('T')[0] // YYYY-MM-DD
-                : '';
-            
-            if (!dateKey) {
-                // Entry without date, add it directly
-                if (!entriesByDate.has('no-date')) {
-                    entriesByDate.set('no-date', []);
-                }
-                entriesByDate.get('no-date').push(entry);
-                return;
-            }
-            
-            if (!entriesByDate.has(dateKey)) {
-                entriesByDate.set(dateKey, []);
-            }
-            entriesByDate.get(dateKey).push(entry);
-        });
-        
-        // Process each date group: Cancelled entries should overwrite any other status on the same date
-        // If Cancelled exists for a date, show only Cancelled (overwriting the previous status)
-        const processedRows = [];
-        
-        entriesByDate.forEach((entries, dateKey) => {
-            if (dateKey === 'no-date') {
-                // Entries without date: if Cancelled exists, show only Cancelled; otherwise show all non-Cancelled
-                const hasCancelled = entries.some(e => e.status && e.status.toLowerCase() === 'cancelled');
-                if (hasCancelled) {
-                    // Find the entry that was cancelled (the one before Cancelled)
-                    const cancelledEntry = entries.find(e => e.status && e.status.toLowerCase() === 'cancelled');
-                    if (cancelledEntry) {
-                        processedRows.push(cancelledEntry);
-                    }
-                } else {
-                    entries.forEach(entry => {
-                        if (entry.status && entry.status.toLowerCase() !== 'cancelled') {
-                            processedRows.push(entry);
-                        }
-                    });
-                }
-                return;
-            }
-            
-            const hasCancelled = entries.some(e => e.status && e.status.toLowerCase() === 'cancelled');
-            const nonCancelledEntries = entries.filter(e => e.status && e.status.toLowerCase() !== 'cancelled');
-            
-            if (hasCancelled && nonCancelledEntries.length > 0) {
-                // Cancelled exists with other statuses: find the last non-Cancelled entry and show it as Cancelled
-                // Sort by changed_at to get the most recent non-Cancelled entry
-                const lastNonCancelled = nonCancelledEntries.sort((a, b) => {
-                    const dateA = a.changed_at ? new Date(a.changed_at).getTime() : 0;
-                    const dateB = b.changed_at ? new Date(b.changed_at).getTime() : 0;
-                    return dateB - dateA;
-                })[0];
-                
-                if (lastNonCancelled) {
-                    processedRows.push({
-                        ...lastNonCancelled,
-                        status: 'Cancelled'
-                    });
-                }
-            } else if (hasCancelled && nonCancelledEntries.length === 0) {
-                // Only Cancelled exists: show it (it overwrote a previous status)
-                const cancelledEntry = entries.find(e => e.status && e.status.toLowerCase() === 'cancelled');
-                if (cancelledEntry) {
-                    processedRows.push(cancelledEntry);
-                }
-            } else {
-                // No Cancelled, add all entries
-                entries.forEach(entry => {
-                    if (entry.status) {
-                        processedRows.push(entry);
-                    }
-                });
-            }
-        });
-        
-        return processedRows
+        // Sort all entries chronologically
+        const sortedRows = rows
             .filter(entry => entry && entry.status)
             .sort((a, b) => {
                 const dateA = a.changed_at ? new Date(a.changed_at).getTime() : 0;
                 const dateB = b.changed_at ? new Date(b.changed_at).getTime() : 0;
                 return dateA - dateB;
             });
+        
+        // Process entries chronologically: Cancelled overwrites the previous entry
+        const processedRows = [];
+        
+        for (let i = 0; i < sortedRows.length; i++) {
+            const currentEntry = sortedRows[i];
+            const isCancelled = currentEntry.status && currentEntry.status.toLowerCase() === 'cancelled';
+            
+            if (isCancelled) {
+                // Cancelled: overwrite the previous entry if it exists
+                if (processedRows.length > 0) {
+                    // Overwrite the last entry with Cancelled (keeping the original date)
+                    const lastEntry = processedRows[processedRows.length - 1];
+                    processedRows[processedRows.length - 1] = {
+                        ...lastEntry,
+                        status: 'Cancelled'
+                    };
+                } else {
+                    // No previous entry, but Cancelled exists - this shouldn't happen normally
+                    // but if it does, we'll show it
+                    processedRows.push(currentEntry);
+                }
+            } else {
+                // Non-Cancelled status: add as new entry
+                processedRows.push(currentEntry);
+            }
+        }
+        
+        return processedRows.filter(entry => entry && entry.status);
     };
     const historyRows = buildDisplayedHistoryRows();
 
