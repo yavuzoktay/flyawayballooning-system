@@ -368,6 +368,7 @@ const PaginatedTable = ({
                                        id === 'created_at' || id === 'created' ? '120px' :
                                        id === 'flight_date' ? '200px' :
                                        id === 'flight_attempts' ? '150px' :
+                                       id === 'expires' ? '140px' :
                                        'auto', 
                                 minWidth: id === 'email' ? '240px' : 
                                          id === 'name' ? '180px' : 
@@ -378,13 +379,14 @@ const PaginatedTable = ({
                                          id === 'created_at' || id === 'created' ? '120px' :
                                          id === 'flight_date' ? '200px' :
                                          id === 'flight_attempts' ? '150px' :
+                                         id === 'expires' ? '140px' :
                                          '80px', 
                                 maxWidth: id === 'email' ? '240px' : undefined 
                             }} />
                         );
                     })}
                     {/* Actions column for bookings/vouchers */}
-                    {(context === 'bookings' || context === 'vouchers') && onEmailClick && <col style={{ width: '120px', minWidth: '120px' }} />}
+                    {(context === 'bookings' || context === 'vouchers') && onEmailClick && <col style={{ width: '160px', minWidth: '160px' }} />}
                 </colgroup>
                 <thead style={{ background: "#3274b4", color: "#FFF" }}>
                     <tr>
