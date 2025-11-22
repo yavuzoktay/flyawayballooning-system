@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import { Container, Typography, Box, Paper, CircularProgress, Alert } from '@mui/material';
+import { Container, Typography, Box, Paper, CircularProgress, Alert, Button } from '@mui/material';
 import dayjs from 'dayjs';
 import CustomerPortalHeader from '../components/CustomerPortal/CustomerPortalHeader';
 import '../components/CustomerPortal/CustomerPortalHeader.css';
@@ -214,6 +214,46 @@ const CustomerPortal = () => {
                         </Typography>
                     </Box>
                 </Box>
+                
+                {/* Reschedule Flight Button - Only show if flight date is more than 120 hours (5 days) away */}
+                {(() => {
+                    if (!bookingData.flight_date) return null;
+                    
+                    const flightDate = dayjs(bookingData.flight_date);
+                    const now = dayjs();
+                    const hoursUntilFlight = flightDate.diff(now, 'hour');
+                    
+                    // Show button only if more than 120 hours (5 days) remain
+                    if (hoursUntilFlight > 120) {
+                        return (
+                            <Box sx={{ mt: 3, pt: 3, borderTop: '1px solid #e0e0e0' }}>
+                                <Button
+                                    variant="contained"
+                                    color="primary"
+                                    fullWidth
+                                    onClick={() => {
+                                        // Scroll to Available Flights section
+                                        scrollToSection('live-availability');
+                                    }}
+                                    sx={{
+                                        py: 1.5,
+                                        fontSize: '1rem',
+                                        fontWeight: 600,
+                                        textTransform: 'none',
+                                        borderRadius: 2,
+                                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                                        '&:hover': {
+                                            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                                        }
+                                    }}
+                                >
+                                    Reschedule Flight
+                                </Button>
+                            </Box>
+                        );
+                    }
+                    return null;
+                })()}
             </Paper>
 
             <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
