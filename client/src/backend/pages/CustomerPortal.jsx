@@ -280,66 +280,99 @@ const CustomerPortal = () => {
                     const flightDate = dayjs(bookingData.flight_date);
                     const now = dayjs();
                     const hoursUntilFlight = flightDate.diff(now, 'hour');
-                    const canRescheduleOrChange = hoursUntilFlight > 120;
-                    const canCancel = hoursUntilFlight > 120;
+                    const isCancelled = bookingData.status === 'Cancelled';
+                    const canRescheduleOrChange = !isCancelled && hoursUntilFlight > 120;
+                    const canCancel = !isCancelled && hoursUntilFlight > 120;
                     
                     return (
                         <Box sx={{ mt: 3, pt: 3, borderTop: '1px solid #e0e0e0' }}>
-                            {/* Reschedule Flight Button - Only show if more than 120 hours remain */}
-                            {canRescheduleOrChange && (
-                                <Button
-                                    variant="contained"
-                                    color="primary"
-                                    fullWidth
-                                    onClick={() => {
-                                        setRescheduleModalOpen(true);
-                                    }}
-                                    sx={{
-                                        py: 1.5,
-                                        fontSize: '1rem',
-                                        fontWeight: 600,
-                                        textTransform: 'none',
-                                        borderRadius: 2,
-                                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                                        '&:hover': {
-                                            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                                        }
-                                    }}
-                                >
-                                    Reschedule Flight
-                                </Button>
-                            )}
-                            
-                            {/* Change Flight Location Button - Only show if more than 120 hours remain */}
-                            {canRescheduleOrChange && (
-                                <Button
-                                    variant="outlined"
-                                    color="primary"
-                                    fullWidth
-                                    onClick={() => {
-                                        setSelectedNewLocation(bookingData.location || '');
-                                        setChangeLocationModalOpen(true);
-                                    }}
-                                    sx={{
-                                        mt: 1.5,
-                                        py: 1.5,
-                                        fontSize: '1rem',
-                                        fontWeight: 600,
-                                        textTransform: 'none',
-                                        borderRadius: 2,
-                                        borderWidth: 2,
-                                        '&:hover': {
-                                            borderWidth: 2,
-                                        }
-                                    }}
-                                >
-                                    Change Flight Location
-                                </Button>
-                            )}
-                            
-                            {/* Cancel Flight Button - Always visible, but disabled if less than 120 hours */}
+                            {/* Reschedule Flight Button - Disabled if cancelled or less than 120 hours */}
                             <Tooltip 
-                                title={!canCancel ? "Less than 120 hours remaining until your flight" : ""}
+                                title={isCancelled ? "Flight is cancelled" : (!canRescheduleOrChange ? "Less than 120 hours remaining until your flight" : "")}
+                                arrow
+                            >
+                                <span style={{ display: 'block', width: '100%' }}>
+                                    <Button
+                                        variant="contained"
+                                        color="primary"
+                                        fullWidth
+                                        disabled={!canRescheduleOrChange}
+                                        onClick={() => canRescheduleOrChange && setRescheduleModalOpen(true)}
+                                        sx={{
+                                            py: 1.5,
+                                            fontSize: '1rem',
+                                            fontWeight: 600,
+                                            textTransform: 'none',
+                                            borderRadius: 2,
+                                            boxShadow: canRescheduleOrChange ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+                                            opacity: canRescheduleOrChange ? 1 : 0.6,
+                                            backgroundColor: canRescheduleOrChange ? undefined : '#f3f4f6',
+                                            color: canRescheduleOrChange ? undefined : '#9ca3af',
+                                            '&:hover': canRescheduleOrChange ? {
+                                                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                                            } : {
+                                                boxShadow: 'none',
+                                            },
+                                            '&.Mui-disabled': {
+                                                backgroundColor: '#f3f4f6',
+                                                color: '#9ca3af',
+                                            }
+                                        }}
+                                    >
+                                        Reschedule Flight
+                                    </Button>
+                                </span>
+                            </Tooltip>
+                            
+                            {/* Change Flight Location Button - Disabled if cancelled or less than 120 hours */}
+                            <Tooltip 
+                                title={isCancelled ? "Flight is cancelled" : (!canRescheduleOrChange ? "Less than 120 hours remaining until your flight" : "")}
+                                arrow
+                            >
+                                <span style={{ display: 'block', width: '100%' }}>
+                                    <Button
+                                        variant="outlined"
+                                        color="primary"
+                                        fullWidth
+                                        disabled={!canRescheduleOrChange}
+                                        onClick={() => canRescheduleOrChange && (() => {
+                                            setSelectedNewLocation(bookingData.location || '');
+                                            setChangeLocationModalOpen(true);
+                                        })()}
+                                        sx={{
+                                            mt: 1.5,
+                                            py: 1.5,
+                                            fontSize: '1rem',
+                                            fontWeight: 600,
+                                            textTransform: 'none',
+                                            borderRadius: 2,
+                                            borderWidth: 2,
+                                            borderColor: canRescheduleOrChange ? undefined : '#d1d5db',
+                                            color: canRescheduleOrChange ? undefined : '#9ca3af',
+                                            backgroundColor: canRescheduleOrChange ? 'transparent' : '#f3f4f6',
+                                            cursor: canRescheduleOrChange ? 'pointer' : 'not-allowed',
+                                            '&:hover': canRescheduleOrChange ? {
+                                                borderWidth: 2,
+                                            } : {
+                                                borderWidth: 2,
+                                                borderColor: '#d1d5db',
+                                                backgroundColor: '#f3f4f6',
+                                            },
+                                            '&.Mui-disabled': {
+                                                borderColor: '#d1d5db',
+                                                color: '#9ca3af',
+                                                backgroundColor: '#f3f4f6',
+                                            }
+                                        }}
+                                    >
+                                        Change Flight Location
+                                    </Button>
+                                </span>
+                            </Tooltip>
+                            
+                            {/* Cancel Flight Button - Always visible, but disabled if cancelled or less than 120 hours */}
+                            <Tooltip 
+                                title={isCancelled ? "Flight is cancelled" : (!canCancel ? "Less than 120 hours remaining until your flight" : "")}
                                 arrow
                             >
                                 <span style={{ display: 'block', width: '100%' }}>
