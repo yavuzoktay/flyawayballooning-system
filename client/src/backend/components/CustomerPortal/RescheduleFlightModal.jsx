@@ -371,10 +371,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                     </>
                 )}
             </DialogContent>
-            <DialogActions sx={{ p: 3, pt: 2 }}>
-                <Button onClick={onClose} disabled={submitting}>
-                    Choose Another Date
-                </Button>
+            <DialogActions sx={{ p: 3, pt: 2, justifyContent: 'flex-end' }}>
                 <Button
                     onClick={handleConfirm}
                     disabled={!selectedDate || !selectedTime || submitting}
