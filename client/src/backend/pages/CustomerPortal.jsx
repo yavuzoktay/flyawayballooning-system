@@ -512,26 +512,6 @@ const CustomerPortal = () => {
                 </Box>
             </Paper>
 
-            <Paper id="additional-info" elevation={2} sx={{ p: 3, scrollMarginTop: '100px' }}>
-                <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
-                    Important Information
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Please read the following before your flight:
-                </Typography>
-                <Box component="ul" sx={{ pl: 2 }}>
-                    <Typography component="li" variant="body2" sx={{ mb: 1 }}>
-                        Weather dependent activity
-                    </Typography>
-                    <Typography component="li" variant="body2" sx={{ mb: 1 }}>
-                        Arrive 30 minutes before scheduled flight
-                    </Typography>
-                    <Typography component="li" variant="body2" sx={{ mb: 1 }}>
-                        Wear comfortable clothing
-                    </Typography>
-                </Box>
-            </Paper>
-
             {/* Customer Portal Content Sections */}
             {portalContents.length > 0 && portalContents.map((content, index) => (
                 <Paper 
