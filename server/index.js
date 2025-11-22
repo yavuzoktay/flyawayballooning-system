@@ -9693,10 +9693,12 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
 // Customer Portal - Change Flight Location
 app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) => {
     const { bookingId } = req.params;
-    const { location } = req.body;
+    const { location, flight_date, activity_id } = req.body;
 
     console.log('📍 Customer Portal Change Location - Booking ID:', bookingId);
     console.log('📍 Customer Portal Change Location - New location:', location);
+    console.log('📍 Customer Portal Change Location - New flight_date:', flight_date);
+    console.log('📍 Customer Portal Change Location - Activity ID:', activity_id);
 
     if (!bookingId || !location) {
         return res.status(400).json({ 
@@ -9731,22 +9733,62 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
             });
         });
 
-        let newActivityId = booking.activity_id;
-        if (activityRows && activityRows.length > 0) {
+        let newActivityId = activity_id || booking.activity_id;
+        if (!newActivityId && activityRows && activityRows.length > 0) {
             newActivityId = activityRows[0].id;
         }
 
-        // Update booking location and activity_id
+        // Prepare update fields
+        const updateFields = ['location = ?', 'activity_id = ?', 'updated_at = NOW()'];
+        const updateValues = [location, newActivityId];
+
+        // If flight_date is provided, update it and set status to Scheduled
+        if (flight_date) {
+            const newFlightDate = dayjs(flight_date);
+            const now = dayjs();
+            
+            // Check if new flight date is in the past
+            if (newFlightDate.isBefore(now)) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Cannot schedule flight to a past date.' 
+                });
+            }
+
+            // Check if current flight date is more than 120 hours away (5 days)
+            const oldFlightDate = booking.flight_date ? dayjs(booking.flight_date) : null;
+            if (oldFlightDate) {
+                const hoursUntilCurrentFlight = oldFlightDate.diff(now, 'hour');
+                if (hoursUntilCurrentFlight <= 120) {
+                    return res.status(400).json({ 
+                        success: false, 
+                        message: 'Flights cannot be rescheduled within 120 hours (5 days) of the original flight date.' 
+                    });
+                }
+            }
+
+            updateFields.push('flight_date = ?', 'status = ?');
+            updateValues.push(flight_date, 'Scheduled');
+            
+            // Extract time from flight_date if it includes time
+            if (flight_date.includes(' ')) {
+                const timePart = flight_date.split(' ')[1];
+                updateFields.push('time_slot = TIME(?)');
+                updateValues.push(timePart);
+            }
+        }
+
+        // Update booking location, activity_id, and optionally flight_date
         const updateSql = `
             UPDATE all_booking 
-            SET location = ?,
-                activity_id = ?,
-                updated_at = NOW()
+            SET ${updateFields.join(', ')}
             WHERE id = ?
         `;
         
+        updateValues.push(bookingId);
+        
         await new Promise((resolve, reject) => {
-            con.query(updateSql, [location, newActivityId, bookingId], (err, result) => {
+            con.query(updateSql, updateValues, (err, result) => {
                 if (err) {
                     console.error('Error updating booking location:', err);
                     reject(err);
@@ -9762,8 +9804,15 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
             VALUES (?, ?, NOW(), ?)
         `;
         
+        let historyNote = `Location changed to ${location} via Customer Portal`;
+        if (flight_date) {
+            const oldDate = booking.flight_date ? dayjs(booking.flight_date).format('DD/MM/YYYY HH:mm') : 'N/A';
+            const newDate = dayjs(flight_date).format('DD/MM/YYYY HH:mm');
+            historyNote = `Location changed to ${location} and flight rescheduled from ${oldDate} to ${newDate} via Customer Portal`;
+        }
+        
         await new Promise((resolve, reject) => {
-            con.query(historySql, [bookingId, booking.status || 'Scheduled', `Location changed to ${location} via Customer Portal`], (err, result) => {
+            con.query(historySql, [bookingId, booking.status || 'Scheduled', historyNote], (err, result) => {
                 if (err) {
                     console.error('Error adding history entry:', err);
                     // Don't fail the request if history insert fails
