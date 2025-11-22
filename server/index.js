@@ -9086,18 +9086,18 @@ app.patch('/api/updateBookingField', (req, res) => {
                     finalizeResponse();
                 };
                 
-                // If status is Cancelled, update the last Scheduled entry instead of creating a new one
+                // If status is Cancelled, update the last entry (any status) instead of creating a new one
                 if (normalizedValue === 'Cancelled') {
-                    // Find the last Scheduled entry for this booking
-                    const findLastScheduledSql = `
-                        SELECT id FROM booking_status_history 
-                        WHERE booking_id = ? AND status = 'Scheduled' 
+                    // Find the last entry for this booking (any status except Cancelled)
+                    const findLastEntrySql = `
+                        SELECT id, status FROM booking_status_history 
+                        WHERE booking_id = ? AND status != 'Cancelled'
                         ORDER BY changed_at DESC, id DESC 
                         LIMIT 1
                     `;
-                    con.query(findLastScheduledSql, [booking_id], (findErr, scheduledRows) => {
+                    con.query(findLastEntrySql, [booking_id], (findErr, lastRows) => {
                         if (findErr) {
-                            console.error('Error finding last Scheduled entry:', findErr);
+                            console.error('Error finding last entry:', findErr);
                             // Fallback to insert if query fails
                             const historySql = 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
                             con.query(historySql, [booking_id, normalizedValue], (err2) => {
@@ -9106,12 +9106,12 @@ app.patch('/api/updateBookingField', (req, res) => {
                                 handleFlightAttemptsIncrement(booking_id);
                                 proceedWithAvailabilityRefresh();
                             });
-                        } else if (scheduledRows && scheduledRows.length > 0) {
-                            // Update the last Scheduled entry to Cancelled
+                        } else if (lastRows && lastRows.length > 0) {
+                            // Update the last entry (any status) to Cancelled
                             const updateSql = 'UPDATE booking_status_history SET status = ? WHERE id = ?';
-                            con.query(updateSql, [normalizedValue, scheduledRows[0].id], (updateErr) => {
+                            con.query(updateSql, [normalizedValue, lastRows[0].id], (updateErr) => {
                                 if (updateErr) {
-                                    console.error('Error updating Scheduled entry to Cancelled:', updateErr);
+                                    console.error('Error updating entry to Cancelled:', updateErr);
                                     // Fallback to insert if update fails
                                     const historySql = 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
                                     con.query(historySql, [booking_id, normalizedValue], (err2) => {
@@ -9121,13 +9121,13 @@ app.patch('/api/updateBookingField', (req, res) => {
                                         proceedWithAvailabilityRefresh();
                                     });
                                 } else {
-                                    console.log('updateBookingField - Updated last Scheduled entry to Cancelled:', scheduledRows[0].id);
+                                    console.log('updateBookingField - Updated last entry (', lastRows[0].status, ') to Cancelled:', lastRows[0].id);
                                     handleFlightAttemptsIncrement(booking_id);
                                     proceedWithAvailabilityRefresh();
                                 }
                             });
                         } else {
-                            // No Scheduled entry found, insert new Cancelled entry
+                            // No previous entry found, insert new Cancelled entry
                             const historySql = 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
                             con.query(historySql, [booking_id, normalizedValue], (err2) => {
                                 if (err2) console.error('History insert error:', err2);
