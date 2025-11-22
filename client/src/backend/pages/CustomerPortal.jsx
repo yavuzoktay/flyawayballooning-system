@@ -494,6 +494,8 @@ const CustomerPortal = () => {
                     setSelectedDate(null);
                     setSelectedTime(null);
                     setLocationAvailabilities([]);
+                    setSelectedActivityId(null);
+                    setError(null);
                 }}
                 maxWidth="sm"
                 fullWidth
@@ -624,6 +626,7 @@ const CustomerPortal = () => {
                                         setSelectedDate(null);
                                         setSelectedTime(null);
                                         setLocationAvailabilities([]);
+                                        setSelectedActivityId(null);
                                     }}
                                     sx={{ mt: 1, textTransform: 'none' }}
                                 >
@@ -873,6 +876,8 @@ const CustomerPortal = () => {
                             setSelectedDate(null);
                             setSelectedTime(null);
                             setLocationAvailabilities([]);
+                            setSelectedActivityId(null);
+                            setError(null);
                         }}
                         disabled={changingLocation}
                     >
@@ -885,7 +890,13 @@ const CustomerPortal = () => {
                                     return;
                                 }
 
+                                if (!selectedActivityId) {
+                                    setError('Activity ID not found for selected location. Please try selecting the location again.');
+                                    return;
+                                }
+
                                 setChangingLocation(true);
+                                setError(null);
                                 try {
                                     const formattedDate = dayjs(selectedDate).format('YYYY-MM-DD');
                                     const selectedDateTime = `${formattedDate} ${selectedTime}`;

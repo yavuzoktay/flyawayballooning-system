@@ -9726,16 +9726,27 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
         const booking = bookingRows[0];
 
         // Find activity for the new location
-        const [activityRows] = await new Promise((resolve, reject) => {
-            con.query('SELECT id FROM activity WHERE location = ? AND status = ? LIMIT 1', [location, 'Live'], (err, rows) => {
-                if (err) reject(err);
-                else resolve([rows]);
-            });
-        });
-
         let newActivityId = activity_id || booking.activity_id;
-        if (!newActivityId && activityRows && activityRows.length > 0) {
-            newActivityId = activityRows[0].id;
+        
+        if (!newActivityId) {
+            const [activityRows] = await new Promise((resolve, reject) => {
+                con.query('SELECT id FROM activity WHERE location = ? AND status = ? LIMIT 1', [location, 'Live'], (err, rows) => {
+                    if (err) reject(err);
+                    else resolve([rows]);
+                });
+            });
+
+            if (activityRows && activityRows.length > 0) {
+                newActivityId = activityRows[0].id;
+            }
+        }
+
+        // If still no activity ID found, return error
+        if (!newActivityId) {
+            return res.status(400).json({ 
+                success: false, 
+                message: `No active activity found for location: ${location}` 
+            });
         }
 
         // Prepare update fields
@@ -9790,9 +9801,12 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
         await new Promise((resolve, reject) => {
             con.query(updateSql, updateValues, (err, result) => {
                 if (err) {
-                    console.error('Error updating booking location:', err);
+                    console.error('❌ Error updating booking location:', err);
+                    console.error('❌ SQL:', updateSql);
+                    console.error('❌ Values:', updateValues);
                     reject(err);
                 } else {
+                    console.log('✅ Successfully updated booking:', bookingId);
                     resolve(result);
                 }
             });
@@ -9828,6 +9842,13 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
                 else resolve([rows]);
             });
         });
+
+        if (!updatedBookingRows || updatedBookingRows.length === 0) {
+            return res.status(500).json({ 
+                success: false, 
+                message: 'Failed to retrieve updated booking data' 
+            });
+        }
 
         const updatedBooking = updatedBookingRows[0];
 
@@ -9890,10 +9911,12 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
         res.json(response);
     } catch (error) {
         console.error('❌ Customer Portal Change Location - Error:', error);
+        console.error('❌ Customer Portal Change Location - Error Stack:', error.stack);
         res.status(500).json({ 
             success: false, 
             message: 'Failed to change location', 
-            error: error.message 
+            error: error.message,
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 });
