@@ -4,6 +4,7 @@ import axios from 'axios';
 import { Container, Typography, Box, Paper, CircularProgress, Alert, Button } from '@mui/material';
 import dayjs from 'dayjs';
 import CustomerPortalHeader from '../components/CustomerPortal/CustomerPortalHeader';
+import RescheduleFlightModal from '../components/CustomerPortal/RescheduleFlightModal';
 import '../components/CustomerPortal/CustomerPortalHeader.css';
 
 const CustomerPortal = () => {
@@ -11,6 +12,7 @@ const CustomerPortal = () => {
     const [bookingData, setBookingData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
 
     // Extract token from URL - handle both /customerPortal/:token and /customerPortal/:token/index
     const token = tokenParam ? tokenParam.split('/')[0] : null;
@@ -232,8 +234,7 @@ const CustomerPortal = () => {
                                     color="primary"
                                     fullWidth
                                     onClick={() => {
-                                        // Scroll to Available Flights section
-                                        scrollToSection('live-availability');
+                                        setRescheduleModalOpen(true);
                                     }}
                                     sx={{
                                         py: 1.5,
@@ -367,6 +368,17 @@ const CustomerPortal = () => {
                 </Box>
             </Paper>
             </Container>
+
+            {/* Reschedule Flight Modal */}
+            <RescheduleFlightModal
+                open={rescheduleModalOpen}
+                onClose={() => setRescheduleModalOpen(false)}
+                bookingData={bookingData}
+                onRescheduleSuccess={(updatedData) => {
+                    setBookingData(updatedData);
+                    setRescheduleModalOpen(false);
+                }}
+            />
         </>
     );
 };
