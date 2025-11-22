@@ -385,7 +385,11 @@ const PaginatedTable = ({
                 <thead style={{ background: "#3274b4", color: "#FFF" }}>
                     <tr>
                         {selectable && (
-                            <th style={{ padding: "8px" }}>
+                            <th style={{ 
+                                padding: "8px",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden"
+                            }}>
                                 <input
                                     type="checkbox"
                                     checked={isAllSelected}
@@ -395,7 +399,12 @@ const PaginatedTable = ({
                             </th>
                         )}
                         {(selectable ? mainHead.slice(1) : mainHead).map((col, index) => (
-                            <th key={index} style={{ padding: "8px" }}>{col}</th>
+                            <th key={index} style={{ 
+                                padding: "8px",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis"
+                            }}>{col}</th>
                         ))}
                     </tr>
                 </thead>
@@ -404,7 +413,11 @@ const PaginatedTable = ({
                         return (
                             <tr key={idx}>
                                 {selectable && (
-                                    <td style={{ textAlign: "center" }}>
+                                    <td style={{ 
+                                        textAlign: "center",
+                                        whiteSpace: "nowrap",
+                                        overflow: "hidden"
+                                    }}>
                                         <input
                                             type="checkbox"
                                             checked={selectedRows.includes(idx)}
@@ -415,7 +428,14 @@ const PaginatedTable = ({
                                                 {columns.map((col) => {
                                                     const id = getColId(col);
                                                     return (
-                                                        <td key={id} style={{ textAlign: "center", padding: "8px", wordBreak: id === 'voucher_code' ? 'normal' : 'break-all', overflowWrap: id === 'voucher_code' ? 'normal' : 'break-word', whiteSpace: id === 'voucher_code' ? 'nowrap' : 'normal' }}>
+                                                        <td key={id} style={{ 
+                                                            textAlign: "center", 
+                                                            padding: "8px", 
+                                                            whiteSpace: "nowrap",
+                                                            overflow: "hidden",
+                                                            textOverflow: "ellipsis",
+                                                            maxWidth: "200px"
+                                                        }}>
                                                             {id === 'name' ? (
                                                                 selectable ? (
                                                                     <span>{item[id]}</span>
@@ -608,8 +628,13 @@ const PaginatedTable = ({
                                 })}
                                 {/* Actions column for bookings/vouchers */}
                                 {(context === 'bookings' || context === 'vouchers') && onEmailClick && (
-                                    <td style={{ textAlign: "center", padding: "8px" }}>
-                                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                                    <td style={{ 
+                                        textAlign: "center", 
+                                        padding: "8px",
+                                        whiteSpace: "nowrap",
+                                        overflow: "hidden"
+                                    }}>
+                                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'nowrap' }}>
                                             <button
                                                 onClick={() => onEmailClick(item)}
                                                 style={{
