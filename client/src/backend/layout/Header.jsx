@@ -153,7 +153,19 @@ const Header = () => {
             {/* Left/Right spacer on mobile, right-aligned logo on desktop */}
             {!isMobile && (
               <Grid item>
-                <img src={process.env.PUBLIC_URL + '/FAB_Logo_DarkBlue.png'} alt="Fly Away Ballooning" style={{ height: 36, objectFit: 'contain' }} />
+                <img 
+                  src={process.env.PUBLIC_URL + '/FAB_Logo_DarkBlue.png'} 
+                  alt="Fly Away Ballooning" 
+                  style={{ 
+                    height: 36, 
+                    objectFit: 'contain',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => {
+                    setActiveMenuItem('Home');
+                    navigate('/');
+                  }}
+                />
               </Grid>
             )}
             {/* Right: Menu Items */}
@@ -239,7 +251,20 @@ const Header = () => {
             )}
             {isMobile && (
               <Grid item>
-                <img src={process.env.PUBLIC_URL + '/FAB_Logo_DarkBlue.png'} alt="Fly Away Ballooning" style={{ height: 28, objectFit: 'contain' }} />
+                <img 
+                  src={process.env.PUBLIC_URL + '/FAB_Logo_DarkBlue.png'} 
+                  alt="Fly Away Ballooning" 
+                  style={{ 
+                    height: 28, 
+                    objectFit: 'contain',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => {
+                    setActiveMenuItem('Home');
+                    navigate('/');
+                    setDrawerOpen(false);
+                  }}
+                />
               </Grid>
             )}
           </Grid>
