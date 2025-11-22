@@ -367,6 +367,7 @@ const PaginatedTable = ({
                                        id === 'passenger_info' ? '200px' :
                                        id === 'created_at' || id === 'created' ? '120px' :
                                        id === 'flight_date' ? '200px' :
+                                       id === 'flight_attempts' ? '150px' :
                                        'auto', 
                                 minWidth: id === 'email' ? '240px' : 
                                          id === 'name' ? '180px' : 
@@ -376,6 +377,7 @@ const PaginatedTable = ({
                                          id === 'passenger_info' ? '200px' :
                                          id === 'created_at' || id === 'created' ? '120px' :
                                          id === 'flight_date' ? '200px' :
+                                         id === 'flight_attempts' ? '150px' :
                                          '80px', 
                                 maxWidth: id === 'email' ? '240px' : undefined 
                             }} />
