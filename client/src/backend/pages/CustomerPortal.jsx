@@ -280,7 +280,7 @@ const CustomerPortal = () => {
                     const flightDate = dayjs(bookingData.flight_date);
                     const now = dayjs();
                     const hoursUntilFlight = flightDate.diff(now, 'hour');
-                    const isCancelled = bookingData.status === 'Cancelled';
+                    const isCancelled = bookingData.status && bookingData.status.toLowerCase() === 'cancelled';
                     const canRescheduleOrChange = !isCancelled && hoursUntilFlight > 120;
                     const canCancel = !isCancelled && hoursUntilFlight > 120;
                     
@@ -305,17 +305,19 @@ const CustomerPortal = () => {
                                             textTransform: 'none',
                                             borderRadius: 2,
                                             boxShadow: canRescheduleOrChange ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
-                                            opacity: canRescheduleOrChange ? 1 : 0.6,
                                             backgroundColor: canRescheduleOrChange ? undefined : '#f3f4f6',
                                             color: canRescheduleOrChange ? undefined : '#9ca3af',
                                             '&:hover': canRescheduleOrChange ? {
                                                 boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
                                             } : {
                                                 boxShadow: 'none',
+                                                backgroundColor: '#f3f4f6',
                                             },
                                             '&.Mui-disabled': {
-                                                backgroundColor: '#f3f4f6',
-                                                color: '#9ca3af',
+                                                backgroundColor: '#f3f4f6 !important',
+                                                color: '#9ca3af !important',
+                                                opacity: 0.6,
+                                                cursor: 'not-allowed',
                                             }
                                         }}
                                     >
@@ -383,7 +385,7 @@ const CustomerPortal = () => {
                                         disabled={!canCancel}
                                         onClick={() => canCancel && setCancelFlightDialogOpen(true)}
                                         sx={{
-                                            mt: canRescheduleOrChange ? 1.5 : 0,
+                                            mt: 1.5,
                                             py: 1.5,
                                             fontSize: '1rem',
                                             fontWeight: 600,
