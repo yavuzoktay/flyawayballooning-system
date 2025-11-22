@@ -12010,6 +12010,64 @@ app.delete('/api/email-templates/:id', (req, res) => {
     });
 });
 
+// Customer Portal Contents endpoints
+// Get all customer portal contents
+app.get('/api/customer-portal-contents', (req, res) => {
+    con.query('SELECT * FROM customer_portal_contents ORDER BY sort_order ASC, created_at DESC', (err, contents) => {
+        if (err) {
+            console.error('Error fetching customer portal contents:', err);
+            return res.status(500).json({ success: false, message: 'Error fetching customer portal contents' });
+        }
+        res.json({ success: true, data: contents });
+    });
+});
+
+// Create new customer portal content
+app.post('/api/customer-portal-contents', (req, res) => {
+    const { header, body, sort_order, is_active } = req.body;
+    
+    const sql = 'INSERT INTO customer_portal_contents (header, body, sort_order, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())';
+    const values = [header || '', body || '', sort_order || 0, is_active !== undefined ? (is_active ? 1 : 0) : 1];
+    
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error creating customer portal content:', err);
+            return res.status(500).json({ success: false, message: 'Error creating customer portal content' });
+        }
+        res.json({ success: true, id: result.insertId });
+    });
+});
+
+// Update customer portal content
+app.put('/api/customer-portal-contents/:id', (req, res) => {
+    const { id } = req.params;
+    const { header, body, sort_order, is_active } = req.body;
+    
+    const sql = 'UPDATE customer_portal_contents SET header = ?, body = ?, sort_order = ?, is_active = ?, updated_at = NOW() WHERE id = ?';
+    const values = [header || '', body || '', sort_order || 0, is_active !== undefined ? (is_active ? 1 : 0) : 1, id];
+    
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error updating customer portal content:', err);
+            return res.status(500).json({ success: false, message: 'Error updating customer portal content' });
+        }
+        res.json({ success: true });
+    });
+});
+
+// Delete customer portal content
+app.delete('/api/customer-portal-contents/:id', (req, res) => {
+    const { id } = req.params;
+    
+    con.query('DELETE FROM customer_portal_contents WHERE id = ?', [id], (err, result) => {
+        if (err) {
+            console.error('Error deleting customer portal content:', err);
+            return res.status(500).json({ success: false, message: 'Error deleting customer portal content' });
+        }
+        res.json({ success: true });
+    });
+});
+
 // Serve React frontend from client/build (exclude /api routes)
 app.use(express.static(path.join(__dirname, '../client/build')));
 
@@ -14627,6 +14685,29 @@ const runDatabaseMigrations = () => {
             });
         } else {
             console.log('✅ purchaser fields already exist in all_vouchers table');
+        }
+    });
+
+    // Create customer_portal_contents table if it doesn't exist
+    const createCustomerPortalContentsTable = `
+        CREATE TABLE IF NOT EXISTS customer_portal_contents (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            header VARCHAR(500) NOT NULL COMMENT 'Header text for the content section',
+            body TEXT NOT NULL COMMENT 'Body content (HTML supported)',
+            sort_order INT DEFAULT 0 COMMENT 'Display order (lower numbers appear first)',
+            is_active TINYINT(1) DEFAULT 1 COMMENT 'Whether this content is active and should be displayed',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_sort_order (sort_order),
+            INDEX idx_is_active (is_active)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `;
+    
+    con.query(createCustomerPortalContentsTable, (err) => {
+        if (err) {
+            console.error('Error creating customer_portal_contents table:', err);
+        } else {
+            console.log('✅ customer_portal_contents table ready');
         }
     });
 };
