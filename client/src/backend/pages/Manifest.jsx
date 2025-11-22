@@ -1034,48 +1034,58 @@ const Manifest = () => {
             entriesByDate.get(dateKey).push(entry);
         });
         
-        // Process each date group: Cancelled entries should NEVER appear as separate rows
-        // Only Scheduled entries appear as separate rows. If Cancelled exists for a Scheduled date,
-        // the Scheduled entry is shown as Cancelled instead.
+        // Process each date group: Cancelled entries should overwrite any other status on the same date
+        // If Cancelled exists for a date, show only Cancelled (overwriting the previous status)
         const processedRows = [];
         
         entriesByDate.forEach((entries, dateKey) => {
             if (dateKey === 'no-date') {
-                // Entries without date, add all non-Cancelled entries (Cancelled never shown separately)
-                entries.forEach(entry => {
-                    if (entry.status && entry.status.toLowerCase() !== 'cancelled') {
-                        processedRows.push(entry);
+                // Entries without date: if Cancelled exists, show only Cancelled; otherwise show all non-Cancelled
+                const hasCancelled = entries.some(e => e.status && e.status.toLowerCase() === 'cancelled');
+                if (hasCancelled) {
+                    // Find the entry that was cancelled (the one before Cancelled)
+                    const cancelledEntry = entries.find(e => e.status && e.status.toLowerCase() === 'cancelled');
+                    if (cancelledEntry) {
+                        processedRows.push(cancelledEntry);
                     }
-                });
+                } else {
+                    entries.forEach(entry => {
+                        if (entry.status && entry.status.toLowerCase() !== 'cancelled') {
+                            processedRows.push(entry);
+                        }
+                    });
+                }
                 return;
             }
             
-            const hasScheduled = entries.some(e => e.status && e.status.toLowerCase() === 'scheduled');
             const hasCancelled = entries.some(e => e.status && e.status.toLowerCase() === 'cancelled');
+            const nonCancelledEntries = entries.filter(e => e.status && e.status.toLowerCase() !== 'cancelled');
             
-            if (hasScheduled && hasCancelled) {
-                // Find the Scheduled entry and convert it to Cancelled (Cancelled overwrites Scheduled)
-                const scheduledEntry = entries.find(e => e.status && e.status.toLowerCase() === 'scheduled');
-                if (scheduledEntry) {
+            if (hasCancelled && nonCancelledEntries.length > 0) {
+                // Cancelled exists with other statuses: find the last non-Cancelled entry and show it as Cancelled
+                // Sort by changed_at to get the most recent non-Cancelled entry
+                const lastNonCancelled = nonCancelledEntries.sort((a, b) => {
+                    const dateA = a.changed_at ? new Date(a.changed_at).getTime() : 0;
+                    const dateB = b.changed_at ? new Date(b.changed_at).getTime() : 0;
+                    return dateB - dateA;
+                })[0];
+                
+                if (lastNonCancelled) {
                     processedRows.push({
-                        ...scheduledEntry,
+                        ...lastNonCancelled,
                         status: 'Cancelled'
                     });
                 }
-            } else if (hasScheduled && !hasCancelled) {
-                // Only Scheduled exists, add it
-                const scheduledEntry = entries.find(e => e.status && e.status.toLowerCase() === 'scheduled');
-                if (scheduledEntry) {
-                    processedRows.push(scheduledEntry);
+            } else if (hasCancelled && nonCancelledEntries.length === 0) {
+                // Only Cancelled exists: show it (it overwrote a previous status)
+                const cancelledEntry = entries.find(e => e.status && e.status.toLowerCase() === 'cancelled');
+                if (cancelledEntry) {
+                    processedRows.push(cancelledEntry);
                 }
-            } else if (!hasScheduled && hasCancelled) {
-                // Only Cancelled exists (no Scheduled), DO NOT show it as a separate row
-                // Cancelled entries are never displayed unless they overwrite a Scheduled entry
-                // Skip this entry completely
             } else {
-                // Other statuses (not Scheduled or Cancelled), add them
+                // No Cancelled, add all entries
                 entries.forEach(entry => {
-                    if (entry.status && entry.status.toLowerCase() !== 'cancelled') {
+                    if (entry.status) {
                         processedRows.push(entry);
                     }
                 });
