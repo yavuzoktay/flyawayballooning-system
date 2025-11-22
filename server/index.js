@@ -1379,7 +1379,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
     function createBookingWithPrice(paidAmount, expiresDateFinal) {
         console.log('=== CREATING BOOKING WITH PAID AMOUNT:', paidAmount, 'AND EXPIRE DATE:', expiresDateFinal, '===');
 
-    // Simple SQL with only essential columns (including expires)
+    // Simple SQL with only essential columns (including expires, flight_attempts, flight_type_source)
     const bookingSql = `
         INSERT INTO all_booking (
             name,
@@ -1394,10 +1394,12 @@ app.post('/api/createRedeemBooking', (req, res) => {
             created_at,
             expires,
             email,
-                phone,
-                activity_id,
-                redeemed_voucher
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            phone,
+            activity_id,
+            redeemed_voucher,
+            flight_attempts,
+            flight_type_source
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     // Use actual passenger count from passengerData array
@@ -1425,7 +1427,9 @@ app.post('/api/createRedeemBooking', (req, res) => {
         passengerData[0].email || null,
             passengerData[0].phone || null,
             activity_id || null,
-            'Yes' // Redeem Voucher bookings always have redeemed_voucher = Yes
+            'Yes', // Redeem Voucher bookings always have redeemed_voucher = Yes
+            0, // flight_attempts (always 0 for redeem voucher bookings)
+            'Redeem Voucher' // flight_type_source (always 'Redeem Voucher' for this endpoint)
     ];
 
     console.log('=== REDEEM BOOKING SQL ===');
@@ -4621,7 +4625,9 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
             v.created_at as voucher_created_at,
             v.voucher_type as original_voucher_type,
             v.experience_type as voucher_experience_type,
-            v.book_flight as voucher_book_flight
+            v.book_flight as voucher_book_flight,
+            -- flight_type_source: use from database if exists, otherwise will be calculated
+            ab.flight_type_source
         FROM all_booking ab
         LEFT JOIN voucher_codes vc 
             ON vc.code = ab.voucher_code
@@ -4664,8 +4670,11 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
             let expiresValue = rest.expires;
             let expiresDisplay = rest.expires_display;
             
-            // For bookings created from redeem voucher (Gift Voucher), use voucher's created_at + 18 months
-            // Check if this booking was created from a Gift Voucher by checking if voucher exists and book_flight is 'Gift Voucher'
+            // Check if this booking was created from redeem voucher
+            // A booking is from redeem voucher if:
+            // 1. It has a voucher_code that exists in all_vouchers table, OR
+            // 2. The voucher's book_flight is 'Gift Voucher' (Gift Voucher redemption)
+            const isRedeemVoucher = rest.voucher_code && (voucher_book_flight === 'Gift Voucher' || original_voucher_type);
             const isGiftVoucherRedeemed = voucher_book_flight === 'Gift Voucher' && voucher_created_at;
             
             // Determine source date: for Gift Voucher redemptions, use voucher created_at; otherwise use voucher_expires or voucher_created_at
@@ -4709,14 +4718,27 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
             // Get voucher_type from all_vouchers (prioritize voucher's voucher_type for redeem voucher bookings)
             let finalVoucherType = original_voucher_type || rest.voucher_type;
             
-            // For bookings created from redeem voucher (Gift Voucher), flight_attempts should start from 0, not 1
-            // If booking has voucher_code and it's from a Gift Voucher, and flight_attempts is 1 (default), set it to 0
+            // For bookings created from redeem voucher, flight_attempts should start from 0, not 1
+            // Check if this is a redeem voucher booking (has voucher_code that exists in all_vouchers)
             let finalFlightAttempts = rest.flight_attempts;
-            if (isGiftVoucherRedeemed && rest.voucher_code) {
-                // If this booking was created from Gift Voucher redemption, flight_attempts should be 0
-                // Only override if it's 1 (the default value for new bookings)
+            if (isRedeemVoucher && rest.voucher_code) {
+                // If this booking was created from redeem voucher, flight_attempts should be 0
+                // Override if it's 1 (the default value for new bookings) or null/undefined
                 if (finalFlightAttempts === 1 || finalFlightAttempts === null || finalFlightAttempts === undefined) {
                     finalFlightAttempts = 0;
+                }
+            }
+            
+            // Determine flight_type_source: 
+            // 1. Use from database if exists
+            // 2. If 'Redeem Voucher' and voucher exists, use 'Redeem Voucher'
+            // 3. Otherwise use flight_type or experience
+            let flight_type_source = rest.flight_type_source;
+            if (!flight_type_source) {
+                if (isRedeemVoucher) {
+                    flight_type_source = 'Redeem Voucher';
+                } else {
+                    flight_type_source = rest.flight_type || rest.experience || null;
                 }
             }
             
@@ -4725,7 +4747,9 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                 voucher_type: finalVoucherType,
                 expires: expiresValue,
                 expires_display: expiresDisplay,
-                flight_attempts: finalFlightAttempts !== null && finalFlightAttempts !== undefined ? finalFlightAttempts : 0
+                flight_attempts: finalFlightAttempts !== null && finalFlightAttempts !== undefined ? finalFlightAttempts : (isRedeemVoucher ? 0 : rest.flight_attempts || 0),
+                flight_type_source: flight_type_source,
+                is_redeem_voucher: isRedeemVoucher
             };
         }));
         
@@ -6171,6 +6195,12 @@ app.post('/api/createBooking', (req, res) => {
             }
             bookingDateTime = `${datePart} ${selectedTime}`;
         }
+        // Determine flight_type_source: 'Redeem Voucher' if activitySelect is 'Redeem Voucher', otherwise use flight_type/experience
+        const flight_type_source = activitySelect === 'Redeem Voucher' ? 'Redeem Voucher' : (chooseFlightType?.type || experience || null);
+        
+        // For redeem voucher bookings, flight_attempts should start from 0
+        const finalFlightAttempts = activitySelect === 'Redeem Voucher' ? 0 : (flight_attempts !== undefined ? flight_attempts : 0);
+        
         // bookingSql ve bookingValues'da selectedDate yerine bookingDateTime kullan
         const bookingSql = `
             INSERT INTO all_booking (
@@ -6205,8 +6235,9 @@ app.post('/api/createBooking', (req, res) => {
                 voucher_discount,
                 original_amount,
                 add_to_booking_items_total_price,
-                weather_refund_total_price
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                weather_refund_total_price,
+                flight_type_source
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         // Debug log for choose_add_on and bookingValues
@@ -6284,7 +6315,7 @@ app.post('/api/createBooking', (req, res) => {
             preferred_location || null,
             preferred_time || null,
             preferred_day || null,
-            flight_attempts || 0, // flight_attempts
+            finalFlightAttempts, // flight_attempts (0 for redeem voucher, otherwise from request or 0)
             req.body.activity_id || null, // activity_id
             selectedTime || null, // time_slot
             experience || chooseFlightType.type, // experience (use from req.body if provided, otherwise use flight type)
@@ -6292,7 +6323,8 @@ app.post('/api/createBooking', (req, res) => {
             0, // voucher_discount
             base_original_amount, // original_amount (base price excluding add-ons and weather refund)
             add_on_total_price, // add_to_booking_items_total_price
-            weather_refund_total_price // weather_refund_total_price
+            weather_refund_total_price, // weather_refund_total_price
+            flight_type_source // flight_type_source ('Redeem Voucher' if activitySelect is 'Redeem Voucher', otherwise flight_type/experience)
         ];
         console.log('bookingValues:', bookingValues);
 
@@ -7184,8 +7216,8 @@ app.post('/api/createVoucher', (req, res) => {
                 voucher_code, created_at, expires, manual_status_override, additional_notes,
                 preferred_location, preferred_time, preferred_day, flight_attempts,
                 activity_id, time_slot, experience, voucher_type, voucher_discount, original_amount,
-                email, phone, weight, additional_information_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                email, phone, weight, additional_information_json, flight_type_source
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         
         const bookingValues = [
@@ -7215,7 +7247,8 @@ app.post('/api/createVoucher', (req, res) => {
             email, // email
             phone, // phone
             weight, // weight
-            null // additional_information_json
+            null, // additional_information_json
+            flight_type // flight_type_source (use flight_type for Flight Voucher)
         ];
         
         con.query(bookingSql, bookingValues, (err, bookingResult) => {
@@ -7270,8 +7303,8 @@ app.post('/api/createVoucher', (req, res) => {
                 voucher_code, created_at, expires, manual_status_override, additional_notes,
                 preferred_location, preferred_time, preferred_day, flight_attempts,
                 activity_id, time_slot, experience, voucher_type, voucher_discount, original_amount,
-                email, phone, weight, additional_information_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                email, phone, weight, additional_information_json, flight_type_source
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         
         const bookingValues = [
@@ -7291,7 +7324,7 @@ app.post('/api/createVoucher', (req, res) => {
             emptyToNull(preferred_location), // preferred_location
             emptyToNull(preferred_time), // preferred_time
             emptyToNull(preferred_day), // preferred_day
-            0, // flight_attempts
+            0, // flight_attempts (always 0 for redeem voucher)
             null, // activity_id
             null, // time_slot
             flight_type_redeem, // experience
@@ -7301,7 +7334,8 @@ app.post('/api/createVoucher', (req, res) => {
             email, // email
             phone, // phone
             weight, // weight
-            (additional_information_json || additionalInfo || additional_information) ? JSON.stringify(additional_information_json || additionalInfo || additional_information) : null // additional_information_json
+            (additional_information_json || additionalInfo || additional_information) ? JSON.stringify(additional_information_json || additionalInfo || additional_information) : null, // additional_information_json
+            'Redeem Voucher' // flight_type_source (always 'Redeem Voucher' for this function)
         ];
         
         con.query(bookingSql, bookingValues, (err, bookingResult) => {
@@ -12041,6 +12075,12 @@ async function createBookingFromWebhook(bookingData) {
             console.log('Base Price Per Passenger:', BASE_PRICE_PER_PASSENGER);
             console.log('Original Amount (passenger_count * base_price):', base_original_amount);
 
+            // Determine flight_type_source: 'Redeem Voucher' if activitySelect is 'Redeem Voucher', otherwise use flight_type/experience
+            const flight_type_source = activitySelect === 'Redeem Voucher' ? 'Redeem Voucher' : (chooseFlightType?.type || null);
+            
+            // For redeem voucher bookings, flight_attempts should start from 0
+            const finalFlightAttempts = activitySelect === 'Redeem Voucher' ? 0 : (flight_attempts !== undefined ? flight_attempts : 0);
+            
             const bookingSql = `
                 INSERT INTO all_booking (
                     name, flight_type, flight_date, pax, location, status, paid, due,
@@ -12048,8 +12088,8 @@ async function createBookingFromWebhook(bookingData) {
                     ballooning_reason, prefer, weight, email, phone, choose_add_on,
                     preferred_location, preferred_time, preferred_day, flight_attempts,
                     activity_id, time_slot, experience, voucher_type, voucher_discount, original_amount,
-                    add_to_booking_items_total_price, weather_refund_total_price
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    add_to_booking_items_total_price, weather_refund_total_price, flight_type_source
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
 
             console.log('=== WEBHOOK PAX COUNT DEBUG ===');
@@ -12081,7 +12121,7 @@ async function createBookingFromWebhook(bookingData) {
                 emptyToNull(preferred_location),
                 emptyToNull(preferred_time),
                 emptyToNull(preferred_day),
-                emptyToNull(flight_attempts) || 0, // flight_attempts
+                finalFlightAttempts, // flight_attempts (0 for redeem voucher, otherwise from request or 0)
                 emptyToNull(bookingData?.activity_id), // activity_id
                 emptyToNull(selectedTime), // time_slot
                 chooseFlightType.type, // experience
@@ -12090,7 +12130,8 @@ async function createBookingFromWebhook(bookingData) {
                 0, // voucher_discount
                 base_original_amount, // original_amount (base price excluding add-ons and weather refund)
                 add_on_total_price, // add_to_booking_items_total_price
-                weather_refund_total_price // weather_refund_total_price
+                weather_refund_total_price, // weather_refund_total_price
+                flight_type_source // flight_type_source ('Redeem Voucher' if activitySelect is 'Redeem Voucher', otherwise flight_type/experience)
             ];
 
             con.query(bookingSql, bookingValues, (err, result) => {
@@ -14179,6 +14220,29 @@ const runDatabaseMigrations = () => {
             });
         } else {
             console.log('✅ Voucher type column already exists');
+        }
+    });
+    
+    // Check if flight_type_source column exists
+    const checkFlightTypeSourceColumn = "SHOW COLUMNS FROM all_booking LIKE 'flight_type_source'";
+    con.query(checkFlightTypeSourceColumn, (err, result) => {
+        if (err) {
+            console.error('Error checking flight_type_source column:', err);
+            return;
+        }
+        
+        if (result.length === 0) {
+            console.log('Adding flight_type_source column...');
+            const addFlightTypeSourceColumn = "ALTER TABLE all_booking ADD COLUMN flight_type_source VARCHAR(100) DEFAULT NULL COMMENT 'Source of flight type: Redeem Voucher, Buy Gift Voucher, or flight_type/experience value'";
+            con.query(addFlightTypeSourceColumn, (err) => {
+                if (err) {
+                    console.error('Error adding flight_type_source column:', err);
+                } else {
+                    console.log('✅ Flight type source column added successfully');
+                }
+            });
+        } else {
+            console.log('✅ Flight type source column already exists');
         }
     });
     
