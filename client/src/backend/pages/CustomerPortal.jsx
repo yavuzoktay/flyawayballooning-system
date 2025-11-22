@@ -5,6 +5,7 @@ import { Container, Typography, Box, Paper, CircularProgress, Alert, Button } fr
 import dayjs from 'dayjs';
 import CustomerPortalHeader from '../components/CustomerPortal/CustomerPortalHeader';
 import RescheduleFlightModal from '../components/CustomerPortal/RescheduleFlightModal';
+import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import '../components/CustomerPortal/CustomerPortalHeader.css';
 
 const CustomerPortal = () => {
@@ -13,7 +14,11 @@ const CustomerPortal = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+    const [changeLocationModalOpen, setChangeLocationModalOpen] = useState(false);
     const [portalContents, setPortalContents] = useState([]);
+    const [availableLocations, setAvailableLocations] = useState([]);
+    const [selectedNewLocation, setSelectedNewLocation] = useState('');
+    const [changingLocation, setChangingLocation] = useState(false);
 
     // Extract token from URL - handle both /customerPortal/:token and /customerPortal/:token/index
     const token = tokenParam ? tokenParam.split('/')[0] : null;
@@ -77,6 +82,27 @@ const CustomerPortal = () => {
         };
         
         fetchPortalContents();
+        
+        // Fetch available locations
+        const fetchLocations = async () => {
+            try {
+                const response = await axios.get('/api/activities');
+                if (response.data?.success) {
+                    const activities = Array.isArray(response.data.data) ? response.data.data : [];
+                    const uniqueLocations = [...new Set(activities
+                        .filter(a => a.location && a.status === 'Live')
+                        .map(a => a.location)
+                    )];
+                    setAvailableLocations(uniqueLocations.sort());
+                }
+            } catch (error) {
+                console.error('Error fetching locations:', error);
+                // Fallback to default locations
+                setAvailableLocations(['Bath', 'Devon', 'Somerset', 'Bristol Fiesta']);
+            }
+        };
+        
+        fetchLocations();
     }, [token]);
 
     const scrollToSection = (id) => {
@@ -270,6 +296,31 @@ const CustomerPortal = () => {
                                 >
                                     Reschedule Flight
                                 </Button>
+                                
+                                {/* Change Flight Location Button */}
+                                <Button
+                                    variant="outlined"
+                                    color="primary"
+                                    fullWidth
+                                    onClick={() => {
+                                        setSelectedNewLocation(bookingData.location || '');
+                                        setChangeLocationModalOpen(true);
+                                    }}
+                                    sx={{
+                                        mt: 1.5,
+                                        py: 1.5,
+                                        fontSize: '1rem',
+                                        fontWeight: 600,
+                                        textTransform: 'none',
+                                        borderRadius: 2,
+                                        borderWidth: 2,
+                                        '&:hover': {
+                                            borderWidth: 2,
+                                        }
+                                    }}
+                                >
+                                    Change Flight Location
+                                </Button>
                             </Box>
                         );
                     }
@@ -425,6 +476,100 @@ const CustomerPortal = () => {
                     setRescheduleModalOpen(false);
                 }}
             />
+
+            {/* Change Flight Location Modal */}
+            <Dialog
+                open={changeLocationModalOpen}
+                onClose={() => setChangeLocationModalOpen(false)}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle sx={{ fontWeight: 700, fontSize: 20, pb: 1.5 }}>
+                    Change Flight Location
+                </DialogTitle>
+                <DialogContent>
+                    <Typography variant="body1" sx={{ mb: 3, color: 'text.secondary' }}>
+                        Select a new location for your flight. This will update your booking location.
+                    </Typography>
+                    
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                        {availableLocations.map((location) => (
+                            <Button
+                                key={location}
+                                variant={selectedNewLocation === location ? 'contained' : 'outlined'}
+                                onClick={() => setSelectedNewLocation(location)}
+                                sx={{
+                                    py: 1.5,
+                                    fontSize: '1rem',
+                                    fontWeight: 600,
+                                    textTransform: 'none',
+                                    borderRadius: 2,
+                                    justifyContent: 'flex-start',
+                                    backgroundColor: selectedNewLocation === location ? 'primary.main' : 'transparent',
+                                    color: selectedNewLocation === location ? 'white' : 'primary.main',
+                                    borderWidth: 2,
+                                    '&:hover': {
+                                        borderWidth: 2,
+                                        backgroundColor: selectedNewLocation === location ? 'primary.dark' : 'primary.light',
+                                        color: selectedNewLocation === location ? 'white' : 'primary.dark'
+                                    }
+                                }}
+                            >
+                                {location}
+                            </Button>
+                        ))}
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ p: 3, pt: 2, justifyContent: 'flex-end' }}>
+                    <Button 
+                        onClick={() => {
+                            setChangeLocationModalOpen(false);
+                            setSelectedNewLocation('');
+                        }}
+                        disabled={changingLocation}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={async () => {
+                            if (!selectedNewLocation || selectedNewLocation === bookingData.location) {
+                                return;
+                            }
+
+                            setChangingLocation(true);
+                            try {
+                                const response = await axios.patch(`/api/customer-portal-change-location/${bookingData.id}`, {
+                                    location: selectedNewLocation
+                                });
+
+                                if (response.data.success) {
+                                    setBookingData(response.data.data);
+                                    setChangeLocationModalOpen(false);
+                                    setSelectedNewLocation('');
+                                } else {
+                                    setError(response.data.message || 'Failed to change location. Please try again.');
+                                }
+                            } catch (err) {
+                                console.error('Error changing location:', err);
+                                setError(err.response?.data?.message || 'Failed to change location. Please try again later.');
+                            } finally {
+                                setChangingLocation(false);
+                            }
+                        }}
+                        disabled={!selectedNewLocation || selectedNewLocation === bookingData.location || changingLocation}
+                        variant="contained"
+                        sx={{
+                            backgroundColor: '#22c55e',
+                            '&:hover': {
+                                backgroundColor: '#16a34a'
+                            },
+                            fontWeight: 600
+                        }}
+                    >
+                        {changingLocation ? <CircularProgress size={20} /> : 'Confirm'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </>
     );
 };
