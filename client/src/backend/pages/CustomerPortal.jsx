@@ -5,7 +5,7 @@ import { Container, Typography, Box, Paper, CircularProgress, Alert, Button } fr
 import dayjs from 'dayjs';
 import CustomerPortalHeader from '../components/CustomerPortal/CustomerPortalHeader';
 import RescheduleFlightModal from '../components/CustomerPortal/RescheduleFlightModal';
-import { Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Alert } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, IconButton } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import '../components/CustomerPortal/CustomerPortalHeader.css';
