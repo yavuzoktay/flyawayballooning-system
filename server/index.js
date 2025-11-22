@@ -4742,8 +4742,25 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                 }
             }
             
+            // For Redeem Voucher bookings, if status is 'Open', change it to 'Scheduled'
+            let finalStatus = rest.status;
+            if (flight_type_source === 'Redeem Voucher' && finalStatus === 'Open') {
+                finalStatus = 'Scheduled';
+                // Update database if booking exists
+                if (rest.id) {
+                    con.query('UPDATE all_booking SET status = ? WHERE id = ?', ['Scheduled', rest.id], (updateErr) => {
+                        if (updateErr) {
+                            console.warn('Failed to update status to Scheduled for redeem voucher booking', rest.id, updateErr.message);
+                        } else {
+                            console.log('✅ Updated status to Scheduled for redeem voucher booking:', rest.id);
+                        }
+                    });
+                }
+            }
+            
             return {
                 ...rest,
+                status: finalStatus,
                 voucher_type: finalVoucherType,
                 expires: expiresValue,
                 expires_display: expiresDisplay,
