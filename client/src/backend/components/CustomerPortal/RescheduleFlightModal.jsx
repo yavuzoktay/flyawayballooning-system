@@ -83,6 +83,13 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         const firstDayOfMonth = startOfMonth.day();
         
         // Calculate offset to previous Monday
+        // Monday (1): 0 days back
+        // Tuesday (2): 1 day back  
+        // Wednesday (3): 2 days back
+        // Thursday (4): 3 days back
+        // Friday (5): 4 days back
+        // Saturday (6): 5 days back
+        // Sunday (0): 6 days back
         let daysBack;
         if (firstDayOfMonth === 0) {
             daysBack = 6; // Sunday -> go back to Monday
@@ -98,6 +105,8 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             const isPast = d.isBefore(dayjs(), 'day');
             const isSelected = selectedDate && dayjs(selectedDate).isSame(d, 'day');
             
+            // Aggregate availability for this date
+            // Handle both date formats: "2025-11-14" or "2025-11-14T00:00:00.000Z"
             const dateStr = d.format('YYYY-MM-DD');
             const slots = availabilities.filter(a => {
                 if (!a.date) return false;
@@ -106,7 +115,11 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             });
             const totalAvailable = slots.reduce((acc, s) => acc + (Number(s.available) || Number(s.calculated_available) || 0), 0);
             const soldOut = slots.length > 0 && totalAvailable <= 0;
-            const isSelectable = inCurrentMonth && !isPast && slots.length > 0 && !soldOut;
+            
+            // Tarih seçilebilir olmalı eğer:
+            // 1. Mevcut ay içinde
+            // 2. Geçmiş değil
+            const isSelectable = inCurrentMonth && !isPast;
             
             cells.push(
                 <div
@@ -117,25 +130,52 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                             setSelectedTime(null);
                         }
                     }}
+                    onMouseEnter={(e) => {
+                        if (isSelectable) {
+                            e.target.style.transform = 'scale(1.05)';
+                            e.target.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
+                        }
+                    }}
+                    onMouseLeave={(e) => {
+                        if (isSelectable) {
+                            e.target.style.transform = 'scale(1)';
+                            e.target.style.boxShadow = 'none';
+                        }
+                    }}
                     style={{
-                        width: 'calc((100% - 3px * 6) / 7)',
                         aspectRatio: '1 / 1',
-                        borderRadius: 8,
-                        background: isSelected ? '#56C1FF' : (isSelectable ? '#22c55e' : '#f0f0f0'),
-                        color: isSelected ? '#fff' : (isSelectable ? '#fff' : '#999'),
-                        display: inCurrentMonth ? 'flex' : 'none',
+                        borderRadius: 10,
+                        background: isSelected 
+                            ? '#56C1FF' 
+                            : isPast 
+                                ? '#f0f0f0' 
+                                : soldOut 
+                                    ? '#888' 
+                                    : '#22c55e',
+                        color: isSelected 
+                            ? '#fff' 
+                            : isPast 
+                                ? '#999' 
+                                : soldOut 
+                                    ? '#fff' 
+                                    : '#fff',
+                        display: 'flex',  // Always flex for Grid - use opacity for visibility
+                        opacity: !inCurrentMonth ? 0 : (isSelectable ? 1 : 0.6),  // Hide other months, dim unselectable dates
+                        pointerEvents: inCurrentMonth && isSelectable ? 'auto' : 'none',  // Disable interaction for hidden/unselectable dates
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
                         fontWeight: 700,
                         cursor: isSelectable ? 'pointer' : 'default',
                         userSelect: 'none',
-                        fontSize: 12,
-                        marginBottom: 3
+                        fontSize: 14,
+                        zIndex: 1,
+                        position: 'relative',
+                        transition: 'all 0.2s ease'
                     }}
                 >
                     <div>{d.date()}</div>
-                    <div style={{ fontSize: 9, fontWeight: 600 }}>
+                    <div style={{ fontSize: 10, fontWeight: 600 }}>
                         {slots.length === 0 ? '' : (soldOut ? 'Sold Out' : `${totalAvailable} Spaces`)}
                     </div>
                 </div>
