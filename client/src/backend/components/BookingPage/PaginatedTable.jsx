@@ -386,7 +386,7 @@ const PaginatedTable = ({
                         );
                     })}
                     {/* Actions column for bookings/vouchers */}
-                    {(context === 'bookings' || context === 'vouchers') && onEmailClick && <col style={{ width: '160px', minWidth: '160px' }} />}
+                    {(context === 'bookings' || context === 'vouchers') && onEmailClick && <col style={{ width: '220px', minWidth: '220px' }} />}
                 </colgroup>
                 <thead style={{ background: "#3274b4", color: "#FFF" }}>
                     <tr>
