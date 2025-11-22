@@ -9690,6 +9690,165 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
     }
 });
 
+// Customer Portal - Change Flight Location
+app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) => {
+    const { bookingId } = req.params;
+    const { location } = req.body;
+
+    console.log('📍 Customer Portal Change Location - Booking ID:', bookingId);
+    console.log('📍 Customer Portal Change Location - New location:', location);
+
+    if (!bookingId || !location) {
+        return res.status(400).json({ 
+            success: false, 
+            message: 'Booking ID and location are required' 
+        });
+    }
+
+    try {
+        // Verify booking exists
+        const [bookingRows] = await new Promise((resolve, reject) => {
+            con.query('SELECT * FROM all_booking WHERE id = ?', [bookingId], (err, rows) => {
+                if (err) reject(err);
+                else resolve([rows]);
+            });
+        });
+
+        if (!bookingRows || bookingRows.length === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Booking not found' 
+            });
+        }
+
+        const booking = bookingRows[0];
+
+        // Find activity for the new location
+        const [activityRows] = await new Promise((resolve, reject) => {
+            con.query('SELECT id FROM activity WHERE location = ? AND status = ? LIMIT 1', [location, 'Live'], (err, rows) => {
+                if (err) reject(err);
+                else resolve([rows]);
+            });
+        });
+
+        let newActivityId = booking.activity_id;
+        if (activityRows && activityRows.length > 0) {
+            newActivityId = activityRows[0].id;
+        }
+
+        // Update booking location and activity_id
+        const updateSql = `
+            UPDATE all_booking 
+            SET location = ?,
+                activity_id = ?,
+                updated_at = NOW()
+            WHERE id = ?
+        `;
+        
+        await new Promise((resolve, reject) => {
+            con.query(updateSql, [location, newActivityId, bookingId], (err, result) => {
+                if (err) {
+                    console.error('Error updating booking location:', err);
+                    reject(err);
+                } else {
+                    resolve(result);
+                }
+            });
+        });
+
+        // Add history entry for location change
+        const historySql = `
+            INSERT INTO booking_status_history (booking_id, status, changed_at, notes)
+            VALUES (?, ?, NOW(), ?)
+        `;
+        
+        await new Promise((resolve, reject) => {
+            con.query(historySql, [bookingId, booking.status || 'Scheduled', `Location changed to ${location} via Customer Portal`], (err, result) => {
+                if (err) {
+                    console.error('Error adding history entry:', err);
+                    // Don't fail the request if history insert fails
+                }
+                resolve(result);
+            });
+        });
+
+        // Fetch updated booking data
+        const [updatedBookingRows] = await new Promise((resolve, reject) => {
+            con.query('SELECT * FROM all_booking WHERE id = ?', [bookingId], (err, rows) => {
+                if (err) reject(err);
+                else resolve([rows]);
+            });
+        });
+
+        const updatedBooking = updatedBookingRows[0];
+
+        // Get passengers
+        const [passengerRows] = await new Promise((resolve, reject) => {
+            con.query('SELECT * FROM passenger WHERE booking_id = ?', [bookingId], (err, rows) => {
+                if (err) reject(err);
+                else resolve([rows]);
+            });
+        });
+
+        // Get flight attempts count
+        let flightAttemptsCount = 0;
+        try {
+            const [historyRows] = await new Promise((resolve, reject) => {
+                con.query(`
+                    SELECT COUNT(*) as count 
+                    FROM booking_status_history 
+                    WHERE booking_id = ? AND status = 'Scheduled'
+                `, [bookingId], (err, rows) => {
+                    if (err) reject(err);
+                    else resolve([rows]);
+                });
+            });
+            flightAttemptsCount = historyRows && historyRows.length > 0 ? (historyRows[0].count || 0) : 0;
+        } catch (historyErr) {
+            console.error('Error counting flight attempts:', historyErr);
+        }
+
+        const response = {
+            success: true,
+            data: {
+                id: updatedBooking.id,
+                booking_id: updatedBooking.id,
+                booking_reference: updatedBooking.id,
+                name: updatedBooking.name,
+                email: updatedBooking.email,
+                phone: updatedBooking.phone,
+                flight_date: updatedBooking.flight_date,
+                flight_type: updatedBooking.flight_type || updatedBooking.experience,
+                experience: updatedBooking.experience || updatedBooking.flight_type,
+                location: updatedBooking.location,
+                status: updatedBooking.status,
+                pax: updatedBooking.pax,
+                passengers: passengerRows || [],
+                voucher_code: updatedBooking.voucher_code,
+                voucher_ref: updatedBooking.voucher_code || null,
+                voucher_type: updatedBooking.voucher_type,
+                paid: updatedBooking.paid,
+                due: updatedBooking.due,
+                expires: updatedBooking.expires,
+                created_at: updatedBooking.created_at,
+                additional_notes: updatedBooking.additional_notes,
+                flight_attempts: flightAttemptsCount,
+                activity_id: updatedBooking.activity_id || null
+            }
+        };
+
+        console.log('✅ Customer Portal Change Location - Successfully changed location for booking:', bookingId);
+        res.json(response);
+    } catch (error) {
+        console.error('❌ Customer Portal Change Location - Error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to change location', 
+            error: error.message 
+        });
+    }
+});
+
 // Passenger tablosunda herhangi bir yolcunun weight bilgisini güncellemek için
 app.patch('/api/updatePassengerField', (req, res) => {
     const { passenger_id, field, value } = req.body;
