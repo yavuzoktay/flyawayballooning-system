@@ -363,7 +363,7 @@ const PaginatedTable = ({
                                        id === 'name' ? '180px' : 
                                        id === 'voucher_code' ? '120px' :
                                        id === 'status' ? '120px' : 
-                                       id === 'voucher_type' ? '180px' :
+                                       id === 'voucher_type' ? (context === 'vouchers' ? '220px' : '180px') :
                                        id === 'voucher_ref' ? '160px' :
                                        id === 'passenger_info' ? '200px' :
                                        id === 'created_at' || id === 'created' ? '120px' :
@@ -377,7 +377,7 @@ const PaginatedTable = ({
                                          id === 'name' ? '180px' : 
                                          id === 'voucher_code' ? '120px' :
                                          id === 'status' ? '120px' : 
-                                         id === 'voucher_type' ? '180px' :
+                                         id === 'voucher_type' ? (context === 'vouchers' ? '220px' : '180px') :
                                          id === 'voucher_ref' ? '160px' :
                                          id === 'passenger_info' ? '200px' :
                                          id === 'created_at' || id === 'created' ? '120px' :
