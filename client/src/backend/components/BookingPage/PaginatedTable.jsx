@@ -406,7 +406,7 @@ const PaginatedTable = ({
                                 whiteSpace: "nowrap",
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
-                                fontSize: "14px"
+                                fontSize: "16px"
                             }}>{col}</th>
                         ))}
                     </tr>
@@ -438,14 +438,14 @@ const PaginatedTable = ({
                                                             overflow: "hidden",
                                                             textOverflow: "ellipsis",
                                                             maxWidth: id === 'flight_date' ? "200px" : "200px",
-                                                            fontSize: "14px"
+                                                            fontSize: "16px"
                                                         }}>
                                                             {id === 'name' ? (
                                                                 selectable ? (
                                                                     <span>{item[id]}</span>
                                                                 ) : (
                                                                     <span
-                                                                        style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer' }}
+                                                                        style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontSize: '16px' }}
                                                                         onClick={() => onNameClick && onNameClick(item)}
                                                                     >
                                                                         {item[id]}
@@ -528,7 +528,7 @@ const PaginatedTable = ({
                                                         return (
                                                             <a
                                                                 href={`https://flyawayballooning-system.com/manifest?date=${urlDate}`}
-                                                                style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
+                                                                style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600, fontSize: '16px' }}
                                                                 target="_self"
                                                                 rel="noopener noreferrer"
                                                             >
@@ -578,7 +578,8 @@ const PaginatedTable = ({
                                                                 color: '#3274b4',
                                                                 textDecoration: 'underline',
                                                                 cursor: 'pointer',
-                                                                fontWeight: '600'
+                                                                fontWeight: '600',
+                                                                fontSize: '16px'
                                                             }}
                                                             onClick={() => onVoucherRefClick(item)}
                                                             title="View related booking"
@@ -600,6 +601,7 @@ const PaginatedTable = ({
                                                             textDecoration: 'underline', 
                                                             cursor: 'pointer',
                                                             fontWeight: '600',
+                                                            fontSize: '16px',
                                                             padding: '4px 8px',
                                                             backgroundColor: '#e3f2fd',
                                                             borderRadius: '4px',
@@ -642,13 +644,13 @@ const PaginatedTable = ({
                                             <button
                                                 onClick={() => onEmailClick(item)}
                                                 style={{
-                                                    padding: "4px 8px",
+                                                    padding: "5px 10px",
                                                     backgroundColor: "#28a745",
                                                     color: "white",
                                                     border: "none",
                                                     borderRadius: "4px",
                                                     cursor: "pointer",
-                                                    fontSize: "13px",
+                                                    fontSize: "15px",
                                                     fontWeight: "500",
                                                     lineHeight: 1.2
                                                 }}
@@ -660,13 +662,13 @@ const PaginatedTable = ({
                                                 <button
                                                     onClick={() => onSmsClick(item)}
                                                     style={{
-                                                        padding: "4px 8px",
+                                                        padding: "5px 10px",
                                                         backgroundColor: "#17a2b8",
                                                         color: "white",
                                                         border: "none",
                                                         borderRadius: "4px",
                                                         cursor: "pointer",
-                                                        fontSize: "13px",
+                                                        fontSize: "15px",
                                                         fontWeight: "500",
                                                         lineHeight: 1.2
                                                     }}
