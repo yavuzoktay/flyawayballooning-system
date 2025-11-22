@@ -9750,7 +9750,7 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
         }
 
         // Prepare update fields
-        const updateFields = ['location = ?', 'activity_id = ?', 'updated_at = NOW()'];
+        const updateFields = ['location = ?', 'activity_id = ?'];
         const updateValues = [location, newActivityId];
         const timeSlotFields = [];
         const timeSlotValues = [];
