@@ -339,7 +339,7 @@ const CustomerPortal = () => {
                             
                             {/* Cancel Flight Button - Always visible, but disabled if less than 120 hours */}
                             <Tooltip 
-                                title={!canCancel ? "Uçuşunuza 120 saatten az kaldı" : ""}
+                                title={!canCancel ? "Less than 120 hours remaining until your flight" : ""}
                                 arrow
                             >
                                 <span style={{ display: 'block', width: '100%' }}>
