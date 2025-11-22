@@ -9782,10 +9782,30 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
             updateValues.push(flight_date, 'Scheduled');
             
             // Extract time from flight_date if it includes time
-            if (flight_date.includes(' ')) {
-                const timePart = flight_date.split(' ')[1];
-                updateFields.push('time_slot = TIME(?)');
-                updateValues.push(timePart);
+            if (flight_date && flight_date.includes(' ')) {
+                try {
+                    const timePart = flight_date.split(' ')[1];
+                    // Ensure time format is correct (HH:mm:ss or HH:mm)
+                    if (timePart && timePart.includes(':')) {
+                        // Remove seconds if present, keep only HH:mm for TIME() function
+                        let timeValue = timePart;
+                        const timeParts = timePart.split(':');
+                        if (timeParts.length >= 2) {
+                            // Take only HH:mm part
+                            timeValue = `${timeParts[0]}:${timeParts[1]}`;
+                            updateFields.push('time_slot = TIME(?)');
+                            updateValues.push(timeValue);
+                            console.log('✅ Time slot will be updated to:', timeValue);
+                        } else {
+                            console.warn('⚠️ Invalid time format:', timePart);
+                        }
+                    } else {
+                        console.warn('⚠️ Time part not found or invalid:', timePart);
+                    }
+                } catch (timeErr) {
+                    console.error('❌ Error extracting time from flight_date:', timeErr);
+                    // Continue without time_slot update if there's an error
+                }
             }
         }
 
@@ -9798,15 +9818,21 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
         
         updateValues.push(bookingId);
         
+        console.log('🔍 Update SQL:', updateSql);
+        console.log('🔍 Update Values:', JSON.stringify(updateValues, null, 2));
+        
         await new Promise((resolve, reject) => {
             con.query(updateSql, updateValues, (err, result) => {
                 if (err) {
                     console.error('❌ Error updating booking location:', err);
+                    console.error('❌ Error code:', err.code);
+                    console.error('❌ Error sqlMessage:', err.sqlMessage);
                     console.error('❌ SQL:', updateSql);
-                    console.error('❌ Values:', updateValues);
+                    console.error('❌ Values:', JSON.stringify(updateValues, null, 2));
                     reject(err);
                 } else {
                     console.log('✅ Successfully updated booking:', bookingId);
+                    console.log('✅ Affected rows:', result.affectedRows);
                     resolve(result);
                 }
             });
