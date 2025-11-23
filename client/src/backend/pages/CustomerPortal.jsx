@@ -33,45 +33,45 @@ const CustomerPortal = () => {
     // Extract token from URL - handle both /customerPortal/:token and /customerPortal/:token/index
     const token = tokenParam ? tokenParam.split('/')[0] : null;
 
-    useEffect(() => {
+    const fetchBookingData = async () => {
         if (!token) {
             setError('Invalid token');
             setLoading(false);
             return;
         }
 
-        const fetchBookingData = async () => {
-            try {
-                setLoading(true);
-                setError(null);
-                // URL encode the token to handle special characters like =
-                const encodedToken = encodeURIComponent(token);
-                console.log('🔍 Customer Portal - Fetching booking data with token:', token);
-                console.log('🔍 Customer Portal - Encoded token:', encodedToken);
-                const response = await axios.get(`/api/customer-portal-booking/${encodedToken}`);
-                
-                console.log('✅ Customer Portal - Response received:', response.data);
-                if (response.data.success) {
-                    setBookingData(response.data.data);
-                } else {
-                    console.error('❌ Customer Portal - API returned error:', response.data);
-                    setError(response.data.message || 'Failed to load booking data');
-                }
-            } catch (err) {
-                console.error('❌ Customer Portal - Error fetching booking data:', err);
-                console.error('❌ Customer Portal - Error response:', err.response);
-                console.error('❌ Customer Portal - Error status:', err.response?.status);
-                console.error('❌ Customer Portal - Error data:', err.response?.data);
-                const errorMessage = err.response?.data?.message || 
-                                   (err.response?.status === 404 ? 'Booking not found. Please check your link.' : 
-                                    err.response?.status === 500 ? 'Server error. Please try again later.' :
-                                    'Error loading booking data. Please try again later.');
-                setError(errorMessage);
-            } finally {
-                setLoading(false);
+        try {
+            setLoading(true);
+            setError(null);
+            // URL encode the token to handle special characters like =
+            const encodedToken = encodeURIComponent(token);
+            console.log('🔍 Customer Portal - Fetching booking data with token:', token);
+            console.log('🔍 Customer Portal - Encoded token:', encodedToken);
+            const response = await axios.get(`/api/customer-portal-booking/${encodedToken}`);
+            
+            console.log('✅ Customer Portal - Response received:', response.data);
+            if (response.data.success) {
+                setBookingData(response.data.data);
+            } else {
+                console.error('❌ Customer Portal - API returned error:', response.data);
+                setError(response.data.message || 'Failed to load booking data');
             }
-        };
+        } catch (err) {
+            console.error('❌ Customer Portal - Error fetching booking data:', err);
+            console.error('❌ Customer Portal - Error response:', err.response);
+            console.error('❌ Customer Portal - Error status:', err.response?.status);
+            console.error('❌ Customer Portal - Error data:', err.response?.data);
+            const errorMessage = err.response?.data?.message || 
+                               (err.response?.status === 404 ? 'Booking not found. Please check your link.' : 
+                                err.response?.status === 500 ? 'Server error. Please try again later.' :
+                                'Error loading booking data. Please try again later.');
+            setError(errorMessage);
+        } finally {
+            setLoading(false);
+        }
+    };
 
+    useEffect(() => {
         fetchBookingData();
         
         // Fetch customer portal contents
@@ -113,6 +113,29 @@ const CustomerPortal = () => {
         };
         
         fetchLocations();
+
+        // Refresh booking data when page becomes visible (user switches back to tab)
+        const handleVisibilityChange = () => {
+            if (!document.hidden && token) {
+                console.log('🔄 Customer Portal - Page visible, refreshing booking data');
+                fetchBookingData();
+            }
+        };
+
+        // Refresh booking data periodically (every 30 seconds) to get latest updates
+        const refreshInterval = setInterval(() => {
+            if (token && !document.hidden) {
+                console.log('🔄 Customer Portal - Periodic refresh of booking data');
+                fetchBookingData();
+            }
+        }, 30000); // 30 seconds
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            clearInterval(refreshInterval);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, [token]);
 
     const scrollToSection = (id) => {
@@ -484,9 +507,9 @@ const CustomerPortal = () => {
                             <Typography variant="body1" sx={{ fontWeight: 500 }}>
                                 {passenger.first_name} {passenger.last_name}
                             </Typography>
-                            {index === 0 && passenger.phone && (
+                            {index === 0 && (bookingData.phone || passenger.phone) && (
                                 <Typography variant="body2" color="text.secondary">
-                                    Phone: {passenger.phone}
+                                    Phone: {bookingData.phone || passenger.phone}
                                 </Typography>
                             )}
                             {passenger.weight && (
