@@ -9483,6 +9483,27 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         
         console.log('✅ Customer Portal - Booking found:', booking.id);
 
+        // Get voucher_type from all_vouchers if booking was created from redeem voucher
+        // This matches the logic in getAllBookingData endpoint
+        let finalVoucherType = booking.voucher_type;
+        if (booking.voucher_code) {
+            try {
+                const [voucherRows] = await new Promise((resolve, reject) => {
+                    con.query('SELECT voucher_type FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [booking.voucher_code], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
+                });
+                if (voucherRows && voucherRows.length > 0 && voucherRows[0].voucher_type) {
+                    finalVoucherType = voucherRows[0].voucher_type;
+                    console.log('✅ Customer Portal - Voucher type from all_vouchers:', finalVoucherType);
+                }
+            } catch (voucherErr) {
+                console.warn('⚠️ Customer Portal - Could not fetch voucher_type from all_vouchers:', voucherErr.message);
+                // Continue with booking.voucher_type as fallback
+            }
+        }
+
         // Get passengers for this booking
         const [passengerRows] = await new Promise((resolve, reject) => {
             con.query('SELECT * FROM passenger WHERE booking_id = ?', [booking.id], (err, rows) => {
@@ -9537,7 +9558,7 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 passengers: passengerRows || [],
                 voucher_code: booking.voucher_code,
                 voucher_ref: booking.voucher_code || null,
-                voucher_type: booking.voucher_type,
+                voucher_type: finalVoucherType || booking.voucher_type,
                 paid: booking.paid,
                 due: booking.due,
                 expires: booking.expires,
