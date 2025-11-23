@@ -291,32 +291,12 @@ const CustomerPortal = () => {
                     </Box>
                     <Box>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
-                            Booking Created Date
-                        </Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1.1rem', color: '#0f172a' }}>
-                            {bookingData.created_at 
-                                ? dayjs(bookingData.created_at).format('DD/MM/YYYY HH:mm')
-                                : 'N/A'}
-                        </Typography>
-                    </Box>
-                    <Box>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
                             Voucher Expiry Date
                         </Typography>
                         <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1.1rem', color: '#0f172a' }}>
                             {bookingData.expires 
                                 ? dayjs(bookingData.expires).format('DD/MM/YYYY')
                                 : 'No expiry date'}
-                        </Typography>
-                    </Box>
-                    <Box sx={{ gridColumn: { xs: '1', md: '1 / -1' } }}>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
-                            Number of Flight Attempts Made
-                        </Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1.1rem', color: '#0f172a' }}>
-                            {bookingData.flight_attempts !== undefined && bookingData.flight_attempts !== null 
-                                ? bookingData.flight_attempts 
-                                : 0}
                         </Typography>
                     </Box>
                 </Box>
@@ -351,6 +331,22 @@ const CustomerPortal = () => {
                         <Typography variant="body2" color="text.secondary">Location</Typography>
                         <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
                             {bookingData.location || 'TBD'}
+                        </Typography>
+                    </Box>
+                    <Box>
+                        <Typography variant="body2" color="text.secondary">Booking Created Date</Typography>
+                        <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                            {bookingData.created_at 
+                                ? dayjs(bookingData.created_at).format('DD/MM/YYYY HH:mm')
+                                : 'N/A'}
+                        </Typography>
+                    </Box>
+                    <Box>
+                        <Typography variant="body2" color="text.secondary">Number of Flight Attempts Made</Typography>
+                        <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                            {bookingData.flight_attempts !== undefined && bookingData.flight_attempts !== null 
+                                ? bookingData.flight_attempts 
+                                : 0}
                         </Typography>
                     </Box>
                 </Box>
