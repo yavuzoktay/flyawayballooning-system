@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import { Container, Typography, Box, Paper, CircularProgress, Alert, Button } from '@mui/material';
+import { Container, Typography, Box, Paper, CircularProgress, Alert, Button, TextField } from '@mui/material';
 import dayjs from 'dayjs';
 import CustomerPortalHeader from '../components/CustomerPortal/CustomerPortalHeader';
 import RescheduleFlightModal from '../components/CustomerPortal/RescheduleFlightModal';
 import { Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Tooltip } from '@mui/material';
+import EditIcon from '@mui/icons-material/Edit';
+import SaveIcon from '@mui/icons-material/Save';
+import CancelIcon from '@mui/icons-material/Cancel';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import '../components/CustomerPortal/CustomerPortalHeader.css';
@@ -29,6 +32,13 @@ const CustomerPortal = () => {
     const [selectedActivityId, setSelectedActivityId] = useState(null);
     const [cancelFlightDialogOpen, setCancelFlightDialogOpen] = useState(false);
     const [cancellingFlight, setCancellingFlight] = useState(false);
+    
+    // Passenger edit states
+    const [editingPassenger, setEditingPassenger] = useState(null);
+    const [editPassengerFirstName, setEditPassengerFirstName] = useState('');
+    const [editPassengerLastName, setEditPassengerLastName] = useState('');
+    const [editPassengerWeight, setEditPassengerWeight] = useState('');
+    const [savingPassengerEdit, setSavingPassengerEdit] = useState(false);
 
     // Extract token from URL - handle both /customerPortal/:token and /customerPortal/:token/index
     const token = tokenParam ? tokenParam.split('/')[0] : null;
@@ -142,6 +152,56 @@ const CustomerPortal = () => {
         const element = document.getElementById(id);
         if (element) {
             element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    };
+
+    // Passenger edit handlers
+    const handleEditPassengerClick = (passenger) => {
+        setEditingPassenger(passenger.id);
+        setEditPassengerFirstName(passenger.first_name || '');
+        setEditPassengerLastName(passenger.last_name || '');
+        setEditPassengerWeight(passenger.weight || '');
+    };
+
+    const handleCancelPassengerEdit = () => {
+        setEditingPassenger(null);
+        setEditPassengerFirstName('');
+        setEditPassengerLastName('');
+        setEditPassengerWeight('');
+    };
+
+    const handleSavePassengerEdit = async (passenger) => {
+        setSavingPassengerEdit(true);
+        try {
+            const updates = [];
+            
+            if (editPassengerFirstName !== (passenger.first_name || '')) {
+                updates.push({ field: 'first_name', value: editPassengerFirstName });
+            }
+            if (editPassengerLastName !== (passenger.last_name || '')) {
+                updates.push({ field: 'last_name', value: editPassengerLastName });
+            }
+            if (editPassengerWeight !== (passenger.weight || '')) {
+                updates.push({ field: 'weight', value: editPassengerWeight });
+            }
+
+            // Update each field that has changed
+            for (const update of updates) {
+                await axios.patch('/api/updatePassengerField', {
+                    passenger_id: passenger.id,
+                    field: update.field,
+                    value: update.value
+                });
+            }
+
+            // Refresh booking data to get updated passenger information
+            await fetchBookingData();
+            setEditingPassenger(null);
+        } catch (err) {
+            console.error('Failed to update passenger details:', err);
+            alert('Failed to update passenger details. Please try again.');
+        } finally {
+            setSavingPassengerEdit(false);
         }
     };
 
@@ -502,28 +562,108 @@ const CustomerPortal = () => {
                     <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
                         Passengers
                     </Typography>
-                    {bookingData.passengers.map((passenger, index) => (
-                        <Box key={index} sx={{ mb: 2, p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
-                            <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                                {passenger.first_name} {passenger.last_name}
-                            </Typography>
-                            {index === 0 && (bookingData.phone || passenger.phone) && (
-                                <Typography variant="body2" color="text.secondary">
-                                    Phone: {bookingData.phone || passenger.phone}
-                                </Typography>
-                            )}
-                            {passenger.weight && (
-                                <Typography variant="body2" color="text.secondary">
-                                    Weight: {passenger.weight} kg
-                                </Typography>
-                            )}
-                            {index === 0 && passenger.email && (
-                                <Typography variant="body2" color="text.secondary">
-                                    Email: {passenger.email}
-                                </Typography>
-                            )}
-                        </Box>
-                    ))}
+                    {bookingData.passengers.map((passenger, index) => {
+                        const isEditing = editingPassenger === passenger.id;
+                        return (
+                            <Box key={passenger.id || index} sx={{ mb: 2, p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+                                {/* Name Section */}
+                                <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    {isEditing ? (
+                                        <Box sx={{ display: 'flex', gap: 1, flex: 1, flexWrap: 'wrap' }}>
+                                            <TextField
+                                                size="small"
+                                                label="First Name"
+                                                value={editPassengerFirstName}
+                                                onChange={(e) => setEditPassengerFirstName(e.target.value)}
+                                                sx={{ flex: 1, minWidth: '120px' }}
+                                            />
+                                            <TextField
+                                                size="small"
+                                                label="Last Name"
+                                                value={editPassengerLastName}
+                                                onChange={(e) => setEditPassengerLastName(e.target.value)}
+                                                sx={{ flex: 1, minWidth: '120px' }}
+                                            />
+                                        </Box>
+                                    ) : (
+                                        <>
+                                            <Typography variant="body1" sx={{ fontWeight: 500, flex: 1 }}>
+                                                {passenger.first_name} {passenger.last_name}
+                                            </Typography>
+                                            <IconButton
+                                                size="small"
+                                                onClick={() => handleEditPassengerClick(passenger)}
+                                                sx={{ color: '#3274b4' }}
+                                            >
+                                                <EditIcon fontSize="small" />
+                                            </IconButton>
+                                        </>
+                                    )}
+                                </Box>
+
+                                {/* Phone (only for first passenger) */}
+                                {index === 0 && (bookingData.phone || passenger.phone) && (
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                                        Phone: {bookingData.phone || passenger.phone}
+                                    </Typography>
+                                )}
+
+                                {/* Weight Section */}
+                                <Box sx={{ mb: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    {isEditing ? (
+                                        <TextField
+                                            size="small"
+                                            label="Weight (kg)"
+                                            value={editPassengerWeight}
+                                            onChange={(e) => setEditPassengerWeight(e.target.value.replace(/[^0-9.]/g, ''))}
+                                            sx={{ width: '150px' }}
+                                            inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
+                                        />
+                                    ) : (
+                                        <>
+                                            {passenger.weight && (
+                                                <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
+                                                    Weight: {passenger.weight} kg
+                                                </Typography>
+                                            )}
+                                        </>
+                                    )}
+                                </Box>
+
+                                {/* Email (only for first passenger) */}
+                                {index === 0 && passenger.email && (
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                                        Email: {passenger.email}
+                                    </Typography>
+                                )}
+
+                                {/* Edit Action Buttons */}
+                                {isEditing && (
+                                    <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+                                        <Button
+                                            size="small"
+                                            variant="contained"
+                                            color="primary"
+                                            startIcon={<SaveIcon />}
+                                            onClick={() => handleSavePassengerEdit(passenger)}
+                                            disabled={savingPassengerEdit}
+                                        >
+                                            Save
+                                        </Button>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            startIcon={<CancelIcon />}
+                                            onClick={handleCancelPassengerEdit}
+                                            disabled={savingPassengerEdit}
+                                        >
+                                            Cancel
+                                        </Button>
+                                    </Box>
+                                )}
+                            </Box>
+                        );
+                    })}
                 </Paper>
             )}
 
