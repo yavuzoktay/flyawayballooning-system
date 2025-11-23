@@ -267,23 +267,6 @@ const CustomerPortal = () => {
                     </Box>
                 </Box>
 
-            {/* Booking/Voucher Information Section */}
-            <Paper elevation={2} sx={{ p: 3, mb: 3, backgroundColor: '#f8f9fa' }}>
-                <Typography variant="h5" sx={{ fontWeight: 600, mb: 3, color: '#0f172a' }}>
-                    Booking & Voucher Information
-                </Typography>
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
-                    <Box>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
-                            Booking ID or Voucher Ref
-                        </Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1.1rem', color: '#0f172a' }}>
-                            {bookingData.booking_id || bookingData.voucher_ref || bookingData.voucher_code || bookingData.id || 'N/A'}
-                        </Typography>
-                    </Box>
-                </Box>
-            </Paper>
-
             <Paper id="scroll-target-booking" elevation={2} sx={{ p: 3, mb: 3, scrollMarginTop: '100px' }}>
                 <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
                     Booking Overview
