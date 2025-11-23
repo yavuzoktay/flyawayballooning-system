@@ -174,9 +174,6 @@ const CustomerPortal = () => {
                             }} 
                         />
                     </Box>
-                    <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 2, textAlign: 'center' }}>
-                        Your Ballooning Adventure
-                    </Typography>
                     <Box sx={{ textAlign: 'left' }}>
                         <Typography variant="h5" component="h2" sx={{ fontWeight: 600, mb: 1, color: '#0f172a' }}>
                             Welcome, {bookingData.name ? bookingData.name.split(' ')[0] : 'Guest'}
