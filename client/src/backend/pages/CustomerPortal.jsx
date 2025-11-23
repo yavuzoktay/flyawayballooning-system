@@ -148,13 +148,6 @@ const CustomerPortal = () => {
         };
     }, [token]);
 
-    const scrollToSection = (id) => {
-        const element = document.getElementById(id);
-        if (element) {
-            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    };
-
     // Passenger edit handlers
     const handleEditPassengerClick = (passenger) => {
         setEditingPassenger(passenger.id);
@@ -208,7 +201,7 @@ const CustomerPortal = () => {
     if (loading) {
         return (
             <>
-                <CustomerPortalHeader onNavigate={scrollToSection} />
+                <CustomerPortalHeader />
                 <Container maxWidth="md" sx={{ py: 4, textAlign: 'center' }}>
                     <CircularProgress />
                     <Typography variant="body1" sx={{ mt: 2 }}>Loading customer portal...</Typography>
@@ -220,7 +213,7 @@ const CustomerPortal = () => {
     if (error) {
         return (
             <>
-                <CustomerPortalHeader onNavigate={scrollToSection} />
+                <CustomerPortalHeader />
                 <Container maxWidth="md" sx={{ py: 4 }}>
                     <Alert severity="error">{error}</Alert>
                 </Container>
@@ -231,7 +224,7 @@ const CustomerPortal = () => {
     if (!bookingData) {
         return (
             <>
-                <CustomerPortalHeader onNavigate={scrollToSection} />
+                <CustomerPortalHeader />
                 <Container maxWidth="md" sx={{ py: 4 }}>
                     <Alert severity="info">No booking data found.</Alert>
                 </Container>
