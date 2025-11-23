@@ -354,14 +354,23 @@ const CustomerPortal = () => {
                     const now = dayjs();
                     const hoursUntilFlight = flightDate.diff(now, 'hour');
                     const isCancelled = bookingData.status && bookingData.status.toLowerCase() === 'cancelled';
-                    const canRescheduleOrChange = !isCancelled && hoursUntilFlight > 120;
+                    
+                    // Check if expiry date has passed
+                    const expiryDate = bookingData.expires ? dayjs(bookingData.expires) : null;
+                    const isExpired = expiryDate ? expiryDate.isBefore(now, 'day') : false;
+                    
+                    // Reschedule button: Only disabled if expiry date has passed (not based on cancelled status)
+                    const canReschedule = !isExpired;
+                    
+                    // Change Location and Cancel buttons: Disabled if cancelled or less than 120 hours
+                    const canChangeLocation = !isCancelled && hoursUntilFlight > 120;
                     const canCancel = !isCancelled && hoursUntilFlight > 120;
                     
                     return (
                         <Box sx={{ mt: 3, pt: 3, borderTop: '1px solid #e0e0e0' }}>
-                            {/* Reschedule Flight Button - Disabled if cancelled or less than 120 hours */}
+                            {/* Reschedule Flight Button - Disabled only if expiry date has passed */}
                             <Tooltip 
-                                title={isCancelled ? "Flight is cancelled" : (!canRescheduleOrChange ? "Less than 120 hours remaining until your flight" : "")}
+                                title={isExpired ? "Voucher / Booking has expired" : ""}
                                 arrow
                             >
                                 <span style={{ display: 'block', width: '100%' }}>
@@ -369,18 +378,18 @@ const CustomerPortal = () => {
                                         variant="contained"
                                         color="primary"
                                         fullWidth
-                                        disabled={!canRescheduleOrChange}
-                                        onClick={() => canRescheduleOrChange && setRescheduleModalOpen(true)}
+                                        disabled={!canReschedule}
+                                        onClick={() => canReschedule && setRescheduleModalOpen(true)}
                                         sx={{
                                             py: 1.5,
                                             fontSize: '1rem',
                                             fontWeight: 600,
                                             textTransform: 'none',
                                             borderRadius: 2,
-                                            boxShadow: canRescheduleOrChange ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
-                                            backgroundColor: canRescheduleOrChange ? undefined : '#f3f4f6',
-                                            color: canRescheduleOrChange ? undefined : '#9ca3af',
-                                            '&:hover': canRescheduleOrChange ? {
+                                            boxShadow: canReschedule ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+                                            backgroundColor: canReschedule ? undefined : '#f3f4f6',
+                                            color: canReschedule ? undefined : '#9ca3af',
+                                            '&:hover': canReschedule ? {
                                                 boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
                                             } : {
                                                 boxShadow: 'none',
@@ -401,7 +410,7 @@ const CustomerPortal = () => {
                             
                             {/* Change Flight Location Button - Disabled if cancelled or less than 120 hours */}
                             <Tooltip 
-                                title={isCancelled ? "Flight is cancelled" : (!canRescheduleOrChange ? "Less than 120 hours remaining until your flight" : "")}
+                                title={isCancelled ? "Flight is cancelled" : (!canChangeLocation ? "Less than 120 hours remaining until your flight" : "")}
                                 arrow
                             >
                                 <span style={{ display: 'block', width: '100%' }}>
@@ -409,8 +418,8 @@ const CustomerPortal = () => {
                                         variant="outlined"
                                         color="primary"
                                         fullWidth
-                                        disabled={!canRescheduleOrChange}
-                                        onClick={() => canRescheduleOrChange && (() => {
+                                        disabled={!canChangeLocation}
+                                        onClick={() => canChangeLocation && (() => {
                                             setSelectedNewLocation(bookingData.location || '');
                                             setChangeLocationModalOpen(true);
                                         })()}
@@ -422,11 +431,11 @@ const CustomerPortal = () => {
                                             textTransform: 'none',
                                             borderRadius: 2,
                                             borderWidth: 2,
-                                            borderColor: canRescheduleOrChange ? undefined : '#d1d5db',
-                                            color: canRescheduleOrChange ? undefined : '#9ca3af',
-                                            backgroundColor: canRescheduleOrChange ? 'transparent' : '#f3f4f6',
-                                            cursor: canRescheduleOrChange ? 'pointer' : 'not-allowed',
-                                            '&:hover': canRescheduleOrChange ? {
+                                            borderColor: canChangeLocation ? undefined : '#d1d5db',
+                                            color: canChangeLocation ? undefined : '#9ca3af',
+                                            backgroundColor: canChangeLocation ? 'transparent' : '#f3f4f6',
+                                            cursor: canChangeLocation ? 'pointer' : 'not-allowed',
+                                            '&:hover': canChangeLocation ? {
                                                 borderWidth: 2,
                                             } : {
                                                 borderWidth: 2,
