@@ -1910,35 +1910,35 @@ const Manifest = () => {
                     }
                 }
             } else {
-                if (editPassengerFirstName !== p.first_name) {
-                    await axios.patch('/api/updatePassengerField', {
-                        passenger_id: p.id,
-                        field: 'first_name',
-                        value: editPassengerFirstName
-                    });
+                // Update all fields that have changed
+                const updates = [];
+                if (editPassengerFirstName !== (p.first_name || '')) {
+                    updates.push({ field: 'first_name', value: editPassengerFirstName });
                 }
-                if (editPassengerLastName !== p.last_name) {
-                    await axios.patch('/api/updatePassengerField', {
-                        passenger_id: p.id,
-                        field: 'last_name',
-                        value: editPassengerLastName
-                    });
+                if (editPassengerLastName !== (p.last_name || '')) {
+                    updates.push({ field: 'last_name', value: editPassengerLastName });
                 }
-                if (editPassengerWeight !== p.weight) {
-                    await axios.patch('/api/updatePassengerField', {
-                        passenger_id: p.id,
-                        field: 'weight',
-                        value: editPassengerWeight
-                    });
+                if (editPassengerWeight !== (p.weight || '')) {
+                    updates.push({ field: 'weight', value: editPassengerWeight });
                 }
-                if (editPassengerPrice !== p.price) {
-                    await axios.patch('/api/updatePassengerField', {
-                        passenger_id: p.id,
-                        field: 'price',
-                        value: editPassengerPrice
-                    });
+                if (editPassengerPrice !== (p.price || '')) {
+                    updates.push({ field: 'price', value: editPassengerPrice });
                 }
+
+                // Execute all updates in parallel
+                await Promise.all(updates.map(update =>
+                    axios.patch('/api/updatePassengerField', {
+                        passenger_id: p.id,
+                        field: update.field,
+                        value: update.value
+                    })
+                ));
             }
+            
+            // Wait a bit to ensure database updates are committed
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Fetch updated booking detail
             await fetchBookingDetail(bookingDetail.booking.id);
             setEditingPassenger(null);
         } catch (e) {
