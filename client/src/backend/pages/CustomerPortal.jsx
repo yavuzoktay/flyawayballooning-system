@@ -321,7 +321,7 @@ const CustomerPortal = () => {
                         </Typography>
                     </Box>
                     <Box>
-                        <Typography variant="body2" color="text.secondary">Voucher Expiry Date</Typography>
+                        <Typography variant="body2" color="text.secondary">Voucher / Booking Expiry Date</Typography>
                         <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
                             {bookingData.expires 
                                 ? dayjs(bookingData.expires).format('DD/MM/YYYY')
