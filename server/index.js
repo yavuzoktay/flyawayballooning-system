@@ -9512,32 +9512,44 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             });
         });
 
-        // Get number of flight attempts (count of Scheduled status entries in history)
-        let flightAttemptsCount = 0;
-        try {
-            const [historyRows] = await new Promise((resolve, reject) => {
-                con.query(`
-                    SELECT COUNT(*) as count 
-                    FROM booking_status_history 
-                    WHERE booking_id = ? AND status = 'Scheduled'
-                `, [booking.id], (err, rows) => {
-                    if (err) reject(err);
-                    else resolve([rows]);
+        // Get flight_attempts from all_booking table (same logic as getAllBookingData)
+        // Check if this is a redeem voucher booking
+        let isRedeemVoucher = false;
+        if (booking.voucher_code) {
+            try {
+                const [voucherCheckRows] = await new Promise((resolve, reject) => {
+                    con.query('SELECT id, book_flight FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [booking.voucher_code], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
                 });
-            });
-            flightAttemptsCount = historyRows && historyRows.length > 0 ? (historyRows[0].count || 0) : 0;
-            
-            // If no history entries found, check if current status is Scheduled
-            if (flightAttemptsCount === 0 && booking.status && booking.status.toLowerCase() === 'scheduled') {
-                flightAttemptsCount = 1;
-            }
-        } catch (historyErr) {
-            console.error('Error counting flight attempts:', historyErr);
-            // Fallback: if booking has Scheduled status, count as 1 attempt
-            if (booking.status && booking.status.toLowerCase() === 'scheduled') {
-                flightAttemptsCount = 1;
+                if (voucherCheckRows && voucherCheckRows.length > 0) {
+                    isRedeemVoucher = voucherCheckRows[0].book_flight === 'Gift Voucher' || !!voucherCheckRows[0].id;
+                }
+            } catch (voucherCheckErr) {
+                console.warn('⚠️ Customer Portal - Could not check if redeem voucher:', voucherCheckErr.message);
             }
         }
+
+        // Use flight_attempts from all_booking table (same as getAllBookingData)
+        let finalFlightAttempts = booking.flight_attempts !== null && booking.flight_attempts !== undefined 
+            ? booking.flight_attempts 
+            : 0;
+        
+        // For bookings created from redeem voucher, flight_attempts should start from 0, not 1
+        // This matches getAllBookingData logic
+        if (isRedeemVoucher && booking.voucher_code) {
+            // If this booking was created from redeem voucher, flight_attempts should be 0
+            // Override if it's 1 (the default value for new bookings) or null/undefined
+            if (finalFlightAttempts === 1 || finalFlightAttempts === null || finalFlightAttempts === undefined) {
+                finalFlightAttempts = 0;
+            }
+        }
+        
+        // Ensure finalFlightAttempts is a number
+        finalFlightAttempts = finalFlightAttempts !== null && finalFlightAttempts !== undefined 
+            ? finalFlightAttempts 
+            : (isRedeemVoucher ? 0 : booking.flight_attempts || 0);
 
         // Format the response
         const response = {
@@ -9564,7 +9576,7 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 expires: booking.expires,
                 created_at: booking.created_at,
                 additional_notes: booking.additional_notes,
-                flight_attempts: flightAttemptsCount,
+                flight_attempts: finalFlightAttempts,
                 activity_id: booking.activity_id || null
             }
         };
