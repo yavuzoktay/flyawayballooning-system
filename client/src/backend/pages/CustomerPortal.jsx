@@ -317,7 +317,30 @@ const CustomerPortal = () => {
                     <Box>
                         <Typography variant="body2" color="text.secondary">Voucher Type Purchased</Typography>
                         <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                            {bookingData.voucher_type || 'Standard'}
+                            {(() => {
+                                const flightType = bookingData.flight_type || bookingData.experience || '';
+                                const voucherType = bookingData.voucher_type || '';
+                                
+                                // Normalize flight type (remove "Flight" or "Charter" if present)
+                                let normalizedFlightType = flightType;
+                                if (normalizedFlightType) {
+                                    normalizedFlightType = normalizedFlightType
+                                        .replace(/\s*Flight\s*/gi, '')
+                                        .replace(/\s*Charter\s*/gi, '')
+                                        .trim();
+                                }
+                                
+                                // Combine flight type and voucher type
+                                if (normalizedFlightType && voucherType) {
+                                    return `${normalizedFlightType} - ${voucherType}`;
+                                } else if (normalizedFlightType) {
+                                    return normalizedFlightType;
+                                } else if (voucherType) {
+                                    return voucherType;
+                                } else {
+                                    return 'Standard';
+                                }
+                            })()}
                         </Typography>
                     </Box>
                     <Box>
