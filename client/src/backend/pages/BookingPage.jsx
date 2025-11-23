@@ -4468,7 +4468,6 @@ setBookingDetail(finalVoucherDetail);
                                                                 <Typography><b>Book Flight:</b> {v.voucher_type || '-'}</Typography>
                                                                 <Typography><b>Paid:</b> £{v.paid || '0.00'}</Typography>
                                                                 <Typography><b>Redeemed:</b> {v.redeemed || '-'}</Typography>
-                                                                <Typography><b>Offer Code:</b> {v.offer_code || '-'}</Typography>
                                                                 <Typography><b>Voucher Ref:</b> {v.voucher_ref || '-'}</Typography>
                                                                 {/* Number of Passengers should come from API's numberOfVouchers; fallback to passengers/pax */}
                                                                 <Typography>
@@ -5639,9 +5638,11 @@ setBookingDetail(finalVoucherDetail);
                                 <Box sx={{ 
                                     border: '1px solid #e0e0e0', 
                                     borderRadius: 2, 
-                                    p: 3,
+                                    p: 2,
                                     backgroundColor: '#f9f9f9',
-                                    position: 'relative'
+                                    position: 'relative',
+                                    overflow: 'auto',
+                                    maxHeight: '600px'
                                 }}>
                                     {/* Email Header */}
                                     <Box sx={{ 
@@ -5693,10 +5694,55 @@ setBookingDetail(finalVoucherDetail);
                                     </Typography>
                                     
                                     {/* Email Body Preview */}
-                                        <div
-                                            style={{ lineHeight: 1.6, color: '#333' }}
-                                            dangerouslySetInnerHTML={{ __html: previewHtml }}
-                                        />
+                                        <Box
+                                            sx={{
+                                                display: 'flex',
+                                                justifyContent: 'center',
+                                                width: '100%',
+                                                overflow: 'auto',
+                                                pb: 0,
+                                                mb: 0
+                                            }}
+                                        >
+                                            <Box
+                                                sx={{
+                                                    transform: 'scale(0.75)',
+                                                    transformOrigin: 'top center',
+                                                    width: '133.33%',
+                                                    maxWidth: '100%',
+                                                    overflow: 'visible',
+                                                    marginBottom: '-25%',
+                                                    '& table': {
+                                                        maxWidth: '100% !important',
+                                                        width: '100% !important',
+                                                        marginBottom: '0 !important'
+                                                    },
+                                                    '& img': {
+                                                        maxWidth: '100% !important',
+                                                        height: 'auto !important'
+                                                    },
+                                                    '& *': {
+                                                        fontSize: 'inherit !important',
+                                                        lineHeight: 'inherit !important'
+                                                    },
+                                                    '& body': {
+                                                        margin: '0 !important',
+                                                        padding: '0 !important'
+                                                    },
+                                                    '& td': {
+                                                        padding: '16px !important'
+                                                    },
+                                                    '& table[role="presentation"]': {
+                                                        margin: '0 !important',
+                                                        marginBottom: '0 !important'
+                                                    },
+                                                    '& tr:last-child td': {
+                                                        paddingBottom: '16px !important'
+                                                    }
+                                                }}
+                                                dangerouslySetInnerHTML={{ __html: previewHtml }}
+                                            />
+                                        </Box>
                                 </Box>
                             </Grid>
                             {/* Hidden fields for backend */}

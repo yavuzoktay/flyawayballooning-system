@@ -75,7 +75,53 @@ const resolveTemplateName = (templateValue, dbTemplate) => {
 
 const MemoizedEmailPreview = React.memo(
     ({ html }) => (
-        <Box sx={{ lineHeight: 1.6, color: '#333' }} dangerouslySetInnerHTML={{ __html: html }} />
+        <Box 
+            sx={{ 
+                display: 'flex',
+                justifyContent: 'center',
+                width: '100%',
+                overflow: 'auto',
+                pb: 0,
+                mb: 0
+            }}
+        >
+            <Box
+                sx={{ 
+                    transform: 'scale(0.75)',
+                    transformOrigin: 'top center',
+                    width: '133.33%',
+                    maxWidth: '100%',
+                    overflow: 'visible',
+                    marginBottom: '-25%',
+                    lineHeight: 1.6, 
+                    color: '#333',
+                    '& table': {
+                        maxWidth: '100% !important',
+                        width: '100% !important',
+                        marginBottom: '0 !important'
+                    },
+                    '& img': {
+                        maxWidth: '100% !important',
+                        height: 'auto !important'
+                    },
+                    '& body': {
+                        margin: '0 !important',
+                        padding: '0 !important'
+                    },
+                    '& td': {
+                        padding: '16px !important'
+                    },
+                    '& table[role="presentation"]': {
+                        margin: '0 !important',
+                        marginBottom: '0 !important'
+                    },
+                    '& tr:last-child td': {
+                        paddingBottom: '16px !important'
+                    }
+                }} 
+                dangerouslySetInnerHTML={{ __html: html }} 
+            />
+        </Box>
     ),
     (prev, next) => prev.html === next.html
 );
@@ -4619,9 +4665,11 @@ const Manifest = () => {
 
                                 <Box sx={{
                                     backgroundColor: '#fff',
-                                    p: 3,
+                                    p: 2,
                                     borderRadius: 2,
-                                    minHeight: 200
+                                    minHeight: 200,
+                                    overflow: 'auto',
+                                    maxHeight: '600px'
                                 }}>
                                     <MemoizedEmailPreview html={groupPreviewHtml} />
                                 </Box>
@@ -4724,9 +4772,11 @@ const Manifest = () => {
                             <Box sx={{ 
                                 border: '1px solid #e0e0e0', 
                                 borderRadius: 2, 
-                                p: 3,
+                                p: 2,
                                 backgroundColor: '#f9f9f9',
-                                position: 'relative'
+                                position: 'relative',
+                                overflow: 'auto',
+                                maxHeight: '600px'
                             }}>
                                 {/* Email Header */}
                                 <Box sx={{ 
