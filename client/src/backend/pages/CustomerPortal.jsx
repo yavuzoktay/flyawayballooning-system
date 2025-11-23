@@ -160,7 +160,7 @@ const CustomerPortal = () => {
         <>
             <CustomerPortalHeader onNavigate={scrollToSection} />
             <Container maxWidth="lg" sx={{ py: 4 }}>
-                <Box id="portal-main" sx={{ mb: 4, textAlign: 'center', scrollMarginTop: '100px' }}>
+                <Box id="portal-main" sx={{ mb: 4, scrollMarginTop: '100px' }}>
                     <Box sx={{ mb: 3, borderRadius: 3, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
                         <img 
                             src="/uploads/email/emailImage.jpg" 
@@ -174,15 +174,17 @@ const CustomerPortal = () => {
                             }} 
                         />
                     </Box>
-                    <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 2 }}>
+                    <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 2, textAlign: 'center' }}>
                         Your Ballooning Adventure
                     </Typography>
-                    <Typography variant="h5" component="h2" sx={{ fontWeight: 600, mb: 1, color: '#0f172a' }}>
-                        Welcome, {bookingData.name ? bookingData.name.split(' ')[0] : 'Guest'}
-                    </Typography>
-                    <Typography variant="body1" color="text.secondary">
-                        You can manage your booking with us here.
-                    </Typography>
+                    <Box sx={{ textAlign: 'left' }}>
+                        <Typography variant="h5" component="h2" sx={{ fontWeight: 600, mb: 1, color: '#0f172a' }}>
+                            Welcome, {bookingData.name ? bookingData.name.split(' ')[0] : 'Guest'}
+                        </Typography>
+                        <Typography variant="body1" color="text.secondary">
+                            You can manage your booking with us here.
+                        </Typography>
+                    </Box>
                 </Box>
 
             {/* Booking/Voucher Information Section */}
