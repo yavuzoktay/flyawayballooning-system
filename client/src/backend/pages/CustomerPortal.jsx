@@ -403,7 +403,7 @@ const CustomerPortal = () => {
                                             }
                                         }}
                                     >
-                                        Reschedule Flight
+                                        Reschedule Your Flight
                                     </Button>
                                 </span>
                             </Tooltip>
