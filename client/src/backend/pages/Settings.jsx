@@ -234,6 +234,9 @@ const Settings = () => {
         const editorRef = useRef(null);
         const inputDebounceRef = useRef(null);
         const [, startTransition] = useTransition();
+        const [showButtonModal, setShowButtonModal] = useState(false);
+        const [buttonText, setButtonText] = useState('');
+        const [buttonUrl, setButtonUrl] = useState('');
 
         useEffect(() => {
             if (!editorRef.current) return;
@@ -302,6 +305,50 @@ const Settings = () => {
             exec('removeFormat');
         };
 
+        const handleAddButton = () => {
+            setButtonText('');
+            setButtonUrl('');
+            setShowButtonModal(true);
+        };
+
+        const handleInsertButton = () => {
+            if (!buttonText || !buttonUrl) {
+                alert('Please enter both button text and URL');
+                return;
+            }
+            
+            if (!editorRef.current) return;
+            editorRef.current.focus();
+            
+            // Create button HTML with target="_blank" for new tab
+            const buttonHtml = `<a href="${buttonUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 10px 20px; background-color: #3274b4; color: white; text-decoration: none; border-radius: 4px; font-weight: 500; margin: 5px 0;">${buttonText}</a>`;
+            
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                range.deleteContents();
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = buttonHtml;
+                const buttonElement = tempDiv.firstChild;
+                range.insertNode(buttonElement);
+                range.setStartAfter(buttonElement);
+                range.collapse(true);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            } else {
+                // If no selection, append at the end
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = buttonHtml;
+                const buttonElement = tempDiv.firstChild;
+                editorRef.current.appendChild(buttonElement);
+            }
+            
+            scheduleChange();
+            setShowButtonModal(false);
+            setButtonText('');
+            setButtonUrl('');
+        };
+
         const insertPrompt = (promptText) => {
             if (!editorRef.current) return;
             editorRef.current.focus();
@@ -337,6 +384,7 @@ const Settings = () => {
                     <button type="button" className="btn btn-secondary" onClick={() => exec('insertUnorderedList')} style={{ padding: '6px 12px' }}>• List</button>
                     <button type="button" className="btn btn-secondary" onClick={handleLink} style={{ padding: '6px 12px' }}>Link</button>
                     <button type="button" className="btn btn-secondary" onClick={handleClear} style={{ padding: '6px 12px' }}>Clear</button>
+                    <button type="button" className="btn btn-secondary" onClick={handleAddButton} style={{ padding: '6px 12px', backgroundColor: '#3274b4', color: 'white' }}>Button</button>
                     <div style={{ width: '1px', backgroundColor: '#e5e7eb', margin: '0 4px' }}></div>
                     <button type="button" className="btn btn-secondary" onClick={() => insertPrompt('[First Name]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[First Name]</button>
                     <button type="button" className="btn btn-secondary" onClick={() => insertPrompt('[Last Name]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Last Name]</button>
@@ -349,6 +397,106 @@ const Settings = () => {
                     <button type="button" className="btn btn-secondary" onClick={() => insertPrompt('[Receipt]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Receipt]</button>
                     <button type="button" className="btn btn-secondary" onClick={() => insertPrompt('[Customer Portal Link]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#dbeafe', color: '#1d4ed8' }}>[Customer Portal Link]</button>
                 </div>
+                {/* Button Modal */}
+                {showButtonModal && (
+                    <div style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 10000
+                    }} onClick={() => setShowButtonModal(false)}>
+                        <div style={{
+                            backgroundColor: 'white',
+                            borderRadius: '8px',
+                            padding: '24px',
+                            width: '90%',
+                            maxWidth: '500px',
+                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                        }} onClick={(e) => e.stopPropagation()}>
+                            <h3 style={{ marginTop: 0, marginBottom: '20px', fontSize: '20px', fontWeight: 600 }}>
+                                Add Button
+                            </h3>
+                            <div style={{ marginBottom: '16px' }}>
+                                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>
+                                    Button Text <span style={{ color: '#ef4444' }}>*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={buttonText}
+                                    onChange={(e) => setButtonText(e.target.value)}
+                                    placeholder="Enter button text"
+                                    style={{
+                                        width: '100%',
+                                        padding: '8px 12px',
+                                        border: '1px solid #e5e7eb',
+                                        borderRadius: '4px',
+                                        fontSize: '14px'
+                                    }}
+                                />
+                            </div>
+                            <div style={{ marginBottom: '20px' }}>
+                                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>
+                                    Button URL <span style={{ color: '#ef4444' }}>*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={buttonUrl}
+                                    onChange={(e) => setButtonUrl(e.target.value)}
+                                    placeholder="Enter URL (e.g., https://example.com)"
+                                    style={{
+                                        width: '100%',
+                                        padding: '8px 12px',
+                                        border: '1px solid #e5e7eb',
+                                        borderRadius: '4px',
+                                        fontSize: '14px'
+                                    }}
+                                />
+                            </div>
+                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowButtonModal(false);
+                                        setButtonText('');
+                                        setButtonUrl('');
+                                    }}
+                                    style={{
+                                        padding: '8px 16px',
+                                        border: '1px solid #e5e7eb',
+                                        borderRadius: '4px',
+                                        backgroundColor: 'white',
+                                        color: '#374151',
+                                        cursor: 'pointer',
+                                        fontWeight: 500
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleInsertButton}
+                                    style={{
+                                        padding: '8px 16px',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        backgroundColor: '#3274b4',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        fontWeight: 500
+                                    }}
+                                >
+                                    Add Button
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 <div
                     ref={editorRef}
                     contentEditable
