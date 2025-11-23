@@ -237,6 +237,8 @@ const Settings = () => {
         const [showButtonModal, setShowButtonModal] = useState(false);
         const [buttonText, setButtonText] = useState('');
         const [buttonUrl, setButtonUrl] = useState('');
+        const [showCustomerPortalLinkModal, setShowCustomerPortalLinkModal] = useState(false);
+        const [customerPortalLinkText, setCustomerPortalLinkText] = useState('');
 
         useEffect(() => {
             if (!editorRef.current) return;
@@ -405,6 +407,39 @@ const Settings = () => {
             scheduleChange();
         };
 
+        const handleInsertCustomerPortalLink = () => {
+            if (!customerPortalLinkText || !customerPortalLinkText.trim()) {
+                alert('Please enter link text');
+                return;
+            }
+            
+            if (!editorRef.current) return;
+            editorRef.current.focus();
+            
+            // Create prompt text with format: [Customer Portal Link:Link Text]
+            const promptText = `[Customer Portal Link:${customerPortalLinkText.trim()}]`;
+            
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                range.deleteContents();
+                const textNode = document.createTextNode(promptText);
+                range.insertNode(textNode);
+                range.setStartAfter(textNode);
+                range.collapse(true);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            } else {
+                // If no selection, append at the end
+                const textNode = document.createTextNode(promptText);
+                editorRef.current.appendChild(textNode);
+            }
+            
+            scheduleChange();
+            setShowCustomerPortalLinkModal(false);
+            setCustomerPortalLinkText('');
+        };
+
         return (
             <div>
                 <div style={{
@@ -430,7 +465,10 @@ const Settings = () => {
                     <button type="button" className="btn btn-secondary" onClick={() => insertPrompt('[First Name of Recipient]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[First Name of Recipient]</button>
                     <button type="button" className="btn btn-secondary" onClick={() => insertPrompt('[Experience Data]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Experience Data]</button>
                     <button type="button" className="btn btn-secondary" onClick={() => insertPrompt('[Receipt]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Receipt]</button>
-                    <button type="button" className="btn btn-secondary" onClick={() => insertPrompt('[Customer Portal Link]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#dbeafe', color: '#1d4ed8' }}>[Customer Portal Link]</button>
+                    <button type="button" className="btn btn-secondary" onClick={() => {
+                        setCustomerPortalLinkText('');
+                        setShowCustomerPortalLinkModal(true);
+                    }} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#dbeafe', color: '#1d4ed8' }}>[Customer Portal Link]</button>
                 </div>
                 {/* Button Modal */}
                 {showButtonModal && (
@@ -527,6 +565,90 @@ const Settings = () => {
                                     }}
                                 >
                                     Add Button
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {/* Customer Portal Link Modal */}
+                {showCustomerPortalLinkModal && (
+                    <div style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 10000
+                    }} onClick={() => setShowCustomerPortalLinkModal(false)}>
+                        <div style={{
+                            backgroundColor: 'white',
+                            borderRadius: '8px',
+                            padding: '24px',
+                            width: '90%',
+                            maxWidth: '500px',
+                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                        }} onClick={(e) => e.stopPropagation()}>
+                            <h3 style={{ marginTop: 0, marginBottom: '20px', fontSize: '20px', fontWeight: 600 }}>
+                                Add Customer Portal Link
+                            </h3>
+                            <div style={{ marginBottom: '16px' }}>
+                                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>
+                                    Link Text <span style={{ color: '#ef4444' }}>*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={customerPortalLinkText}
+                                    onChange={(e) => setCustomerPortalLinkText(e.target.value)}
+                                    placeholder="Enter link text (e.g., View Your Booking)"
+                                    style={{
+                                        width: '100%',
+                                        padding: '8px 12px',
+                                        border: '1px solid #e5e7eb',
+                                        borderRadius: '4px',
+                                        fontSize: '14px'
+                                    }}
+                                />
+                                <p style={{ marginTop: '8px', fontSize: '12px', color: '#6b7280' }}>
+                                    The link URL will be automatically generated from the booking data.
+                                </p>
+                            </div>
+                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowCustomerPortalLinkModal(false);
+                                        setCustomerPortalLinkText('');
+                                    }}
+                                    style={{
+                                        padding: '8px 16px',
+                                        border: '1px solid #e5e7eb',
+                                        borderRadius: '4px',
+                                        backgroundColor: 'white',
+                                        color: '#374151',
+                                        cursor: 'pointer',
+                                        fontWeight: 500
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleInsertCustomerPortalLink}
+                                    style={{
+                                        padding: '8px 16px',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        backgroundColor: '#1d4ed8',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        fontWeight: 500
+                                    }}
+                                >
+                                    Add Link
                                 </button>
                             </div>
                         </div>

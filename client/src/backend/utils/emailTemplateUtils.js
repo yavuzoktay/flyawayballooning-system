@@ -995,8 +995,20 @@ export const replacePrompts = (html = '', booking = {}) => {
     }
     result = result.replace(/\[Experience Data\]/gi, escapeHtml(experienceData));
     
-    // Replace [Customer Portal Link]
+    // Replace [Customer Portal Link] and [Customer Portal Link:Link Text]
     const customerPortalLink = getCustomerPortalLink(booking);
+    
+    // Replace [Customer Portal Link:Link Text] format (with custom link text)
+    result = result.replace(
+        /\[Customer Portal Link:([^\]]+)\]/gi,
+        (match, linkText) => {
+            if (!customerPortalLink) return '';
+            const escapedLinkText = escapeHtml(linkText.trim());
+            return `<a href="${customerPortalLink}" target="_blank" rel="noopener noreferrer">${escapedLinkText}</a>`;
+        }
+    );
+    
+    // Replace [Customer Portal Link] (without custom text, use URL as text)
     result = result.replace(
         /\[Customer Portal Link\]/gi,
         customerPortalLink

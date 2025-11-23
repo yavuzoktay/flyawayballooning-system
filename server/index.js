@@ -17140,6 +17140,18 @@ function replacePrompts(html = '', booking = {}) {
     result = result.replace(/\[Voucher Code\]/gi, escapeHtml(booking.voucher_code || booking.voucherCode || ''));
     
     const customerPortalLink = getCustomerPortalLink(booking);
+    
+    // Replace [Customer Portal Link:Link Text] format (with custom link text)
+    result = result.replace(
+        /\[Customer Portal Link:([^\]]+)\]/gi,
+        (match, linkText) => {
+            if (!customerPortalLink) return '';
+            const escapedLinkText = escapeHtml(linkText.trim());
+            return `<a href="${customerPortalLink}" target="_blank" rel="noopener noreferrer">${escapedLinkText}</a>`;
+        }
+    );
+    
+    // Replace [Customer Portal Link] (without custom text, use URL as text)
     result = result.replace(
         /\[Customer Portal Link\]/gi,
         customerPortalLink
