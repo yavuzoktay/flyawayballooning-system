@@ -4144,17 +4144,49 @@ const getPrivateCharterPricingFromCache = (voucherTitle, location) => {
 
 const inferPrivateCharterPassengersFromPrice = (voucherTitle, location, totalPrice) => {
     if (!totalPrice || Number(totalPrice) <= 0) return null;
-    const pricing = getPrivateCharterPricingFromCache(voucherTitle, location);
-    if (!pricing) return null;
     const normalizedTotal = Number(totalPrice);
-    for (const [pax, price] of Object.entries(pricing)) {
-        const parsedPrice = Number(price);
-        if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) continue;
-        if (Math.abs(parsedPrice - normalizedTotal) < 0.01) {
-            const paxInt = parsePositiveInt(pax);
-            if (paxInt) return paxInt;
+    
+    // First try exact match with voucher title
+    const pricing = getPrivateCharterPricingFromCache(voucherTitle, location);
+    if (pricing) {
+        for (const [pax, price] of Object.entries(pricing)) {
+            const parsedPrice = Number(price);
+            if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) continue;
+            if (Math.abs(parsedPrice - normalizedTotal) < 0.01) {
+                const paxInt = parsePositiveInt(pax);
+                if (paxInt) {
+                    console.log(`[inferPrivateCharterPassengersFromPrice] Found exact match: ${paxInt} passengers for price ${normalizedTotal}`);
+                    return paxInt;
+                }
+            }
         }
     }
+    
+    // If no exact match, try to find in all Private Charter pricing entries
+    // This handles cases where voucher title doesn't match exactly (e.g., "Private Charter Flights" vs "Private Charter Flights (8 passengers)")
+    const locationKey = normalizeLocationKey(location);
+    const locationPricing = privateCharterPriceCache[locationKey] || privateCharterPriceCache[DEFAULT_LOCATION_KEY] || {};
+    
+    for (const [title, paxMap] of Object.entries(locationPricing)) {
+        // Check if this title is related to Private Charter (fuzzy match)
+        const titleLower = title.toLowerCase();
+        const voucherTitleLower = (voucherTitle || '').toLowerCase();
+        if (titleLower.includes('private') && titleLower.includes('charter')) {
+            for (const [pax, price] of Object.entries(paxMap)) {
+                const parsedPrice = Number(price);
+                if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) continue;
+                if (Math.abs(parsedPrice - normalizedTotal) < 0.01) {
+                    const paxInt = parsePositiveInt(pax);
+                    if (paxInt) {
+                        console.log(`[inferPrivateCharterPassengersFromPrice] Found match in alternative title "${title}": ${paxInt} passengers for price ${normalizedTotal}`);
+                        return paxInt;
+                    }
+                }
+            }
+        }
+    }
+    
+    console.log(`[inferPrivateCharterPassengersFromPrice] No match found for price ${normalizedTotal} with title "${voucherTitle}"`);
     return null;
 };
 
@@ -4169,6 +4201,16 @@ function derivePassengerCount(source = {}, options = {}) {
         safeArrayLength(payload.passenger_details),
         safeArrayLength(payload.add_to_booking_items?.passengers)
     ];
+
+    console.log(`[derivePassengerCount] Input payload:`, {
+        numberOfPassengers: payload.numberOfPassengers,
+        passenger_count: payload.passenger_count,
+        voucher_type: payload.voucher_type,
+        actual_voucher_type: payload.actual_voucher_type,
+        voucher_type_detail: payload.voucher_type_detail,
+        paid: payload.paid,
+        experience_type: chooseFlightType?.type
+    });
 
     const storedCandidates = [payload.numberOfPassengers];
     const inferredCandidates = [
@@ -4185,9 +4227,14 @@ function derivePassengerCount(source = {}, options = {}) {
         ? storedCandidates.concat(inferredCandidates)
         : inferredCandidates.concat(storedCandidates);
 
+    console.log(`[derivePassengerCount] Candidate values:`, candidateValues);
+
     for (const candidate of candidateValues) {
         const parsed = parsePositiveInt(candidate);
-        if (parsed) return parsed;
+        if (parsed) {
+            console.log(`[derivePassengerCount] Found valid passenger count from candidate: ${parsed}`);
+            return parsed;
+        }
     }
 
     const locationHint = payload.chooseLocation || payload.preferred_location || payload.location || null;
@@ -4197,6 +4244,21 @@ function derivePassengerCount(source = {}, options = {}) {
         payload.actual_voucher_type ||
         payload.voucher_type ||
         payload.book_flight;
+    
+    console.log(`[derivePassengerCount] Voucher title: ${voucherTitle}`);
+    
+    // Extract passenger count from voucher type string (e.g., "Private Charter Flights (8 passengers)")
+    if (voucherTitle && typeof voucherTitle === 'string') {
+        const passengerMatch = voucherTitle.match(/\((\d+)\s*passenger/i);
+        if (passengerMatch && passengerMatch[1]) {
+            const extractedCount = parsePositiveInt(passengerMatch[1]);
+            if (extractedCount) {
+                console.log(`[derivePassengerCount] Extracted passenger count from voucher title: ${extractedCount}`);
+                return extractedCount;
+            }
+        }
+    }
+    
     const totalPaid = Number(
         payload.paid ||
         payload.totalPrice ||
@@ -4205,8 +4267,12 @@ function derivePassengerCount(source = {}, options = {}) {
     );
 
     if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
+        console.log(`[derivePassengerCount] Attempting to infer from Private Charter pricing...`);
         const inferredPrivate = inferPrivateCharterPassengersFromPrice(voucherTitle, locationHint, totalPaid);
-        if (inferredPrivate) return inferredPrivate;
+        if (inferredPrivate) {
+            console.log(`[derivePassengerCount] Inferred passenger count from Private Charter pricing: ${inferredPrivate}`);
+            return inferredPrivate;
+        }
     }
 
     const explicitPerPersonPrice = (() => {
@@ -4224,9 +4290,13 @@ function derivePassengerCount(source = {}, options = {}) {
 
     if (resolvedPerPersonPrice && totalPaid > 0) {
         const inferred = Math.round(totalPaid / resolvedPerPersonPrice);
-        if (inferred > 0) return inferred;
+        if (inferred > 0) {
+            console.log(`[derivePassengerCount] Inferred passenger count from price calculation: ${inferred} (paid: ${totalPaid}, per person: ${resolvedPerPersonPrice})`);
+            return inferred;
+        }
     }
 
+    console.log(`[derivePassengerCount] Returning default passenger count: 1`);
     return 1;
 }
 
@@ -5476,9 +5546,17 @@ app.get('/api/getAllVoucherData', (req, res) => {
                 };
                 
                 console.log(`=== PROCESSING VOUCHER ID: ${row.id} ===`);
+                console.log(`Voucher Type: ${row.actual_voucher_type || row.voucher_type}`);
+                console.log(`Experience Type: ${row.experience_type}`);
+                console.log(`Stored numberOfPassengers: ${row.numberOfPassengers}`);
+                console.log(`Passenger Count (from booking): ${row.passenger_count}`);
+                console.log(`Paid Amount: ${row.paid}`);
+                console.log(`All Voucher Codes: ${row.all_voucher_codes}`);
+                
                 // Normalize numberOfPassengers for clients of getAllVoucherData
                 // Prefer explicit numberOfPassengers on voucher; otherwise fall back to passenger_count from linked booking
                 row.numberOfPassengers = Number.parseInt(row.numberOfPassengers, 10) || Number.parseInt(row.passenger_count, 10) || 1;
+                console.log(`Initial numberOfPassengers after parse: ${row.numberOfPassengers}`);
                 console.log('row.additional_information_json:', row.additional_information_json);
                 console.log('typeof row.additional_information_json:', typeof row.additional_information_json);
                 console.log('row.add_to_booking_items:', row.add_to_booking_items);
@@ -5761,6 +5839,14 @@ app.get('/api/getAllVoucherData', (req, res) => {
                 const numFromCodes = voucherCodesList.length > 0 ? voucherCodesList.length : null;
                 const isPrivateCharterVoucher = ((row.voucher_type || '').toLowerCase().includes('private') ||
                     (row.experience_type || '').toLowerCase().includes('private'));
+                console.log(`Calling derivePassengerCount with:`);
+                console.log(`  - numberOfPassengers: ${row.numberOfPassengers}`);
+                console.log(`  - passenger_count: ${row.passenger_count}`);
+                console.log(`  - voucher_type: ${row.actual_voucher_type || row.voucher_type}`);
+                console.log(`  - actual_voucher_type: ${row.actual_voucher_type || row.voucher_type}`);
+                console.log(`  - paid: ${row.paid}`);
+                console.log(`  - experience_type: ${row.experience_type}`);
+                
                 const normalizedPassengerCount = derivePassengerCount({
                     numberOfPassengers: row.numberOfPassengers,
                     passenger_count: row.passenger_count,
@@ -5768,14 +5854,24 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     voucher_passenger_details: voucherPassengerListRaw,
                     numberOfVouchers: numFromCodes,
                     voucher_type: row.actual_voucher_type || row.voucher_type,
+                    actual_voucher_type: row.actual_voucher_type || row.voucher_type,
+                    voucher_type_detail: row.actual_voucher_type || row.voucher_type,
                     book_flight: row.book_flight,
                     chooseFlightType: { type: row.experience_type },
                     paid: row.paid,
                     preferred_location: row.preferred_location || row.location || null,
                     chooseLocation: row.preferred_location || row.location || null
-                }, { preferStoredCount: false });
+                }, { preferStoredCount: true }); // Prefer stored numberOfPassengers from database
+                
+                console.log(`Normalized Passenger Count: ${normalizedPassengerCount}`);
                 row.numberOfPassengers = normalizedPassengerCount;
-                const computedVoucherCount = Math.max(numFromCodes || 0, normalizedPassengerCount);
+                
+                // numberOfVouchers should be the same as numberOfPassengers for Gift Vouchers
+                // If multiple voucher codes exist, use that count; otherwise use passenger count
+                const computedVoucherCount = numFromCodes && numFromCodes > 0 
+                    ? Math.max(numFromCodes, normalizedPassengerCount)
+                    : normalizedPassengerCount;
+                console.log(`Computed Voucher Count: ${computedVoucherCount}`);
                 const pricePerPassenger = !isPrivateCharterVoucher
                     ? getSharedVoucherPriceFromCache(
                         row.actual_voucher_type || row.voucher_type || '',
@@ -5891,6 +5987,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     passenger_info: row.passenger_info ?? '',
                     passenger_count: row.passenger_count ?? 0,
                     passenger_details: passengerDetails, // Add parsed passenger details
+                    numberOfPassengers: normalizedPassengerCount, // Use normalized passenger count
                     numberOfVouchers: computedVoucherCount,
                     flight_attempts: row.flight_attempts ?? 0,
                     additional_information: additionalInfo,
