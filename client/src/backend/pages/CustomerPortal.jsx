@@ -494,7 +494,7 @@ const CustomerPortal = () => {
                                     Weight: {passenger.weight} kg
                                 </Typography>
                             )}
-                            {passenger.email && (
+                            {index === 0 && passenger.email && (
                                 <Typography variant="body2" color="text.secondary">
                                     Email: {passenger.email}
                                 </Typography>
