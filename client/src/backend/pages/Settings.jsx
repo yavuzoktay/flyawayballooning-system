@@ -320,26 +320,61 @@ const Settings = () => {
             if (!editorRef.current) return;
             editorRef.current.focus();
             
-            // Create button HTML with target="_blank" for new tab
-            const buttonHtml = `<a href="${buttonUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 10px 20px; background-color: #3274b4; color: white; text-decoration: none; border-radius: 4px; font-weight: 500; margin: 5px 0;">${buttonText}</a>`;
+            // Create button element directly (not using innerHTML to preserve existing buttons)
+            const buttonElement = document.createElement('a');
+            buttonElement.href = buttonUrl;
+            buttonElement.target = '_blank';
+            buttonElement.rel = 'noopener noreferrer';
+            buttonElement.style.display = 'inline-block';
+            buttonElement.style.padding = '10px 20px';
+            buttonElement.style.backgroundColor = '#3274b4';
+            buttonElement.style.color = 'white';
+            buttonElement.style.textDecoration = 'none';
+            buttonElement.style.borderRadius = '4px';
+            buttonElement.style.fontWeight = '500';
+            buttonElement.style.margin = '5px 0';
+            buttonElement.textContent = buttonText;
             
             const selection = window.getSelection();
             if (selection.rangeCount > 0) {
                 const range = selection.getRangeAt(0);
-                range.deleteContents();
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = buttonHtml;
-                const buttonElement = tempDiv.firstChild;
-                range.insertNode(buttonElement);
-                range.setStartAfter(buttonElement);
-                range.collapse(true);
+                
+                // Check if we're inside an existing button/link - if so, insert after it
+                let container = range.commonAncestorContainer;
+                if (container.nodeType === 3) { // TEXT_NODE
+                    container = container.parentElement;
+                }
+                
+                // If we're inside a link/button, move selection after it
+                if (container && (container.tagName === 'A' || container.closest('a'))) {
+                    const linkElement = container.tagName === 'A' ? container : container.closest('a');
+                    if (linkElement && linkElement.parentNode) {
+                        // Insert after the link element
+                        const spaceNode = document.createTextNode(' ');
+                        linkElement.parentNode.insertBefore(spaceNode, linkElement.nextSibling);
+                        linkElement.parentNode.insertBefore(buttonElement, linkElement.nextSibling);
+                        range.setStartAfter(buttonElement);
+                        range.collapse(true);
+                    }
+                } else {
+                    // Normal insertion - insert button and space
+                    range.deleteContents();
+                    range.insertNode(buttonElement);
+                    // Add space after button for better formatting
+                    const spaceNode = document.createTextNode(' ');
+                    range.setStartAfter(buttonElement);
+                    range.insertNode(spaceNode);
+                    range.setStartAfter(spaceNode);
+                    range.collapse(true);
+                }
+                
                 selection.removeAllRanges();
                 selection.addRange(range);
             } else {
                 // If no selection, append at the end
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = buttonHtml;
-                const buttonElement = tempDiv.firstChild;
+                // Add space and then button
+                const spaceNode = document.createTextNode(' ');
+                editorRef.current.appendChild(spaceNode);
                 editorRef.current.appendChild(buttonElement);
             }
             
