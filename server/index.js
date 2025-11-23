@@ -4798,7 +4798,7 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                     };
                 });
                 
-                // Batch fetch all passengers with weather_refund info for all bookings
+                // Batch fetch all passengers with weather_refund info and first passenger name for all bookings
                 const [passengersRows] = await new Promise((resolve, reject) => {
                     const passengersSql = `
                         SELECT 
@@ -4811,6 +4811,36 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                         if (err) reject(err);
                         else resolve([rows]);
                     });
+                });
+                
+                // Batch fetch first passenger's name (first_name + last_name) for each booking
+                const [firstPassengersRows] = await new Promise((resolve, reject) => {
+                    const firstPassengersSql = `
+                        SELECT 
+                            p1.booking_id,
+                            p1.first_name,
+                            p1.last_name
+                        FROM passenger p1
+                        INNER JOIN (
+                            SELECT booking_id, MIN(id) as min_id
+                            FROM passenger
+                            WHERE booking_id IN (${bookingIds.map(() => '?').join(',')})
+                            GROUP BY booking_id
+                        ) p2 ON p1.booking_id = p2.booking_id AND p1.id = p2.min_id
+                    `;
+                    con.query(firstPassengersSql, bookingIds, (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
+                });
+                
+                // Create a map of booking_id -> first passenger name
+                const firstPassengerNameByBooking = {};
+                firstPassengersRows.forEach(p => {
+                    const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim();
+                    if (fullName) {
+                        firstPassengerNameByBooking[p.booking_id] = fullName;
+                    }
                 });
                 
                 // Group passengers by booking_id and calculate weather refund total
@@ -5107,6 +5137,11 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                 
                 // Add additional information and add-on items to each booking object
                 enriched.forEach((booking, index) => {
+                    // Update name from first passenger if available
+                    if (firstPassengerNameByBooking[booking.id]) {
+                        booking.name = firstPassengerNameByBooking[booking.id];
+                    }
+                    
                     const bookingAnswers = answersByBooking[booking.id] || [];
                     
                     // Parse and enrich add-on items for this booking
