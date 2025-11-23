@@ -9989,13 +9989,78 @@ app.patch('/api/updatePassengerField', (req, res) => {
     if (!passenger_id || !field || !allowedFields.includes(field)) {
         return res.status(400).json({ success: false, message: 'Invalid request' });
     }
-    const sql = `UPDATE passenger SET ${field} = ? WHERE id = ?`;
-    con.query(sql, [value, passenger_id], (err, result) => {
+    
+    // First, get the passenger's booking_id and current name values
+    const getPassengerSql = `SELECT booking_id, first_name, last_name FROM passenger WHERE id = ?`;
+    con.query(getPassengerSql, [passenger_id], (err, passengerRows) => {
         if (err) {
-            console.error('Error updating passenger field:', err);
+            console.error('Error fetching passenger:', err);
             return res.status(500).json({ success: false, message: 'Database error' });
         }
-        res.json({ success: true });
+        
+        if (!passengerRows || passengerRows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Passenger not found' });
+        }
+        
+        const passenger = passengerRows[0];
+        const booking_id = passenger.booking_id;
+        
+        // Determine the new first_name and last_name values after update
+        let newFirstName = passenger.first_name;
+        let newLastName = passenger.last_name;
+        if (field === 'first_name') {
+            newFirstName = value;
+        } else if (field === 'last_name') {
+            newLastName = value;
+        }
+        
+        // Update the passenger field
+        const updateSql = `UPDATE passenger SET ${field} = ? WHERE id = ?`;
+        con.query(updateSql, [value, passenger_id], (err, result) => {
+            if (err) {
+                console.error('Error updating passenger field:', err);
+                return res.status(500).json({ success: false, message: 'Database error' });
+            }
+            
+            // If first_name or last_name was updated, check if this is the first passenger
+            // and update the booking name accordingly
+            if (field === 'first_name' || field === 'last_name') {
+                // Get all passengers for this booking ordered by id to find the first one
+                const getFirstPassengerSql = `SELECT id FROM passenger WHERE booking_id = ? ORDER BY id ASC LIMIT 1`;
+                con.query(getFirstPassengerSql, [booking_id], (err, firstPassengerRows) => {
+                    if (err) {
+                        console.error('Error fetching first passenger:', err);
+                        // Don't fail the request, just log the error
+                        return res.json({ success: true });
+                    }
+                    
+                    if (firstPassengerRows && firstPassengerRows.length > 0) {
+                        const firstPassengerId = firstPassengerRows[0].id;
+                        // If this is the first passenger, update booking name
+                        if (firstPassengerId == passenger_id) {
+                            // Use the calculated new name values
+                            const newName = `${newFirstName || ''} ${newLastName || ''}`.trim();
+                            
+                            // Update booking name
+                            const updateBookingNameSql = `UPDATE all_booking SET name = ? WHERE id = ?`;
+                            con.query(updateBookingNameSql, [newName, booking_id], (err, bookingResult) => {
+                                if (err) {
+                                    console.error('Error updating booking name:', err);
+                                    // Don't fail the request, just log the error
+                                }
+                                res.json({ success: true });
+                            });
+                        } else {
+                            res.json({ success: true });
+                        }
+                    } else {
+                        res.json({ success: true });
+                    }
+                });
+            } else {
+                res.json({ success: true });
+            }
+        });
     });
 });
 
