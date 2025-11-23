@@ -281,24 +281,6 @@ const CustomerPortal = () => {
                             {bookingData.booking_id || bookingData.voucher_ref || bookingData.voucher_code || bookingData.id || 'N/A'}
                         </Typography>
                     </Box>
-                    <Box>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
-                            Voucher Type Purchased
-                        </Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1.1rem', color: '#0f172a' }}>
-                            {bookingData.voucher_type || 'Standard'}
-                        </Typography>
-                    </Box>
-                    <Box>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
-                            Voucher Expiry Date
-                        </Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 600, fontSize: '1.1rem', color: '#0f172a' }}>
-                            {bookingData.expires 
-                                ? dayjs(bookingData.expires).format('DD/MM/YYYY')
-                                : 'No expiry date'}
-                        </Typography>
-                    </Box>
                 </Box>
             </Paper>
 
@@ -347,6 +329,20 @@ const CustomerPortal = () => {
                             {bookingData.flight_attempts !== undefined && bookingData.flight_attempts !== null 
                                 ? bookingData.flight_attempts 
                                 : 0}
+                        </Typography>
+                    </Box>
+                    <Box>
+                        <Typography variant="body2" color="text.secondary">Voucher Type Purchased</Typography>
+                        <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                            {bookingData.voucher_type || 'Standard'}
+                        </Typography>
+                    </Box>
+                    <Box>
+                        <Typography variant="body2" color="text.secondary">Voucher Expiry Date</Typography>
+                        <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                            {bookingData.expires 
+                                ? dayjs(bookingData.expires).format('DD/MM/YYYY')
+                                : 'No expiry date'}
                         </Typography>
                     </Box>
                 </Box>
