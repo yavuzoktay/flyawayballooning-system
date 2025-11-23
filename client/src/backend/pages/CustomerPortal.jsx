@@ -269,7 +269,7 @@ const CustomerPortal = () => {
 
             <Paper id="scroll-target-booking" elevation={2} sx={{ p: 3, mb: 3, scrollMarginTop: '100px' }}>
                 <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
-                    Booking Overview
+                    Your Booking
                 </Typography>
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
                     <Box>
