@@ -193,6 +193,12 @@ const Manifest = () => {
     const [messagesLoading, setMessagesLoading] = useState(false);
     const [messageLogs, setMessageLogs] = useState([]);
     const [expandedMessageIds, setExpandedMessageIds] = useState({});
+    
+    // Payment History modal state
+    const [paymentHistoryModalOpen, setPaymentHistoryModalOpen] = useState(false);
+    const [paymentHistory, setPaymentHistory] = useState([]);
+    const [paymentHistoryLoading, setPaymentHistoryLoading] = useState(false);
+    const [expandedPaymentIds, setExpandedPaymentIds] = useState({});
 
     // SMS state
     const [smsModalOpen, setSmsModalOpen] = useState(false);
@@ -726,6 +732,51 @@ const Manifest = () => {
             ...prev,
             [id]: !prev[id]
         }));
+    };
+
+    const fetchPaymentHistory = async (bookingId) => {
+        if (!bookingId) return;
+        setPaymentHistoryLoading(true);
+        try {
+            const response = await axios.get(`/api/booking-payment-history/${bookingId}`);
+            const paymentData = response.data?.data || [];
+            
+            // If no payment history but booking has stripe_session_id, try to sync
+            if (paymentData.length === 0 && bookingDetail?.booking?.stripe_session_id) {
+                try {
+                    await axios.post(`/api/sync-payment-history/${bookingId}`);
+                    // Fetch again after sync
+                    const syncResponse = await axios.get(`/api/booking-payment-history/${bookingId}`);
+                    setPaymentHistory(syncResponse.data?.data || []);
+                } catch (syncError) {
+                    console.error('Error syncing payment history:', syncError);
+                    setPaymentHistory([]);
+                }
+            } else {
+                setPaymentHistory(paymentData);
+            }
+        } catch (error) {
+            console.error('Error fetching payment history:', error);
+            setPaymentHistory([]);
+        } finally {
+            setPaymentHistoryLoading(false);
+        }
+    };
+
+    const togglePaymentExpand = (id) => {
+        setExpandedPaymentIds(prev => ({
+            ...prev,
+            [id]: !prev[id]
+        }));
+    };
+
+    const getCardBrandLogo = (brand) => {
+        const brandLower = (brand || '').toLowerCase();
+        if (brandLower.includes('visa')) return 'VISA';
+        if (brandLower.includes('mastercard') || brandLower.includes('master')) return 'MC';
+        if (brandLower.includes('amex') || brandLower.includes('american')) return 'AMEX';
+        if (brandLower.includes('discover')) return 'DISC';
+        return brand?.toUpperCase() || 'CARD';
     };
 
     const sanitizeMessageHtml = (html) => {
@@ -3877,6 +3928,20 @@ const Manifest = () => {
                                                 >
                                                     Messages
                                                 </Button>
+                                                <Button
+                                                    variant="contained"
+                                                    color="info"
+                                                    sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d', mt: 1 }}
+                                                    onClick={() => {
+                                                        if (bookingDetail?.booking?.id) {
+                                                            setPaymentHistoryModalOpen(true);
+                                                            fetchPaymentHistory(bookingDetail.booking.id);
+                                                        }
+                                                    }}
+                                                    disabled={!bookingDetail?.booking}
+                                                >
+                                                    Payment History
+                                                </Button>
                                             </Box>
                                         </Box>
                                         <Divider sx={{ my: 2 }} />
@@ -4164,13 +4229,13 @@ const Manifest = () => {
                                                 </TableHead>
                                                 <TableBody>
                                                     {historyRows.map((h, i) => (
-                                                        <TableRow key={i}>
-                                                            <TableCell>{h.changed_at ? dayjs(h.changed_at).format('DD/MM/YYYY HH:mm') : '-'}</TableCell>
-                                                            <TableCell>{bookingDetail.booking.flight_type || '-'}</TableCell>
-                                                            <TableCell>{bookingDetail.booking.location || '-'}</TableCell>
-                                                            <TableCell>{getStatusWithEmoji(h.status)}</TableCell>
-                                                        </TableRow>
-                                                    ))}
+                                                            <TableRow key={i}>
+                                                                <TableCell>{h.changed_at ? dayjs(h.changed_at).format('DD/MM/YYYY HH:mm') : '-'}</TableCell>
+                                                                <TableCell>{bookingDetail.booking.flight_type || '-'}</TableCell>
+                                                                <TableCell>{bookingDetail.booking.location || '-'}</TableCell>
+                                                                <TableCell>{getStatusWithEmoji(h.status)}</TableCell>
+                                                            </TableRow>
+                                                        ))}
                                                     {historyRows.length === 0 && (
                                                         <TableRow>
                                                             <TableCell colSpan={4} align="center">No history yet</TableCell>
@@ -4523,6 +4588,296 @@ const Manifest = () => {
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setMessagesModalOpen(false)}>Close</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Payment History Modal */}
+            <Dialog
+                open={paymentHistoryModalOpen}
+                onClose={() => {
+                    setPaymentHistoryModalOpen(false);
+                    setExpandedPaymentIds({});
+                }}
+                maxWidth="lg"
+                fullWidth
+            >
+                <DialogTitle sx={{ 
+                    fontWeight: 700, 
+                    fontSize: 24,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    pb: 2
+                }}>
+                    <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                        Payments / Promos
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Button 
+                            variant="outlined" 
+                            size="small"
+                            sx={{ textTransform: 'none', borderRadius: 1 }}
+                        >
+                            + Payment
+                        </Button>
+                        <Button 
+                            variant="outlined" 
+                            size="small"
+                            sx={{ textTransform: 'none', borderRadius: 1 }}
+                        >
+                            + Promo
+                        </Button>
+                        <Button 
+                            variant="outlined" 
+                            size="small"
+                            startIcon={<span>🕐</span>}
+                            sx={{ textTransform: 'none', borderRadius: 1 }}
+                        >
+                            Save Card & Charge Later
+                        </Button>
+                    </Box>
+                </DialogTitle>
+                <DialogContent dividers sx={{ background: '#ffffff', p: 0 }}>
+                    {paymentHistoryLoading ? (
+                        <Box sx={{ p: 3, textAlign: 'center' }}>
+                            <Typography variant="body2">Loading payment history...</Typography>
+                        </Box>
+                    ) : paymentHistory.length === 0 ? (
+                        <Box sx={{ p: 3, textAlign: 'center' }}>
+                            <Typography variant="body2" color="text.secondary">
+                                No payment history available for this booking.
+                            </Typography>
+                        </Box>
+                    ) : (
+                        <Box>
+                            {/* Table Header */}
+                            <Box sx={{ 
+                                display: 'flex', 
+                                px: 3, 
+                                py: 1.5, 
+                                borderBottom: '1px solid #e2e8f0',
+                                background: '#f8f9fa'
+                            }}>
+                                <Box sx={{ flex: '0 0 200px', color: '#6c757d', fontSize: '0.875rem', fontWeight: 500 }}>
+                                    DATE
+                                </Box>
+                                <Box sx={{ flex: 1, textAlign: 'center', color: '#6c757d', fontSize: '0.875rem', fontWeight: 500 }}>
+                                    DETAILS
+                                </Box>
+                                <Box sx={{ flex: '0 0 150px', textAlign: 'right', color: '#6c757d', fontSize: '0.875rem', fontWeight: 500 }}>
+                                    AMOUNT
+                                </Box>
+                                <Box sx={{ flex: '0 0 100px' }}></Box>
+                            </Box>
+                            
+                            {/* Payment Entries */}
+                            {paymentHistory.map((payment, index) => {
+                                const isExpanded = expandedPaymentIds[payment.id || index];
+                                const paymentDate = payment.created_at ? dayjs(payment.created_at) : null;
+                                const daysAgo = paymentDate ? dayjs().diff(paymentDate, 'day') : null;
+                                
+                                return (
+                                    <Box key={payment.id || index} sx={{ borderBottom: '1px solid #e2e8f0' }}>
+                                        {/* Main Payment Row */}
+                                        <Box sx={{ 
+                                            display: 'flex', 
+                                            px: 3, 
+                                            py: 2,
+                                            alignItems: 'center',
+                                            cursor: 'pointer',
+                                            '&:hover': { background: '#f8f9fa' }
+                                        }}
+                                        onClick={() => togglePaymentExpand(payment.id || index)}
+                                        >
+                                            <Box sx={{ flex: '0 0 200px' }}>
+                                                {paymentDate && (
+                                                    <>
+                                                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                                            {paymentDate.format('MMM D, YYYY')}
+                                                        </Typography>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            {paymentDate.format('h:mm A')}
+                                                        </Typography>
+                                                        {daysAgo !== null && (
+                                                            <Typography variant="caption" color="text.secondary" display="block">
+                                                                {daysAgo} {daysAgo === 1 ? 'day' : 'days'} ago
+                                                            </Typography>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </Box>
+                                            <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'center' }}>
+                                                <Typography variant="body2" sx={{ 
+                                                    fontWeight: 600,
+                                                    textTransform: 'uppercase',
+                                                    fontSize: '0.75rem',
+                                                    px: 1,
+                                                    py: 0.5,
+                                                    borderRadius: 1,
+                                                    background: '#f0f0f0'
+                                                }}>
+                                                    {getCardBrandLogo(payment.card_brand)}
+                                                </Typography>
+                                                <Typography variant="body2">
+                                                    **** {payment.card_last4 || 'N/A'}
+                                                </Typography>
+                                            </Box>
+                                            <Box sx={{ flex: '0 0 150px', textAlign: 'right' }}>
+                                                <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                                                    £{parseFloat(payment.amount || 0).toFixed(2)}
+                                                </Typography>
+                                            </Box>
+                                            <Box sx={{ flex: '0 0 100px', textAlign: 'right' }}>
+                                                <IconButton 
+                                                    size="small"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        togglePaymentExpand(payment.id || index);
+                                                    }}
+                                                >
+                                                    {isExpanded ? '▼' : '▶'}
+                                                </IconButton>
+                                                {payment.payment_status === 'succeeded' && (
+                                                    <Button 
+                                                        size="small" 
+                                                        variant="outlined"
+                                                        sx={{ ml: 1, textTransform: 'none' }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            // TODO: Implement refund
+                                                        }}
+                                                    >
+                                                        Refund...
+                                                    </Button>
+                                                )}
+                                            </Box>
+                                        </Box>
+                                        
+                                        {/* Expanded Details */}
+                                        {isExpanded && (
+                                            <Box sx={{ 
+                                                px: 3, 
+                                                py: 2, 
+                                                background: '#ffffff',
+                                                borderTop: '1px solid #e2e8f0'
+                                            }}>
+                                                <Grid container spacing={2}>
+                                                    <Grid item xs={6}>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            Created
+                                                        </Typography>
+                                                        <Typography variant="body2">
+                                                            {paymentDate ? `${paymentDate.format('MMM D, YYYY h:mm A')} (${daysAgo} ${daysAgo === 1 ? 'day' : 'days'} ago)` : 'N/A'}
+                                                        </Typography>
+                                                    </Grid>
+                                                    <Grid item xs={6}>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            Guest Charge
+                                                        </Typography>
+                                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                            £{parseFloat(payment.amount || 0).toFixed(2)}
+                                                        </Typography>
+                                                    </Grid>
+                                                    <Grid item xs={6}>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            Card Type
+                                                        </Typography>
+                                                        <Typography variant="body2">
+                                                            Credit Card **** {payment.card_last4 || 'N/A'}
+                                                        </Typography>
+                                                    </Grid>
+                                                    <Grid item xs={6}>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            Wallet Type
+                                                        </Typography>
+                                                        <Typography variant="body2">
+                                                            {payment.wallet_type || 'N/A'}
+                                                            {payment.wallet_type === 'apple_pay' && ' 🍎'}
+                                                        </Typography>
+                                                    </Grid>
+                                                    <Grid item xs={6}>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            Fingerprint
+                                                        </Typography>
+                                                        <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                                                            {payment.fingerprint || 'N/A'}
+                                                        </Typography>
+                                                    </Grid>
+                                                    <Grid item xs={6}>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            Origin
+                                                        </Typography>
+                                                        <Typography variant="body2">
+                                                            {payment.origin || 'N/A'}
+                                                        </Typography>
+                                                    </Grid>
+                                                    <Grid item xs={6}>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            Transaction ID
+                                                        </Typography>
+                                                        <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                                                            {payment.transaction_id || payment.stripe_charge_id || 'N/A'}
+                                                        </Typography>
+                                                    </Grid>
+                                                    <Grid item xs={6}>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            Card Present
+                                                        </Typography>
+                                                        <Typography variant="body2">
+                                                            {payment.card_present ? 'Yes' : 'No'}
+                                                        </Typography>
+                                                    </Grid>
+                                                    <Grid item xs={6}>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            Status
+                                                        </Typography>
+                                                        <Box sx={{ 
+                                                            display: 'inline-block',
+                                                            px: 1,
+                                                            py: 0.5,
+                                                            borderRadius: 1,
+                                                            background: payment.payment_status === 'succeeded' ? '#28a745' : '#6c757d',
+                                                            color: '#fff',
+                                                            fontSize: '0.75rem',
+                                                            fontWeight: 600
+                                                        }}>
+                                                            {payment.payment_status === 'succeeded' ? 'Successful' : payment.payment_status || 'Pending'}
+                                                        </Box>
+                                                    </Grid>
+                                                    {payment.payout_id && (
+                                                        <Grid item xs={6}>
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                Payout
+                                                            </Typography>
+                                                            <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                                                                {payment.payout_id}
+                                                            </Typography>
+                                                        </Grid>
+                                                    )}
+                                                    {payment.arriving_on && (
+                                                        <Grid item xs={6}>
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                Arriving on
+                                                            </Typography>
+                                                            <Typography variant="body2">
+                                                                {dayjs(payment.arriving_on).format('MMM D, YYYY')}
+                                                            </Typography>
+                                                        </Grid>
+                                                    )}
+                                                </Grid>
+                                            </Box>
+                                        )}
+                                    </Box>
+                                );
+                            })}
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => {
+                        setPaymentHistoryModalOpen(false);
+                        setExpandedPaymentIds({});
+                    }}>Close</Button>
                 </DialogActions>
             </Dialog>
 

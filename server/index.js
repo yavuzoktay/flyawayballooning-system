@@ -3765,6 +3765,128 @@ app.get('/api/webhook-test', (req, res) => {
     });
 });
 
+// Function to save payment history from Stripe session
+async function savePaymentHistory(session, bookingId, voucherId) {
+    try {
+        const sessionId = session.id;
+        const paymentIntentId = session.payment_intent;
+        const amountTotal = session.amount_total ? session.amount_total / 100 : 0; // Convert from cents
+        const currency = session.currency || 'GBP';
+        
+        let charge = null;
+        let paymentMethod = null;
+        let cardLast4 = null;
+        let cardBrand = null;
+        let walletType = null;
+        let fingerprint = null;
+        let origin = null;
+        let cardPresent = false;
+        let chargeId = null;
+        let payoutId = null;
+        let paymentStatus = 'pending';
+        let arrivingOn = null;
+        
+        // Get payment intent details
+        if (paymentIntentId) {
+            try {
+                const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+                paymentStatus = paymentIntent.status === 'succeeded' ? 'succeeded' : paymentIntent.status;
+                
+                // Get charges from payment intent
+                if (paymentIntent.charges && paymentIntent.charges.data && paymentIntent.charges.data.length > 0) {
+                    charge = paymentIntent.charges.data[0];
+                    chargeId = charge.id;
+                    
+                    // Get payment method details
+                    if (charge.payment_method_details) {
+                        const pmDetails = charge.payment_method_details;
+                        
+                        if (pmDetails.card) {
+                            cardLast4 = pmDetails.card.last4;
+                            cardBrand = pmDetails.card.brand;
+                            fingerprint = pmDetails.card.fingerprint;
+                        }
+                        
+                        if (pmDetails.type === 'card') {
+                            cardPresent = pmDetails.card?.present || false;
+                        }
+                        
+                        // Check for wallet type
+                        if (pmDetails.type === 'card' && pmDetails.card?.wallet) {
+                            walletType = pmDetails.card.wallet.type;
+                        }
+                    }
+                    
+                    // Get origin from charge
+                    if (charge.payment_method_details?.card?.country) {
+                        origin = charge.payment_method_details.card.country;
+                    }
+                    
+                    // Get payout information if available
+                    if (charge.balance_transaction) {
+                        try {
+                            const balanceTransaction = await stripe.balanceTransactions.retrieve(charge.balance_transaction);
+                            if (balanceTransaction.available_on) {
+                                arrivingOn = new Date(balanceTransaction.available_on * 1000).toISOString().split('T')[0];
+                            }
+                            if (balanceTransaction.reporting_category === 'charge') {
+                                // Try to get payout ID from balance transaction
+                                if (balanceTransaction.payout) {
+                                    payoutId = balanceTransaction.payout;
+                                }
+                            }
+                        } catch (btError) {
+                            console.warn('Could not retrieve balance transaction:', btError.message);
+                        }
+                    }
+                }
+            } catch (piError) {
+                console.warn('Could not retrieve payment intent:', piError.message);
+            }
+        }
+        
+        // Insert payment history
+        const insertPaymentHistory = `
+            INSERT INTO payment_history (
+                booking_id, stripe_session_id, stripe_charge_id, stripe_payment_intent_id,
+                amount, currency, card_last4, card_brand, wallet_type, transaction_id,
+                payout_id, payment_status, fingerprint, origin, card_present, arriving_on
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+        
+        con.query(
+            insertPaymentHistory,
+            [
+                bookingId || null,
+                sessionId,
+                chargeId,
+                paymentIntentId,
+                amountTotal,
+                currency,
+                cardLast4,
+                cardBrand,
+                walletType,
+                chargeId, // transaction_id
+                payoutId,
+                paymentStatus,
+                fingerprint,
+                origin,
+                cardPresent ? 1 : 0,
+                arrivingOn
+            ],
+            (err, result) => {
+                if (err) {
+                    console.error('Error saving payment history:', err);
+                } else {
+                    console.log('✅ Payment history saved successfully, ID:', result.insertId);
+                }
+            }
+        );
+    } catch (error) {
+        console.error('Error in savePaymentHistory:', error);
+    }
+}
+
 // Stripe Webhook endpoint
 app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (req, res) => {
     console.log('Stripe webhook endpoint hit!');
@@ -3826,15 +3948,49 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
             
             try {
                 if (storeData.type === 'booking') {
-                    // If already processed with a booking id, skip duplicate creation
+                    // If already processed with a booking id, still save payment history
                     if (storeData.bookingData?.booking_id) {
-                        console.log('Webhook: booking already created for session, skipping.');
+                        console.log('Webhook: booking already created for session, saving payment history only.');
+                        const existingBookingId = storeData.bookingData.booking_id;
+                        await savePaymentHistory(session, existingBookingId, null);
+                        
+                        // Update booking with stripe_session_id if not already set
+                        con.query(
+                            'UPDATE all_booking SET stripe_session_id = ? WHERE id = ? AND (stripe_session_id IS NULL OR stripe_session_id = "")',
+                            [session_id, existingBookingId],
+                            (err) => {
+                                if (err) {
+                                    console.error('Error updating booking with stripe_session_id:', err);
+                                } else {
+                                    console.log('✅ Booking updated with stripe_session_id');
+                                }
+                            }
+                        );
                         return res.json({ received: true });
                     }
                     console.log('Creating booking via webhook:', storeData.bookingData);
                     // Direct database insertion instead of HTTP call
                     const bookingId = await createBookingFromWebhook(storeData.bookingData);
                     console.log('Webhook booking creation completed, ID:', bookingId);
+                    
+                    // Save payment information
+                    await savePaymentHistory(session, bookingId, null);
+                    
+                    // Update booking with stripe_session_id
+                    if (bookingId) {
+                        con.query(
+                            'UPDATE all_booking SET stripe_session_id = ? WHERE id = ?',
+                            [session_id, bookingId],
+                            (err) => {
+                                if (err) {
+                                    console.error('Error updating booking with stripe_session_id:', err);
+                                } else {
+                                    console.log('✅ Booking updated with stripe_session_id');
+                                }
+                            }
+                        );
+                    }
+                    
                     // Mark processed and store created id to avoid duplicate creation by fallback
                     storeData.processed = true;
                     if (!storeData.bookingData) storeData.bookingData = {};
@@ -4149,11 +4305,11 @@ const inferPrivateCharterPassengersFromPrice = (voucherTitle, location, totalPri
     // First try exact match with voucher title
     const pricing = getPrivateCharterPricingFromCache(voucherTitle, location);
     if (pricing) {
-        for (const [pax, price] of Object.entries(pricing)) {
-            const parsedPrice = Number(price);
-            if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) continue;
-            if (Math.abs(parsedPrice - normalizedTotal) < 0.01) {
-                const paxInt = parsePositiveInt(pax);
+    for (const [pax, price] of Object.entries(pricing)) {
+        const parsedPrice = Number(price);
+        if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) continue;
+        if (Math.abs(parsedPrice - normalizedTotal) < 0.01) {
+            const paxInt = parsePositiveInt(pax);
                 if (paxInt) {
                     console.log(`[inferPrivateCharterPassengersFromPrice] Found exact match: ${paxInt} passengers for price ${normalizedTotal}`);
                     return paxInt;
@@ -5400,6 +5556,229 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
         
         res.json(response);
     });
+});
+
+// Get Payment History for a booking
+app.get('/api/booking-payment-history/:bookingId', (req, res) => {
+    const bookingId = parseInt(req.params.bookingId);
+    
+    if (!bookingId || isNaN(bookingId)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid booking ID'
+        });
+    }
+    
+    const sql = `
+        SELECT 
+            id,
+            booking_id,
+            stripe_session_id,
+            stripe_charge_id,
+            stripe_payment_intent_id,
+            amount,
+            currency,
+            card_last4,
+            card_brand,
+            wallet_type,
+            transaction_id,
+            payout_id,
+            payment_status,
+            fingerprint,
+            origin,
+            card_present,
+            created_at,
+            arriving_on
+        FROM payment_history
+        WHERE booking_id = ?
+        ORDER BY created_at DESC
+    `;
+    
+    con.query(sql, [bookingId], (err, results) => {
+        if (err) {
+            console.error('Error fetching payment history:', err);
+            return res.status(500).json({
+                success: false,
+                message: 'Error fetching payment history',
+                error: err.message
+            });
+        }
+        
+        res.json({
+            success: true,
+            data: results
+        });
+    });
+});
+
+// Sync payment history from Stripe for existing booking
+app.post('/api/sync-payment-history/:bookingId', async (req, res) => {
+    const bookingId = parseInt(req.params.bookingId);
+    
+    if (!bookingId || isNaN(bookingId)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid booking ID'
+        });
+    }
+    
+    try {
+        // Get booking with stripe_session_id
+        con.query(
+            'SELECT id, stripe_session_id FROM all_booking WHERE id = ?',
+            [bookingId],
+            async (err, results) => {
+                if (err) {
+                    console.error('Error fetching booking:', err);
+                    return res.status(500).json({
+                        success: false,
+                        message: 'Error fetching booking',
+                        error: err.message
+                    });
+                }
+                
+                if (results.length === 0) {
+                    return res.status(404).json({
+                        success: false,
+                        message: 'Booking not found'
+                    });
+                }
+                
+                const booking = results[0];
+                
+                if (!booking.stripe_session_id) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Booking does not have a Stripe session ID'
+                    });
+                }
+                
+                // Check if payment history already exists
+                con.query(
+                    'SELECT id FROM payment_history WHERE booking_id = ? AND stripe_session_id = ?',
+                    [bookingId, booking.stripe_session_id],
+                    async (checkErr, checkResults) => {
+                        if (checkErr) {
+                            console.error('Error checking payment history:', checkErr);
+                            return res.status(500).json({
+                                success: false,
+                                message: 'Error checking payment history',
+                                error: checkErr.message
+                            });
+                        }
+                        
+                        if (checkResults.length > 0) {
+                            return res.json({
+                                success: true,
+                                message: 'Payment history already exists for this booking',
+                                data: checkResults[0]
+                            });
+                        }
+                        
+                        // Retrieve session from Stripe
+                        try {
+                            const session = await stripe.checkout.sessions.retrieve(booking.stripe_session_id);
+                            await savePaymentHistory(session, bookingId, null);
+                            
+                            // Update booking with stripe_session_id if not already set
+                            con.query(
+                                'UPDATE all_booking SET stripe_session_id = ? WHERE id = ? AND (stripe_session_id IS NULL OR stripe_session_id = "")',
+                                [booking.stripe_session_id, bookingId],
+                                (updateErr) => {
+                                    if (updateErr) {
+                                        console.error('Error updating booking with stripe_session_id:', updateErr);
+                                    }
+                                }
+                            );
+                            
+                            res.json({
+                                success: true,
+                                message: 'Payment history synced successfully'
+                            });
+                        } catch (stripeError) {
+                            console.error('Error retrieving Stripe session:', stripeError);
+                            return res.status(500).json({
+                                success: false,
+                                message: 'Error retrieving Stripe session',
+                                error: stripeError.message
+                            });
+                        }
+                    }
+                );
+            }
+        );
+    } catch (error) {
+        console.error('Error in sync-payment-history:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
+// Sync payment history for all bookings with stripe_session_id but no payment history
+app.post('/api/sync-all-payment-history', async (req, res) => {
+    try {
+        // Get all bookings with stripe_session_id but no payment history
+        const sql = `
+            SELECT ab.id, ab.stripe_session_id
+            FROM all_booking ab
+            LEFT JOIN payment_history ph ON ab.id = ph.booking_id AND ab.stripe_session_id = ph.stripe_session_id
+            WHERE ab.stripe_session_id IS NOT NULL 
+            AND ab.stripe_session_id != ''
+            AND ph.id IS NULL
+            LIMIT 100
+        `;
+        
+        con.query(sql, async (err, bookings) => {
+            if (err) {
+                console.error('Error fetching bookings:', err);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Error fetching bookings',
+                    error: err.message
+                });
+            }
+            
+            if (bookings.length === 0) {
+                return res.json({
+                    success: true,
+                    message: 'No bookings need payment history sync',
+                    synced: 0
+                });
+            }
+            
+            let synced = 0;
+            let errors = 0;
+            
+            for (const booking of bookings) {
+                try {
+                    const session = await stripe.checkout.sessions.retrieve(booking.stripe_session_id);
+                    await savePaymentHistory(session, booking.id, null);
+                    synced++;
+                } catch (syncError) {
+                    console.error(`Error syncing payment history for booking ${booking.id}:`, syncError);
+                    errors++;
+                }
+            }
+            
+            res.json({
+                success: true,
+                message: `Payment history sync completed`,
+                synced,
+                errors,
+                total: bookings.length
+            });
+        });
+    } catch (error) {
+        console.error('Error in sync-all-payment-history:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
 });
 
 // In-memory short cache to avoid duplicate rapid calls for the same key
@@ -10182,9 +10561,9 @@ app.patch('/api/updatePassengerField', (req, res) => {
         // Update the passenger field
         const updateSql = `UPDATE passenger SET ${field} = ? WHERE id = ?`;
         con.query(updateSql, [value, passenger_id], (err, result) => {
-            if (err) {
-                console.error('Error updating passenger field:', err);
-                return res.status(500).json({ success: false, message: 'Database error' });
+        if (err) {
+            console.error('Error updating passenger field:', err);
+            return res.status(500).json({ success: false, message: 'Database error' });
             }
             
             // If first_name or last_name was updated, check if this is the first passenger
@@ -10212,8 +10591,8 @@ app.patch('/api/updatePassengerField', (req, res) => {
                                 if (err) {
                                     console.error('Error updating booking name:', err);
                                     // Don't fail the request, just log the error
-                                }
-                                res.json({ success: true });
+        }
+        res.json({ success: true });
                             });
                         } else {
                             res.json({ success: true });
@@ -13955,6 +14334,29 @@ app.post('/api/createBookingFromSession', async (req, res) => {
             try {
                 result = await createBookingFromWebhook(storeData.bookingData);
                 console.log('Booking created successfully, ID:', result);
+                
+                // Save payment history from Stripe session
+                try {
+                    const session = await stripe.checkout.sessions.retrieve(session_id);
+                    await savePaymentHistory(session, result, null);
+                    
+                    // Update booking with stripe_session_id
+                    con.query(
+                        'UPDATE all_booking SET stripe_session_id = ? WHERE id = ?',
+                        [session_id, result],
+                        (err) => {
+                            if (err) {
+                                console.error('Error updating booking with stripe_session_id:', err);
+                            } else {
+                                console.log('✅ Booking updated with stripe_session_id');
+                            }
+                        }
+                    );
+                } catch (paymentHistoryError) {
+                    console.error('Error saving payment history in createBookingFromSession:', paymentHistoryError);
+                    // Continue even if payment history fails - booking is still valid
+                }
+                
                 // mark processed and store id to avoid duplicates
                 storeData.processed = true;
                 storeData.bookingData.booking_id = result;
@@ -15267,6 +15669,66 @@ const runDatabaseMigrations = () => {
             console.error('Error creating customer_portal_contents table:', err);
         } else {
             console.log('✅ customer_portal_contents table ready');
+        }
+    });
+
+    // Create payment_history table if it doesn't exist
+    const createPaymentHistoryTable = `
+        CREATE TABLE IF NOT EXISTS payment_history (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            booking_id INT NOT NULL COMMENT 'Reference to the booking',
+            stripe_session_id VARCHAR(255) COMMENT 'Stripe Checkout Session ID',
+            stripe_charge_id VARCHAR(255) COMMENT 'Stripe Charge ID',
+            stripe_payment_intent_id VARCHAR(255) COMMENT 'Stripe Payment Intent ID',
+            amount DECIMAL(10,2) NOT NULL COMMENT 'Payment amount',
+            currency VARCHAR(10) DEFAULT 'GBP' COMMENT 'Currency code',
+            card_last4 VARCHAR(4) COMMENT 'Last 4 digits of card',
+            card_brand VARCHAR(50) COMMENT 'Card brand (visa, mastercard, amex, etc.)',
+            wallet_type VARCHAR(50) COMMENT 'Wallet type (Apple Pay, Google Pay, etc.)',
+            transaction_id VARCHAR(255) COMMENT 'Stripe transaction ID',
+            payout_id VARCHAR(255) COMMENT 'Stripe payout ID',
+            payment_status VARCHAR(50) DEFAULT 'pending' COMMENT 'Payment status (succeeded, pending, failed, refunded)',
+            fingerprint VARCHAR(255) COMMENT 'Payment method fingerprint',
+            origin VARCHAR(10) COMMENT 'Country origin code',
+            card_present TINYINT(1) DEFAULT 0 COMMENT 'Whether card was present',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'Payment creation timestamp',
+            arriving_on DATE COMMENT 'Payout arrival date',
+            INDEX idx_booking_id (booking_id),
+            INDEX idx_stripe_session_id (stripe_session_id),
+            INDEX idx_stripe_charge_id (stripe_charge_id),
+            INDEX idx_payment_status (payment_status),
+            INDEX idx_created_at (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `;
+    
+    con.query(createPaymentHistoryTable, (err) => {
+        if (err) {
+            console.error('Error creating payment_history table:', err);
+        } else {
+            console.log('✅ payment_history table ready');
+        }
+    });
+
+    // Add stripe_session_id column to all_booking table
+    const checkStripeSessionIdColumn = "SHOW COLUMNS FROM all_booking LIKE 'stripe_session_id'";
+    con.query(checkStripeSessionIdColumn, (err, result) => {
+        if (err) {
+            console.error('Error checking stripe_session_id column:', err);
+            return;
+        }
+        
+        if (result.length === 0) {
+            console.log('Adding stripe_session_id column to all_booking...');
+            const addStripeSessionIdColumn = "ALTER TABLE all_booking ADD COLUMN stripe_session_id VARCHAR(255) DEFAULT NULL COMMENT 'Stripe Checkout Session ID for payment tracking'";
+            con.query(addStripeSessionIdColumn, (err) => {
+                if (err) {
+                    console.error('Error adding stripe_session_id column:', err);
+                } else {
+                    console.log('✅ stripe_session_id column added successfully');
+                }
+            });
+        } else {
+            console.log('✅ stripe_session_id column already exists');
         }
     });
 };
