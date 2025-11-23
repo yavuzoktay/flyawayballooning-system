@@ -273,7 +273,7 @@ const CustomerPortal = () => {
                 </Typography>
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
                     <Box>
-                        <Typography variant="body2" color="text.secondary">Booking Reference</Typography>
+                        <Typography variant="body2" color="text.secondary">Booking ID or Voucher Reference</Typography>
                         <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
                             {bookingData.booking_reference || bookingData.id || 'N/A'}
                         </Typography>
