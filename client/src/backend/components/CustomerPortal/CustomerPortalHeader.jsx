@@ -20,10 +20,6 @@ const CustomerPortalHeader = ({ onNavigate = () => {} }) => {
             <div className="cph-inner">
                 <div className="cph-brand" onClick={() => { handleNavClick('portal-main'); scrollToSection('portal-main'); }}>
                     <img src="/FAB_Logo_DarkBlue.png" alt="Fly Away Ballooning" />
-                    <div className="cph-brand-text">
-                        <span className="cph-label">Customer Portal</span>
-                        <span className="cph-sub">Manage your flight experience</span>
-                    </div>
                 </div>
 
                 <button
