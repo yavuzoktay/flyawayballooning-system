@@ -234,7 +234,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             }}
         >
             <DialogTitle sx={{ fontWeight: 700, fontSize: 20, pb: 1.5 }}>
-                Reschedule Flight
+                Reschedule Your Flight
             </DialogTitle>
             <DialogContent>
                 {error && (
