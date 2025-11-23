@@ -484,6 +484,11 @@ const CustomerPortal = () => {
                             <Typography variant="body1" sx={{ fontWeight: 500 }}>
                                 {passenger.first_name} {passenger.last_name}
                             </Typography>
+                            {index === 0 && passenger.phone && (
+                                <Typography variant="body2" color="text.secondary">
+                                    Phone: {passenger.phone}
+                                </Typography>
+                            )}
                             {passenger.weight && (
                                 <Typography variant="body2" color="text.secondary">
                                     Weight: {passenger.weight} kg
