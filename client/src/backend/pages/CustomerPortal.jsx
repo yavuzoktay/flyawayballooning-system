@@ -665,18 +665,6 @@ const CustomerPortal = () => {
                 </Paper>
             )}
 
-            <Paper id="live-availability" elevation={2} sx={{ p: 3, mb: 3, scrollMarginTop: '100px' }}>
-                <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
-                    Available Flights
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Check for other available dates and times to reschedule your flight.
-                </Typography>
-                <Box sx={{ border: '1px dashed #ccc', p: 3, textAlign: 'center', color: '#888', borderRadius: 1 }}>
-                    <Typography variant="body2">Availability calendar will be available soon.</Typography>
-                </Box>
-            </Paper>
-
             {/* Customer Portal Content Sections */}
             {portalContents.length > 0 && portalContents.map((content, index) => (
                 <Paper 
