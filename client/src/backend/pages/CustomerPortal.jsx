@@ -118,7 +118,7 @@ const CustomerPortal = () => {
             } catch (error) {
                 console.error('Error fetching locations:', error);
                 // Fallback to default locations
-                setAvailableLocations(['Bath', 'Devon', 'Somerset', 'Bristol Fiesta']);
+                setAvailableLocations(['Bath', 'Devon', 'Somerset']);
             }
         };
         
@@ -730,7 +730,7 @@ const CustomerPortal = () => {
                             </Typography>
                             
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                                {availableLocations.map((location) => (
+                                {availableLocations.filter(location => location !== 'Bristol Fiesta').map((location) => (
                                     <Button
                                         key={location}
                                         variant={selectedNewLocation === location ? 'contained' : 'outlined'}
