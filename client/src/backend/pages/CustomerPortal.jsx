@@ -234,7 +234,7 @@ const CustomerPortal = () => {
 
     return (
         <>
-            <CustomerPortalHeader onNavigate={scrollToSection} />
+            <CustomerPortalHeader />
             <Container maxWidth="lg" sx={{ py: 4 }}>
                 <Box id="portal-main" sx={{ mb: 4, scrollMarginTop: '100px' }}>
                     <Box sx={{ mb: 3, borderRadius: 3, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
