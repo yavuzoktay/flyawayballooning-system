@@ -359,18 +359,24 @@ const CustomerPortal = () => {
                     const expiryDate = bookingData.expires ? dayjs(bookingData.expires) : null;
                     const isExpired = expiryDate ? expiryDate.isBefore(now, 'day') : false;
                     
-                    // Reschedule button: Only disabled if expiry date has passed (not based on cancelled status)
-                    const canReschedule = !isExpired;
+                    // Reschedule disabled if expired, cancelled or within 120 hours
+                    const canReschedule = !isExpired && !isCancelled && hoursUntilFlight > 120;
                     
                     // Change Location and Cancel buttons: Disabled if cancelled or less than 120 hours
                     const canChangeLocation = !isCancelled && hoursUntilFlight > 120;
                     const canCancel = !isCancelled && hoursUntilFlight > 120;
                     
                     return (
-                        <Box sx={{ mt: 3, pt: 3, borderTop: '1px solid #e0e0e0' }}>
-                            {/* Reschedule Flight Button - Disabled only if expiry date has passed */}
+                        <Box sx={{ mt: 3, pt: 3, borderTop: '1px solid #d1d5db' }}>
+                            {/* Reschedule Flight Button - Disabled if expired, cancelled, or within 120 hours */}
                             <Tooltip 
-                                title={isExpired ? "Voucher / Booking has expired" : ""}
+                                title={
+                                    isExpired 
+                                        ? "Voucher / Booking has expired"
+                                        : isCancelled
+                                            ? "Flight is cancelled"
+                                            : (!canReschedule ? "Less than 120 hours remaining until your flight" : "")
+                                }
                                 arrow
                             >
                                 <span style={{ display: 'block', width: '100%' }}>
@@ -501,60 +507,6 @@ const CustomerPortal = () => {
                         </Box>
                     );
                 })()}
-            </Paper>
-
-            <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
-                <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
-                    Booking Details
-                </Typography>
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-                    <Box>
-                        <Typography variant="body2" color="text.secondary">Passengers</Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                            {bookingData.pax || 1}
-                        </Typography>
-                    </Box>
-                    <Box>
-                        <Typography variant="body2" color="text.secondary">Experience</Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                            {bookingData.flight_type || bookingData.experience || 'N/A'}
-                        </Typography>
-                    </Box>
-                    <Box>
-                        <Typography variant="body2" color="text.secondary">Name</Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                            {bookingData.name || 'N/A'}
-                        </Typography>
-                    </Box>
-                    <Box>
-                        <Typography variant="body2" color="text.secondary">Email</Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                            {bookingData.email || 'N/A'}
-                        </Typography>
-                    </Box>
-                    <Box>
-                        <Typography variant="body2" color="text.secondary">Phone</Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                            {bookingData.phone || 'N/A'}
-                        </Typography>
-                    </Box>
-                    {bookingData.voucher_code && (
-                        <Box>
-                            <Typography variant="body2" color="text.secondary">Voucher Code</Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                                {bookingData.voucher_code}
-                            </Typography>
-                        </Box>
-                    )}
-                    {bookingData.expires && (
-                        <Box>
-                            <Typography variant="body2" color="text.secondary">Expires</Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                                {dayjs(bookingData.expires).format('DD/MM/YYYY')}
-                            </Typography>
-                        </Box>
-                    )}
-                </Box>
             </Paper>
 
             {bookingData.passengers && bookingData.passengers.length > 0 && (
@@ -1170,25 +1122,7 @@ const CustomerPortal = () => {
                 <DialogTitle sx={{ fontWeight: 700, fontSize: 20, pb: 1.5, color: '#ef4444' }}>
                     Cancel Flight
                 </DialogTitle>
-                <DialogContent>
-                    <Alert severity="warning" sx={{ mb: 2 }}>
-                        Are you sure you want to cancel this flight? This action cannot be undone.
-                    </Alert>
-                    <Typography variant="body1" sx={{ mb: 2 }}>
-                        <strong>Booking Reference:</strong> {bookingData?.booking_reference || bookingData?.id || 'N/A'}
-                    </Typography>
-                    {bookingData?.flight_date && (
-                        <Typography variant="body1" sx={{ mb: 2 }}>
-                            <strong>Flight Date:</strong> {dayjs(bookingData.flight_date).format('DD/MM/YYYY HH:mm')}
-                        </Typography>
-                    )}
-                    <Typography variant="body1" sx={{ mb: 2 }}>
-                        <strong>Location:</strong> {bookingData?.location || 'N/A'}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                        Cancelling this flight will update the booking status to "Cancelled" and increment the flight attempts count.
-                    </Typography>
-                </DialogContent>
+                <DialogContent />
                 <DialogActions sx={{ p: 3, pt: 2, justifyContent: 'flex-end' }}>
                     <Button 
                         onClick={() => setCancelFlightDialogOpen(false)}
