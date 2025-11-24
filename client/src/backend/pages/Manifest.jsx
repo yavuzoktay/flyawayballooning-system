@@ -3419,6 +3419,27 @@ const Manifest = () => {
                                                     {groupFlights.map((flight, idx) => {
                                                         // Sadece ilk passenger'ı al
                                                         const firstPassenger = Array.isArray(flight.passengers) && flight.passengers.length > 0 ? flight.passengers[0] : null;
+                                                        const hasWeatherRefund = (() => {
+                                                            const bookingLevelRaw = flight.weather_refund_total_price ?? flight.weather_refund_price ?? flight.weather_refund ?? null;
+                                                            if (bookingLevelRaw !== null && bookingLevelRaw !== undefined) {
+                                                                const parsed = parseFloat(bookingLevelRaw);
+                                                                if (!isNaN(parsed) && parsed > 0) {
+                                                                    return true;
+                                                                }
+                                                            }
+                                                            if (Array.isArray(flight.passengers)) {
+                                                                return flight.passengers.some(p => {
+                                                                    const value = p.weather_refund ?? p.weatherRefund;
+                                                                    if (value === null || value === undefined) return false;
+                                                                    if (typeof value === 'string') {
+                                                                        const normalized = value.trim().toLowerCase();
+                                                                        return normalized === '1' || normalized === 'true' || normalized === 'yes';
+                                                                    }
+                                                                    return Boolean(value);
+                                                                });
+                                                            }
+                                                            return false;
+                                                        })();
                                                         return (
                                                             <TableRow key={flight.id}>
                                                                 <TableCell>
@@ -3469,7 +3490,7 @@ const Manifest = () => {
                                                                 </TableCell>
                                                                 <TableCell>{flight.phone || ''}</TableCell>
                                                                 <TableCell>{flight.email || ''}</TableCell>
-                                                                <TableCell>{passenger.weatherRefund || passenger.weather_refund ? 'Yes' : 'No'}</TableCell>
+                                                                <TableCell>{hasWeatherRefund ? 'Yes' : 'No'}</TableCell>
                                                                 <TableCell>{(() => {
                                                                     if (Array.isArray(flight.choose_add_on)) {
                                                                         return flight.choose_add_on.join(', ');
@@ -3837,71 +3858,6 @@ const Manifest = () => {
                                             })()}
                                         </Typography>
 
-                                    </Box>
-                                    {/* Preferences Section - always visible */}
-                                    <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
-                                        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Preferences</Typography>
-                                        {/* Preferred Day */}
-                                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                            <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Day:</b></Typography>
-                                            {editPrefField === 'preferred_day' ? (
-                                                <>
-                                                    <select value={editPrefValue} onChange={e => setEditPrefValue(e.target.value)} style={{ marginRight: 8, width: 220 }} disabled={savingPref}>
-                                                        <option value="">Select...</option>
-                                                        <option value="Weekend Only">Weekend Only</option>
-                                                        <option value="Weekday & Weekend">Weekday & Weekend</option>
-                                                    </select>
-                                                    <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_day')} disabled={savingPref}>Save</Button>
-                                                    <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Typography sx={{ mr: 1 }}>{bookingDetail.booking.preferred_day || '-'}</Typography>
-                                                    <Button size="small" onClick={() => handleEditPref('preferred_day', bookingDetail.booking.preferred_day)}>Edit</Button>
-                                                </>
-                                            )}
-                                        </Box>
-                                        {/* Preferred Location */}
-                                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                            <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Location:</b></Typography>
-                                            {editPrefField === 'preferred_location' ? (
-                                                <>
-                                                    <select value={editPrefValue} onChange={e => setEditPrefValue(e.target.value)} style={{ marginRight: 8, width: 220 }} disabled={savingPref}>
-                                                        <option value="">Select...</option>
-                                                        <option value="Bath">Bath</option>
-                                                        <option value="Taunton & South Somerset">Taunton & South Somerset</option>
-                                                        <option value="Exeter & Tiverton">Exeter & Tiverton</option>
-                                                    </select>
-                                                    <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_location')} disabled={savingPref}>Save</Button>
-                                                    <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Typography sx={{ mr: 1 }}>{bookingDetail.booking.preferred_location || '-'}</Typography>
-                                                    <Button size="small" onClick={() => handleEditPref('preferred_location', bookingDetail.booking.preferred_location)}>Edit</Button>
-                                                </>
-                                            )}
-                                        </Box>
-                                        {/* Preferred Time */}
-                                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                            <Typography sx={{ fontWeight: 700, minWidth: 150 }}><b>Preferred Time:</b></Typography>
-                                            {editPrefField === 'preferred_time' ? (
-                                                <>
-                                                    <select value={editPrefValue} onChange={e => setEditPrefValue(e.target.value)} style={{ marginRight: 8, width: 220 }} disabled={savingPref}>
-                                                        <option value="">Select...</option>
-                                                        <option value="Morning">Morning</option>
-                                                        <option value="Afternoon & Evening">Afternoon & Evening</option>
-                                                    </select>
-                                                    <Button size="small" variant="contained" onClick={() => handleSavePref('preferred_time')} disabled={savingPref}>Save</Button>
-                                                    <Button size="small" onClick={handleCancelPref} sx={{ ml: 1 }} disabled={savingPref}>Cancel</Button>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Typography sx={{ mr: 1 }}>{bookingDetail.booking.preferred_time || '-'}</Typography>
-                                                    <Button size="small" onClick={() => handleEditPref('preferred_time', bookingDetail.booking.preferred_time)}>Edit</Button>
-                                                </>
-                                            )}
-                                        </Box>
                                     </Box>
                                 </Grid>
                                 {/* Main Details */}
