@@ -1064,7 +1064,8 @@ app.post('/api/createRedeemBooking', (req, res) => {
         selectedTime,
         voucher_code,
         totalPrice = 0,
-        activity_id
+        activity_id,
+        userSessionData
     } = req.body;
 
     // Basic validation
@@ -1449,6 +1450,26 @@ app.post('/api/createRedeemBooking', (req, res) => {
 
         const bookingId = result.insertId;
         console.log('=== REDEEM BOOKING SUCCESS ===');
+        
+        // Save user session data if provided
+        if (userSessionData && userSessionData.session_id) {
+            const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.connection.remoteAddress || null;
+            const userSessionPayload = {
+                ...userSessionData,
+                booking_id: bookingId,
+                ip_address: ipAddress || userSessionData.ip_address || null,
+                booking_clicks: 1 // Increment booking clicks
+            };
+            
+            // Save user session asynchronously (don't wait for it)
+            axios.post(`${req.protocol}://${req.get('host')}/api/save-user-session`, userSessionPayload)
+                .then(() => {
+                    console.log('User session saved successfully for booking:', bookingId);
+                })
+                .catch((err) => {
+                    console.error('Error saving user session:', err.message);
+                });
+        }
         
         // Send automatic booking confirmation email
         if (passengerData && passengerData[0] && passengerData[0].email) {
@@ -3969,6 +3990,11 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
                         return res.json({ received: true });
                     }
                     console.log('Creating booking via webhook:', storeData.bookingData);
+                    // Pass userSessionData to bookingData for createBookingFromWebhook
+                    if (storeData.userSessionData) {
+                        storeData.bookingData = storeData.bookingData || {};
+                        storeData.bookingData.userSessionData = storeData.userSessionData;
+                    }
                     // Direct database insertion instead of HTTP call
                     const bookingId = await createBookingFromWebhook(storeData.bookingData);
                     console.log('Webhook booking creation completed, ID:', bookingId);
@@ -3989,6 +4015,26 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
                                 }
                             }
                         );
+                    }
+                    
+                    // Save user session data if provided
+                    if (storeData.userSessionData && storeData.userSessionData.session_id && bookingId) {
+                        const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.connection.remoteAddress || null;
+                        const userSessionPayload = {
+                            ...storeData.userSessionData,
+                            booking_id: bookingId,
+                            ip_address: ipAddress || storeData.userSessionData.ip_address || null,
+                            booking_clicks: 1 // Increment booking clicks
+                        };
+                        
+                        // Save user session asynchronously
+                        axios.post(`${req.protocol}://${req.get('host')}/api/save-user-session`, userSessionPayload)
+                            .then(() => {
+                                console.log('User session saved successfully for booking:', bookingId);
+                            })
+                            .catch((err) => {
+                                console.error('Error saving user session:', err.message);
+                            });
                     }
                     
                     // Mark processed and store created id to avoid duplicate creation by fallback
@@ -5779,6 +5825,292 @@ app.post('/api/sync-all-payment-history', async (req, res) => {
             error: error.message
         });
     }
+});
+
+// Get User Session for a booking
+app.get('/api/booking-user-session/:bookingId', (req, res) => {
+    const bookingId = parseInt(req.params.bookingId);
+    
+    if (!bookingId || isNaN(bookingId)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid booking ID'
+        });
+    }
+    
+    // First get booking to find user_session_id
+    con.query(
+        'SELECT user_session_id FROM all_booking WHERE id = ?',
+        [bookingId],
+        (err, bookingResults) => {
+            if (err) {
+                console.error('Error fetching booking:', err);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Error fetching booking',
+                    error: err.message
+                });
+            }
+            
+            if (bookingResults.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Booking not found'
+                });
+            }
+            
+            const userSessionId = bookingResults[0].user_session_id;
+            
+            if (!userSessionId) {
+                return res.json({
+                    success: true,
+                    data: null,
+                    message: 'No user session found for this booking'
+                });
+            }
+            
+            // Get user session data
+            const sql = `
+                SELECT 
+                    id,
+                    booking_id,
+                    session_id,
+                    ip_address,
+                    user_agent,
+                    browser,
+                    browser_size,
+                    language,
+                    operating_system,
+                    device_type,
+                    location_city,
+                    location_country,
+                    location_country_code,
+                    coordinates_lat,
+                    coordinates_lng,
+                    referrer,
+                    landing_page,
+                    booking_clicks,
+                    site_page_views,
+                    first_seen,
+                    last_seen,
+                    created_at
+                FROM user_sessions
+                WHERE session_id = ?
+                ORDER BY first_seen ASC
+                LIMIT 1
+            `;
+            
+            con.query(sql, [userSessionId], (sessionErr, sessionResults) => {
+                if (sessionErr) {
+                    console.error('Error fetching user session:', sessionErr);
+                    return res.status(500).json({
+                        success: false,
+                        message: 'Error fetching user session',
+                        error: sessionErr.message
+                    });
+                }
+                
+                if (sessionResults.length === 0) {
+                    return res.json({
+                        success: true,
+                        data: null,
+                        message: 'User session not found'
+                    });
+                }
+                
+                const session = sessionResults[0];
+                
+                // Calculate days ago
+                const firstSeen = session.first_seen ? new Date(session.first_seen) : null;
+                const daysAgo = firstSeen ? Math.floor((Date.now() - firstSeen.getTime()) / (1000 * 60 * 60 * 24)) : null;
+                
+                res.json({
+                    success: true,
+                    data: {
+                        ...session,
+                        days_ago: daysAgo
+                    }
+                });
+            });
+        }
+    );
+});
+
+// Save or update user session
+app.post('/api/save-user-session', (req, res) => {
+    const {
+        session_id,
+        booking_id,
+        ip_address,
+        user_agent,
+        browser,
+        browser_size,
+        language,
+        operating_system,
+        device_type,
+        location_city,
+        location_country,
+        location_country_code,
+        coordinates_lat,
+        coordinates_lng,
+        referrer,
+        landing_page,
+        booking_clicks,
+        site_page_views
+    } = req.body;
+
+    if (!session_id) {
+        return res.status(400).json({
+            success: false,
+            message: 'Session ID is required'
+        });
+    }
+
+    // Check if session already exists
+    const checkSql = 'SELECT id FROM user_sessions WHERE session_id = ?';
+    con.query(checkSql, [session_id], (checkErr, checkResults) => {
+        if (checkErr) {
+            console.error('Error checking user session:', checkErr);
+            return res.status(500).json({
+                success: false,
+                message: 'Error checking user session',
+                error: checkErr.message
+            });
+        }
+
+        if (checkResults.length > 0) {
+            // Update existing session
+            const updateSql = `
+                UPDATE user_sessions SET
+                    booking_id = COALESCE(?, booking_id),
+                    ip_address = COALESCE(?, ip_address),
+                    user_agent = COALESCE(?, user_agent),
+                    browser = COALESCE(?, browser),
+                    browser_size = COALESCE(?, browser_size),
+                    language = COALESCE(?, language),
+                    operating_system = COALESCE(?, operating_system),
+                    device_type = COALESCE(?, device_type),
+                    location_city = COALESCE(?, location_city),
+                    location_country = COALESCE(?, location_country),
+                    location_country_code = COALESCE(?, location_country_code),
+                    coordinates_lat = COALESCE(?, coordinates_lat),
+                    coordinates_lng = COALESCE(?, coordinates_lng),
+                    referrer = COALESCE(?, referrer),
+                    landing_page = COALESCE(?, landing_page),
+                    booking_clicks = booking_clicks + ?,
+                    site_page_views = site_page_views + ?,
+                    last_seen = CURRENT_TIMESTAMP
+                WHERE session_id = ?
+            `;
+            
+            con.query(updateSql, [
+                booking_id || null,
+                ip_address || null,
+                user_agent || null,
+                browser || null,
+                browser_size || null,
+                language || null,
+                operating_system || null,
+                device_type || null,
+                location_city || null,
+                location_country || null,
+                location_country_code || null,
+                coordinates_lat || null,
+                coordinates_lng || null,
+                referrer || null,
+                landing_page || null,
+                booking_clicks || 0,
+                site_page_views || 0,
+                session_id
+            ], (updateErr, updateResult) => {
+                if (updateErr) {
+                    console.error('Error updating user session:', updateErr);
+                    return res.status(500).json({
+                        success: false,
+                        message: 'Error updating user session',
+                        error: updateErr.message
+                    });
+                }
+
+                // Update booking with user_session_id if booking_id is provided
+                if (booking_id) {
+                    con.query(
+                        'UPDATE all_booking SET user_session_id = ? WHERE id = ?',
+                        [session_id, booking_id],
+                        (bookingErr) => {
+                            if (bookingErr) {
+                                console.error('Error updating booking with user_session_id:', bookingErr);
+                            }
+                        }
+                    );
+                }
+
+                res.json({
+                    success: true,
+                    message: 'User session updated successfully'
+                });
+            });
+        } else {
+            // Insert new session
+            const insertSql = `
+                INSERT INTO user_sessions (
+                    session_id, booking_id, ip_address, user_agent, browser, browser_size,
+                    language, operating_system, device_type, location_city, location_country,
+                    location_country_code, coordinates_lat, coordinates_lng, referrer,
+                    landing_page, booking_clicks, site_page_views
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+            
+            con.query(insertSql, [
+                session_id,
+                booking_id || null,
+                ip_address || null,
+                user_agent || null,
+                browser || null,
+                browser_size || null,
+                language || null,
+                operating_system || null,
+                device_type || null,
+                location_city || null,
+                location_country || null,
+                location_country_code || null,
+                coordinates_lat || null,
+                coordinates_lng || null,
+                referrer || null,
+                landing_page || null,
+                booking_clicks || 0,
+                site_page_views || 0
+            ], (insertErr, insertResult) => {
+                if (insertErr) {
+                    console.error('Error inserting user session:', insertErr);
+                    return res.status(500).json({
+                        success: false,
+                        message: 'Error inserting user session',
+                        error: insertErr.message
+                    });
+                }
+
+                // Update booking with user_session_id if booking_id is provided
+                if (booking_id) {
+                    con.query(
+                        'UPDATE all_booking SET user_session_id = ? WHERE id = ?',
+                        [session_id, booking_id],
+                        (bookingErr) => {
+                            if (bookingErr) {
+                                console.error('Error updating booking with user_session_id:', bookingErr);
+                            }
+                        }
+                    );
+                }
+
+                res.json({
+                    success: true,
+                    message: 'User session saved successfully',
+                    session_id: session_id
+                });
+            });
+        }
+    });
 });
 
 // In-memory short cache to avoid duplicate rapid calls for the same key
@@ -13319,6 +13651,29 @@ async function createBookingFromWebhook(bookingData) {
                 const bookingId = result.insertId;
                 console.log('Webhook booking created successfully, ID:', bookingId);
                 
+                // Save user session data if provided (can be in bookingData or passed separately)
+                const userSessionData = bookingData.userSessionData || bookingData._userSessionData;
+                if (userSessionData && userSessionData.session_id) {
+                    // Get IP address from request if available (passed through from webhook)
+                    const ipAddress = userSessionData.ip_address || null;
+                    const userSessionPayload = {
+                        ...userSessionData,
+                        booking_id: bookingId,
+                        ip_address: ipAddress,
+                        booking_clicks: 1 // Increment booking clicks
+                    };
+                    
+                    // Save user session asynchronously
+                    const host = process.env.API_BASE_URL || 'http://localhost:3002';
+                    axios.post(`${host}/api/save-user-session`, userSessionPayload)
+                        .then(() => {
+                            console.log('User session saved successfully for booking:', bookingId);
+                        })
+                        .catch((err) => {
+                            console.error('Error saving user session:', err.message);
+                        });
+                }
+                
                 // Update availability if date and time are provided
                 if (selectedDate && selectedTime && bookingData.activity_id) {
                     const bookingDate = moment(selectedDate).format('YYYY-MM-DD');
@@ -13890,12 +14245,30 @@ app.post('/api/create-checkout-session', async (req, res) => {
             });
         }
         
-        const { totalPrice, currency = 'GBP', bookingData, voucherData, type } = req.body;
+        const { totalPrice, currency = 'GBP', bookingData, voucherData, type, userSessionData } = req.body;
         if (totalPrice === undefined || totalPrice === null || isNaN(Number(totalPrice))) {
             return res.status(400).json({ success: false, message: 'Invalid totalPrice' });
         }
         if (!bookingData && !voucherData) {
             return res.status(400).json({ success: false, message: 'Eksik veri: bookingData veya voucherData gereklidir.' });
+        }
+        
+        // Save user session data if provided
+        if (userSessionData && userSessionData.session_id) {
+            const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.connection.remoteAddress || null;
+            const userSessionPayload = {
+                ...userSessionData,
+                ip_address: ipAddress || userSessionData.ip_address || null
+            };
+            
+            // Save user session asynchronously (don't wait for it)
+            axios.post(`${req.protocol}://${req.get('host')}/api/save-user-session`, userSessionPayload)
+                .then(() => {
+                    console.log('User session saved successfully');
+                })
+                .catch((err) => {
+                    console.error('Error saving user session:', err.message);
+                });
         }
         
         // Debug: Log activity_id in bookingData
@@ -13988,6 +14361,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
             type: type || (voucherData ? 'voucher' : 'booking'),
             bookingData,
             voucherData: normalizedVoucherData,
+            userSessionData: userSessionData || null, // Store user session data
             timestamp: Date.now() // Add timestamp for debugging
         };
         // File logging for saved session voucherData
@@ -14329,6 +14703,11 @@ app.post('/api/createBookingFromSession', async (req, res) => {
             } catch (mapErr) {
                 console.warn('voucher_type_detail mapping failed:', mapErr?.message);
             }
+            // Pass userSessionData to bookingData for createBookingFromWebhook
+            if (storeData.userSessionData) {
+                storeData.bookingData = storeData.bookingData || {};
+                storeData.bookingData.userSessionData = storeData.userSessionData;
+            }
             // Acquire a simple in-memory lock
             storeData.processing = true;
             try {
@@ -14355,6 +14734,26 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                 } catch (paymentHistoryError) {
                     console.error('Error saving payment history in createBookingFromSession:', paymentHistoryError);
                     // Continue even if payment history fails - booking is still valid
+                }
+                
+                // Save user session data if provided
+                if (storeData.userSessionData && storeData.userSessionData.session_id) {
+                    const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.connection.remoteAddress || null;
+                    const userSessionPayload = {
+                        ...storeData.userSessionData,
+                        booking_id: result,
+                        ip_address: ipAddress || storeData.userSessionData.ip_address || null,
+                        booking_clicks: 1 // Increment booking clicks
+                    };
+                    
+                    // Save user session asynchronously
+                    axios.post(`${req.protocol}://${req.get('host')}/api/save-user-session`, userSessionPayload)
+                        .then(() => {
+                            console.log('User session saved successfully for booking:', result);
+                        })
+                        .catch((err) => {
+                            console.error('Error saving user session:', err.message);
+                        });
                 }
                 
                 // mark processed and store id to avoid duplicates
@@ -15729,6 +16128,69 @@ const runDatabaseMigrations = () => {
             });
         } else {
             console.log('✅ stripe_session_id column already exists');
+        }
+    });
+
+    // Create user_sessions table if it doesn't exist
+    const createUserSessionsTable = `
+        CREATE TABLE IF NOT EXISTS user_sessions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            booking_id INT COMMENT 'Reference to the booking',
+            session_id VARCHAR(255) UNIQUE COMMENT 'Unique session identifier',
+            ip_address VARCHAR(45) COMMENT 'IP address',
+            user_agent TEXT COMMENT 'User agent string',
+            browser VARCHAR(100) COMMENT 'Browser name and version',
+            browser_size VARCHAR(50) COMMENT 'Browser window size (e.g., 390x663)',
+            language VARCHAR(10) COMMENT 'Language code (e.g., en-GB)',
+            operating_system VARCHAR(100) COMMENT 'Operating system',
+            device_type VARCHAR(50) COMMENT 'Device type (mobile, desktop, tablet)',
+            location_city VARCHAR(255) COMMENT 'City name',
+            location_country VARCHAR(100) COMMENT 'Country name',
+            location_country_code VARCHAR(10) COMMENT 'Country code (e.g., GB)',
+            coordinates_lat DECIMAL(10, 8) COMMENT 'Latitude',
+            coordinates_lng DECIMAL(11, 8) COMMENT 'Longitude',
+            referrer TEXT COMMENT 'Referrer URL',
+            landing_page TEXT COMMENT 'Landing page URL',
+            booking_clicks INT DEFAULT 0 COMMENT 'Number of booking clicks',
+            site_page_views INT DEFAULT 0 COMMENT 'Number of site page views',
+            first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'First seen timestamp',
+            last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Last seen timestamp',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_booking_id (booking_id),
+            INDEX idx_session_id (session_id),
+            INDEX idx_ip_address (ip_address),
+            INDEX idx_first_seen (first_seen)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `;
+    
+    con.query(createUserSessionsTable, (err) => {
+        if (err) {
+            console.error('Error creating user_sessions table:', err);
+        } else {
+            console.log('✅ user_sessions table ready');
+        }
+    });
+
+    // Add user_session_id column to all_booking table
+    const checkUserSessionIdColumn = "SHOW COLUMNS FROM all_booking LIKE 'user_session_id'";
+    con.query(checkUserSessionIdColumn, (err, result) => {
+        if (err) {
+            console.error('Error checking user_session_id column:', err);
+            return;
+        }
+        
+        if (result.length === 0) {
+            console.log('Adding user_session_id column to all_booking...');
+            const addUserSessionIdColumn = "ALTER TABLE all_booking ADD COLUMN user_session_id VARCHAR(255) DEFAULT NULL COMMENT 'User session ID for tracking user activity'";
+            con.query(addUserSessionIdColumn, (err) => {
+                if (err) {
+                    console.error('Error adding user_session_id column:', err);
+                } else {
+                    console.log('✅ user_session_id column added successfully');
+                }
+            });
+        } else {
+            console.log('✅ user_session_id column already exists');
         }
     });
 };

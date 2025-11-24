@@ -199,6 +199,11 @@ const Manifest = () => {
     const [paymentHistory, setPaymentHistory] = useState([]);
     const [paymentHistoryLoading, setPaymentHistoryLoading] = useState(false);
     const [expandedPaymentIds, setExpandedPaymentIds] = useState({});
+    
+    // User Session modal state
+    const [userSessionModalOpen, setUserSessionModalOpen] = useState(false);
+    const [userSession, setUserSession] = useState(null);
+    const [userSessionLoading, setUserSessionLoading] = useState(false);
 
     // SMS state
     const [smsModalOpen, setSmsModalOpen] = useState(false);
@@ -777,6 +782,20 @@ const Manifest = () => {
         if (brandLower.includes('amex') || brandLower.includes('american')) return 'AMEX';
         if (brandLower.includes('discover')) return 'DISC';
         return brand?.toUpperCase() || 'CARD';
+    };
+
+    const fetchUserSession = async (bookingId) => {
+        if (!bookingId) return;
+        setUserSessionLoading(true);
+        try {
+            const response = await axios.get(`/api/booking-user-session/${bookingId}`);
+            setUserSession(response.data?.data || null);
+        } catch (error) {
+            console.error('Error fetching user session:', error);
+            setUserSession(null);
+        } finally {
+            setUserSessionLoading(false);
+        }
     };
 
     const sanitizeMessageHtml = (html) => {
@@ -3942,6 +3961,20 @@ const Manifest = () => {
                                                 >
                                                     Payment History
                                                 </Button>
+                                                <Button
+                                                    variant="contained"
+                                                    color="info"
+                                                    sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d', mt: 1 }}
+                                                    onClick={() => {
+                                                        if (bookingDetail?.booking?.id) {
+                                                            setUserSessionModalOpen(true);
+                                                            fetchUserSession(bookingDetail.booking.id);
+                                                        }
+                                                    }}
+                                                    disabled={!bookingDetail?.booking}
+                                                >
+                                                    More
+                                                </Button>
                                             </Box>
                                         </Box>
                                         <Divider sx={{ my: 2 }} />
@@ -4878,6 +4911,251 @@ const Manifest = () => {
                         setPaymentHistoryModalOpen(false);
                         setExpandedPaymentIds({});
                     }}>Close</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* User Session Modal */}
+            <Dialog
+                open={userSessionModalOpen}
+                onClose={() => setUserSessionModalOpen(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle sx={{ fontWeight: 700, fontSize: 24 }}>
+                    User Session
+                </DialogTitle>
+                <DialogContent dividers sx={{ background: '#f5f7fb' }}>
+                    {userSessionLoading ? (
+                        <Box sx={{ p: 3, textAlign: 'center' }}>
+                            <Typography variant="body2">Loading user session...</Typography>
+                        </Box>
+                    ) : !userSession ? (
+                        <Box sx={{ p: 3, textAlign: 'center' }}>
+                            <Typography variant="body2" color="text.secondary">
+                                No user session data available for this booking.
+                            </Typography>
+                        </Box>
+                    ) : (
+                        <Box sx={{ p: 2 }}>
+                            <Grid container spacing={3}>
+                                {/* Session Activity Metrics */}
+                                <Grid item xs={12}>
+                                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                                        Session Activity
+                                    </Typography>
+                                    <Grid container spacing={2}>
+                                        <Grid item xs={6}>
+                                            <Box sx={{ 
+                                                p: 2, 
+                                                borderRadius: 2, 
+                                                background: '#ffffff',
+                                                border: '1px solid #e2e8f0'
+                                            }}>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    Booking Clicks
+                                                </Typography>
+                                                <Typography variant="h5" sx={{ fontWeight: 600, mt: 0.5 }}>
+                                                    {userSession.booking_clicks || 0}
+                                                </Typography>
+                                            </Box>
+                                        </Grid>
+                                        <Grid item xs={6}>
+                                            <Box sx={{ 
+                                                p: 2, 
+                                                borderRadius: 2, 
+                                                background: '#ffffff',
+                                                border: '1px solid #e2e8f0'
+                                            }}>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    Site Page Views
+                                                </Typography>
+                                                <Typography variant="h5" sx={{ fontWeight: 600, mt: 0.5 }}>
+                                                    {userSession.site_page_views || 0}
+                                                </Typography>
+                                            </Box>
+                                        </Grid>
+                                        <Grid item xs={12}>
+                                            <Box sx={{ 
+                                                p: 2, 
+                                                borderRadius: 2, 
+                                                background: '#ffffff',
+                                                border: '1px solid #e2e8f0'
+                                            }}>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    First Seen
+                                                </Typography>
+                                                <Typography variant="body1" sx={{ fontWeight: 500, mt: 0.5 }}>
+                                                    {userSession.first_seen ? dayjs(userSession.first_seen).format('MMMM D, YYYY, h:mm A') : 'N/A'}
+                                                    {userSession.days_ago !== null && (
+                                                        <Typography variant="caption" color="text.secondary" display="block">
+                                                            ({userSession.days_ago} {userSession.days_ago === 1 ? 'day' : 'days'} ago)
+                                                        </Typography>
+                                                    )}
+                                                </Typography>
+                                            </Box>
+                                        </Grid>
+                                    </Grid>
+                                </Grid>
+
+                                {/* Location Information */}
+                                {(userSession.location_city || userSession.location_country) && (
+                                    <Grid item xs={12}>
+                                        <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                                            Location
+                                        </Typography>
+                                        <Box sx={{ 
+                                            p: 2, 
+                                            borderRadius: 2, 
+                                            background: '#ffffff',
+                                            border: '1px solid #e2e8f0'
+                                        }}>
+                                            <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                                                {[userSession.location_city, userSession.location_country].filter(Boolean).join(', ') || 'N/A'}
+                                            </Typography>
+                                            {userSession.coordinates_lat && userSession.coordinates_lng && (
+                                                <>
+                                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                                        {userSession.coordinates_lat}°N {userSession.coordinates_lng}°W
+                                                    </Typography>
+                                                    <Box sx={{ mt: 2 }}>
+                                                        <a
+                                                            href={`https://www.google.com/maps?q=${userSession.coordinates_lat},${userSession.coordinates_lng}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            style={{ 
+                                                                display: 'inline-block',
+                                                                padding: '8px 16px',
+                                                                background: '#1976d2',
+                                                                color: '#fff',
+                                                                textDecoration: 'none',
+                                                                borderRadius: '4px',
+                                                                fontWeight: 500
+                                                            }}
+                                                        >
+                                                            View on Google Maps
+                                                        </a>
+                                                    </Box>
+                                                </>
+                                            )}
+                                        </Box>
+                                    </Grid>
+                                )}
+
+                                {/* Technical Details */}
+                                <Grid item xs={12}>
+                                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                                        Technical Details
+                                    </Typography>
+                                    <Grid container spacing={2}>
+                                        {userSession.ip_address && (
+                                            <Grid item xs={6}>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    IP Address
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                                                    {userSession.ip_address}
+                                                </Typography>
+                                            </Grid>
+                                        )}
+                                        {userSession.browser && (
+                                            <Grid item xs={6}>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    Browser
+                                                </Typography>
+                                                <Typography variant="body2">
+                                                    {userSession.browser}
+                                                </Typography>
+                                            </Grid>
+                                        )}
+                                        {userSession.browser_size && (
+                                            <Grid item xs={6}>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    Browser Size
+                                                </Typography>
+                                                <Typography variant="body2">
+                                                    {userSession.browser_size}
+                                                </Typography>
+                                            </Grid>
+                                        )}
+                                        {userSession.language && (
+                                            <Grid item xs={6}>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    Language
+                                                </Typography>
+                                                <Typography variant="body2">
+                                                    {userSession.language}
+                                                </Typography>
+                                            </Grid>
+                                        )}
+                                        {userSession.operating_system && (
+                                            <Grid item xs={6}>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    Operating System
+                                                </Typography>
+                                                <Typography variant="body2">
+                                                    {userSession.operating_system}
+                                                </Typography>
+                                            </Grid>
+                                        )}
+                                        {userSession.device_type && (
+                                            <Grid item xs={6}>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    Device Type
+                                                </Typography>
+                                                <Typography variant="body2">
+                                                    {userSession.device_type}
+                                                </Typography>
+                                            </Grid>
+                                        )}
+                                        {userSession.user_agent && (
+                                            <Grid item xs={12}>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    User Agent
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem', wordBreak: 'break-all' }}>
+                                                    {userSession.user_agent}
+                                                </Typography>
+                                            </Grid>
+                                        )}
+                                    </Grid>
+                                </Grid>
+
+                                {/* Referral and Navigation */}
+                                {(userSession.referrer || userSession.landing_page) && (
+                                    <Grid item xs={12}>
+                                        <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                                            Referral and Navigation
+                                        </Typography>
+                                        <Grid container spacing={2}>
+                                            {userSession.referrer && (
+                                                <Grid item xs={12}>
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        Referrer
+                                                    </Typography>
+                                                    <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
+                                                        {userSession.referrer}
+                                                    </Typography>
+                                                </Grid>
+                                            )}
+                                            {userSession.landing_page && (
+                                                <Grid item xs={12}>
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        Landing Page
+                                                    </Typography>
+                                                    <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
+                                                        {userSession.landing_page}
+                                                    </Typography>
+                                                </Grid>
+                                            )}
+                                        </Grid>
+                                    </Grid>
+                                )}
+                            </Grid>
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setUserSessionModalOpen(false)}>Close</Button>
                 </DialogActions>
             </Dialog>
 
