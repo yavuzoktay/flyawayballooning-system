@@ -117,11 +117,11 @@ function logToFile(message, data = null) {
 // Enable CORS
 app.use(cors({
     origin: [
-        'https://flyawayballooning-book.com', 
+        'https://flyawayballooning-book.com',
         'http://flyawayballooning-book.com',
-        'https://flyawayballooning-system.com', 
+        'https://flyawayballooning-system.com',
         'http://flyawayballooning-system.com',
-        'http://localhost:3000', 
+        'http://localhost:3000',
         'http://localhost:3001',
         'http://localhost:3002',
         'http://localhost:3004',
@@ -130,8 +130,8 @@ app.use(cors({
     ],
     methods: "GET,POST,PUT,DELETE,PATCH,OPTIONS",
     allowedHeaders: [
-        'Content-Type', 
-        'Authorization', 
+        'Content-Type',
+        'Authorization',
         'X-Requested-With',
         'Cache-Control',
         'Pragma'
@@ -196,7 +196,7 @@ app.post('/api/generate-voucher-code', async (req, res) => {
                 }
             });
         };
-        
+
         // Check for recent duplicates first - only prevent if there's already a NON-NULL code
         const existingCode = await duplicateCheck();
         if (existingCode && existingCode.length > 0 && existingCode[0].code) {
@@ -210,26 +210,26 @@ app.post('/api/generate-voucher-code', async (req, res) => {
                 duplicate_prevented: true
             });
         }
-        
+
         console.log('=== NO EXISTING VOUCHER CODE FOUND ===');
         console.log('Proceeding with new voucher code generation for:', customer_name);
-        
+
         // Generate voucher code based on the pattern: F/G + Category + Year + Serial
         const year = new Date().getFullYear().toString().slice(-2); // Get last 2 digits of year (25 for 2025)
-        
+
         // Map flight categories to codes
         const categoryMap = {
             'Weekday Morning': 'WM',
-            'Weekday Flex': 'WF', 
+            'Weekday Flex': 'WF',
             'Anytime': 'AT',
             'Any Day Flight': 'AT' // Default mapping
         };
-        
+
         // Determine flight category based on voucher type if not provided
         let finalFlightCategory = flight_category;
         console.log('Received flight_category:', flight_category);
         console.log('Received voucher_type:', voucher_type);
-        
+
         if (!finalFlightCategory && voucher_type) {
             // If voucher type is provided but flight category is not, try to determine from voucher type
             if (voucher_type === 'Book Flight' || voucher_type === 'Flight Voucher' || voucher_type === 'Buy Gift') {
@@ -238,11 +238,11 @@ app.post('/api/generate-voucher-code', async (req, res) => {
                 finalFlightCategory = 'Any Day Flight'; // Default fallback
             }
         }
-        
+
         console.log('Final Flight Category:', finalFlightCategory);
         const categoryCode = categoryMap[finalFlightCategory] || 'AT';
         console.log('Generated Category Code:', categoryCode);
-        
+
         // Determine prefix based on voucher type
         let prefix = 'F'; // Default for Flight Voucher
         if (voucher_type === 'Buy Gift' || voucher_type === 'Gift Voucher') {
@@ -250,7 +250,7 @@ app.post('/api/generate-voucher-code', async (req, res) => {
         } else if (voucher_type === 'Book Flight') {
             prefix = 'B';
         }
-        
+
         // Generate unique serial (3 characters)
         const generateSerial = () => {
             const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -260,7 +260,7 @@ app.post('/api/generate-voucher-code', async (req, res) => {
             }
             return result;
         };
-        
+
         // Helper to normalize currency inputs to float for comparisons
         const normalizePaidAmount = (value) => {
             if (typeof value === 'number' && !Number.isNaN(value)) {
@@ -272,19 +272,19 @@ app.post('/api/generate-voucher-code', async (req, res) => {
             }
             return 0;
         };
-        
+
         // Generate unique voucher code
         let voucherCode;
         let isUnique = false;
         let attempts = 0;
         const maxAttempts = 10;
-        
+
         // Use async/await pattern for database operations
         const generateUniqueCode = async () => {
             while (!isUnique && attempts < maxAttempts) {
                 const serial = generateSerial();
                 voucherCode = `${prefix}${categoryCode}${year}${serial}`;
-                
+
                 // Check if code already exists in both tables
                 const checkCode = () => {
                     return new Promise((resolve, reject) => {
@@ -302,7 +302,7 @@ app.post('/api/generate-voucher-code', async (req, res) => {
                         });
                     });
                 };
-                
+
                 try {
                     const codeAvailable = await checkCode();
                     if (codeAvailable) {
@@ -313,26 +313,26 @@ app.post('/api/generate-voucher-code', async (req, res) => {
                     console.error('Error checking voucher code uniqueness:', err);
                     return res.status(500).json({ success: false, message: 'Database error' });
                 }
-                
+
                 attempts++;
             }
-            
+
             if (!isUnique) {
                 return res.status(500).json({ success: false, message: 'Could not generate unique voucher code' });
             }
         };
-        
+
         // Generate the unique code
         await generateUniqueCode();
-        
+
         // Create title for the voucher code
         const title = `${customer_name} - ${flight_category} - ${location}`;
-        
+
         // Handle different voucher types
         console.log('=== VOUCHER CODE UPDATE ===');
         console.log('Voucher type:', voucher_type);
         console.log('Looking for record with customer:', customer_name, customer_email, paid_amount);
-        
+
         const findAndUpdateRecord = () => {
             return new Promise((resolve, reject) => {
                 if (voucher_type === 'Book Flight') {
@@ -343,7 +343,7 @@ app.post('/api/generate-voucher-code', async (req, res) => {
                         customer_email,
                         paid_amount
                     });
-                    
+
                     const findSql = `
                         SELECT id FROM all_booking 
                         WHERE name = ? AND email = ? AND paid = ? 
@@ -351,20 +351,20 @@ app.post('/api/generate-voucher-code', async (req, res) => {
                         ORDER BY created_at DESC 
                         LIMIT 1
                     `;
-                    
+
                     con.query(findSql, [customer_name, customer_email, paid_amount], (err, findResult) => {
                         if (err) {
                             console.error('Error finding booking record:', err);
                             reject(err);
                             return;
                         }
-                        
+
                         console.log('Found booking records:', findResult.length);
                         console.log('Booking records:', findResult);
-                        
+
                         if (findResult.length === 0) {
                             console.log('No booking found with exact match, trying broader search...');
-                            
+
                             // Try broader search without exact paid amount match
                             const broaderSql = `
                                 SELECT id FROM all_booking 
@@ -373,23 +373,23 @@ app.post('/api/generate-voucher-code', async (req, res) => {
                                 ORDER BY created_at DESC 
                                 LIMIT 1
                             `;
-                            
+
                             con.query(broaderSql, [customer_name, customer_email], (broaderErr, broaderResult) => {
                                 if (broaderErr) {
                                     console.error('Error in broader search:', broaderErr);
                                     reject(new Error('No booking found to update with code'));
                                     return;
                                 }
-                                
+
                                 if (broaderResult.length === 0) {
                                     console.log('No booking found even with broader search');
                                     reject(new Error('No booking found to update with code'));
                                     return;
                                 }
-                                
+
                                 const bookingId = broaderResult[0].id;
                                 console.log('Found booking ID with broader search:', bookingId);
-                                
+
                                 // Update the booking with the generated code
                                 const updateSql = 'UPDATE all_booking SET voucher_code = ? WHERE id = ?';
                                 con.query(updateSql, [voucherCode, bookingId], (updateErr, updateResult) => {
@@ -404,10 +404,10 @@ app.post('/api/generate-voucher-code', async (req, res) => {
                             });
                             return;
                         }
-                        
+
                         const bookingId = findResult[0].id;
                         console.log('Found booking ID to update:', bookingId);
-                        
+
                         // Update the booking with the generated code
                         const updateSql = 'UPDATE all_booking SET voucher_code = ? WHERE id = ?';
                         con.query(updateSql, [voucherCode, bookingId], (updateErr, updateResult) => {
@@ -521,9 +521,9 @@ app.post('/api/generate-voucher-code', async (req, res) => {
 
                         const voucherId = candidates[0].id;
                         console.log('Found voucher ID to update:', voucherId);
-                        
+
                         await queryAsync('UPDATE all_vouchers SET voucher_ref = ? WHERE id = ?', [voucherCode, voucherId]);
-                                console.log('Voucher updated with code:', voucherCode);
+                        console.log('Voucher updated with code:', voucherCode);
                         return { recordId: voucherId, voucherCode };
                     };
 
@@ -533,7 +533,7 @@ app.post('/api/generate-voucher-code', async (req, res) => {
                 }
             });
         };
-        
+
         try {
             const result = await findAndUpdateRecord();
 
@@ -614,8 +614,8 @@ app.post('/api/generate-voucher-code', async (req, res) => {
                     customer_email || null,
                     paid_amount || 0
                 ];
-                con.query(insertUserCodeSql, insertVals, () => {});
-            } catch (e) {}
+                con.query(insertUserCodeSql, insertVals, () => { });
+            } catch (e) { }
 
             // Return the voucher code so it can be used
             res.json({
@@ -628,7 +628,7 @@ app.post('/api/generate-voucher-code', async (req, res) => {
                 warning: 'Code generated but could not update record automatically'
             });
         }
-        
+
     } catch (error) {
         console.error('Error generating voucher code:', error);
         console.error('Error details:', {
@@ -645,9 +645,9 @@ app.post('/api/generate-voucher-code', async (req, res) => {
                 expires_date
             }
         });
-        res.status(500).json({ 
-            success: false, 
-            message: 'Server error', 
+        res.status(500).json({
+            success: false,
+            message: 'Server error',
             error: error.message,
             details: 'Check server logs for more information'
         });
@@ -669,13 +669,13 @@ app.get('/api/voucher-codes', (req, res) => {
         GROUP BY vc.id
         ORDER BY vc.created_at DESC
     `;
-    
+
     con.query(sql, (err, result) => {
         if (err) {
             console.error('Error fetching voucher codes:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         res.json({ success: true, data: result });
     });
 });
@@ -692,19 +692,19 @@ app.post('/api/voucher-codes', (req, res) => {
         applicable_experiences,
         applicable_voucher_types
     } = req.body;
-    
+
     // Validation
     if (!code || !title) {
         return res.status(400).json({ success: false, message: 'Missing required fields: code and title' });
     }
-    
+
     const sql = `
         INSERT INTO voucher_codes (
             code, title, valid_from, valid_until, max_uses, 
             applicable_locations, applicable_experiences, applicable_voucher_types
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    
+
     const values = [
         code.toUpperCase(),
         title,
@@ -715,7 +715,7 @@ app.post('/api/voucher-codes', (req, res) => {
         applicable_experiences || null,
         applicable_voucher_types || null
     ];
-    
+
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error creating voucher code:', err);
@@ -724,7 +724,7 @@ app.post('/api/voucher-codes', (req, res) => {
             }
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         res.json({ success: true, message: 'Voucher code created successfully', id: result.insertId });
     });
 });
@@ -743,12 +743,12 @@ app.put('/api/voucher-codes/:id', (req, res) => {
         applicable_voucher_types,
         is_active
     } = req.body;
-    
+
     // Validation
     if (!code || !title) {
         return res.status(400).json({ success: false, message: 'Missing required fields: code and title' });
     }
-    
+
     const sql = `
         UPDATE voucher_codes SET 
             code = ?, title = ?, valid_from = ?, valid_until = ?, 
@@ -756,7 +756,7 @@ app.put('/api/voucher-codes/:id', (req, res) => {
             applicable_voucher_types = ?, is_active = ?, updated_at = NOW()
         WHERE id = ?
     `;
-    
+
     const values = [
         code.toUpperCase(),
         title,
@@ -769,17 +769,17 @@ app.put('/api/voucher-codes/:id', (req, res) => {
         is_active !== undefined ? is_active : 1,
         id
     ];
-    
+
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error updating voucher code:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: 'Voucher code not found' });
         }
-        
+
         res.json({ success: true, message: 'Voucher code updated successfully' });
     });
 });
@@ -787,18 +787,18 @@ app.put('/api/voucher-codes/:id', (req, res) => {
 // Delete voucher code
 app.delete('/api/voucher-codes/:id', (req, res) => {
     const { id } = req.params;
-    
+
     const sql = 'DELETE FROM voucher_codes WHERE id = ?';
     con.query(sql, [id], (err, result) => {
         if (err) {
             console.error('Error deleting voucher code:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: 'Voucher code not found' });
         }
-        
+
         res.json({ success: true, message: 'Voucher code deleted successfully' });
     });
 });
@@ -812,13 +812,13 @@ app.post('/api/voucher-codes/validate', (req, res) => {
         voucher_type,
         booking_amount
     } = req.body;
-    
+
     console.log('Voucher validation request:', { code, location, experience, voucher_type, booking_amount });
-    
+
     if (!code) {
         return res.status(400).json({ success: false, message: 'Voucher code is required' });
     }
-    
+
     // Enforce single-use for codes (Voucher Codes Management entries)
     const sql = `
         SELECT * FROM voucher_codes 
@@ -831,18 +831,18 @@ app.post('/api/voucher-codes/validate', (req, res) => {
         )
         AND (source_type = 'admin_created' OR source_type = 'user_generated')
     `;
-    
+
     console.log('SQL query:', sql);
     console.log('SQL params:', [code.toUpperCase()]);
-    
+
     con.query(sql, [code.toUpperCase()], (err, result) => {
         if (err) {
             console.error('Error validating voucher code:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         console.log('Database result:', result);
-        
+
         if (result.length === 0) {
             console.log('No voucher_codes match. Falling back to all_vouchers/all_booking for voucher_ref/voucher_code...');
             const fallbackSql = `
@@ -923,9 +923,9 @@ app.post('/api/voucher-codes/validate', (req, res) => {
             });
             return; // prevent continuing
         }
-        
+
         const voucher = result[0];
-        
+
         console.log('Voucher found:', {
             id: voucher.id,
             code: voucher.code,
@@ -936,7 +936,7 @@ app.post('/api/voucher-codes/validate', (req, res) => {
             current_uses: voucher.current_uses,
             max_uses: voucher.max_uses
         });
-        
+
         // For user generated codes, skip strict validation checks
         if (voucher.source_type === 'user_generated') {
             console.log('User generated voucher code - skipping strict validation checks');
@@ -948,7 +948,7 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                     return res.json({ success: false, message: 'Voucher code not valid for this location' });
                 }
             }
-            
+
             // Check experience restrictions (only for admin created codes)
             if (voucher.applicable_experiences && experience) {
                 const experiences = voucher.applicable_experiences.split(',');
@@ -956,7 +956,7 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                     return res.json({ success: false, message: 'Voucher code not valid for this experience' });
                 }
             }
-            
+
             // Check voucher type restrictions (only for admin created codes)
             if (voucher.applicable_voucher_types && voucher_type) {
                 const types = voucher.applicable_voucher_types.split(',');
@@ -965,7 +965,7 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                 }
             }
         }
-        
+
         // Try to enrich response with voucher details from all_vouchers/all_booking
         const detailsSql = `
             SELECT 
@@ -1003,7 +1003,7 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                     expires: v.expires || null
                 };
             }
-            
+
             // Voucher code is valid (no discount calculation needed)
             res.json({
                 success: true,
@@ -1026,7 +1026,7 @@ app.post('/api/voucher-codes/validate', (req, res) => {
 // Get voucher code usage
 app.get('/api/voucher-codes/:id/usage', (req, res) => {
     const { id } = req.params;
-    
+
     const sql = `
         SELECT 
             vcu.*,
@@ -1041,13 +1041,13 @@ app.get('/api/voucher-codes/:id/usage', (req, res) => {
         WHERE vcu.voucher_code_id = ?
         ORDER BY vcu.used_at DESC
     `;
-    
+
     con.query(sql, [id], (err, result) => {
         if (err) {
             console.error('Error fetching voucher usage:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         res.json({ success: true, data: result });
     });
 });
@@ -1085,7 +1085,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
             WHERE UPPER(code) = UPPER(?)
             LIMIT 1
         `;
-        
+
         con.query(checkVoucherCodesSql, [cleanVoucherCode], (checkErr, checkResult) => {
             if (checkErr) {
                 // If voucher_codes table doesn't exist or query fails, check all_vouchers instead
@@ -1093,7 +1093,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
                 checkAllVouchers();
                 return;
             }
-            
+
             if (checkResult.length > 0) {
                 const voucherCode = checkResult[0];
                 console.log('=== VOUCHER CODE VALIDATION (voucher_codes) ===');
@@ -1101,23 +1101,23 @@ app.post('/api/createRedeemBooking', (req, res) => {
                 console.log('Is Active:', voucherCode.is_active);
                 console.log('Current Uses:', voucherCode.current_uses);
                 console.log('Max Uses:', voucherCode.max_uses);
-                
+
                 // Check if inactive (already used)
                 if (voucherCode.is_active === 0 || voucherCode.is_active === false) {
-                    return res.status(400).json({ 
-                        success: false, 
-                        error: 'This voucher code has already been used and cannot be redeemed again' 
+                    return res.status(400).json({
+                        success: false,
+                        error: 'This voucher code has already been used and cannot be redeemed again'
                     });
                 }
-                
+
                 // Check if max uses reached
                 if (voucherCode.max_uses && voucherCode.current_uses >= voucherCode.max_uses) {
-                    return res.status(400).json({ 
-                        success: false, 
-                        error: 'This voucher code has reached its maximum number of uses' 
+                    return res.status(400).json({
+                        success: false,
+                        error: 'This voucher code has reached its maximum number of uses'
                     });
                 }
-                
+
                 // Voucher is valid, proceed
                 createRedeemBookingLogic();
             } else {
@@ -1126,7 +1126,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
                 checkAllVouchers();
             }
         });
-        
+
         // Function to check all_vouchers table
         function checkAllVouchers() {
             const checkAllVouchersSql = `
@@ -1135,7 +1135,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
                 WHERE UPPER(voucher_ref) = UPPER(?)
                 LIMIT 1
             `;
-            
+
             con.query(checkAllVouchersSql, [cleanVoucherCode], (voucherErr, voucherResult) => {
                 if (voucherErr) {
                     console.warn('Warning: Could not check all_vouchers table:', voucherErr.message);
@@ -1143,7 +1143,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     createRedeemBookingLogic();
                     return;
                 }
-                
+
                 if (voucherResult.length > 0) {
                     const voucher = voucherResult[0];
                     console.log('=== VOUCHER CODE VALIDATION (all_vouchers) ===');
@@ -1151,15 +1151,15 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     console.log('Redeemed:', voucher.redeemed);
                     console.log('Status:', voucher.status);
                     console.log('Name:', voucher.name);
-                    
+
                     // Check if already redeemed
                     if (voucher.redeemed === 'Yes' || voucher.status === 'Used') {
-                        return res.status(400).json({ 
-                            success: false, 
-                            error: 'This voucher has already been redeemed and cannot be used again' 
+                        return res.status(400).json({
+                            success: false,
+                            error: 'This voucher has already been redeemed and cannot be used again'
                         });
                     }
-                    
+
                     // Voucher is valid, proceed
                     createRedeemBookingLogic();
                 } else {
@@ -1169,7 +1169,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
                 }
             });
         }
-        
+
         // Function to check all_booking table for previously used voucher codes
         function checkAllBooking() {
             const checkBookingSql = `
@@ -1178,7 +1178,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
                 WHERE UPPER(voucher_code) = UPPER(?)
                 LIMIT 1
             `;
-            
+
             con.query(checkBookingSql, [cleanVoucherCode], (bookingErr, bookingResult) => {
                 if (bookingErr) {
                     console.warn('Warning: Could not check all_booking table:', bookingErr.message);
@@ -1186,7 +1186,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     createRedeemBookingLogic();
                     return;
                 }
-                
+
                 if (bookingResult.length > 0) {
                     const booking = bookingResult[0];
                     console.log('=== VOUCHER CODE FOUND IN ALL_BOOKING ===');
@@ -1194,194 +1194,194 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     console.log('Previously used by:', booking.name);
                     console.log('Used on:', booking.created_at);
                     console.log('Redeemed Voucher Status:', booking.redeemed_voucher);
-                    
+
                     // If this voucher code exists in all_booking, it means it was already used for a booking
                     // Regardless of redeemed_voucher status, we should not allow it to be used again
                     // because each voucher code should only create ONE booking
-                    return res.status(400).json({ 
-                        success: false, 
-                        error: 'This voucher code has already been used for a booking and cannot be redeemed again' 
+                    return res.status(400).json({
+                        success: false,
+                        error: 'This voucher code has already been used for a booking and cannot be redeemed again'
                     });
                 }
-                
+
                 // Voucher code not found anywhere, proceed with booking
                 console.log('Voucher code not found in any table, proceeding with new booking');
                 createRedeemBookingLogic();
             });
         }
-        
+
         return; // Exit here and continue in callback
     }
-    
+
     // If no voucher code, proceed directly
     createRedeemBookingLogic();
-    
+
     function createRedeemBookingLogic() {
-    const passengerName = `${passengerData[0].firstName} ${passengerData[0].lastName}`;
-    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-    
-    // Format booking date
-    let bookingDateTime = selectedDate;
-    if (selectedDate && selectedTime) {
-        const datePart = typeof selectedDate === 'string' && selectedDate.includes(' ') 
-            ? selectedDate.split(' ')[0] 
-            : (typeof selectedDate === 'string' && selectedDate.length >= 10 
-                ? selectedDate.substring(0, 10) 
-                : selectedDate);
-        bookingDateTime = `${datePart} ${selectedTime}`;
-    } else if (selectedDate) {
-        // If no selectedTime, use selectedDate as-is (might already include time)
-        bookingDateTime = selectedDate;
-    } else {
-        // Fallback to current timestamp if no date provided
-        bookingDateTime = now;
-    }
-    
-    console.log('=== REDEEM BOOKING DATE FORMAT ===');
-    console.log('selectedDate:', selectedDate);
-    console.log('selectedTime:', selectedTime);
-    console.log('Final bookingDateTime:', bookingDateTime);
-    
-    // Get voucher information (created_at, voucher_type, experience_type) and price
-    if (cleanVoucherCode) {
-        // First, get voucher info from all_vouchers table
-        const getVoucherInfoSql = `
+        const passengerName = `${passengerData[0].firstName} ${passengerData[0].lastName}`;
+        const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+        // Format booking date
+        let bookingDateTime = selectedDate;
+        if (selectedDate && selectedTime) {
+            const datePart = typeof selectedDate === 'string' && selectedDate.includes(' ')
+                ? selectedDate.split(' ')[0]
+                : (typeof selectedDate === 'string' && selectedDate.length >= 10
+                    ? selectedDate.substring(0, 10)
+                    : selectedDate);
+            bookingDateTime = `${datePart} ${selectedTime}`;
+        } else if (selectedDate) {
+            // If no selectedTime, use selectedDate as-is (might already include time)
+            bookingDateTime = selectedDate;
+        } else {
+            // Fallback to current timestamp if no date provided
+            bookingDateTime = now;
+        }
+
+        console.log('=== REDEEM BOOKING DATE FORMAT ===');
+        console.log('selectedDate:', selectedDate);
+        console.log('selectedTime:', selectedTime);
+        console.log('Final bookingDateTime:', bookingDateTime);
+
+        // Get voucher information (created_at, voucher_type, experience_type) and price
+        if (cleanVoucherCode) {
+            // First, get voucher info from all_vouchers table
+            const getVoucherInfoSql = `
             SELECT created_at, voucher_type, experience_type, book_flight
             FROM all_vouchers 
             WHERE UPPER(voucher_ref) = UPPER(?)
             LIMIT 1
         `;
-        
-        con.query(getVoucherInfoSql, [cleanVoucherCode], (voucherInfoErr, voucherInfoResult) => {
-            if (voucherInfoErr) {
-                console.warn('Warning: Could not fetch voucher info:', voucherInfoErr.message);
-                // Voucher bilgisi alınamazsa, sadece fiyat bilgisini al
-                getVoucherPriceOnly();
-                return;
-            }
-            
-            let voucherCreatedAt = null;
-            let voucherType = null;
-            let experienceType = null;
-            
-            if (voucherInfoResult.length > 0) {
-                voucherCreatedAt = voucherInfoResult[0].created_at;
-                voucherType = voucherInfoResult[0].voucher_type;
-                experienceType = voucherInfoResult[0].experience_type;
-                console.log('✅ Voucher info found:', {
-                    created_at: voucherCreatedAt,
-                    voucher_type: voucherType,
-                    experience_type: experienceType
-                });
-            }
-            
-            // Now get price from voucher_codes table
-        const getVoucherPriceSql = `
+
+            con.query(getVoucherInfoSql, [cleanVoucherCode], (voucherInfoErr, voucherInfoResult) => {
+                if (voucherInfoErr) {
+                    console.warn('Warning: Could not fetch voucher info:', voucherInfoErr.message);
+                    // Voucher bilgisi alınamazsa, sadece fiyat bilgisini al
+                    getVoucherPriceOnly();
+                    return;
+                }
+
+                let voucherCreatedAt = null;
+                let voucherType = null;
+                let experienceType = null;
+
+                if (voucherInfoResult.length > 0) {
+                    voucherCreatedAt = voucherInfoResult[0].created_at;
+                    voucherType = voucherInfoResult[0].voucher_type;
+                    experienceType = voucherInfoResult[0].experience_type;
+                    console.log('✅ Voucher info found:', {
+                        created_at: voucherCreatedAt,
+                        voucher_type: voucherType,
+                        experience_type: experienceType
+                    });
+                }
+
+                // Now get price from voucher_codes table
+                const getVoucherPriceSql = `
             SELECT paid_amount 
             FROM voucher_codes 
             WHERE UPPER(code) = UPPER(?)
             LIMIT 1
         `;
-        
-        con.query(getVoucherPriceSql, [cleanVoucherCode], (priceErr, priceResult) => {
-            let voucherOriginalPrice = totalPrice || 0;
-            
-            if (!priceErr && priceResult.length > 0 && priceResult[0].paid_amount) {
-                voucherOriginalPrice = priceResult[0].paid_amount;
-                console.log('✅ Found original voucher price:', voucherOriginalPrice);
-            } else {
-                console.log('⚠️ Could not find voucher price, using totalPrice:', voucherOriginalPrice);
-            }
-            
-                // Calculate expire date based on voucher type and created_at
-                let expiresDate = null;
-                if (voucherCreatedAt) {
-                    // Voucher türüne göre expire süresini belirle
-                    let durationMonths = 24; // Default
-                    
-                    if (experienceType === 'Private Charter') {
-                        durationMonths = 18;
-                    } else if (experienceType === 'Shared Flight') {
-                        // Shared Flight: Any Day Flight = 24 ay, diğerleri = 18 ay
-                        if (voucherType === 'Any Day Flight') {
-                            durationMonths = 24;
-                        } else {
-                            durationMonths = 18;
-                        }
-                    }
-                    
-                    // Voucher'ın created_at tarihinden itibaren hesapla
-                    expiresDate = moment(voucherCreatedAt).add(durationMonths, 'months').format('YYYY-MM-DD HH:mm:ss');
-                    console.log('✅ Expire date calculated:', {
-                        voucherCreatedAt,
-                        durationMonths,
-                        expiresDate
-        });
-    } else {
-                    // Voucher bilgisi yoksa, bugünden itibaren hesapla
-                    if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
-                        expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
-                    } else if (chooseFlightType && chooseFlightType.type === 'Shared Flight') {
-                        // Shared Flight için voucher_type bilgisi yoksa, default 18 ay
-                        expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
+
+                con.query(getVoucherPriceSql, [cleanVoucherCode], (priceErr, priceResult) => {
+                    let voucherOriginalPrice = totalPrice || 0;
+
+                    if (!priceErr && priceResult.length > 0 && priceResult[0].paid_amount) {
+                        voucherOriginalPrice = priceResult[0].paid_amount;
+                        console.log('✅ Found original voucher price:', voucherOriginalPrice);
                     } else {
-                        expiresDate = moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+                        console.log('⚠️ Could not find voucher price, using totalPrice:', voucherOriginalPrice);
                     }
-                    console.log('⚠️ Voucher info not found, using current date for expire calculation');
-                }
-                
-                // Continue with booking creation using the original voucher price and expire date
-                createBookingWithPrice(voucherOriginalPrice, expiresDate);
+
+                    // Calculate expire date based on voucher type and created_at
+                    let expiresDate = null;
+                    if (voucherCreatedAt) {
+                        // Voucher türüne göre expire süresini belirle
+                        let durationMonths = 24; // Default
+
+                        if (experienceType === 'Private Charter') {
+                            durationMonths = 18;
+                        } else if (experienceType === 'Shared Flight') {
+                            // Shared Flight: Any Day Flight = 24 ay, diğerleri = 18 ay
+                            if (voucherType === 'Any Day Flight') {
+                                durationMonths = 24;
+                            } else {
+                                durationMonths = 18;
+                            }
+                        }
+
+                        // Voucher'ın created_at tarihinden itibaren hesapla
+                        expiresDate = moment(voucherCreatedAt).add(durationMonths, 'months').format('YYYY-MM-DD HH:mm:ss');
+                        console.log('✅ Expire date calculated:', {
+                            voucherCreatedAt,
+                            durationMonths,
+                            expiresDate
+                        });
+                    } else {
+                        // Voucher bilgisi yoksa, bugünden itibaren hesapla
+                        if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
+                            expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
+                        } else if (chooseFlightType && chooseFlightType.type === 'Shared Flight') {
+                            // Shared Flight için voucher_type bilgisi yoksa, default 18 ay
+                            expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
+                        } else {
+                            expiresDate = moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+                        }
+                        console.log('⚠️ Voucher info not found, using current date for expire calculation');
+                    }
+
+                    // Continue with booking creation using the original voucher price and expire date
+                    createBookingWithPrice(voucherOriginalPrice, expiresDate);
+                });
             });
-        });
-        
-        // Fallback function to get only price if voucher info query fails
-        function getVoucherPriceOnly() {
-            const getVoucherPriceSql = `
+
+            // Fallback function to get only price if voucher info query fails
+            function getVoucherPriceOnly() {
+                const getVoucherPriceSql = `
                 SELECT paid_amount 
                 FROM voucher_codes 
                 WHERE UPPER(code) = UPPER(?)
                 LIMIT 1
             `;
-            
-            con.query(getVoucherPriceSql, [cleanVoucherCode], (priceErr, priceResult) => {
-                let voucherOriginalPrice = totalPrice || 0;
-                
-                if (!priceErr && priceResult.length > 0 && priceResult[0].paid_amount) {
-                    voucherOriginalPrice = priceResult[0].paid_amount;
-                }
-                
-                // Voucher bilgisi yoksa, bugünden itibaren hesapla
-                let expiresDate = null;
-                if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
-                    expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
-                } else if (chooseFlightType && chooseFlightType.type === 'Shared Flight') {
-                    expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
-                } else {
-                    expiresDate = moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
-                }
-                
-                createBookingWithPrice(voucherOriginalPrice, expiresDate);
-            });
-        }
-    } else {
-        // No voucher code, use totalPrice and calculate expire from now
-        let expiresDate = null;
-        if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
-            expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
-        } else if (chooseFlightType && chooseFlightType.type === 'Shared Flight') {
-            expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
-        } else {
-            expiresDate = moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
-        }
-        createBookingWithPrice(totalPrice || 0, expiresDate);
-    }
-    
-    function createBookingWithPrice(paidAmount, expiresDateFinal) {
-        console.log('=== CREATING BOOKING WITH PAID AMOUNT:', paidAmount, 'AND EXPIRE DATE:', expiresDateFinal, '===');
 
-    // Simple SQL with only essential columns (including expires, flight_attempts, flight_type_source)
-    const bookingSql = `
+                con.query(getVoucherPriceSql, [cleanVoucherCode], (priceErr, priceResult) => {
+                    let voucherOriginalPrice = totalPrice || 0;
+
+                    if (!priceErr && priceResult.length > 0 && priceResult[0].paid_amount) {
+                        voucherOriginalPrice = priceResult[0].paid_amount;
+                    }
+
+                    // Voucher bilgisi yoksa, bugünden itibaren hesapla
+                    let expiresDate = null;
+                    if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
+                        expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
+                    } else if (chooseFlightType && chooseFlightType.type === 'Shared Flight') {
+                        expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
+                    } else {
+                        expiresDate = moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+                    }
+
+                    createBookingWithPrice(voucherOriginalPrice, expiresDate);
+                });
+            }
+        } else {
+            // No voucher code, use totalPrice and calculate expire from now
+            let expiresDate = null;
+            if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
+                expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
+            } else if (chooseFlightType && chooseFlightType.type === 'Shared Flight') {
+                expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
+            } else {
+                expiresDate = moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+            }
+            createBookingWithPrice(totalPrice || 0, expiresDate);
+        }
+
+        function createBookingWithPrice(paidAmount, expiresDateFinal) {
+            console.log('=== CREATING BOOKING WITH PAID AMOUNT:', paidAmount, 'AND EXPIRE DATE:', expiresDateFinal, '===');
+
+            // Simple SQL with only essential columns (including expires, flight_attempts, flight_type_source)
+            const bookingSql = `
         INSERT INTO all_booking (
             name,
             flight_type, 
@@ -1403,255 +1403,255 @@ app.post('/api/createRedeemBooking', (req, res) => {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    // Use actual passenger count from passengerData array
-    const actualPaxCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
-    console.log('=== REDEEM BOOKING PAX COUNT DEBUG ===');
-    console.log('passengerData.length:', passengerData?.length);
-    console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
-    console.log('actualPaxCount (FINAL):', actualPaxCount);
-        console.log('activity_id:', activity_id);
-        console.log('cleanVoucherCode:', cleanVoucherCode);
-        console.log('paidAmount (original voucher price):', paidAmount);
-    
-    const bookingValues = [
-        passengerName,
-        chooseFlightType.type || 'Shared Flight',
-        bookingDateTime,
-        actualPaxCount, // Use actual passenger count instead of chooseFlightType.passengerCount
-        chooseLocation,
-        'Open',
-            paidAmount, // Use original voucher price instead of totalPrice
-        0,
-            cleanVoucherCode,
-        now, // created_at
-        expiresDateFinal || null, // expires - calculated from voucher created_at
-        passengerData[0].email || null,
-            passengerData[0].phone || null,
-            activity_id || null,
-            'Yes', // Redeem Voucher bookings always have redeemed_voucher = Yes
-            0, // flight_attempts (always 0 for redeem voucher bookings)
-            'Redeem Voucher' // flight_type_source (always 'Redeem Voucher' for this endpoint)
-    ];
-
-    console.log('=== REDEEM BOOKING SQL ===');
-    console.log('SQL:', bookingSql);
-    console.log('Values:', bookingValues);
-
-    con.query(bookingSql, bookingValues, (err, result) => {
-        if (err) {
-            console.error('=== REDEEM BOOKING ERROR ===');
-            console.error('Error:', err);
-            return res.status(500).json({ 
-                success: false, 
-                error: 'Database query failed to create booking', 
-                details: err.message 
-            });
-        }
-
-        const bookingId = result.insertId;
-        console.log('=== REDEEM BOOKING SUCCESS ===');
-        
-        // Save user session data if provided
-        if (userSessionData && userSessionData.session_id) {
-            const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.connection.remoteAddress || null;
-            const userSessionPayload = {
-                ...userSessionData,
-                booking_id: bookingId,
-                ip_address: ipAddress || userSessionData.ip_address || null,
-                booking_clicks: 1 // Increment booking clicks
-            };
-            
-            // Save user session asynchronously (don't wait for it)
-            axios.post(`${req.protocol}://${req.get('host')}/api/save-user-session`, userSessionPayload)
-                .then(() => {
-                    console.log('User session saved successfully for booking:', bookingId);
-                })
-                .catch((err) => {
-                    console.error('Error saving user session:', err.message);
-                });
-        }
-        
-        // Send automatic booking confirmation email
-        if (passengerData && passengerData[0] && passengerData[0].email) {
-            sendAutomaticBookingConfirmationEmail(bookingId);
-        }
-        console.log('Booking ID:', bookingId);
-
-        // Update availability if date and time are provided
-        if (selectedDate && selectedTime && req.body.activity_id) {
-            const bookingDate = moment(selectedDate).format('YYYY-MM-DD');
-            const bookingTime = selectedTime;
-            
-            console.log('=== REDEEM BOOKING AVAILABILITY UPDATE ===');
-            console.log('passengerData RECEIVED:', JSON.stringify(passengerData, null, 2));
-            console.log('passengerData type:', typeof passengerData);
-            console.log('passengerData is Array?', Array.isArray(passengerData));
-            console.log('passengerData length:', passengerData?.length);
-            console.log('chooseFlightType:', JSON.stringify(chooseFlightType, null, 2));
+            // Use actual passenger count from passengerData array
+            const actualPaxCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
+            console.log('=== REDEEM BOOKING PAX COUNT DEBUG ===');
+            console.log('passengerData.length:', passengerData?.length);
             console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
-            
-            // Use actual passenger count from passengerData array (real passenger count entered by user)
-            const actualPassengerCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
-            
-            console.log('Date:', bookingDate, 'Time:', bookingTime, 'Activity ID:', req.body.activity_id);
-            console.log('Actual Passenger Count (FINAL):', actualPassengerCount);
-            
-            updateSpecificAvailability(bookingDate, bookingTime, req.body.activity_id, actualPassengerCount);
-        } else if (selectedDate && selectedTime && chooseLocation) {
-            // Get activity_id first, then update availability
-            const bookingDate = moment(selectedDate).format('YYYY-MM-DD');
-            const bookingTime = selectedTime;
-            // Use actual passenger count from passengerData array (real passenger count entered by user)
-            const actualPassengerCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
-            
-            const activitySql = `SELECT id FROM activity WHERE location = ? AND status = 'Live' LIMIT 1`;
-            con.query(activitySql, [chooseLocation], (activityErr, activityResult) => {
-                if (activityErr) {
-                    console.error('Error getting activity_id for redeem availability update:', activityErr);
-                } else if (activityResult.length > 0) {
-                    const activityId = activityResult[0].id;
-                    
-                    console.log('=== REDEEM BOOKING AVAILABILITY UPDATE (alt sorgu) ===');
-                    console.log('Date:', bookingDate, 'Time:', bookingTime, 'Activity ID:', activityId);
-                    console.log('passengerData length:', passengerData?.length);
-                    console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
-                    console.log('Actual Passenger Count (FINAL):', actualPassengerCount);
-                    
-                    updateSpecificAvailability(bookingDate, bookingTime, activityId, actualPassengerCount);
-                } else {
-                    console.error('No activity found for location:', chooseLocation);
-                }
-            });
-        }
+            console.log('actualPaxCount (FINAL):', actualPaxCount);
+            console.log('activity_id:', activity_id);
+            console.log('cleanVoucherCode:', cleanVoucherCode);
+            console.log('paidAmount (original voucher price):', paidAmount);
 
-        // Create passenger record
-        if (passengerData && passengerData.length > 0) {
-            const passengerSql = `
+            const bookingValues = [
+                passengerName,
+                chooseFlightType.type || 'Shared Flight',
+                bookingDateTime,
+                actualPaxCount, // Use actual passenger count instead of chooseFlightType.passengerCount
+                chooseLocation,
+                'Open',
+                paidAmount, // Use original voucher price instead of totalPrice
+                0,
+                cleanVoucherCode,
+                now, // created_at
+                expiresDateFinal || null, // expires - calculated from voucher created_at
+                passengerData[0].email || null,
+                passengerData[0].phone || null,
+                activity_id || null,
+                'Yes', // Redeem Voucher bookings always have redeemed_voucher = Yes
+                0, // flight_attempts (always 0 for redeem voucher bookings)
+                'Redeem Voucher' // flight_type_source (always 'Redeem Voucher' for this endpoint)
+            ];
+
+            console.log('=== REDEEM BOOKING SQL ===');
+            console.log('SQL:', bookingSql);
+            console.log('Values:', bookingValues);
+
+            con.query(bookingSql, bookingValues, (err, result) => {
+                if (err) {
+                    console.error('=== REDEEM BOOKING ERROR ===');
+                    console.error('Error:', err);
+                    return res.status(500).json({
+                        success: false,
+                        error: 'Database query failed to create booking',
+                        details: err.message
+                    });
+                }
+
+                const bookingId = result.insertId;
+                console.log('=== REDEEM BOOKING SUCCESS ===');
+
+                // Save user session data if provided
+                if (userSessionData && userSessionData.session_id) {
+                    const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.connection.remoteAddress || null;
+                    const userSessionPayload = {
+                        ...userSessionData,
+                        booking_id: bookingId,
+                        ip_address: ipAddress || userSessionData.ip_address || null,
+                        booking_clicks: 1 // Increment booking clicks
+                    };
+
+                    // Save user session asynchronously (don't wait for it)
+                    axios.post(`${req.protocol}://${req.get('host')}/api/save-user-session`, userSessionPayload)
+                        .then(() => {
+                            console.log('User session saved successfully for booking:', bookingId);
+                        })
+                        .catch((err) => {
+                            console.error('Error saving user session:', err.message);
+                        });
+                }
+
+                // Send automatic booking confirmation email
+                if (passengerData && passengerData[0] && passengerData[0].email) {
+                    sendAutomaticBookingConfirmationEmail(bookingId);
+                }
+                console.log('Booking ID:', bookingId);
+
+                // Update availability if date and time are provided
+                if (selectedDate && selectedTime && req.body.activity_id) {
+                    const bookingDate = moment(selectedDate).format('YYYY-MM-DD');
+                    const bookingTime = selectedTime;
+
+                    console.log('=== REDEEM BOOKING AVAILABILITY UPDATE ===');
+                    console.log('passengerData RECEIVED:', JSON.stringify(passengerData, null, 2));
+                    console.log('passengerData type:', typeof passengerData);
+                    console.log('passengerData is Array?', Array.isArray(passengerData));
+                    console.log('passengerData length:', passengerData?.length);
+                    console.log('chooseFlightType:', JSON.stringify(chooseFlightType, null, 2));
+                    console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
+
+                    // Use actual passenger count from passengerData array (real passenger count entered by user)
+                    const actualPassengerCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
+
+                    console.log('Date:', bookingDate, 'Time:', bookingTime, 'Activity ID:', req.body.activity_id);
+                    console.log('Actual Passenger Count (FINAL):', actualPassengerCount);
+
+                    updateSpecificAvailability(bookingDate, bookingTime, req.body.activity_id, actualPassengerCount);
+                } else if (selectedDate && selectedTime && chooseLocation) {
+                    // Get activity_id first, then update availability
+                    const bookingDate = moment(selectedDate).format('YYYY-MM-DD');
+                    const bookingTime = selectedTime;
+                    // Use actual passenger count from passengerData array (real passenger count entered by user)
+                    const actualPassengerCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
+
+                    const activitySql = `SELECT id FROM activity WHERE location = ? AND status = 'Live' LIMIT 1`;
+                    con.query(activitySql, [chooseLocation], (activityErr, activityResult) => {
+                        if (activityErr) {
+                            console.error('Error getting activity_id for redeem availability update:', activityErr);
+                        } else if (activityResult.length > 0) {
+                            const activityId = activityResult[0].id;
+
+                            console.log('=== REDEEM BOOKING AVAILABILITY UPDATE (alt sorgu) ===');
+                            console.log('Date:', bookingDate, 'Time:', bookingTime, 'Activity ID:', activityId);
+                            console.log('passengerData length:', passengerData?.length);
+                            console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
+                            console.log('Actual Passenger Count (FINAL):', actualPassengerCount);
+
+                            updateSpecificAvailability(bookingDate, bookingTime, activityId, actualPassengerCount);
+                        } else {
+                            console.error('No activity found for location:', chooseLocation);
+                        }
+                    });
+                }
+
+                // Create passenger record
+                if (passengerData && passengerData.length > 0) {
+                    const passengerSql = `
                 INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone)
                 VALUES (?, ?, ?, ?, ?, ?)
             `;
-            
-            passengerData.forEach((passenger, index) => {
-                if (passenger.firstName) {
-                    const passengerValues = [
-                        bookingId,
-                        passenger.firstName,
-                        passenger.lastName || '',
-                        passenger.weight || '',
-                        passenger.email || '',
-                        passenger.phone || ''
-                    ];
-                    
-                    con.query(passengerSql, passengerValues, (passengerErr) => {
-                        if (passengerErr) {
-                            console.error('Error creating passenger:', passengerErr);
-                        } else {
-                            console.log(`Passenger ${index + 1} created for booking ${bookingId}`);
+
+                    passengerData.forEach((passenger, index) => {
+                        if (passenger.firstName) {
+                            const passengerValues = [
+                                bookingId,
+                                passenger.firstName,
+                                passenger.lastName || '',
+                                passenger.weight || '',
+                                passenger.email || '',
+                                passenger.phone || ''
+                            ];
+
+                            con.query(passengerSql, passengerValues, (passengerErr) => {
+                                if (passengerErr) {
+                                    console.error('Error creating passenger:', passengerErr);
+                                } else {
+                                    console.log(`Passenger ${index + 1} created for booking ${bookingId}`);
+                                }
+                            });
                         }
                     });
                 }
-            });
-        }
 
-        // Save additional info answers if provided
-        if (additionalInfo && typeof additionalInfo === 'object') {
-            console.log('=== SAVING ADDITIONAL INFO ===');
-            console.log('Additional Info:', additionalInfo);
-            
-            // Remove non-answer fields
-            const { notes, __requiredKeys, ...answers } = additionalInfo;
-            
-            // Save each question answer
-            Object.keys(answers).forEach(questionKey => {
-                const answer = answers[questionKey];
-                if (answer !== undefined && answer !== null && answer !== '') {
-                    const answerSql = `
+                // Save additional info answers if provided
+                if (additionalInfo && typeof additionalInfo === 'object') {
+                    console.log('=== SAVING ADDITIONAL INFO ===');
+                    console.log('Additional Info:', additionalInfo);
+
+                    // Remove non-answer fields
+                    const { notes, __requiredKeys, ...answers } = additionalInfo;
+
+                    // Save each question answer
+                    Object.keys(answers).forEach(questionKey => {
+                        const answer = answers[questionKey];
+                        if (answer !== undefined && answer !== null && answer !== '') {
+                            const answerSql = `
                         INSERT INTO additional_info_answers (booking_id, question_id, answer)
                         VALUES (?, ?, ?)
                     `;
-                    
-                    // Extract question number from key (e.g., "question_14" -> 14)
-                    const questionId = questionKey.replace('question_', '');
-                    
-                    con.query(answerSql, [bookingId, questionId, answer], (answerErr) => {
-                        if (answerErr) {
-                            console.error(`Error saving answer for ${questionKey}:`, answerErr);
-                        } else {
-                            console.log(`Answer saved for question ${questionId}`);
+
+                            // Extract question number from key (e.g., "question_14" -> 14)
+                            const questionId = questionKey.replace('question_', '');
+
+                            con.query(answerSql, [bookingId, questionId, answer], (answerErr) => {
+                                if (answerErr) {
+                                    console.error(`Error saving answer for ${questionKey}:`, answerErr);
+                                } else {
+                                    console.log(`Answer saved for question ${questionId}`);
+                                }
+                            });
                         }
                     });
                 }
-            });
-        }
 
-        // Update voucher_codes table to mark as Used
-        if (cleanVoucherCode) {
-            console.log('=== UPDATING VOUCHER_CODES TABLE ===');
-            console.log('Voucher Code:', cleanVoucherCode);
-            
-            // First, mark in all_vouchers table if exists
-            const updateAllVouchersSql = `
+                // Update voucher_codes table to mark as Used
+                if (cleanVoucherCode) {
+                    console.log('=== UPDATING VOUCHER_CODES TABLE ===');
+                    console.log('Voucher Code:', cleanVoucherCode);
+
+                    // First, mark in all_vouchers table if exists
+                    const updateAllVouchersSql = `
                 UPDATE all_vouchers 
                 SET redeemed = 'Yes', status = 'Used'
                 WHERE UPPER(voucher_ref) = UPPER(?)
             `;
-            con.query(updateAllVouchersSql, [cleanVoucherCode], (voucherErr, voucherResult) => {
-                if (voucherErr) {
-                    console.warn('Warning: Could not update all_vouchers:', voucherErr.message);
-                } else {
-                    console.log('all_vouchers update result:', {
-                        affectedRows: voucherResult.affectedRows,
-                        changedRows: voucherResult.changedRows
+                    con.query(updateAllVouchersSql, [cleanVoucherCode], (voucherErr, voucherResult) => {
+                        if (voucherErr) {
+                            console.warn('Warning: Could not update all_vouchers:', voucherErr.message);
+                        } else {
+                            console.log('all_vouchers update result:', {
+                                affectedRows: voucherResult.affectedRows,
+                                changedRows: voucherResult.changedRows
+                            });
+                        }
                     });
-                }
-            });
-            
-            // Then, update voucher_codes table (if it exists)
-            const updateVoucherCodesSql = `
+
+                    // Then, update voucher_codes table (if it exists)
+                    const updateVoucherCodesSql = `
                 UPDATE voucher_codes 
                 SET current_uses = COALESCE(current_uses, 0) + 1, 
                     is_active = 0
                 WHERE UPPER(code) = UPPER(?)
             `;
-            con.query(updateVoucherCodesSql, [cleanVoucherCode], (codeErr, codeResult) => {
-                if (codeErr) {
-                    console.warn('Warning: Could not update voucher_codes:', codeErr.message);
-                } else {
-                    console.log('✅ voucher_codes update result:', {
-                        affectedRows: codeResult.affectedRows,
-                        changedRows: codeResult.changedRows,
-                        message: 'Voucher code marked as inactive'
+                    con.query(updateVoucherCodesSql, [cleanVoucherCode], (codeErr, codeResult) => {
+                        if (codeErr) {
+                            console.warn('Warning: Could not update voucher_codes:', codeErr.message);
+                        } else {
+                            console.log('✅ voucher_codes update result:', {
+                                affectedRows: codeResult.affectedRows,
+                                changedRows: codeResult.changedRows,
+                                message: 'Voucher code marked as inactive'
+                            });
+                        }
                     });
                 }
-            });
-        }
 
-        res.json({ 
-            success: true, 
-            message: 'Booking created successfully', 
-            bookingId: bookingId 
-        });
-    });
-    } // end of createBookingWithPrice
+                res.json({
+                    success: true,
+                    message: 'Booking created successfully',
+                    bookingId: bookingId
+                });
+            });
+        } // end of createBookingWithPrice
     } // end of createRedeemBookingLogic
 });
 
 // Mark voucher as redeemed
 app.post('/api/redeem-voucher', (req, res) => {
     const { voucher_code, booking_id } = req.body;
-    
+
     if (!voucher_code) {
         return res.status(400).json({ success: false, message: 'Voucher code is required' });
     }
-    
+
     // Trim and clean voucher code
     const cleanVoucherCode = voucher_code.trim().toUpperCase();
-    
+
     console.log('=== MARKING VOUCHER AS REDEEMED ===');
     console.log('Original Voucher Code:', voucher_code);
     console.log('Clean Voucher Code:', cleanVoucherCode);
     console.log('Booking ID:', booking_id);
-    
+
     // Check both all_vouchers (voucher_ref) and all_booking (voucher_code) tables
     const checkVoucherSql = `
         SELECT 'all_vouchers' as source, id, voucher_ref as code, redeemed, name 
@@ -1663,36 +1663,36 @@ app.post('/api/redeem-voucher', (req, res) => {
         WHERE UPPER(voucher_code) = UPPER(?)
         LIMIT 1
     `;
-    
+
     con.query(checkVoucherSql, [cleanVoucherCode, cleanVoucherCode], (checkErr, checkResult) => {
         if (checkErr) {
             console.error('Error checking voucher existence:', checkErr);
             return res.status(500).json({ success: false, message: 'Database error', error: checkErr.message });
         }
-        
+
         console.log('=== VOUCHER CHECK RESULT ===');
         console.log('Found vouchers:', checkResult.length);
-        
+
         if (checkResult.length === 0) {
             console.log('No voucher found with code:', cleanVoucherCode);
             return res.status(404).json({ success: false, message: 'Voucher not found' });
         }
-        
+
         const voucherRecord = checkResult[0];
-            console.log('Voucher details:', {
+        console.log('Voucher details:', {
             source: voucherRecord.source,
             id: voucherRecord.id,
             code: voucherRecord.code,
             current_redeemed_status: voucherRecord.redeemed,
             name: voucherRecord.name
         });
-        
+
         // Check if already redeemed (only for all_vouchers)
         if (voucherRecord.source === 'all_vouchers' && voucherRecord.redeemed === 'Yes') {
             console.log('Voucher already redeemed');
             return res.status(400).json({ success: false, message: 'Voucher already redeemed' });
         }
-        
+
         // Update voucher based on source
         let updateVoucherSql;
         if (voucherRecord.source === 'all_vouchers') {
@@ -1705,23 +1705,23 @@ app.post('/api/redeem-voucher', (req, res) => {
             // For all_booking vouchers, we don't update - they're already marked as used
             // Just return success
             console.log('Voucher from all_booking - no need to mark as redeemed');
-            return res.json({ 
-                success: true, 
-                message: 'Voucher successfully redeemed (from booking)' 
+            return res.json({
+                success: true,
+                message: 'Voucher successfully redeemed (from booking)'
             });
         }
-        
+
         console.log('=== EXECUTING UPDATE ===');
         console.log('SQL:', updateVoucherSql);
         console.log('Parameter:', cleanVoucherCode);
-        
+
         con.query(updateVoucherSql, [cleanVoucherCode], (err, result) => {
             if (err) {
                 console.error('=== UPDATE ERROR ===');
                 console.error('Error marking voucher as redeemed:', err);
                 return res.status(500).json({ success: false, message: 'Database error', error: err.message });
             }
-            
+
             console.log('=== UPDATE RESULT ===');
             console.log('Voucher redemption update result:', {
                 affectedRows: result.affectedRows,
@@ -1729,13 +1729,13 @@ app.post('/api/redeem-voucher', (req, res) => {
                 insertId: result.insertId,
                 warningCount: result.warningCount
             });
-            
+
             if (result.affectedRows === 0) {
                 console.warn('=== NO ROWS AFFECTED ===');
                 console.warn('No voucher found to update with code:', voucher_code);
                 return res.json({ success: false, message: 'Voucher not found or already redeemed' });
             }
-            
+
             console.log('=== SUCCESS ===');
             console.log('Voucher marked as redeemed successfully');
             // Also update voucher_codes table to mark as inactive and increment current_uses
@@ -1778,13 +1778,13 @@ app.get('/api/voucher-codes/usage/stats', (req, res) => {
         GROUP BY vc.id
         ORDER BY vc.created_at DESC
     `;
-    
+
     con.query(sql, (err, result) => {
         if (err) {
             console.error('Error fetching voucher usage stats:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         res.json({ success: true, data: result });
     });
 });
@@ -1794,23 +1794,23 @@ app.get('/api/voucher-codes/usage/stats', (req, res) => {
 // Get all experiences
 app.get('/api/experiences', (req, res) => {
     console.log('GET /api/experiences called');
-    
+
     const sql = `
         SELECT * FROM experiences 
         ORDER BY sort_order ASC, created_at DESC
     `;
-    
+
     console.log('SQL Query:', sql);
-    
+
     con.query(sql, (err, result) => {
         if (err) {
             console.error('Error fetching experiences:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         console.log('Query result:', result);
         console.log('Result length:', result ? result.length : 'undefined');
-        
+
         res.json({ success: true, data: result });
     });
 });
@@ -1854,24 +1854,24 @@ app.post('/api/experiences', experiencesUpload.single('experience_image'), (req,
         sort_order,
         is_active
     } = req.body;
-    
+
     // Validation
     if (!title || !description) {
         return res.status(400).json({ success: false, message: 'Missing required fields: title and description' });
     }
-    
+
     // Handle image upload
     let image_url = null;
     if (req.file) {
         image_url = `/uploads/experiences/${req.file.filename}`;
     }
-    
+
     const sql = `
         INSERT INTO experiences (
             title, description, image_url, max_passengers, sort_order, is_active
         ) VALUES (?, ?, ?, ?, ?, ?)
     `;
-    
+
     const values = [
         title,
         description,
@@ -1880,13 +1880,13 @@ app.post('/api/experiences', experiencesUpload.single('experience_image'), (req,
         sort_order || 0,
         is_active !== undefined ? is_active : true
     ];
-    
+
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error creating experience:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         res.json({
             success: true,
             message: 'Experience created successfully',
@@ -1906,24 +1906,24 @@ app.put('/api/experiences/:id', experiencesUpload.single('experience_image'), (r
         sort_order,
         is_active
     } = req.body;
-    
+
     // Validation
     if (!title || !description) {
         return res.status(400).json({ success: false, message: 'Missing required fields: title and description' });
     }
-    
+
     // Handle image upload
     let image_url = req.body.image_url; // Keep existing image if no new file uploaded
     if (req.file) {
         image_url = `/uploads/experiences/${req.file.filename}`;
     }
-    
+
     const sql = `
         UPDATE experiences SET 
             title = ?, description = ?, image_url = ?, max_passengers = ?, sort_order = ?, is_active = ?
         WHERE id = ?
     `;
-    
+
     const values = [
         title,
         description,
@@ -1933,17 +1933,17 @@ app.put('/api/experiences/:id', experiencesUpload.single('experience_image'), (r
         is_active !== undefined ? is_active : true,
         id
     ];
-    
+
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error updating experience:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: 'Experience not found' });
         }
-        
+
         res.json({
             success: true,
             message: 'Experience updated successfully',
@@ -1954,19 +1954,19 @@ app.put('/api/experiences/:id', experiencesUpload.single('experience_image'), (r
 // Delete experience
 app.delete('/api/experiences/:id', (req, res) => {
     const { id } = req.params;
-    
+
     const sql = 'DELETE FROM experiences WHERE id = ?';
-    
+
     con.query(sql, [id], (err, result) => {
         if (err) {
             console.error('Error deleting experience:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: 'Experience not found' });
         }
-        
+
         res.json({
             success: true,
             message: 'Experience deleted successfully'
@@ -1979,12 +1979,12 @@ app.delete('/api/experiences/:id', (req, res) => {
 // Get all voucher types with updated pricing from activity table
 app.get('/api/voucher-types', (req, res) => {
     console.log('GET /api/voucher-types called');
-    
+
     // Get location from query parameter if provided
     const { location } = req.query;
-    
+
     let sql, params = [];
-    
+
     if (location) {
         // If location is provided, get voucher types with location-specific pricing
         sql = `
@@ -2017,20 +2017,20 @@ app.get('/api/voucher-types', (req, res) => {
             ORDER BY vt.sort_order ASC, vt.created_at DESC
         `;
     }
-    
+
     console.log('SQL Query:', sql);
     console.log('SQL params:', params);
-    
+
     con.query(sql, params, (err, result) => {
         if (err) {
             console.error('Error fetching voucher types:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         // Process the results to map voucher types to their correct pricing
         const processedVoucherTypes = result.map(vt => {
             let updatedPrice = vt.price_per_person;
-            
+
             // Map voucher type titles to their corresponding pricing fields
             if (vt.title === 'Weekday Morning' && vt.weekday_morning_price) {
                 updatedPrice = vt.weekday_morning_price;
@@ -2039,7 +2039,7 @@ app.get('/api/voucher-types', (req, res) => {
             } else if (vt.title === 'Any Day Flight' && vt.any_day_flight_price) {
                 updatedPrice = vt.any_day_flight_price;
             }
-            
+
             return {
                 ...vt,
                 image_text_tag: vt.image_text_tag || null,
@@ -2054,10 +2054,10 @@ app.get('/api/voucher-types', (req, res) => {
                 }
             };
         });
-        
+
         console.log('Processed voucher types with updated pricing:', processedVoucherTypes);
         console.log('Result length:', processedVoucherTypes ? processedVoucherTypes.length : 'undefined');
-        
+
         res.json({ success: true, data: processedVoucherTypes });
     });
 });
@@ -2079,26 +2079,26 @@ app.post('/api/voucher-types', experiencesUpload.single('voucher_type_image'), (
         sort_order,
         is_active
     } = req.body;
-    
+
     // Validation: allow creating a voucher type without price yet
     // Only require title and description at creation time
     if (!title || !description) {
         return res.status(400).json({ success: false, message: 'Missing required fields: title and description' });
     }
-    
+
     // Handle image upload
     let image_url = req.body.image_url; // Keep existing image if no new file uploaded
     if (req.file) {
         image_url = `/uploads/experiences/${req.file.filename}`;
     }
-    
+
     const sql = `
         INSERT INTO voucher_types (
             title, description, image_url, image_text_tag, price_per_person, price_unit, max_passengers,
             validity_months, flight_days, flight_time, features, terms, sort_order, is_active
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    
+
     const values = [
         title,
         description,
@@ -2115,13 +2115,13 @@ app.post('/api/voucher-types', experiencesUpload.single('voucher_type_image'), (
         sort_order || 0,
         is_active !== undefined ? is_active : true
     ];
-    
+
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error creating voucher type:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         res.json({
             success: true,
             message: 'Voucher type created successfully',
@@ -2148,18 +2148,18 @@ app.put('/api/voucher-types/:id', experiencesUpload.single('voucher_type_image')
         sort_order,
         is_active
     } = req.body;
-    
+
     // Validation
     if (!title || !description) {
         return res.status(400).json({ success: false, message: 'Missing required fields: title and description' });
     }
-    
+
     // Handle image upload
     let image_url = req.body.image_url; // Keep existing image if no new file uploaded
     if (req.file) {
         image_url = `/uploads/experiences/${req.file.filename}`;
     }
-    
+
     const sql = `
         UPDATE voucher_types SET 
             title = ?, description = ?, image_url = ?, image_text_tag = ?, max_passengers = ?, 
@@ -2167,7 +2167,7 @@ app.put('/api/voucher-types/:id', experiencesUpload.single('voucher_type_image')
             terms = ?, sort_order = ?, is_active = ?
         WHERE id = ?
     `;
-    
+
     const values = [
         title,
         description,
@@ -2183,17 +2183,17 @@ app.put('/api/voucher-types/:id', experiencesUpload.single('voucher_type_image')
         is_active !== undefined ? is_active : true,
         id
     ];
-    
+
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error updating voucher type:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: 'Voucher type not found' });
         }
-        
+
         res.json({
             success: true,
             message: 'Voucher type updated successfully',
@@ -2205,19 +2205,19 @@ app.put('/api/voucher-types/:id', experiencesUpload.single('voucher_type_image')
 // Delete voucher type
 app.delete('/api/voucher-types/:id', (req, res) => {
     const { id } = req.params;
-    
+
     const sql = 'DELETE FROM voucher_types WHERE id = ?';
-    
+
     con.query(sql, [id], (err, result) => {
         if (err) {
             console.error('Error deleting voucher type:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: 'Voucher type not found' });
         }
-        
+
         res.json({
             success: true,
             message: 'Voucher type deleted successfully'
@@ -2230,12 +2230,12 @@ app.delete('/api/voucher-types/:id', (req, res) => {
 // Get all private charter voucher types
 app.get('/api/private-charter-voucher-types', (req, res) => {
     console.log('GET /api/private-charter-voucher-types called');
-    
+
     // Check if we want only active voucher types (default) or all
     const showOnlyActive = req.query.active !== 'false';
     const location = req.query.location;
     const passengers = req.query.passengers ? Number(req.query.passengers) : undefined;
-    
+
     let sql, params = [];
     if (showOnlyActive) {
         sql = `SELECT * FROM private_charter_voucher_types WHERE is_active = 1 ORDER BY sort_order ASC, created_at DESC`;
@@ -2244,13 +2244,13 @@ app.get('/api/private-charter-voucher-types', (req, res) => {
         sql = `SELECT * FROM private_charter_voucher_types ORDER BY sort_order ASC, created_at DESC`;
         console.log('SQL Query (all):', sql);
     }
-    
+
     con.query(sql, params, (err, result) => {
         if (err) {
             console.error('Error fetching private charter voucher types:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         console.log('GET /api/private-charter-voucher-types - Raw query result:');
         result.forEach((item, index) => {
             console.log(`Item ${index + 1}:`, {
@@ -2261,7 +2261,7 @@ app.get('/api/private-charter-voucher-types', (req, res) => {
                 updated_at: item.updated_at
             });
         });
-        
+
         // For admin view (showOnlyActive = false), return all voucher types
         // For frontend view (showOnlyActive = true), return only active ones
         let finalResult = result;
@@ -2281,12 +2281,12 @@ app.get('/api/private-charter-voucher-types', (req, res) => {
                         pricingMap = {};
                     }
                     const normalize = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
-                    const selectedPassengers = passengers && [2,3,4,8].includes(passengers) ? String(passengers) : '2';
+                    const selectedPassengers = passengers && [2, 3, 4, 8].includes(passengers) ? String(passengers) : '2';
                     // Map titles to prices (tolerant)
                     finalResult = finalResult.map(v => {
                         const title = v.title || '';
                         let matchVal = null;
-                        
+
                         // Güvenli erişim için pricingMap kontrolü
                         if (pricingMap && typeof pricingMap === 'object') {
                             matchVal = pricingMap[title];
@@ -2330,7 +2330,7 @@ app.get('/api/private-charter-voucher-types', (req, res) => {
         console.log('Show only active:', showOnlyActive);
         console.log('Result length:', result ? result.length : 'undefined');
         console.log('Final result length:', finalResult ? finalResult.length : 'undefined');
-        
+
         res.json({ success: true, data: finalResult });
     });
 });
@@ -2350,25 +2350,25 @@ app.post('/api/private-charter-voucher-types', experiencesUpload.single('private
         sort_order,
         is_active
     } = req.body;
-    
+
     // Validation
     if (!title || !description) {
         return res.status(400).json({ success: false, message: 'Missing required fields: title and description' });
     }
-    
+
     // Handle image upload
     let image_url = req.body.image_url; // Keep existing image if no new file uploaded
     if (req.file) {
         image_url = `/uploads/experiences/${req.file.filename}`;
     }
-    
+
     const sql = `
         INSERT INTO private_charter_voucher_types (
             title, description, image_url, image_text_tag, max_passengers,
             validity_months, flight_days, flight_time, features, terms, sort_order, is_active
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    
+
     const values = [
         title,
         description,
@@ -2383,16 +2383,16 @@ app.post('/api/private-charter-voucher-types', experiencesUpload.single('private
         sort_order || 0,
         is_active !== undefined ? is_active : true
     ];
-    
+
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error creating private charter voucher type:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         console.log('Private charter voucher type created successfully with ID:', result.insertId);
         console.log('Inserted values:', values);
-        
+
         // After successful creation, fetch the newly created voucher type to return complete data
         const selectSql = `SELECT * FROM private_charter_voucher_types WHERE id = ?`;
         con.query(selectSql, [result.insertId], (selectErr, selectResult) => {
@@ -2433,18 +2433,18 @@ app.put('/api/private-charter-voucher-types/:id', experiencesUpload.single('priv
         sort_order,
         is_active
     } = req.body;
-    
+
     // Validation
     if (!title || !description) {
         return res.status(400).json({ success: false, message: 'Missing required fields: title and description' });
     }
-    
+
     // Handle image upload
     let image_url = req.body.image_url; // Keep existing image if no new file uploaded
     if (req.file) {
         image_url = `/uploads/experiences/${req.file.filename}`;
     }
-    
+
     const sql = `
         UPDATE private_charter_voucher_types SET 
             title = ?, description = ?, image_url = ?, image_text_tag = ?, max_passengers = ?, 
@@ -2452,10 +2452,10 @@ app.put('/api/private-charter-voucher-types/:id', experiencesUpload.single('priv
             terms = ?, sort_order = ?, is_active = ?
         WHERE id = ?
     `;
-    
+
     // Convert is_active to proper boolean value
     let isActiveValue;
-    
+
     console.log('DEBUG - is_active received:', {
         value: is_active,
         type: typeof is_active,
@@ -2463,7 +2463,7 @@ app.put('/api/private-charter-voucher-types/:id', experiencesUpload.single('priv
         isNull: is_active === null,
         toString: String(is_active)
     });
-    
+
     if (is_active === undefined || is_active === null) {
         // If is_active is not provided, default to false to avoid unintended activation
         isActiveValue = false;
@@ -2478,14 +2478,14 @@ app.put('/api/private-charter-voucher-types/:id', experiencesUpload.single('priv
         // Unknown type, default to false
         isActiveValue = false;
     }
-    
+
     console.log('PUT /api/private-charter-voucher-types/:id - is_active handling:', {
         originalValue: is_active,
         type: typeof is_active,
         convertedValue: isActiveValue,
         reqBody: req.body
     });
-    
+
     // Additional logging for debugging
     console.log('PUT /api/private-charter-voucher-types/:id - All form fields:', {
         title,
@@ -2499,7 +2499,7 @@ app.put('/api/private-charter-voucher-types/:id', experiencesUpload.single('priv
         sort_order,
         is_active
     });
-    
+
     const values = [
         title,
         description,
@@ -2515,20 +2515,20 @@ app.put('/api/private-charter-voucher-types/:id', experiencesUpload.single('priv
         isActiveValue,
         id
     ];
-    
+
     console.log('PUT /api/private-charter-voucher-types/:id - SQL Query:', sql);
     console.log('PUT /api/private-charter-voucher-types/:id - Values:', values);
-    
+
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error updating private charter voucher type:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: 'Private charter voucher type not found' });
         }
-        
+
         console.log('PUT /api/private-charter-voucher-types/:id - Update successful, affected rows:', result.affectedRows);
         console.log('PUT /api/private-charter-voucher-types/:id - Update result info:', {
             affectedRows: result.affectedRows,
@@ -2537,7 +2537,7 @@ app.put('/api/private-charter-voucher-types/:id', experiencesUpload.single('priv
             serverStatus: result.serverStatus,
             warningCount: result.warningCount
         });
-        
+
         // Fetch the updated voucher type to return complete data
         const selectSql = `SELECT * FROM private_charter_voucher_types WHERE id = ?`;
         con.query(selectSql, [id], (selectErr, selectResult) => {
@@ -2571,19 +2571,19 @@ app.put('/api/private-charter-voucher-types/:id', experiencesUpload.single('priv
 // Delete private charter voucher type
 app.delete('/api/private-charter-voucher-types/:id', (req, res) => {
     const { id } = req.params;
-    
+
     const sql = 'DELETE FROM private_charter_voucher_types WHERE id = ?';
-    
+
     con.query(sql, [id], (err, result) => {
         if (err) {
             console.error('Error deleting private charter voucher type:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: 'Private charter voucher type not found' });
         }
-        
+
         res.json({
             success: true,
             message: 'Private charter voucher type deleted successfully'
@@ -2594,86 +2594,86 @@ app.delete('/api/private-charter-voucher-types/:id', (req, res) => {
 // Test endpoint to check database connection and table contents
 app.get('/api/debug/add-to-booking-items', (req, res) => {
     console.log('🔧 DEBUG: /api/debug/add-to-booking-items called');
-    
+
     // Test database connection
     con.query('SELECT 1 as test', (err, result) => {
         if (err) {
             console.error('❌ Database connection test failed:', err);
-            return res.json({ 
-                success: false, 
+            return res.json({
+                success: false,
                 message: 'Database connection failed',
-                error: err.message 
+                error: err.message
             });
         }
         console.log('✅ Database connection test passed');
-        
+
         // Check if table exists
         con.query('SHOW TABLES LIKE "add_to_booking_items"', (err, tables) => {
             if (err) {
                 console.error('❌ Table check failed:', err);
-                return res.json({ 
-                    success: false, 
+                return res.json({
+                    success: false,
                     message: 'Table check failed',
-                    error: err.message 
+                    error: err.message
                 });
             }
-            
+
             if (tables.length === 0) {
                 console.log('❌ Table add_to_booking_items does not exist');
-                return res.json({ 
-                    success: false, 
+                return res.json({
+                    success: false,
                     message: 'Table add_to_booking_items does not exist',
                     tables: tables
                 });
             }
-            
+
             console.log('✅ Table add_to_booking_items exists');
-            
+
             // Check table structure
             con.query('DESCRIBE add_to_booking_items', (err, structure) => {
                 if (err) {
                     console.error('❌ Table structure check failed:', err);
-                    return res.json({ 
-                        success: false, 
+                    return res.json({
+                        success: false,
                         message: 'Table structure check failed',
-                        error: err.message 
+                        error: err.message
                     });
                 }
-                
+
                 console.log('✅ Table structure:', structure);
-                
+
                 // Check table contents
                 con.query('SELECT COUNT(*) as total_count FROM add_to_booking_items', (err, countResult) => {
                     if (err) {
                         console.error('❌ Count query failed:', err);
-                        return res.json({ 
-                            success: false, 
+                        return res.json({
+                            success: false,
                             message: 'Count query failed',
                             error: err.message,
                             structure: structure
                         });
                     }
-                    
+
                     const totalCount = countResult[0].total_count;
                     console.log('✅ Total items in table:', totalCount);
-                    
+
                     if (totalCount > 0) {
                         // Get sample data
                         con.query('SELECT id, title, is_active, journey_types, locations, experience_types FROM add_to_booking_items LIMIT 3', (err, sampleData) => {
                             if (err) {
                                 console.error('❌ Sample data query failed:', err);
-                                return res.json({ 
-                                    success: true, 
+                                return res.json({
+                                    success: true,
                                     message: 'Table exists with data but sample query failed',
                                     totalCount: totalCount,
                                     structure: structure,
                                     error: err.message
                                 });
                             }
-                            
+
                             console.log('✅ Sample data:', sampleData);
-                            res.json({ 
-                                success: true, 
+                            res.json({
+                                success: true,
                                 message: 'Table exists with data',
                                 totalCount: totalCount,
                                 structure: structure,
@@ -2681,8 +2681,8 @@ app.get('/api/debug/add-to-booking-items', (req, res) => {
                             });
                         });
                     } else {
-                        res.json({ 
-                            success: true, 
+                        res.json({
+                            success: true,
                             message: 'Table exists but is empty',
                             totalCount: totalCount,
                             structure: structure
@@ -2701,22 +2701,22 @@ app.get('/api/add-to-booking-items', (req, res) => {
     console.log('GET /api/add-to-booking-items called');
     console.log('Request headers:', req.headers);
     console.log('Request query:', req.query);
-    
+
     const sql = `SELECT * FROM add_to_booking_items ORDER BY sort_order ASC, created_at DESC`;
     console.log('SQL Query:', sql);
-    
+
     con.query(sql, (err, result) => {
         if (err) {
             console.error('Error fetching add to booking items:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         console.log('Database query completed');
         console.log('Query result:', result);
         console.log('Result type:', typeof result);
         console.log('Result is array:', Array.isArray(result));
         console.log('Result length:', result ? result.length : 'undefined');
-        
+
         if (result && result.length > 0) {
             console.log('First item sample:', {
                 id: result[0].id,
@@ -2733,7 +2733,7 @@ app.get('/api/add-to-booking-items', (req, res) => {
             console.log('2. All items are inactive');
             console.log('3. Database connection issue');
         }
-        
+
         // Add cache busting to image URLs and ensure proper image serving
         if (result && Array.isArray(result)) {
             result.forEach(item => {
@@ -2741,20 +2741,20 @@ app.get('/api/add-to-booking-items', (req, res) => {
                     // Add timestamp for cache busting
                     const timestamp = Date.now();
                     item.image_url = `${item.image_url}?t=${timestamp}`;
-                    
+
                     // Leave as relative path - frontend will handle absolute URL conversion
                     // This allows flexibility for different environments and cross-origin scenarios
                 }
             });
         }
-        
+
         // Add cache control headers
         res.set({
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache',
             'Expires': '0'
         });
-        
+
         console.log('Sending response with', result ? result.length : 0, 'items');
         res.json({ success: true, data: result });
     });
@@ -2776,25 +2776,25 @@ app.post('/api/add-to-booking-items', experiencesUpload.single('add_to_booking_i
         sort_order,
         is_active
     } = req.body;
-    
+
     // Validation
     if (!title || !description || !price) {
         return res.status(400).json({ success: false, message: 'Missing required fields: title, description, and price' });
     }
-    
+
     // Handle image upload
     let image_url = req.body.image_url; // Keep existing image if no new file uploaded
     if (req.file) {
         image_url = `/uploads/experiences/${req.file.filename}`;
     }
-    
+
     const sql = `
         INSERT INTO add_to_booking_items (
             title, description, image_url, price, price_unit, category,
             stock_quantity, is_physical_item, weight_grams, journey_types, locations, experience_types, sort_order, is_active
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    
+
     const values = [
         title,
         description,
@@ -2811,13 +2811,13 @@ app.post('/api/add-to-booking-items', experiencesUpload.single('add_to_booking_i
         sort_order || 0,
         is_active !== undefined ? (is_active === 'true' || is_active === true) : true
     ];
-    
+
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error creating add to booking item:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         res.json({
             success: true,
             message: 'Add to booking item created successfully',
@@ -2844,7 +2844,7 @@ app.put('/api/add-to-booking-items/:id', experiencesUpload.single('add_to_bookin
         sort_order,
         is_active
     } = req.body;
-    
+
     // Debug: Log received values
     console.log('PUT /api/add-to-booking-items/:id - Received data:', {
         id,
@@ -2862,12 +2862,12 @@ app.put('/api/add-to-booking-items/:id', experiencesUpload.single('add_to_bookin
         is_active_type: typeof is_active,
         is_active_value: is_active
     });
-    
+
     // Validation
     if (!title || !description || !price) {
         return res.status(400).json({ success: false, message: 'Missing required fields: title, description, and price' });
     }
-    
+
     // Handle image upload
     let image_url = req.body.image_url; // Keep existing image if no new file uploaded
     if (req.file) {
@@ -2878,7 +2878,7 @@ app.put('/api/add-to-booking-items/:id', experiencesUpload.single('add_to_bookin
     } else {
         console.log('PUT - No image provided');
     }
-    
+
     const sql = `
         UPDATE add_to_booking_items SET 
             title = ?, description = ?, image_url = ?, price = ?, 
@@ -2886,7 +2886,7 @@ app.put('/api/add-to-booking-items/:id', experiencesUpload.single('add_to_bookin
             weight_grams = ?, journey_types = ?, locations = ?, experience_types = ?, sort_order = ?, is_active = ?
         WHERE id = ?
     `;
-    
+
     const values = [
         title,
         description,
@@ -2904,21 +2904,21 @@ app.put('/api/add-to-booking-items/:id', experiencesUpload.single('add_to_bookin
         is_active !== undefined ? (is_active === 'true' || is_active === true) : true,
         id
     ];
-    
+
     // Debug: Log SQL values
     console.log('SQL values being sent:', values);
     console.log('is_active value in SQL:', is_active !== undefined ? (is_active === 'true' || is_active === true) : true);
-    
+
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error updating add to booking item:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: 'Add to booking item not found' });
         }
-        
+
         res.json({
             success: true,
             message: 'Add to booking item updated successfully',
@@ -2930,19 +2930,19 @@ app.put('/api/add-to-booking-items/:id', experiencesUpload.single('add_to_bookin
 // Delete add to booking item
 app.delete('/api/add-to-booking-items/:id', (req, res) => {
     const { id } = req.params;
-    
+
     const sql = 'DELETE FROM add_to_booking_items WHERE id = ?';
-    
+
     con.query(sql, [id], (err, result) => {
         if (err) {
             console.error('Error deleting add to booking item:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: 'Add to booking item not found' });
         }
-        
+
         res.json({
             success: true,
             message: 'Add to booking item deleted successfully'
@@ -2955,14 +2955,14 @@ app.delete('/api/add-to-booking-items/:id', (req, res) => {
 app.get('/uploads/experiences/:filename', (req, res) => {
     const { filename } = req.params;
     const filePath = path.join(__dirname, 'uploads', 'experiences', filename);
-    
+
     // Add cache control headers
     res.set({
         'Cache-Control': 'public, max-age=60',
         'Pragma': 'no-cache',
         'Expires': '0'
     });
-    
+
     if (fs.existsSync(filePath)) {
         return res.sendFile(filePath);
     }
@@ -2980,7 +2980,7 @@ app.get('/api/additional-information-questions', (req, res) => {
     console.log('GET /api/additional-information-questions called');
     const sql = `SELECT * FROM additional_information_questions ORDER BY sort_order ASC, created_at DESC`;
     console.log('SQL Query:', sql);
-    
+
     con.query(sql, (err, result) => {
         if (err) {
             console.error('Error fetching additional information questions:', err);
@@ -3008,19 +3008,19 @@ app.post('/api/additional-information-questions', (req, res) => {
         sort_order,
         is_active
     } = req.body;
-    
+
     // Validation
     if (!question_text || !question_type) {
         return res.status(400).json({ success: false, message: 'Missing required fields: question_text and question_type' });
     }
-    
+
     const sql = `
         INSERT INTO additional_information_questions (
             question_text, question_type, is_required, options,
             placeholder_text, help_text, category, journey_types, locations, experience_types, sort_order, is_active
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    
+
     const values = [
         question_text,
         question_type,
@@ -3035,17 +3035,17 @@ app.post('/api/additional-information-questions', (req, res) => {
         sort_order || 0,
         is_active !== undefined ? is_active : true
     ];
-    
+
     // Debug: Log SQL values
     console.log('SQL values being sent:', values);
     console.log('journey_types value in SQL:', Array.isArray(journey_types) ? JSON.stringify(journey_types) : (journey_types || JSON.stringify(['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'])));
-    
+
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error creating additional information question:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         res.json({
             success: true,
             message: 'Additional information question created successfully',
@@ -3101,7 +3101,7 @@ app.put('/api/additional-information-questions/:id', (req, res) => {
         sort_order,
         is_active
     } = req.body;
-    
+
     // Debug: Log received values
     console.log('PUT /api/additional-information-questions/:id - Received data:', {
         id,
@@ -3118,19 +3118,19 @@ app.put('/api/additional-information-questions/:id', (req, res) => {
         sort_order,
         is_active
     });
-    
+
     // Validation
     if (!question_text || !question_type) {
         return res.status(400).json({ success: false, message: 'Missing required fields: question_text and question_type' });
     }
-    
+
     const sql = `
         UPDATE additional_information_questions SET 
             question_text = ?, question_type = ?, is_required = ?, options = ?,
             placeholder_text = ?, help_text = ?, category = ?, journey_types = ?, locations = ?, experience_types = ?, sort_order = ?, is_active = ?
         WHERE id = ?
     `;
-    
+
     const values = [
         question_text,
         question_type,
@@ -3146,21 +3146,21 @@ app.put('/api/additional-information-questions/:id', (req, res) => {
         is_active !== undefined ? is_active : true,
         id
     ];
-    
+
     // Debug: Log SQL values
     console.log('SQL values being sent:', values);
     console.log('journey_types value in SQL:', Array.isArray(journey_types) ? JSON.stringify(journey_types) : (journey_types || JSON.stringify(['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'])));
-    
+
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error updating additional information question:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: 'Additional information question not found' });
         }
-        
+
         res.json({
             success: true,
             message: 'Additional information question updated successfully'
@@ -3171,19 +3171,19 @@ app.put('/api/additional-information-questions/:id', (req, res) => {
 // Delete additional information question
 app.delete('/api/additional-information-questions/:id', (req, res) => {
     const { id } = req.params;
-    
+
     const sql = 'DELETE FROM additional_information_questions WHERE id = ?';
-    
+
     con.query(sql, [id], (err, result) => {
         if (err) {
             console.error('Error deleting additional information question:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: 'Additional information question not found' });
         }
-        
+
         res.json({
             success: true,
             message: 'Additional information question deleted successfully'
@@ -3196,19 +3196,19 @@ app.delete('/api/additional-information-questions/:id', (req, res) => {
 // Create new crew member
 app.post('/api/crew', (req, res) => {
     const { first_name, last_name, is_active } = req.body;
-    
+
     // Validation
     if (!first_name || !last_name) {
         return res.status(400).json({ success: false, message: 'Missing required fields: first_name and last_name' });
     }
-    
+
     const sql = 'INSERT INTO crew (first_name, last_name, is_active) VALUES (?, ?, ?)';
     const values = [
         first_name.trim(),
         last_name.trim(),
         is_active !== undefined ? is_active : true
     ];
-    
+
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error creating crew member:', err);
@@ -3217,7 +3217,7 @@ app.post('/api/crew', (req, res) => {
             }
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         res.json({
             success: true,
             message: 'Crew member created successfully',
@@ -3230,12 +3230,12 @@ app.post('/api/crew', (req, res) => {
 app.put('/api/crew/:id', (req, res) => {
     const { id } = req.params;
     const { first_name, last_name, is_active } = req.body;
-    
+
     // Validation
     if (!first_name || !last_name) {
         return res.status(400).json({ success: false, message: 'Missing required fields: first_name and last_name' });
     }
-    
+
     const sql = 'UPDATE crew SET first_name = ?, last_name = ?, is_active = ? WHERE id = ?';
     const values = [
         first_name.trim(),
@@ -3243,7 +3243,7 @@ app.put('/api/crew/:id', (req, res) => {
         is_active !== undefined ? is_active : true,
         id
     ];
-    
+
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error updating crew member:', err);
@@ -3252,11 +3252,11 @@ app.put('/api/crew/:id', (req, res) => {
             }
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: 'Crew member not found' });
         }
-        
+
         res.json({
             success: true,
             message: 'Crew member updated successfully'
@@ -3267,19 +3267,19 @@ app.put('/api/crew/:id', (req, res) => {
 // Delete crew member
 app.delete('/api/crew/:id', (req, res) => {
     const { id } = req.params;
-    
+
     const sql = 'DELETE FROM crew WHERE id = ?';
-    
+
     con.query(sql, [id], (err, result) => {
         if (err) {
             console.error('Error deleting crew member:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: 'Crew member not found' });
         }
-        
+
         res.json({
             success: true,
             message: 'Crew member deleted successfully'
@@ -3320,19 +3320,19 @@ app.get('/api/pilots/:id', (req, res) => {
 // Create new pilot
 app.post('/api/pilots', (req, res) => {
     const { first_name, last_name, is_active } = req.body;
-    
+
     // Validation
     if (!first_name || !last_name) {
         return res.status(400).json({ success: false, message: 'Missing required fields: first_name and last_name' });
     }
-    
+
     const sql = 'INSERT INTO pilots (first_name, last_name, is_active) VALUES (?, ?, ?)';
     const values = [
         first_name.trim(),
         last_name.trim(),
         is_active !== undefined ? is_active : true
     ];
-    
+
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error creating pilot:', err);
@@ -3341,7 +3341,7 @@ app.post('/api/pilots', (req, res) => {
             }
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         res.json({
             success: true,
             message: 'Pilot created successfully',
@@ -3354,12 +3354,12 @@ app.post('/api/pilots', (req, res) => {
 app.put('/api/pilots/:id', (req, res) => {
     const { id } = req.params;
     const { first_name, last_name, is_active } = req.body;
-    
+
     // Validation
     if (!first_name || !last_name) {
         return res.status(400).json({ success: false, message: 'Missing required fields: first_name and last_name' });
     }
-    
+
     const sql = 'UPDATE pilots SET first_name = ?, last_name = ?, is_active = ? WHERE id = ?';
     const values = [
         first_name.trim(),
@@ -3367,7 +3367,7 @@ app.put('/api/pilots/:id', (req, res) => {
         is_active !== undefined ? is_active : true,
         id
     ];
-    
+
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error updating pilot:', err);
@@ -3376,11 +3376,11 @@ app.put('/api/pilots/:id', (req, res) => {
             }
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: 'Pilot not found' });
         }
-        
+
         res.json({
             success: true,
             message: 'Pilot updated successfully'
@@ -3391,19 +3391,19 @@ app.put('/api/pilots/:id', (req, res) => {
 // Delete pilot
 app.delete('/api/pilots/:id', (req, res) => {
     const { id } = req.params;
-    
+
     const sql = 'DELETE FROM pilots WHERE id = ?';
-    
+
     con.query(sql, [id], (err, result) => {
         if (err) {
             console.error('Error deleting pilot:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: 'Pilot not found' });
         }
-        
+
         res.json({
             success: true,
             message: 'Pilot deleted successfully'
@@ -3418,7 +3418,7 @@ app.get('/api/terms-and-conditions', async (req, res) => {
     console.log('GET /api/terms-and-conditions called');
     const sql = `SELECT * FROM terms_and_conditions ORDER BY sort_order ASC, created_at DESC`;
     console.log('SQL Query:', sql);
-    
+
     try {
         const result = await new Promise((resolve, reject) => {
             con.query(sql, (err, result) => {
@@ -3430,10 +3430,10 @@ app.get('/api/terms-and-conditions', async (req, res) => {
                 }
             });
         });
-        
+
         console.log('Query result:', result);
         console.log('Result length:', result ? result.length : 'undefined');
-        
+
         // Debug: Check if private_voucher_type_ids is present in results
         if (result && result.length > 0) {
             result.forEach((item, index) => {
@@ -3445,12 +3445,12 @@ app.get('/api/terms-and-conditions', async (req, res) => {
                 });
             });
         }
-        
+
         // Enrich with voucher type information
         if (result && result.length > 0) {
             const enrichedResult = await Promise.all(result.map(async (terms) => {
                 const enrichedTerms = { ...terms };
-                
+
                 // Add voucher type information for private_voucher_type_ids
                 if (terms.private_voucher_type_ids && Array.isArray(terms.private_voucher_type_ids) && terms.private_voucher_type_ids.length > 0) {
                     try {
@@ -3468,7 +3468,7 @@ app.get('/api/terms-and-conditions', async (req, res) => {
                         console.error('Error fetching private_voucher_type_ids:', e);
                     }
                 }
-                
+
                 // Add voucher type information for voucher_type_ids
                 if (terms.voucher_type_ids && Array.isArray(terms.voucher_type_ids) && terms.voucher_type_ids.length > 0) {
                     try {
@@ -3486,10 +3486,10 @@ app.get('/api/terms-and-conditions', async (req, res) => {
                         console.error('Error fetching voucher_type_ids:', e);
                     }
                 }
-                
+
                 return enrichedTerms;
             }));
-            
+
             res.json({ success: true, data: enrichedResult });
         } else {
             res.json({ success: true, data: result });
@@ -3504,10 +3504,10 @@ app.get('/api/terms-and-conditions', async (req, res) => {
 app.get('/api/terms-and-conditions/voucher-type/:voucherTypeId', (req, res) => {
     const { voucherTypeId } = req.params;
     console.log('GET /api/terms-and-conditions/voucher-type/' + voucherTypeId + ' called');
-    
+
     const sql = `SELECT * FROM terms_and_conditions WHERE (voucher_type_id = ? OR JSON_CONTAINS(voucher_type_ids, ?) OR JSON_CONTAINS(private_voucher_type_ids, ?)) AND is_active = 1 ORDER BY sort_order ASC`;
     console.log('SQL Query:', sql);
-    
+
     con.query(sql, [parseInt(voucherTypeId), JSON.stringify(parseInt(voucherTypeId)), JSON.stringify(parseInt(voucherTypeId))], (err, result) => {
         if (err) {
             console.error('Error fetching terms and conditions for voucher type:', err);
@@ -3522,21 +3522,21 @@ app.get('/api/terms-and-conditions/voucher-type/:voucherTypeId', (req, res) => {
 app.get('/api/terms-and-conditions/experience/:experienceType', (req, res) => {
     const { experienceType } = req.params;
     console.log('GET /api/terms-and-conditions/experience/' + experienceType + ' called');
-    
+
     // Map experience types to experience IDs
     const experienceTypeMap = {
         'Private Charter': 2,
         'Shared Flight': 1
     };
-    
+
     const experienceId = experienceTypeMap[experienceType];
     if (!experienceId) {
         return res.status(400).json({ success: false, message: 'Invalid experience type' });
     }
-    
+
     const sql = `SELECT * FROM terms_and_conditions WHERE (JSON_CONTAINS(experience_ids, ?) OR JSON_CONTAINS(private_voucher_type_ids, ?)) AND is_active = 1 ORDER BY sort_order ASC`;
     console.log('SQL Query:', sql);
-    
+
     con.query(sql, [JSON.stringify(experienceId), JSON.stringify(experienceId)], (err, result) => {
         if (err) {
             console.error('Error fetching terms and conditions for experience type:', err);
@@ -3559,12 +3559,12 @@ app.post('/api/terms-and-conditions', (req, res) => {
         is_active,
         sort_order
     } = req.body;
-    
+
     // Normalize experience input
     const normalizedExperienceIds = Array.isArray(experience_ids) && experience_ids.length > 0
         ? experience_ids.map((v) => Number(v))
         : [];
-    
+
     // Normalize voucher type input
     const normalizedVoucherTypeIds = Array.isArray(voucher_type_ids) && voucher_type_ids.length > 0
         ? voucher_type_ids.map((v) => Number(v))
@@ -3579,13 +3579,13 @@ app.post('/api/terms-and-conditions', (req, res) => {
     if (!title || !content || (normalizedExperienceIds.length === 0 && normalizedVoucherTypeIds.length === 0 && normalizedPrivateVoucherTypeIds.length === 0)) {
         return res.status(400).json({ success: false, message: 'Missing required fields: title, content, and at least one selection (experience_ids, voucher_type_ids, or private_voucher_type_ids)' });
     }
-    
+
     const sql = `
         INSERT INTO terms_and_conditions (
             title, content, experience_ids, voucher_type_id, voucher_type_ids, private_voucher_type_ids, is_active, sort_order
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    
+
     const values = [
         title,
         content,
@@ -3596,13 +3596,13 @@ app.post('/api/terms-and-conditions', (req, res) => {
         is_active !== undefined ? is_active : true,
         sort_order || 0
     ];
-    
+
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error creating terms and conditions:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         res.json({
             success: true,
             message: 'Terms and conditions created successfully',
@@ -3623,7 +3623,7 @@ app.put('/api/terms-and-conditions/:id', (req, res) => {
         is_active,
         sort_order
     } = req.body;
-    
+
     console.log('PUT /api/terms-and-conditions/' + id + ' called');
     console.log('Request body:', req.body);
     console.log('experience_ids type:', typeof experience_ids);
@@ -3634,12 +3634,12 @@ app.put('/api/terms-and-conditions/:id', (req, res) => {
     console.log('private_voucher_type_ids value:', private_voucher_type_ids);
     console.log('private_voucher_type_ids length:', private_voucher_type_ids ? private_voucher_type_ids.length : 'undefined');
     console.log('private_voucher_type_ids isArray:', Array.isArray(private_voucher_type_ids));
-    
+
     // Normalize experience input
     const normalizedExperienceIds = Array.isArray(experience_ids) && experience_ids.length > 0
         ? experience_ids.map((v) => Number(v))
         : [];
-    
+
     // Normalize voucher type input
     const normalizedVoucherTypeIds = Array.isArray(voucher_type_ids) && voucher_type_ids.length > 0
         ? voucher_type_ids.map((v) => Number(v))
@@ -3654,13 +3654,13 @@ app.put('/api/terms-and-conditions/:id', (req, res) => {
     if (!title || !content || (normalizedExperienceIds.length === 0 && normalizedVoucherTypeIds.length === 0 && normalizedPrivateVoucherTypeIds.length === 0)) {
         return res.status(400).json({ success: false, message: 'Missing required fields: title, content, and at least one selection (experience_ids, voucher_type_ids, or private_voucher_type_ids)' });
     }
-    
+
     const sql = `
         UPDATE terms_and_conditions SET 
             title = ?, content = ?, experience_ids = ?, voucher_type_id = ?, voucher_type_ids = ?, private_voucher_type_ids = ?, is_active = ?, sort_order = ?
         WHERE id = ?
     `;
-    
+
     const values = [
         title,
         content,
@@ -3672,19 +3672,19 @@ app.put('/api/terms-and-conditions/:id', (req, res) => {
         sort_order || 0,
         id
     ];
-    
+
     console.log('SQL values:', values);
-    
+
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error updating terms and conditions:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: 'Terms and conditions not found' });
         }
-        
+
         console.log('Terms and conditions updated successfully');
         res.json({
             success: true,
@@ -3696,19 +3696,19 @@ app.put('/api/terms-and-conditions/:id', (req, res) => {
 // Delete terms and conditions
 app.delete('/api/terms-and-conditions/:id', (req, res) => {
     const { id } = req.params;
-    
+
     const sql = 'DELETE FROM terms_and_conditions WHERE id = ?';
-    
+
     con.query(sql, [id], (err, result) => {
         if (err) {
             console.error('Error deleting terms and conditions:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: 'Terms and conditions not found' });
         }
-        
+
         res.json({
             success: true,
             message: 'Terms and conditions deleted successfully'
@@ -3777,8 +3777,8 @@ app.delete('/api/passenger-terms/:id', (req, res) => {
 });
 // Simple webhook test endpoint
 app.get('/api/webhook-test', (req, res) => {
-    res.json({ 
-        success: true, 
+    res.json({
+        success: true,
         message: 'Webhook endpoint is accessible',
         timestamp: new Date().toISOString(),
         sessionStore: Object.keys(stripeSessionStore),
@@ -3793,7 +3793,7 @@ async function savePaymentHistory(session, bookingId, voucherId) {
         const paymentIntentId = session.payment_intent;
         const amountTotal = session.amount_total ? session.amount_total / 100 : 0; // Convert from cents
         const currency = session.currency || 'GBP';
-        
+
         let charge = null;
         let paymentMethod = null;
         let cardLast4 = null;
@@ -3806,43 +3806,43 @@ async function savePaymentHistory(session, bookingId, voucherId) {
         let payoutId = null;
         let paymentStatus = 'pending';
         let arrivingOn = null;
-        
+
         // Get payment intent details
         if (paymentIntentId) {
             try {
                 const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
                 paymentStatus = paymentIntent.status === 'succeeded' ? 'succeeded' : paymentIntent.status;
-                
+
                 // Get charges from payment intent
                 if (paymentIntent.charges && paymentIntent.charges.data && paymentIntent.charges.data.length > 0) {
                     charge = paymentIntent.charges.data[0];
                     chargeId = charge.id;
-                    
+
                     // Get payment method details
                     if (charge.payment_method_details) {
                         const pmDetails = charge.payment_method_details;
-                        
+
                         if (pmDetails.card) {
                             cardLast4 = pmDetails.card.last4;
                             cardBrand = pmDetails.card.brand;
                             fingerprint = pmDetails.card.fingerprint;
                         }
-                        
+
                         if (pmDetails.type === 'card') {
                             cardPresent = pmDetails.card?.present || false;
                         }
-                        
+
                         // Check for wallet type
                         if (pmDetails.type === 'card' && pmDetails.card?.wallet) {
                             walletType = pmDetails.card.wallet.type;
                         }
                     }
-                    
+
                     // Get origin from charge
                     if (charge.payment_method_details?.card?.country) {
                         origin = charge.payment_method_details.card.country;
                     }
-                    
+
                     // Get payout information if available
                     if (charge.balance_transaction) {
                         try {
@@ -3865,7 +3865,7 @@ async function savePaymentHistory(session, bookingId, voucherId) {
                 console.warn('Could not retrieve payment intent:', piError.message);
             }
         }
-        
+
         // Insert payment history
         const insertPaymentHistory = `
             INSERT INTO payment_history (
@@ -3874,7 +3874,7 @@ async function savePaymentHistory(session, bookingId, voucherId) {
                 payout_id, payment_status, fingerprint, origin, card_present, arriving_on
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
-        
+
         con.query(
             insertPaymentHistory,
             [
@@ -3909,21 +3909,21 @@ async function savePaymentHistory(session, bookingId, voucherId) {
 }
 
 // Stripe Webhook endpoint
-app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (req, res) => {
+app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
     console.log('Stripe webhook endpoint hit!');
     console.log('Webhook body length:', req.body ? req.body.length : 'undefined');
     console.log('Webhook headers:', req.headers);
-    
+
     const sig = req.headers['stripe-signature'];
     let event;
-    
+
     try {
         // Webhook signature verification
         if (!process.env.STRIPE_WEBHOOK_SECRET) {
             console.error('STRIPE_WEBHOOK_SECRET environment variable is not set');
             return res.status(500).send('Webhook configuration error');
         }
-        
+
         console.log('Webhook secret:', process.env.STRIPE_WEBHOOK_SECRET);
         event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
         console.log('Webhook signature verified successfully');
@@ -3933,40 +3933,40 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
         console.error('Webhook signature verification failed:', err.message);
         return res.status(400).send(`Webhook Error: ${err.message}`);
     }
-    
+
     try {
         if (event.type === 'checkout.session.completed') {
             const session = event.data.object;
             console.log('Checkout session completed:', session.id);
             console.log('Session metadata:', session.metadata);
-            
+
             const session_id = session.id;
             console.log('Using session ID:', session_id);
-            
+
             const storeData = stripeSessionStore[session_id];
             console.log('Store data found:', !!storeData);
             console.log('Store data content:', storeData);
-            
+
             if (!storeData) {
                 console.error('Stripe session store data not found for session_id:', session_id);
                 console.log('Available session IDs in store:', Object.keys(stripeSessionStore));
                 return res.status(400).send('Session data not found');
             }
-            
+
             // Duplicate kontrolü - aynı session için birden fazla işlem yapılmasını engelle
             if (storeData.processed) {
                 console.log('Session already processed, skipping:', session_id);
-                return res.json({received: true, message: 'Session already processed'});
+                return res.json({ received: true, message: 'Session already processed' });
             }
-            
+
             // Session ID kontrolü - session data var mı kontrol et
             if (!storeData.bookingData && !storeData.voucherData) {
                 console.log('No booking/voucher data found for session:', session_id);
                 return res.status(400).send('No booking/voucher data found');
             }
-            
+
             console.log('Processing webhook for session:', session_id, 'Type:', storeData.type);
-            
+
             try {
                 if (storeData.type === 'booking') {
                     // If already processed with a booking id, still save payment history
@@ -3974,7 +3974,7 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
                         console.log('Webhook: booking already created for session, saving payment history only.');
                         const existingBookingId = storeData.bookingData.booking_id;
                         await savePaymentHistory(session, existingBookingId, null);
-                        
+
                         // Update booking with stripe_session_id if not already set
                         con.query(
                             'UPDATE all_booking SET stripe_session_id = ? WHERE id = ? AND (stripe_session_id IS NULL OR stripe_session_id = "")',
@@ -3998,10 +3998,10 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
                     // Direct database insertion instead of HTTP call
                     const bookingId = await createBookingFromWebhook(storeData.bookingData);
                     console.log('Webhook booking creation completed, ID:', bookingId);
-                    
+
                     // Save payment information
                     await savePaymentHistory(session, bookingId, null);
-                    
+
                     // Update booking with stripe_session_id
                     if (bookingId) {
                         con.query(
@@ -4016,7 +4016,7 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
                             }
                         );
                     }
-                    
+
                     // Save user session data if provided
                     if (storeData.userSessionData && storeData.userSessionData.session_id && bookingId) {
                         const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.connection.remoteAddress || null;
@@ -4026,7 +4026,7 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
                             ip_address: ipAddress || storeData.userSessionData.ip_address || null,
                             booking_clicks: 1 // Increment booking clicks
                         };
-                        
+
                         // Save user session asynchronously
                         axios.post(`${req.protocol}://${req.get('host')}/api/save-user-session`, userSessionPayload)
                             .then(() => {
@@ -4036,7 +4036,7 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
                                 console.error('Error saving user session:', err.message);
                             });
                     }
-                    
+
                     // Mark processed and store created id to avoid duplicate creation by fallback
                     storeData.processed = true;
                     if (!storeData.bookingData) storeData.bookingData = {};
@@ -4055,16 +4055,16 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
                     console.log('storeData.voucherData.add_to_booking_items:', storeData.voucherData.add_to_booking_items);
                     console.log('typeof storeData.voucherData.add_to_booking_items:', typeof storeData.voucherData.add_to_booking_items);
                     console.log('storeData.voucherData.add_to_booking_items length:', storeData.voucherData.add_to_booking_items ? storeData.voucherData.add_to_booking_items.length : 'add_to_booking_items is null/undefined');
-                    
+
                     // Check if voucher was already created to prevent duplicate creation
                     if (storeData.voucherData?.voucher_id) {
                         console.log('Webhook: voucher already created for session, skipping. ID:', storeData.voucherData.voucher_id);
                         return res.json({ received: true });
                     }
-                    
+
                     // Webhook creates the voucher, voucher code generation will be done by createBookingFromSession
                     console.log('Creating voucher via webhook, voucher code generation will be done by createBookingFromSession');
-                    
+
                     // Log the voucher data before creation
                     logToFile('Creating voucher from webhook with data:', {
                         additionalInfo: storeData.voucherData.additionalInfo,
@@ -4075,20 +4075,20 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
                     // Direct database insertion instead of HTTP call
                     const voucherId = await createVoucherFromWebhook(storeData.voucherData);
                     console.log('Webhook voucher creation completed, ID:', voucherId);
-                    
+
                     // Store voucher ID in session data to prevent duplicate creation
                     storeData.voucherData.voucher_id = voucherId;
-                    
+
                     // Mark session as processed to prevent duplicate calls
                     storeData.processed = true;
-                    
+
                     // Webhook does NOT generate voucher code - this will be done by createBookingFromSession
                     console.log('Voucher code generation skipped in webhook - will be done by createBookingFromSession');
-                    
+
                     // Immediately return to prevent further processing
                     return res.json({ received: true });
                 }
-                
+
                 // Retain session data for a grace period so fallback createBookingFromSession can read it
                 // Automatically clean up after 15 minutes to avoid memory growth
                 if (storeData) {
@@ -4114,8 +4114,8 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
         } else {
             console.log('Webhook event type not handled:', event.type);
         }
-        
-        res.json({received: true});
+
+        res.json({ received: true });
     } catch (error) {
         console.error('Webhook processing error:', error);
         res.status(500).send('Webhook processing failed');
@@ -4347,15 +4347,15 @@ const getPrivateCharterPricingFromCache = (voucherTitle, location) => {
 const inferPrivateCharterPassengersFromPrice = (voucherTitle, location, totalPrice) => {
     if (!totalPrice || Number(totalPrice) <= 0) return null;
     const normalizedTotal = Number(totalPrice);
-    
+
     // First try exact match with voucher title
     const pricing = getPrivateCharterPricingFromCache(voucherTitle, location);
     if (pricing) {
-    for (const [pax, price] of Object.entries(pricing)) {
-        const parsedPrice = Number(price);
-        if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) continue;
-        if (Math.abs(parsedPrice - normalizedTotal) < 0.01) {
-            const paxInt = parsePositiveInt(pax);
+        for (const [pax, price] of Object.entries(pricing)) {
+            const parsedPrice = Number(price);
+            if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) continue;
+            if (Math.abs(parsedPrice - normalizedTotal) < 0.01) {
+                const paxInt = parsePositiveInt(pax);
                 if (paxInt) {
                     console.log(`[inferPrivateCharterPassengersFromPrice] Found exact match: ${paxInt} passengers for price ${normalizedTotal}`);
                     return paxInt;
@@ -4363,12 +4363,12 @@ const inferPrivateCharterPassengersFromPrice = (voucherTitle, location, totalPri
             }
         }
     }
-    
+
     // If no exact match, try to find in all Private Charter pricing entries
     // This handles cases where voucher title doesn't match exactly (e.g., "Private Charter Flights" vs "Private Charter Flights (8 passengers)")
     const locationKey = normalizeLocationKey(location);
     const locationPricing = privateCharterPriceCache[locationKey] || privateCharterPriceCache[DEFAULT_LOCATION_KEY] || {};
-    
+
     for (const [title, paxMap] of Object.entries(locationPricing)) {
         // Check if this title is related to Private Charter (fuzzy match)
         const titleLower = title.toLowerCase();
@@ -4387,7 +4387,7 @@ const inferPrivateCharterPassengersFromPrice = (voucherTitle, location, totalPri
             }
         }
     }
-    
+
     console.log(`[inferPrivateCharterPassengersFromPrice] No match found for price ${normalizedTotal} with title "${voucherTitle}"`);
     return null;
 };
@@ -4446,9 +4446,9 @@ function derivePassengerCount(source = {}, options = {}) {
         payload.actual_voucher_type ||
         payload.voucher_type ||
         payload.book_flight;
-    
+
     console.log(`[derivePassengerCount] Voucher title: ${voucherTitle}`);
-    
+
     // Extract passenger count from voucher type string (e.g., "Private Charter Flights (8 passengers)")
     if (voucherTitle && typeof voucherTitle === 'string') {
         const passengerMatch = voucherTitle.match(/\((\d+)\s*passenger/i);
@@ -4460,7 +4460,7 @@ function derivePassengerCount(source = {}, options = {}) {
             }
         }
     }
-    
+
     const totalPaid = Number(
         payload.paid ||
         payload.totalPrice ||
@@ -4613,26 +4613,26 @@ app.get('/api/test-uploads', (req, res) => {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    
+
     const uploadsPath = path.join(__dirname, 'uploads');
     const activitiesPath = path.join(uploadsPath, 'activities');
-    
+
     try {
         const uploadsExists = fs.existsSync(uploadsPath);
         const activitiesExists = fs.existsSync(activitiesPath);
-        
+
         let files = [];
         if (activitiesExists) {
             files = fs.readdirSync(activitiesPath);
         }
-        
+
         console.log('Test uploads endpoint called');
         console.log('Uploads path:', uploadsPath);
         console.log('Activities path:', activitiesPath);
         console.log('Uploads exists:', uploadsExists);
         console.log('Activities exists:', activitiesExists);
         console.log('Files:', files);
-        
+
         res.json({
             success: true,
             uploadsExists,
@@ -4660,7 +4660,7 @@ app.get('/api/example', (req, res) => {
 // Simple test endpoint
 app.get('/api/test', (req, res) => {
     res.setHeader('Content-Type', 'application/json');
-    res.json({ 
+    res.json({
         message: 'API is working!',
         timestamp: new Date().toISOString(),
         server: 'flyawayballooning-system'
@@ -4753,7 +4753,7 @@ const __getAllBookingDataCache = {
 // Get all booking data
 app.get('/api/getAllBookingData', (req, res) => {
     console.log('GET /api/getAllBookingData called with filters:', req.query);
-    
+
     // Debounce duplicate calls within 500ms for the same filters
     const cacheKey = JSON.stringify(req.query || {});
     const nowTs = Date.now();
@@ -4761,11 +4761,11 @@ app.get('/api/getAllBookingData', (req, res) => {
         console.log('Responding from cache to avoid duplicate query');
         return res.json(__getAllBookingDataCache.lastResponse);
     }
-    
+
     // Build WHERE clause based on filters
     let whereClause = '';
     let params = [];
-    
+
     // Experience filter
     if (req.query.experience && req.query.experience !== 'Select') {
         if (req.query.experience === 'Private') {
@@ -4774,115 +4774,115 @@ app.get('/api/getAllBookingData', (req, res) => {
             whereClause += ' AND (ab.experience = "Shared Flight" OR ab.experience = "Shared")';
         }
     }
-    
+
     // Status filter
     if (req.query.status && req.query.status !== 'Select') {
         whereClause += ' AND ab.status = ?';
         params.push(req.query.status);
     }
-    
+
     // Voucher Type filter
     if (req.query.voucher_type && req.query.voucher_type !== 'Select') {
         whereClause += ' AND ab.voucher_type = ?';
         params.push(req.query.voucher_type);
     }
-    
+
     // Location filter
     if (req.query.location && req.query.location !== 'Select') {
         whereClause += ' AND ab.location = ?';
         params.push(req.query.location);
     }
-    
+
     // Search by name or email
     if (req.query.search && req.query.search.trim() !== '') {
         whereClause += ' AND (ab.name LIKE ? OR ab.email LIKE ?)';
         const searchTerm = `%${req.query.search.trim()}%`;
         params.push(searchTerm, searchTerm);
     }
-    
+
     // Remove leading ' AND ' if whereClause exists
     if (whereClause) {
         whereClause = 'WHERE ' + whereClause.substring(5);
     }
-    
+
     // Optimized query with better indexing hints
     // Include voucher_type from all_vouchers if booking's voucher_type is null
     // Note: all_vouchers table has voucher_type column, actual_voucher_type is just an alias in getAllVoucherData
-const voucherValidityCache = {
-    data: {},
-    lastFetched: 0
-};
+    const voucherValidityCache = {
+        data: {},
+        lastFetched: 0
+    };
 
-const refreshVoucherValidityCache = async () => {
-    const cacheData = {};
-    const [voucherRows] = await new Promise((resolve, reject) => {
-        const sql = 'SELECT title, validity_months FROM voucher_types WHERE is_active = 1';
-        con.query(sql, (err, rows) => {
-            if (err) reject(err);
-            else resolve([rows]);
+    const refreshVoucherValidityCache = async () => {
+        const cacheData = {};
+        const [voucherRows] = await new Promise((resolve, reject) => {
+            const sql = 'SELECT title, validity_months FROM voucher_types WHERE is_active = 1';
+            con.query(sql, (err, rows) => {
+                if (err) reject(err);
+                else resolve([rows]);
+            });
         });
-    });
-    voucherRows.forEach(row => {
-        const key = (row.title || '').trim().toLowerCase();
-        if (key) {
-            cacheData[key] = parseInt(row.validity_months, 10) || 18;
-        }
-    });
-
-    const [privateRows] = await new Promise((resolve, reject) => {
-        const sql = 'SELECT title, validity_months FROM private_charter_voucher_types WHERE is_active = 1';
-        con.query(sql, (err, rows) => {
-            if (err) reject(err);
-            else resolve([rows]);
+        voucherRows.forEach(row => {
+            const key = (row.title || '').trim().toLowerCase();
+            if (key) {
+                cacheData[key] = parseInt(row.validity_months, 10) || 18;
+            }
         });
-    });
-    privateRows.forEach(row => {
-        const key = (row.title || '').trim().toLowerCase();
-        if (key) {
-            cacheData[key] = parseInt(row.validity_months, 10) || 18;
+
+        const [privateRows] = await new Promise((resolve, reject) => {
+            const sql = 'SELECT title, validity_months FROM private_charter_voucher_types WHERE is_active = 1';
+            con.query(sql, (err, rows) => {
+                if (err) reject(err);
+                else resolve([rows]);
+            });
+        });
+        privateRows.forEach(row => {
+            const key = (row.title || '').trim().toLowerCase();
+            if (key) {
+                cacheData[key] = parseInt(row.validity_months, 10) || 18;
+            }
+        });
+
+        voucherValidityCache.data = cacheData;
+        voucherValidityCache.lastFetched = Date.now();
+    };
+
+    const getVoucherValidityMonths = async (title) => {
+        const key = (title || '').trim().toLowerCase();
+        if (!key) return null;
+        const now = Date.now();
+        if (!voucherValidityCache.data || (now - voucherValidityCache.lastFetched) > 5 * 60 * 1000) {
+            try {
+                await refreshVoucherValidityCache();
+            } catch (err) {
+                console.warn('Failed to refresh voucher validity cache:', err.message);
+            }
         }
-    });
+        return voucherValidityCache.data[key] || null;
+    };
 
-    voucherValidityCache.data = cacheData;
-    voucherValidityCache.lastFetched = Date.now();
-};
-
-const getVoucherValidityMonths = async (title) => {
-    const key = (title || '').trim().toLowerCase();
-    if (!key) return null;
-    const now = Date.now();
-    if (!voucherValidityCache.data || (now - voucherValidityCache.lastFetched) > 5 * 60 * 1000) {
-        try {
-            await refreshVoucherValidityCache();
-        } catch (err) {
-            console.warn('Failed to refresh voucher validity cache:', err.message);
+    const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFlight) => {
+        const candidates = [
+            voucherType,
+            voucherType ? voucherType.replace(/flight/gi, '').trim() : '',
+            experienceType,
+            bookFlight
+        ];
+        for (const candidate of candidates) {
+            if (!candidate) continue;
+            const months = await getVoucherValidityMonths(candidate);
+            if (months) return months;
         }
-    }
-    return voucherValidityCache.data[key] || null;
-};
 
-const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFlight) => {
-    const candidates = [
-        voucherType,
-        voucherType ? voucherType.replace(/flight/gi, '').trim() : '',
-        experienceType,
-        bookFlight
-    ];
-    for (const candidate of candidates) {
-        if (!candidate) continue;
-        const months = await getVoucherValidityMonths(candidate);
-        if (months) return months;
-    }
+        const experience = (experienceType || '').toLowerCase();
+        const bookingType = (bookFlight || '').toLowerCase();
+        const type = (voucherType || '').toLowerCase();
+        if (experience.includes('private') || bookingType.includes('private') || type.includes('private')) return 18;
+        if (type.includes('any day')) return 24;
+        if (type.includes('weekday') || type.includes('flexible')) return 18;
+        return 24;
+    };
 
-    const experience = (experienceType || '').toLowerCase();
-    const bookingType = (bookFlight || '').toLowerCase();
-    const type = (voucherType || '').toLowerCase();
-    if (experience.includes('private') || bookingType.includes('private') || type.includes('private')) return 18;
-    if (type.includes('any day')) return 24;
-    if (type.includes('weekday') || type.includes('flexible')) return 18;
-    return 24;
-};
-    
     const sql = `
         SELECT 
             ab.*, 
@@ -4898,6 +4898,7 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
             v.voucher_type as original_voucher_type,
             v.experience_type as voucher_experience_type,
             v.book_flight as voucher_book_flight,
+            v.flight_attempts as voucher_flight_attempts,
             -- flight_type_source: use from database if exists, otherwise will be calculated
             ab.flight_type_source
         FROM all_booking ab
@@ -4913,22 +4914,22 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
         ORDER BY ab.created_at DESC
         LIMIT 1000
     `;
-    
+
     console.log('SQL Query:', sql);
     console.log('SQL Parameters:', params);
-    
+
     con.query(sql, params, async (err, result) => {
         if (err) {
             console.error('Error fetching all booking data:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err });
         }
-        
+
         // If voucher_code is still null, fallback to joined usage mapping
         const enriched = await Promise.all(result.map(async (r) => {
             if (!r.voucher_code && r.vcu_map_code) {
                 r.voucher_code = r.vcu_map_code;
             }
-            
+
             const {
                 voucher_expires,
                 voucher_expires_display,
@@ -4938,20 +4939,20 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                 voucher_book_flight,
                 ...rest
             } = r;
-            
+
             let expiresValue = rest.expires;
             let expiresDisplay = rest.expires_display;
-            
+
             // Check if this booking was created from redeem voucher
             // A booking is from redeem voucher if:
             // 1. It has a voucher_code that exists in all_vouchers table, OR
             // 2. The voucher's book_flight is 'Gift Voucher' (Gift Voucher redemption)
             const isRedeemVoucher = rest.voucher_code && (voucher_book_flight === 'Gift Voucher' || original_voucher_type);
             const isGiftVoucherRedeemed = voucher_book_flight === 'Gift Voucher' && voucher_created_at;
-            
+
             // Determine source date: for Gift Voucher redemptions, use voucher created_at; otherwise use voucher_expires or voucher_created_at
             const sourceDate = isGiftVoucherRedeemed ? voucher_created_at : (voucher_expires || voucher_created_at);
-            
+
             if ((!expiresValue || expiresValue === '' || expiresValue === '0000-00-00' || expiresValue === null) && sourceDate) {
                 let months;
                 if (isGiftVoucherRedeemed) {
@@ -4959,12 +4960,12 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                     months = 18;
                 } else {
                     months = await determineVoucherExpiryMonths(
-                    original_voucher_type || rest.voucher_type,
-                    voucher_experience_type || rest.experience,
-                    voucher_book_flight
-                );
+                        original_voucher_type || rest.voucher_type,
+                        voucher_experience_type || rest.experience,
+                        voucher_book_flight
+                    );
                 }
-                
+
                 const baseDate = moment(sourceDate);
                 if (baseDate.isValid()) {
                     // For Gift Voucher, always add months from created_at; for others, only add if no voucher_expires
@@ -4974,7 +4975,7 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                     const computed = baseDate.format('YYYY-MM-DD HH:mm:ss');
                     expiresValue = computed;
                     expiresDisplay = baseDate.format('DD/MM/YYYY');
-                    
+
                     if (rest.id) {
                         con.query('UPDATE all_booking SET expires = ? WHERE id = ?', [computed, rest.id], (updateErr) => {
                             if (updateErr) {
@@ -4986,10 +4987,10 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
             } else if (!expiresDisplay && voucher_expires_display) {
                 expiresDisplay = voucher_expires_display;
             }
-            
+
             // Get voucher_type from all_vouchers (prioritize voucher's voucher_type for redeem voucher bookings)
             let finalVoucherType = original_voucher_type || rest.voucher_type;
-            
+
             // For bookings created from redeem voucher, flight_attempts should start from 0, not 1
             // Check if this is a redeem voucher booking (has voucher_code that exists in all_vouchers)
             let finalFlightAttempts = rest.flight_attempts;
@@ -5000,7 +5001,7 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                     finalFlightAttempts = 0;
                 }
             }
-            
+
             // Determine flight_type_source: 
             // 1. Use from database if exists
             // 2. If 'Redeem Voucher' and voucher exists, use 'Redeem Voucher'
@@ -5013,7 +5014,7 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                     flight_type_source = rest.flight_type || rest.experience || null;
                 }
             }
-            
+
             // For Redeem Voucher bookings, if status is 'Open', change it to 'Scheduled'
             let finalStatus = rest.status;
             if (flight_type_source === 'Redeem Voucher' && finalStatus === 'Open') {
@@ -5029,24 +5030,24 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                     });
                 }
             }
-            
+
             return {
                 ...rest,
                 status: finalStatus,
                 voucher_type: finalVoucherType,
                 expires: expiresValue,
                 expires_display: expiresDisplay,
-                flight_attempts: finalFlightAttempts !== null && finalFlightAttempts !== undefined ? finalFlightAttempts : (isRedeemVoucher ? 0 : rest.flight_attempts || 0),
+                flight_attempts: finalFlightAttempts !== null && finalFlightAttempts !== undefined ? finalFlightAttempts : (isRedeemVoucher ? 0 : (rest.flight_attempts || rest.voucher_flight_attempts || 0)),
                 flight_type_source: flight_type_source,
                 is_redeem_voucher: isRedeemVoucher
             };
         }));
-        
+
         // Fetch additional information and add-on items for all bookings in batch queries (optimized)
         try {
             // Get all booking IDs
             const bookingIds = enriched.map(b => b.id);
-                
+
             if (bookingIds.length > 0) {
                 // Batch fetch all add-on items from add_to_booking_items table
                 const [addOnItemsRows] = await new Promise((resolve, reject) => {
@@ -5056,7 +5057,7 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                         else resolve([rows]);
                     });
                 });
-                
+
                 // Create a map of add-on items by title for quick lookup
                 const addOnItemsByTitle = {};
                 addOnItemsRows.forEach(item => {
@@ -5069,7 +5070,7 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                         description: item.description
                     };
                 });
-                
+
                 // Batch fetch all passengers with weather_refund info and first passenger name for all bookings
                 const [passengersRows] = await new Promise((resolve, reject) => {
                     const passengersSql = `
@@ -5084,7 +5085,7 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                         else resolve([rows]);
                     });
                 });
-                
+
                 // Batch fetch first passenger's name (first_name + last_name) for each booking
                 const [firstPassengersRows] = await new Promise((resolve, reject) => {
                     const firstPassengersSql = `
@@ -5105,7 +5106,7 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                         else resolve([rows]);
                     });
                 });
-                
+
                 // Create a map of booking_id -> first passenger name
                 const firstPassengerNameByBooking = {};
                 firstPassengersRows.forEach(p => {
@@ -5114,7 +5115,7 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                         firstPassengerNameByBooking[p.booking_id] = fullName;
                     }
                 });
-                
+
                 // Group passengers by booking_id and calculate weather refund total
                 const weatherRefundByBooking = {};
                 const WEATHER_REFUND_PRICE = 47.5;
@@ -5127,7 +5128,7 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                         weatherRefundByBooking[passenger.booking_id] += WEATHER_REFUND_PRICE;
                     }
                 });
-                
+
                 // Batch fetch all additional information answers for all bookings
                 const [allAnswersRows] = await new Promise((resolve, reject) => {
                     const answersSql = `
@@ -5152,7 +5153,7 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                         else resolve([rows]);
                     });
                 });
-                
+
                 // Batch fetch all available questions (only once, not per booking)
                 const [questionsRows] = await new Promise((resolve, reject) => {
                     const questionsSql = `
@@ -5178,7 +5179,7 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                         }
                     });
                 });
-                
+
                 // Group answers by booking_id
                 const answersByBooking = {};
                 allAnswersRows.forEach(answer => {
@@ -5187,13 +5188,13 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                     }
                     answersByBooking[answer.booking_id].push(answer);
                 });
-                
+
                 // Format questions once
                 const formattedQuestions = questionsRows.map(question => {
                     try {
                         let parsedOptions = [];
                         let parsedJourneyTypes = [];
-                        
+
                         // Safely parse options
                         if (question.options) {
                             try {
@@ -5203,7 +5204,7 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                                 parsedOptions = [];
                             }
                         }
-                        
+
                         // Safely parse journey_types
                         if (question.journey_types) {
                             if (Array.isArray(question.journey_types)) {
@@ -5217,7 +5218,7 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                                 }
                             }
                         }
-                        
+
                         return {
                             id: question.id,
                             question_text: question.question_text,
@@ -5242,15 +5243,15 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                         };
                     }
                 });
-                
+
                 // Identify Private Charter bookings that need price recalculation
-                const privateCharterBookings = enriched.filter(b => 
-                    (b.experience === 'Private Charter' || b.experience === 'Private') && 
-                    b.location && 
-                    b.voucher_type && 
+                const privateCharterBookings = enriched.filter(b =>
+                    (b.experience === 'Private Charter' || b.experience === 'Private') &&
+                    b.location &&
+                    b.voucher_type &&
                     b.pax
                 );
-                
+
                 // Fetch activity data for Private Charter bookings to get pricing
                 const activityDataByLocation = {};
                 if (privateCharterBookings.length > 0) {
@@ -5265,7 +5266,7 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                                     else resolve([rows]);
                                 });
                             });
-                            
+
                             if (activityRows && activityRows.length > 0) {
                                 activityDataByLocation[location] = activityRows[0];
                                 console.log(`Fetched activity data for location ${location}:`, {
@@ -5280,7 +5281,7 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                         }
                     }
                 }
-                
+
                 // Helper function to get Private Charter price from activity pricing
                 const getPrivateCharterPrice = (booking) => {
                     const activityData = activityDataByLocation[booking.location];
@@ -5288,7 +5289,7 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                         console.warn(`No activity data or pricing for location ${booking.location}, booking ${booking.id}`);
                         return null;
                     }
-                    
+
                     let pricingData = activityData.private_charter_pricing;
                     if (typeof pricingData === 'string') {
                         try {
@@ -5298,23 +5299,23 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                             return null;
                         }
                     }
-                    
+
                     if (!pricingData || typeof pricingData !== 'object' || Array.isArray(pricingData)) {
                         console.warn(`Invalid pricing data structure for booking ${booking.id}`);
                         return null;
                     }
-                    
+
                     // Normalize voucher type for matching
                     const normalize = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ').replace(/[^a-z0-9\s]/g, '');
                     const voucherTypeNorm = normalize(booking.voucher_type);
-                    
+
                     console.log(`Looking for voucher type "${booking.voucher_type}" (normalized: "${voucherTypeNorm}") in pricing data for booking ${booking.id}`);
                     console.log(`Available pricing keys:`, Object.keys(pricingData));
-                    
+
                     // Find pricing for the voucher type - try multiple matching strategies
                     let voucherPricing = null;
                     let matchedKey = null;
-                    
+
                     // Strategy 1: Exact match (normalized)
                     for (const [key, value] of Object.entries(pricingData)) {
                         const keyNorm = normalize(key);
@@ -5325,7 +5326,7 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                             break;
                         }
                     }
-                    
+
                     // Strategy 2: Partial match (one contains the other)
                     if (!voucherPricing) {
                         for (const [key, value] of Object.entries(pricingData)) {
@@ -5338,7 +5339,7 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                             }
                         }
                     }
-                    
+
                     // Strategy 3: Both contain "private" and "charter"
                     if (!voucherPricing) {
                         const hasPrivateCharter = (s) => {
@@ -5356,7 +5357,7 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                             }
                         }
                     }
-                    
+
                     // Strategy 4: If only one key exists, use it
                     if (!voucherPricing && Object.keys(pricingData).length === 1) {
                         const onlyKey = Object.keys(pricingData)[0];
@@ -5364,14 +5365,14 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                         matchedKey = onlyKey;
                         console.log(`Using only available pricing key: "${onlyKey}"`);
                     }
-                    
+
                     if (!voucherPricing || typeof voucherPricing !== 'object') {
                         console.warn(`Could not find voucher pricing for "${booking.voucher_type}" in pricing data for booking ${booking.id}`);
                         return null;
                     }
-                    
+
                     console.log(`Found voucher pricing for key "${matchedKey}":`, voucherPricing);
-                    
+
                     // Get price for passenger count
                     const pax = parseInt(booking.pax) || 0;
                     const parsePrice = (val) => {
@@ -5383,14 +5384,14 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                         const parsed = parseFloat(val);
                         return isNaN(parsed) ? null : parsed;
                     };
-                    
+
                     // Try direct lookup first (e.g., "2" or "2 passengers")
                     const directPrice = parsePrice(voucherPricing[String(pax)]);
                     if (directPrice !== null) {
                         console.log(`Direct price lookup for ${pax} passengers: ${directPrice}`);
                         return directPrice;
                     }
-                    
+
                     // Try to match keys like "2 passengers", "3 passengers", etc.
                     for (const [key, value] of Object.entries(voucherPricing)) {
                         const extracted = parseInt(key.replace(/[^0-9]/g, ''));
@@ -5402,29 +5403,29 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                             }
                         }
                     }
-                    
+
                     console.warn(`Could not find price for ${pax} passengers in voucher pricing for booking ${booking.id}`);
                     return null;
                 };
-                
+
                 // Add additional information and add-on items to each booking object
                 enriched.forEach((booking, index) => {
                     // Update name from first passenger if available
                     if (firstPassengerNameByBooking[booking.id]) {
                         booking.name = firstPassengerNameByBooking[booking.id];
                     }
-                    
+
                     const bookingAnswers = answersByBooking[booking.id] || [];
-                    
+
                     // Parse and enrich add-on items for this booking
                     let addOnItems = [];
                     let addOnTotalPrice = 0;
-                    
+
                     // Check if choose_add_on field contains a value (e.g., "FAB Cap")
                     if (booking.choose_add_on && booking.choose_add_on !== '' && booking.choose_add_on !== 'null') {
                         const chosenAddOnTitle = booking.choose_add_on.trim();
                         const addOnItem = addOnItemsByTitle[chosenAddOnTitle];
-                        
+
                         if (addOnItem) {
                             addOnItems.push(addOnItem);
                             addOnTotalPrice += addOnItem.price;
@@ -5440,56 +5441,56 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                             });
                         }
                     }
-                    
+
                     const additionalInfo = {
                         questions: formattedQuestions,
                         answers: bookingAnswers.map(answer => ({
-                        question_id: answer.question_id,
-                        question_text: answer.question_text,
-                        question_type: answer.question_type,
-                        answer: answer.answer,
-                        options: answer.options ? JSON.parse(answer.options) : [],
-                        help_text: answer.help_text,
-                        category: answer.category,
-                        created_at: answer.created_at
-                    })),
-                    legacy: {
-                        additional_notes: booking.additional_notes,
-                        hear_about_us: booking.hear_about_us,
-                        ballooning_reason: booking.ballooning_reason,
-                        prefer: booking.prefer
-                    },
-                    additional_information_json: (() => {
-                        if (!booking.additional_information_json) return null;
-                        if (typeof booking.additional_information_json === 'string') {
-                            try {
-                                return JSON.parse(booking.additional_information_json);
-                            } catch (e) {
-                                console.warn('Failed to parse additional_information_json:', e);
-                                return null;
+                            question_id: answer.question_id,
+                            question_text: answer.question_text,
+                            question_type: answer.question_type,
+                            answer: answer.answer,
+                            options: answer.options ? JSON.parse(answer.options) : [],
+                            help_text: answer.help_text,
+                            category: answer.category,
+                            created_at: answer.created_at
+                        })),
+                        legacy: {
+                            additional_notes: booking.additional_notes,
+                            hear_about_us: booking.hear_about_us,
+                            ballooning_reason: booking.ballooning_reason,
+                            prefer: booking.prefer
+                        },
+                        additional_information_json: (() => {
+                            if (!booking.additional_information_json) return null;
+                            if (typeof booking.additional_information_json === 'string') {
+                                try {
+                                    return JSON.parse(booking.additional_information_json);
+                                } catch (e) {
+                                    console.warn('Failed to parse additional_information_json:', e);
+                                    return null;
+                                }
                             }
-                        }
-                        return booking.additional_information_json;
-                    })()
-                };
-                
+                            return booking.additional_information_json;
+                        })()
+                    };
+
                     enriched[index].additional_information = additionalInfo;
-                    
+
                     // Add add-on items information
                     enriched[index].add_to_booking_items = addOnItems;
                     enriched[index].add_to_booking_items_total_price = addOnTotalPrice;
-                    
+
                     // Check if this is a Private Charter booking
                     const isPrivateCharter = booking.experience === 'Private Charter' || booking.experience === 'Private';
-                    
+
                     // For Private Charter, recalculate original_amount and weather_refund_total_price
                     if (isPrivateCharter) {
                         const voucherTypePrice = getPrivateCharterPrice(booking);
-                        
+
                         if (voucherTypePrice !== null && voucherTypePrice > 0) {
                             // Update original_amount to the voucher type price (this should match the Voucher Type price in summary)
                             enriched[index].original_amount = parseFloat(voucherTypePrice.toFixed(2));
-                            
+
                             // Calculate weather_refund_total_price as 10% of voucher type price (one-time charge)
                             // This should match the "Weather Refundable" price in the summary screen
                             const paid = parseFloat(booking.paid) || 0;
@@ -5497,7 +5498,7 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                             const weatherRefundPrice = parseFloat((voucherTypePrice * 0.1).toFixed(2));
                             const totalWithWeatherRefund = voucherTypePrice + addOnPrice + weatherRefundPrice;
                             const totalWithoutWeatherRefund = voucherTypePrice + addOnPrice;
-                            
+
                             console.log(`Private Charter booking ${booking.id} calculation:`, {
                                 voucherTypePrice,
                                 addOnPrice,
@@ -5507,7 +5508,7 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                                 paid,
                                 difference: paid - totalWithoutWeatherRefund
                             });
-                            
+
                             // Determine if weather refund was selected by comparing paid amount
                             // If paid amount equals totalWithWeatherRefund (within 0.01 tolerance), weather refund was included
                             if (Math.abs(paid - totalWithWeatherRefund) <= 0.01) {
@@ -5538,14 +5539,14 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                                     }
                                 }
                             }
-                            
+
                             // Calculate due amount: due = originalAmount - paid
                             // For Private Charter, due represents the outstanding balance after guest additions
                             // original_amount is the current total price for the current passenger count
                             // paid is the amount already paid
                             const calculatedDue = Math.max(0, enriched[index].original_amount - paid);
                             enriched[index].due = parseFloat(calculatedDue.toFixed(2));
-                            
+
                             console.log(`Private Charter booking ${booking.id} final values:`, {
                                 original_amount: enriched[index].original_amount,
                                 weather_refund_total_price: enriched[index].weather_refund_total_price,
@@ -5563,14 +5564,14 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                         // First check if database has a value, if not or if 0, calculate from passengers
                         const dbWeatherRefundTotal = parseFloat(booking.weather_refund_total_price) || 0;
                         const calculatedWeatherRefundTotal = weatherRefundByBooking[booking.id] || 0;
-                        
+
                         // Use calculated value if database value is 0 or missing, otherwise use database value
                         // For Shared Flight bookings, always use calculated value from passengers
                         const isSharedFlight = booking.experience === 'Shared Flight' || booking.experience?.includes('Shared');
-                        const finalWeatherRefundTotal = (isSharedFlight && calculatedWeatherRefundTotal > 0) 
-                            ? calculatedWeatherRefundTotal 
+                        const finalWeatherRefundTotal = (isSharedFlight && calculatedWeatherRefundTotal > 0)
+                            ? calculatedWeatherRefundTotal
                             : (dbWeatherRefundTotal > 0 ? dbWeatherRefundTotal : calculatedWeatherRefundTotal);
-                        
+
                         enriched[index].weather_refund_total_price = finalWeatherRefundTotal;
                     }
                 });
@@ -5579,9 +5580,9 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
             console.error('Error fetching additional information:', error);
             // Continue without additional information if there's an error
         }
-        
+
         console.log(`Fetched ${result.length} bookings with additional information`);
-        
+
         // Debug: Log what we're returning
         console.log('getAllBookingData - Returning bookings with additional info:', {
             totalBookings: enriched.length,
@@ -5592,14 +5593,14 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
                 answersCount: enriched[0].additional_information?.answers?.length || 0
             } : null
         });
-        
+
         const response = { success: true, data: enriched };
-        
+
         // Cache the response
         __getAllBookingDataCache.lastKey = cacheKey;
         __getAllBookingDataCache.lastAt = nowTs;
         __getAllBookingDataCache.lastResponse = response;
-        
+
         res.json(response);
     });
 });
@@ -5607,14 +5608,14 @@ const determineVoucherExpiryMonths = async (voucherType, experienceType, bookFli
 // Get Payment History for a booking
 app.get('/api/booking-payment-history/:bookingId', (req, res) => {
     const bookingId = parseInt(req.params.bookingId);
-    
+
     if (!bookingId || isNaN(bookingId)) {
         return res.status(400).json({
             success: false,
             message: 'Invalid booking ID'
         });
     }
-    
+
     const sql = `
         SELECT 
             id,
@@ -5639,7 +5640,7 @@ app.get('/api/booking-payment-history/:bookingId', (req, res) => {
         WHERE booking_id = ?
         ORDER BY created_at DESC
     `;
-    
+
     con.query(sql, [bookingId], (err, results) => {
         if (err) {
             console.error('Error fetching payment history:', err);
@@ -5649,7 +5650,7 @@ app.get('/api/booking-payment-history/:bookingId', (req, res) => {
                 error: err.message
             });
         }
-        
+
         res.json({
             success: true,
             data: results
@@ -5660,14 +5661,14 @@ app.get('/api/booking-payment-history/:bookingId', (req, res) => {
 // Sync payment history from Stripe for existing booking
 app.post('/api/sync-payment-history/:bookingId', async (req, res) => {
     const bookingId = parseInt(req.params.bookingId);
-    
+
     if (!bookingId || isNaN(bookingId)) {
         return res.status(400).json({
             success: false,
             message: 'Invalid booking ID'
         });
     }
-    
+
     try {
         // Get booking with stripe_session_id
         con.query(
@@ -5682,23 +5683,23 @@ app.post('/api/sync-payment-history/:bookingId', async (req, res) => {
                         error: err.message
                     });
                 }
-                
+
                 if (results.length === 0) {
                     return res.status(404).json({
                         success: false,
                         message: 'Booking not found'
                     });
                 }
-                
+
                 const booking = results[0];
-                
+
                 if (!booking.stripe_session_id) {
                     return res.status(400).json({
                         success: false,
                         message: 'Booking does not have a Stripe session ID'
                     });
                 }
-                
+
                 // Check if payment history already exists
                 con.query(
                     'SELECT id FROM payment_history WHERE booking_id = ? AND stripe_session_id = ?',
@@ -5712,7 +5713,7 @@ app.post('/api/sync-payment-history/:bookingId', async (req, res) => {
                                 error: checkErr.message
                             });
                         }
-                        
+
                         if (checkResults.length > 0) {
                             return res.json({
                                 success: true,
@@ -5720,12 +5721,12 @@ app.post('/api/sync-payment-history/:bookingId', async (req, res) => {
                                 data: checkResults[0]
                             });
                         }
-                        
+
                         // Retrieve session from Stripe
                         try {
                             const session = await stripe.checkout.sessions.retrieve(booking.stripe_session_id);
                             await savePaymentHistory(session, bookingId, null);
-                            
+
                             // Update booking with stripe_session_id if not already set
                             con.query(
                                 'UPDATE all_booking SET stripe_session_id = ? WHERE id = ? AND (stripe_session_id IS NULL OR stripe_session_id = "")',
@@ -5736,7 +5737,7 @@ app.post('/api/sync-payment-history/:bookingId', async (req, res) => {
                                     }
                                 }
                             );
-                            
+
                             res.json({
                                 success: true,
                                 message: 'Payment history synced successfully'
@@ -5776,7 +5777,7 @@ app.post('/api/sync-all-payment-history', async (req, res) => {
             AND ph.id IS NULL
             LIMIT 100
         `;
-        
+
         con.query(sql, async (err, bookings) => {
             if (err) {
                 console.error('Error fetching bookings:', err);
@@ -5786,7 +5787,7 @@ app.post('/api/sync-all-payment-history', async (req, res) => {
                     error: err.message
                 });
             }
-            
+
             if (bookings.length === 0) {
                 return res.json({
                     success: true,
@@ -5794,10 +5795,10 @@ app.post('/api/sync-all-payment-history', async (req, res) => {
                     synced: 0
                 });
             }
-            
+
             let synced = 0;
             let errors = 0;
-            
+
             for (const booking of bookings) {
                 try {
                     const session = await stripe.checkout.sessions.retrieve(booking.stripe_session_id);
@@ -5808,7 +5809,7 @@ app.post('/api/sync-all-payment-history', async (req, res) => {
                     errors++;
                 }
             }
-            
+
             res.json({
                 success: true,
                 message: `Payment history sync completed`,
@@ -5830,14 +5831,14 @@ app.post('/api/sync-all-payment-history', async (req, res) => {
 // Get User Session for a booking
 app.get('/api/booking-user-session/:bookingId', (req, res) => {
     const bookingId = parseInt(req.params.bookingId);
-    
+
     if (!bookingId || isNaN(bookingId)) {
         return res.status(400).json({
             success: false,
             message: 'Invalid booking ID'
         });
     }
-    
+
     // First get booking to find user_session_id
     con.query(
         'SELECT user_session_id FROM all_booking WHERE id = ?',
@@ -5851,16 +5852,16 @@ app.get('/api/booking-user-session/:bookingId', (req, res) => {
                     error: err.message
                 });
             }
-            
+
             if (bookingResults.length === 0) {
                 return res.status(404).json({
                     success: false,
                     message: 'Booking not found'
                 });
             }
-            
+
             const userSessionId = bookingResults[0].user_session_id;
-            
+
             if (!userSessionId) {
                 return res.json({
                     success: true,
@@ -5868,7 +5869,7 @@ app.get('/api/booking-user-session/:bookingId', (req, res) => {
                     message: 'No user session found for this booking'
                 });
             }
-            
+
             // Get user session data
             const sql = `
                 SELECT 
@@ -5899,7 +5900,7 @@ app.get('/api/booking-user-session/:bookingId', (req, res) => {
                 ORDER BY first_seen ASC
                 LIMIT 1
             `;
-            
+
             con.query(sql, [userSessionId], (sessionErr, sessionResults) => {
                 if (sessionErr) {
                     console.error('Error fetching user session:', sessionErr);
@@ -5909,7 +5910,7 @@ app.get('/api/booking-user-session/:bookingId', (req, res) => {
                         error: sessionErr.message
                     });
                 }
-                
+
                 if (sessionResults.length === 0) {
                     return res.json({
                         success: true,
@@ -5917,13 +5918,13 @@ app.get('/api/booking-user-session/:bookingId', (req, res) => {
                         message: 'User session not found'
                     });
                 }
-                
+
                 const session = sessionResults[0];
-                
+
                 // Calculate days ago
                 const firstSeen = session.first_seen ? new Date(session.first_seen) : null;
                 const daysAgo = firstSeen ? Math.floor((Date.now() - firstSeen.getTime()) / (1000 * 60 * 60 * 24)) : null;
-                
+
                 res.json({
                     success: true,
                     data: {
@@ -6002,7 +6003,7 @@ app.post('/api/save-user-session', (req, res) => {
                     last_seen = CURRENT_TIMESTAMP
                 WHERE session_id = ?
             `;
-            
+
             con.query(updateSql, [
                 booking_id || null,
                 ip_address || null,
@@ -6060,7 +6061,7 @@ app.post('/api/save-user-session', (req, res) => {
                     landing_page, booking_clicks, site_page_views
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
-            
+
             con.query(insertSql, [
                 session_id,
                 booking_id || null,
@@ -6123,7 +6124,7 @@ const __getAllVoucherDataCache = {
 // Get All Voucher Data (with booking and passenger info)
 app.get('/api/getAllVoucherData', (req, res) => {
     console.log('=== getAllVoucherData ENDPOINT CALLED ===');
-    
+
     // Optional filters: vc_code or voucher_ref
     const { vc_code, voucher_ref } = req.query || {};
     console.log('Request query:', req.query);
@@ -6135,7 +6136,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
         console.log('Responding from short cache to avoid duplicate query');
         return res.json(__getAllVoucherDataCache.lastResponse);
     }
-    
+
     // Get vouchers with booking info; optionally filter by code
     // For multiple vouchers (Buy Gift), we need to group by purchaser and show all voucher codes
     const voucher = `
@@ -6203,7 +6204,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
         ${vc_code || voucher_ref ? 'WHERE v.voucher_ref = ?' : ''}
         ORDER BY v.created_at DESC
     `;
-    
+
     console.log('SQL Query:', voucher);
     const params = [];
     if (vc_code || voucher_ref) params.push((vc_code || voucher_ref).toUpperCase());
@@ -6214,10 +6215,10 @@ app.get('/api/getAllVoucherData', (req, res) => {
             res.status(500).send(payload);
             return;
         }
-        
+
         console.log('=== DATABASE QUERY RESULT ===');
         console.log('Number of vouchers found:', result ? result.length : 0);
-        
+
         if (result && result.length > 0) {
             console.log('Sample voucher data (first record):');
             console.log('ID:', result[0].id);
@@ -6225,7 +6226,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
             console.log('additional_information_json:', result[0].additional_information_json);
             console.log('booking_id:', result[0].booking_id);
             console.log('booking_additional_information_json:', result[0].booking_additional_information_json);
-            
+
             // Process each voucher to add additional information
             const enriched = await Promise.all(result.map(async (row) => {
                 let expiresVal = row.expires;
@@ -6242,7 +6243,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
                 }
                 // Prefer explicit voucher_ref; if null, fill from vc_code
                 const voucher_ref = row.voucher_ref || row.vc_code || null;
-                
+
                 // Initialize additional information structure - always create it like getAllBookingData
                 let additionalInfo = {
                     questions: [],
@@ -6255,7 +6256,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     },
                     additional_information_json: null
                 };
-                
+
                 console.log(`=== PROCESSING VOUCHER ID: ${row.id} ===`);
                 console.log(`Voucher Type: ${row.actual_voucher_type || row.voucher_type}`);
                 console.log(`Experience Type: ${row.experience_type}`);
@@ -6263,7 +6264,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
                 console.log(`Passenger Count (from booking): ${row.passenger_count}`);
                 console.log(`Paid Amount: ${row.paid}`);
                 console.log(`All Voucher Codes: ${row.all_voucher_codes}`);
-                
+
                 // Normalize numberOfPassengers for clients of getAllVoucherData
                 // Prefer explicit numberOfPassengers on voucher; otherwise fall back to passenger_count from linked booking
                 row.numberOfPassengers = Number.parseInt(row.numberOfPassengers, 10) || Number.parseInt(row.passenger_count, 10) || 1;
@@ -6274,23 +6275,23 @@ app.get('/api/getAllVoucherData', (req, res) => {
                 console.log('typeof row.add_to_booking_items:', typeof row.add_to_booking_items);
                 console.log('row.booking_id:', row.booking_id);
                 console.log('row.booking_additional_information_json:', row.booking_additional_information_json);
-                
+
                 // For vouchers, we need to check if there's additional information data
                 // This can come from either the linked booking OR the voucher's own additional_information_json column
-                const hasVoucherAdditionalInfo = row.additional_information_json && 
-                    row.additional_information_json !== null && 
+                const hasVoucherAdditionalInfo = row.additional_information_json &&
+                    row.additional_information_json !== null &&
                     row.additional_information_json !== 'null';
                 const hasBookingAdditionalInfo = row.booking_id && row.booking_additional_information_json;
-                
+
                 console.log('hasVoucherAdditionalInfo:', hasVoucherAdditionalInfo);
                 console.log('hasBookingAdditionalInfo:', hasBookingAdditionalInfo);
-                
+
                 // Always process additional information like getAllBookingData
                 console.log('Processing additional information for voucher:', row.id);
                 try {
                     // Get all available questions for this journey type
                     const [questionsRows] = await new Promise((resolve, reject) => {
-                            const questionsSql = `
+                        const questionsSql = `
                                 SELECT 
                                     id,
                                     question_text,
@@ -6304,176 +6305,176 @@ app.get('/api/getAllVoucherData', (req, res) => {
                                 WHERE is_active = 1 
                                 ORDER BY sort_order, id
                             `;
-                            con.query(questionsSql, (err, rows) => {
-                                if (err) {
-                                    console.error('Error fetching questions:', err);
-                                    reject(err);
-                                } else {
-                                    resolve([rows]);
-                                }
-                            });
-                        });
-                        
-                        // Parse additional information data
-                        let additionalInfoData = null;
-                        console.log('=== PARSING ADDITIONAL INFORMATION DATA ===');
-                        
-                        // First try voucher's additional_information_json
-                        if (row.additional_information_json) {
-                            console.log('Found voucher additional_information_json:', row.additional_information_json);
-                            try {
-                                if (typeof row.additional_information_json === 'string') {
-                                    additionalInfoData = JSON.parse(row.additional_information_json);
-                                } else {
-                                    additionalInfoData = row.additional_information_json;
-                                }
-                                console.log('Successfully parsed voucher additional_information_json:', additionalInfoData);
-                            } catch (e) {
-                                console.warn('Failed to parse voucher additional_information_json:', e);
+                        con.query(questionsSql, (err, rows) => {
+                            if (err) {
+                                console.error('Error fetching questions:', err);
+                                reject(err);
+                            } else {
+                                resolve([rows]);
                             }
-                        }
-                        
-                        // If no voucher data, try booking's additional_information_json
-                        if (!additionalInfoData && row.booking_additional_information_json) {
-                            logToFile('Using booking additional_information_json:', row.booking_additional_information_json);
-                            try {
-                                if (typeof row.booking_additional_information_json === 'string') {
-                                    additionalInfoData = JSON.parse(row.booking_additional_information_json);
-                                } else {
-                                    additionalInfoData = row.booking_additional_information_json;
-                                }
-                                logToFile('Successfully parsed booking additional_information_json:', additionalInfoData);
-                            } catch (e) {
-                                logToFile('Failed to parse booking additional_information_json:', e);
-                            }
-                        }
-                        
-                        // Log the state of additionalInfoData before processing answers
-                        logToFile('Final additionalInfoData before processing answers:', {
-                            additionalInfoData,
-                            hasData: !!additionalInfoData,
-                            dataType: typeof additionalInfoData,
-                            keys: additionalInfoData ? Object.keys(additionalInfoData) : []
                         });
-                        
-                        // If still no data, check if we have answers in a different format
-                        if (!additionalInfoData && row.additional_information?.answers?.length > 0) {
-                            console.log('Found answers in additional_information:', row.additional_information.answers);
-                            additionalInfoData = row.additional_information.answers.reduce((acc, answer) => {
-                                acc[`question_${answer.question_id}`] = answer.answer;
-                                return acc;
-                            }, {});
-                            console.log('Converted answers to additionalInfoData:', additionalInfoData);
+                    });
+
+                    // Parse additional information data
+                    let additionalInfoData = null;
+                    console.log('=== PARSING ADDITIONAL INFORMATION DATA ===');
+
+                    // First try voucher's additional_information_json
+                    if (row.additional_information_json) {
+                        console.log('Found voucher additional_information_json:', row.additional_information_json);
+                        try {
+                            if (typeof row.additional_information_json === 'string') {
+                                additionalInfoData = JSON.parse(row.additional_information_json);
+                            } else {
+                                additionalInfoData = row.additional_information_json;
+                            }
+                            console.log('Successfully parsed voucher additional_information_json:', additionalInfoData);
+                        } catch (e) {
+                            console.warn('Failed to parse voucher additional_information_json:', e);
                         }
-                        
-                        console.log('Final additionalInfoData:', additionalInfoData);
-                        
-                        // Convert additional information data to answers format
-                        let answers = [];
-                        console.log('=== CONVERTING ADDITIONAL INFO TO ANSWERS ===');
-                        console.log('additionalInfoData:', additionalInfoData);
-                        console.log('typeof additionalInfoData:', typeof additionalInfoData);
-                        
-                        if (additionalInfoData) {
-                            const questionKeys = Object.keys(additionalInfoData).filter(key => key.startsWith('question_'));
-                            console.log('Found question keys:', questionKeys);
-                            
-                            answers = questionKeys.map(key => {
-                                const questionId = parseInt(key.replace('question_', ''));
-                                const question = questionsRows.find(q => q.id === questionId);
-                                const answer = {
-                                    question_id: questionId,
-                                    question_text: question ? question.question_text : `Question ${questionId}`,
-                                    question_type: question ? question.question_type : 'text',
-                                    answer: additionalInfoData[key],
-                                    options: question && question.options ? JSON.parse(question.options) : [],
-                                    help_text: question ? question.help_text : '',
-                                    category: question ? question.category : '',
-                                    created_at: row.created_at
-                                };
-                                console.log(`Created answer for question ${questionId}:`, answer);
-                                return answer;
-                            });
-                        }
-                        
-                        console.log('Final answers array:', answers);
-                        
-                        // Format additional information - always update questions
-                        additionalInfo.questions = questionsRows.map(question => {
-                                try {
-                                    let parsedOptions = [];
-                                    let parsedJourneyTypes = [];
-                                    
-                                    // Safely parse options
-                                    if (question.options) {
-                                        try {
-                                            parsedOptions = JSON.parse(question.options);
-                                        } catch (e) {
-                                            console.warn('Failed to parse options for question', question.id, e);
-                                            parsedOptions = [];
-                                        }
-                                    }
-                                    
-                                    // Safely parse journey_types
-                                    if (question.journey_types) {
-                                        if (Array.isArray(question.journey_types)) {
-                                            parsedJourneyTypes = question.journey_types;
-                                        } else if (typeof question.journey_types === 'string') {
-                                            try {
-                                                parsedJourneyTypes = JSON.parse(question.journey_types);
-                                            } catch (e) {
-                                                console.warn('Failed to parse journey_types for question', question.id, e);
-                                                parsedJourneyTypes = [];
-                                            }
-                                        }
-                                    }
-                                    
-                                    return {
-                                        id: question.id,
-                                        question_text: question.question_text,
-                                        question_type: question.question_type,
-                                        options: parsedOptions,
-                                        help_text: question.help_text,
-                                        category: question.category,
-                                        journey_types: parsedJourneyTypes,
-                                        sort_order: question.sort_order
-                                    };
-                                } catch (error) {
-                                    console.warn('Error processing question:', question.id, error);
-                                    return {
-                                        id: question.id,
-                                        question_text: question.question_text,
-                                        question_type: question.question_type,
-                                        options: [],
-                                        help_text: question.help_text,
-                                        category: question.category,
-                                        journey_types: [],
-                                        sort_order: question.sort_order
-                                    };
-                                }
-                            });
-                        
-                        // Update answers if we have data
-                        additionalInfo.answers = answers;
-                        additionalInfo.legacy = {
-                            additional_notes: additionalInfoData?.notes || row.additional_notes || null,
-                            hear_about_us: additionalInfoData?.hear_about_us || row.hear_about_us || null,
-                            ballooning_reason: additionalInfoData?.ballooning_reason || row.ballooning_reason || null,
-                            prefer: additionalInfoData?.prefer || row.prefer || null
-                        };
-                        additionalInfo.additional_information_json = additionalInfoData;
-                        
-                        console.log('Created additionalInfo for voucher', row.id, ':', JSON.stringify(additionalInfo, null, 2));
-                    } catch (error) {
-                        console.error('Error fetching additional information for voucher:', row.id, error);
-                        // Continue without additional information if there's an error
                     }
-                
+
+                    // If no voucher data, try booking's additional_information_json
+                    if (!additionalInfoData && row.booking_additional_information_json) {
+                        logToFile('Using booking additional_information_json:', row.booking_additional_information_json);
+                        try {
+                            if (typeof row.booking_additional_information_json === 'string') {
+                                additionalInfoData = JSON.parse(row.booking_additional_information_json);
+                            } else {
+                                additionalInfoData = row.booking_additional_information_json;
+                            }
+                            logToFile('Successfully parsed booking additional_information_json:', additionalInfoData);
+                        } catch (e) {
+                            logToFile('Failed to parse booking additional_information_json:', e);
+                        }
+                    }
+
+                    // Log the state of additionalInfoData before processing answers
+                    logToFile('Final additionalInfoData before processing answers:', {
+                        additionalInfoData,
+                        hasData: !!additionalInfoData,
+                        dataType: typeof additionalInfoData,
+                        keys: additionalInfoData ? Object.keys(additionalInfoData) : []
+                    });
+
+                    // If still no data, check if we have answers in a different format
+                    if (!additionalInfoData && row.additional_information?.answers?.length > 0) {
+                        console.log('Found answers in additional_information:', row.additional_information.answers);
+                        additionalInfoData = row.additional_information.answers.reduce((acc, answer) => {
+                            acc[`question_${answer.question_id}`] = answer.answer;
+                            return acc;
+                        }, {});
+                        console.log('Converted answers to additionalInfoData:', additionalInfoData);
+                    }
+
+                    console.log('Final additionalInfoData:', additionalInfoData);
+
+                    // Convert additional information data to answers format
+                    let answers = [];
+                    console.log('=== CONVERTING ADDITIONAL INFO TO ANSWERS ===');
+                    console.log('additionalInfoData:', additionalInfoData);
+                    console.log('typeof additionalInfoData:', typeof additionalInfoData);
+
+                    if (additionalInfoData) {
+                        const questionKeys = Object.keys(additionalInfoData).filter(key => key.startsWith('question_'));
+                        console.log('Found question keys:', questionKeys);
+
+                        answers = questionKeys.map(key => {
+                            const questionId = parseInt(key.replace('question_', ''));
+                            const question = questionsRows.find(q => q.id === questionId);
+                            const answer = {
+                                question_id: questionId,
+                                question_text: question ? question.question_text : `Question ${questionId}`,
+                                question_type: question ? question.question_type : 'text',
+                                answer: additionalInfoData[key],
+                                options: question && question.options ? JSON.parse(question.options) : [],
+                                help_text: question ? question.help_text : '',
+                                category: question ? question.category : '',
+                                created_at: row.created_at
+                            };
+                            console.log(`Created answer for question ${questionId}:`, answer);
+                            return answer;
+                        });
+                    }
+
+                    console.log('Final answers array:', answers);
+
+                    // Format additional information - always update questions
+                    additionalInfo.questions = questionsRows.map(question => {
+                        try {
+                            let parsedOptions = [];
+                            let parsedJourneyTypes = [];
+
+                            // Safely parse options
+                            if (question.options) {
+                                try {
+                                    parsedOptions = JSON.parse(question.options);
+                                } catch (e) {
+                                    console.warn('Failed to parse options for question', question.id, e);
+                                    parsedOptions = [];
+                                }
+                            }
+
+                            // Safely parse journey_types
+                            if (question.journey_types) {
+                                if (Array.isArray(question.journey_types)) {
+                                    parsedJourneyTypes = question.journey_types;
+                                } else if (typeof question.journey_types === 'string') {
+                                    try {
+                                        parsedJourneyTypes = JSON.parse(question.journey_types);
+                                    } catch (e) {
+                                        console.warn('Failed to parse journey_types for question', question.id, e);
+                                        parsedJourneyTypes = [];
+                                    }
+                                }
+                            }
+
+                            return {
+                                id: question.id,
+                                question_text: question.question_text,
+                                question_type: question.question_type,
+                                options: parsedOptions,
+                                help_text: question.help_text,
+                                category: question.category,
+                                journey_types: parsedJourneyTypes,
+                                sort_order: question.sort_order
+                            };
+                        } catch (error) {
+                            console.warn('Error processing question:', question.id, error);
+                            return {
+                                id: question.id,
+                                question_text: question.question_text,
+                                question_type: question.question_type,
+                                options: [],
+                                help_text: question.help_text,
+                                category: question.category,
+                                journey_types: [],
+                                sort_order: question.sort_order
+                            };
+                        }
+                    });
+
+                    // Update answers if we have data
+                    additionalInfo.answers = answers;
+                    additionalInfo.legacy = {
+                        additional_notes: additionalInfoData?.notes || row.additional_notes || null,
+                        hear_about_us: additionalInfoData?.hear_about_us || row.hear_about_us || null,
+                        ballooning_reason: additionalInfoData?.ballooning_reason || row.ballooning_reason || null,
+                        prefer: additionalInfoData?.prefer || row.prefer || null
+                    };
+                    additionalInfo.additional_information_json = additionalInfoData;
+
+                    console.log('Created additionalInfo for voucher', row.id, ':', JSON.stringify(additionalInfo, null, 2));
+                } catch (error) {
+                    console.error('Error fetching additional information for voucher:', row.id, error);
+                    // Continue without additional information if there's an error
+                }
+
                 // Parse add_to_booking_items if it's a JSON string
                 let parsedAddToBookingItems = null;
                 console.log(`Voucher ${row.id} - raw add_to_booking_items:`, row.add_to_booking_items);
                 console.log(`Voucher ${row.id} - typeof:`, typeof row.add_to_booking_items);
-                
+
                 if (row.add_to_booking_items) {
                     try {
                         if (typeof row.add_to_booking_items === 'string') {
@@ -6496,16 +6497,16 @@ app.get('/api/getAllVoucherData', (req, res) => {
                 // For Gift Vouchers, use booking passenger_details if available
                 let passengerDetails = [];
                 const voucherPassengerListRaw = parsePassengerList(row.voucher_passenger_details);
-                
+
                 // Determine if this is a Flight Voucher (using same logic as normalizedBookFlight calculation)
                 const vtLowerCheck = (row.actual_voucher_type || row.voucher_type || '').toLowerCase();
                 const hasRecipientSignalsCheck = !!(row.recipient_name || row.recipient_email || row.recipient_phone || row.recipient_gift_date);
                 const bookFlightLowerCheck = (row.book_flight || '').toLowerCase();
-                const isFlightVoucher = !hasRecipientSignalsCheck && 
-                    !vtLowerCheck.includes('gift') && 
+                const isFlightVoucher = !hasRecipientSignalsCheck &&
+                    !vtLowerCheck.includes('gift') &&
                     !bookFlightLowerCheck.includes('gift') &&
                     bookFlightLowerCheck !== 'buy gift';
-                
+
                 if (isFlightVoucher && voucherPassengerListRaw.length > 0) {
                     // For Flight Vouchers, use voucher_passenger_details as primary source
                     passengerDetails = voucherPassengerListRaw.map((vp) => ({
@@ -6522,8 +6523,8 @@ app.get('/api/getAllVoucherData', (req, res) => {
                 } else if (row.passenger_details) {
                     // For Gift Vouchers or if no voucher_passenger_details, use booking passenger_details
                     try {
-                        passengerDetails = typeof row.passenger_details === 'string' 
-                            ? JSON.parse(row.passenger_details) 
+                        passengerDetails = typeof row.passenger_details === 'string'
+                            ? JSON.parse(row.passenger_details)
                             : row.passenger_details;
                     } catch (e) {
                         console.warn('Failed to parse passenger_details for voucher', row.id, ':', e);
@@ -6557,7 +6558,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
                 console.log(`  - actual_voucher_type: ${row.actual_voucher_type || row.voucher_type}`);
                 console.log(`  - paid: ${row.paid}`);
                 console.log(`  - experience_type: ${row.experience_type}`);
-                
+
                 const normalizedPassengerCount = derivePassengerCount({
                     numberOfPassengers: row.numberOfPassengers,
                     passenger_count: row.passenger_count,
@@ -6573,13 +6574,13 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     preferred_location: row.preferred_location || row.location || null,
                     chooseLocation: row.preferred_location || row.location || null
                 }, { preferStoredCount: true }); // Prefer stored numberOfPassengers from database
-                
+
                 console.log(`Normalized Passenger Count: ${normalizedPassengerCount}`);
                 row.numberOfPassengers = normalizedPassengerCount;
-                
+
                 // numberOfVouchers should be the same as numberOfPassengers for Gift Vouchers
                 // If multiple voucher codes exist, use that count; otherwise use passenger count
-                const computedVoucherCount = numFromCodes && numFromCodes > 0 
+                const computedVoucherCount = numFromCodes && numFromCodes > 0
                     ? Math.max(numFromCodes, normalizedPassengerCount)
                     : normalizedPassengerCount;
                 console.log(`Computed Voucher Count: ${computedVoucherCount}`);
@@ -6604,7 +6605,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
                 const vtLower = (row.actual_voucher_type || row.voucher_type || '').toLowerCase();
                 const hasRecipientSignals = !!(row.recipient_name || row.recipient_email || row.recipient_phone || row.recipient_gift_date);
                 const bookFlightLower = (row.book_flight || '').toLowerCase();
-                
+
                 // Determine the correct book_flight value
                 let normalizedBookFlight;
                 if (hasRecipientSignals) {
@@ -6708,7 +6709,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     booking_additional_information_json: row.booking_additional_information_json || null
                 };
             }));
-            
+
             // Returning enriched voucher data
             const responsePayload = { success: true, data: enriched };
             __getAllVoucherDataCache.lastKey = cacheKey;
@@ -6729,9 +6730,9 @@ app.post('/api/testAdditionalInfo', (req, res) => {
     console.log('additionalInfo in body:', req.body.additionalInfo);
     console.log('typeof additionalInfo:', typeof req.body.additionalInfo);
     console.log('additionalInfo keys:', req.body.additionalInfo ? Object.keys(req.body.additionalInfo) : 'additionalInfo is null/undefined');
-    
-    res.json({ 
-        success: true, 
+
+    res.json({
+        success: true,
         received: {
             additionalInfo: req.body.additionalInfo,
             type: typeof req.body.additionalInfo,
@@ -6743,21 +6744,21 @@ app.post('/api/testAdditionalInfo', (req, res) => {
 // Debug endpoint to check raw voucher data
 app.get('/api/debugVoucherData', (req, res) => {
     console.log('=== DEBUG VOUCHER DATA ENDPOINT CALLED ===');
-    
+
     const debugSql = `
         SELECT id, additional_information, additional_information_json, voucher_ref, created_at
         FROM all_vouchers 
         ORDER BY created_at DESC 
         LIMIT 10
     `;
-    
+
     con.query(debugSql, (err, result) => {
         if (err) {
             console.error("Debug query error:", err);
             res.status(500).send({ success: false, error: "Database query failed" });
             return;
         }
-        
+
         console.log('=== DEBUG QUERY RESULT ===');
         console.log('Number of vouchers:', result.length);
         result.forEach((row, index) => {
@@ -6769,7 +6770,7 @@ app.get('/api/debugVoucherData', (req, res) => {
             console.log('  created_at:', row.created_at);
             console.log('---');
         });
-        
+
         res.json({ success: true, data: result });
     });
 });
@@ -6833,14 +6834,14 @@ app.get('/api/getAllActivity', (req, res) => {
             res.status(500).send({ success: false, error: "Database query failed" });
             return;
         }
-        
+
         // Ensure result is always an array
         const activities = Array.isArray(result) ? result : [];
-        
+
         console.log('getAllActivity endpoint called, returning:', activities.length, 'activities');
-        
-        res.send({ 
-            success: true, 
+
+        res.send({
+            success: true,
             data: activities,
             count: activities.length,
             timestamp: new Date().toISOString()
@@ -6987,7 +6988,7 @@ app.post('/api/createBooking', (req, res) => {
     // Extract voucher_type from req.body for use in expires calculation
     const voucher_type = req.body.voucher_type || req.body.selectedVoucherType?.title || '';
     const experience = req.body.experience || chooseFlightType?.type || '';
-    
+
     // Create bookingData object for use in expires calculation
     const bookingData = {
         selectedVoucherType: req.body.selectedVoucherType || (voucher_type ? { title: voucher_type } : null)
@@ -7001,7 +7002,7 @@ app.post('/api/createBooking', (req, res) => {
         if (!email_template_override || typeof email_template_override !== 'string') {
             return null;
         }
-        
+
         if (email_template_override === 'Passenger Rescheduling Information') {
             const baseType = email_template_type_override || 'passenger_reschedule_information_automatic';
             return {
@@ -7022,7 +7023,7 @@ app.post('/api/createBooking', (req, res) => {
                 }
             };
         }
-        
+
         const fallbackType = email_template_type_override || 'booking_confirmation_automatic';
         return {
             templateName: email_template_override,
@@ -7034,7 +7035,7 @@ app.post('/api/createBooking', (req, res) => {
     function insertBookingAndPassengers(expiresDateFinal) {
         const nowDate = moment().format('YYYY-MM-DD HH:mm:ss');
         const mainPassenger = passengerData[0] || {};
-        
+
         // Ensure email is set - try passenger email first, then booking email field
         const bookingEmail = mainPassenger.email || (passengerData.find(p => p.email && p.email.trim())?.email) || null;
         if (!bookingEmail) {
@@ -7057,10 +7058,10 @@ app.post('/api/createBooking', (req, res) => {
         }
         // Determine flight_type_source: 'Redeem Voucher' if activitySelect is 'Redeem Voucher', otherwise use flight_type/experience
         const flight_type_source = activitySelect === 'Redeem Voucher' ? 'Redeem Voucher' : (chooseFlightType?.type || experience || null);
-        
+
         // For redeem voucher bookings, flight_attempts should start from 0
         const finalFlightAttempts = activitySelect === 'Redeem Voucher' ? 0 : (flight_attempts !== undefined ? flight_attempts : 0);
-        
+
         // bookingSql ve bookingValues'da selectedDate yerine bookingDateTime kullan
         const bookingSql = `
             INSERT INTO all_booking (
@@ -7114,10 +7115,10 @@ app.post('/api/createBooking', (req, res) => {
         console.log('DEBUG choose_add_on:', choose_add_on);
         console.log('DEBUG choose_add_on_str:', choose_add_on_str);
         console.log('DEBUG add_on_total_price:', add_on_total_price);
-        
+
         // Use actual passenger count from passengerData array
         const actualPaxCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
-        
+
         // Calculate weather refund total price (only for Shared Flight)
         const WEATHER_REFUND_PRICE = 47.5;
         const isSharedFlight = chooseFlightType && (chooseFlightType.type === 'Shared Flight' || chooseFlightType.type?.includes('Shared'));
@@ -7132,7 +7133,7 @@ app.post('/api/createBooking', (req, res) => {
         console.log('Is Shared Flight:', isSharedFlight);
         console.log('Passenger Count:', actualPaxCount);
         console.log('Weather Refund Total Price:', weather_refund_total_price);
-        
+
         // Calculate original_amount: passenger_count * base_price_per_passenger
         // Base price depends on voucher_type (Any Day Flight = 220, etc.)
         const BASE_PRICE_PER_PASSENGER = 220; // Default for Any Day Flight
@@ -7145,10 +7146,10 @@ app.post('/api/createBooking', (req, res) => {
         console.log('passengerData.length:', passengerData?.length);
         console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
         console.log('actualPaxCount (FINAL):', actualPaxCount);
-        
+
         // Determine status: use from req.body if provided (for rebook operations), otherwise default to 'Confirmed'
         const bookingStatus = req.body.status || 'Confirmed';
-        
+
         const bookingValues = [
             passengerName,
             chooseFlightType.type,
@@ -7192,7 +7193,7 @@ app.post('/api/createBooking', (req, res) => {
         console.log('SQL:', bookingSql);
         console.log('Values:', bookingValues);
         console.log('Values length:', bookingValues.length);
-        
+
         con.query(bookingSql, bookingValues, (err, result) => {
             if (err) {
                 console.error('=== DATABASE ERROR DETAILS ===');
@@ -7246,7 +7247,7 @@ app.post('/api/createBooking', (req, res) => {
             // Add initial status to booking history
             // Status is at index 5 in bookingValues array (after name, flight_type, flight_date, pax, location)
             const initialStatus = bookingStatus || bookingValues[5] || 'Open';
-            
+
             // Insert initial status into history for new bookings
             // This ensures every new booking (including rebooks) gets a history entry
             const initialHistorySql = 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
@@ -7270,7 +7271,7 @@ app.post('/api/createBooking', (req, res) => {
                 console.log('passengerData type:', typeof passengerData);
                 console.log('passengerData is Array?', Array.isArray(passengerData));
                 console.log('passengerData length:', passengerData?.length);
-                
+
                 let bookingDate = moment(selectedDate).format('YYYY-MM-DD');
                 let bookingTime = null;
                 // Eğer selectedTime varsa onu kullan
@@ -7287,7 +7288,7 @@ app.post('/api/createBooking', (req, res) => {
                 } else if (typeof selectedDate === 'string' && selectedDate.length === 10) {
                     bookingTime = null;
                 }
-                
+
                 console.log('Parsed bookingDate:', bookingDate);
                 console.log('Parsed bookingTime:', bookingTime);
                 if (bookingTime && req.body.activity_id) {
@@ -7300,14 +7301,14 @@ app.post('/api/createBooking', (req, res) => {
                     console.log('passengerData length:', passengerData?.length);
                     console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
                     console.log('Actual passenger count (FINAL):', actualPassengerCount);
-                    
+
                     updateSpecificAvailability(bookingDate, bookingTime, req.body.activity_id, actualPassengerCount);
                     console.log('=== END REBOOK AVAILABILITY UPDATE ===');
                 } else if (bookingTime) {
                     // Get activity_id first, then update availability
                     const actualPassengerCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
                     console.log('UPDATE AVAILABILITY PARAMS (alt sorgu):', actualPassengerCount, bookingDate, bookingTime, chooseLocation);
-                    
+
                     const activitySql = `SELECT id FROM activity WHERE location = ? AND status = 'Live' LIMIT 1`;
                     con.query(activitySql, [chooseLocation], (activityErr, activityResult) => {
                         if (activityErr) {
@@ -7339,29 +7340,29 @@ app.post('/api/createBooking', (req, res) => {
                     p.ticketType || null,
                     p.weatherRefund ? 1 : 0
                 ]);
-                
+
                 // Log passenger emails before inserting
                 console.log('📧 [createBooking] Passenger emails being saved:', passengerValues.map((pv, idx) => ({
                     passenger: idx + 1,
                     name: `${passengerData[idx].firstName} ${passengerData[idx].lastName}`,
                     email: pv[4] || 'NO EMAIL'
                 })));
-                
+
                 con.query(passengerSql, [passengerValues], (err, result) => {
                     if (err) {
                         console.error('❌ [createBooking] Error creating passengers:', err);
                         return res.status(500).json({ success: false, error: 'Database query failed to create passengers' });
                     }
-                    
+
                     console.log('✅ [createBooking] Passengers created successfully:', result.affectedRows, 'passengers');
                     // Availability is already updated by updateSpecificAvailability function
                     // No need to call updateAvailabilityStatus() here
-                    
+
                     // If activitySelect is 'Redeem Voucher' and voucher_code exists, mark it as redeemed
                     if (activitySelect === 'Redeem Voucher' && voucher_code) {
                         const cleanVoucherCode = voucher_code.trim();
                         console.log('🔄 Marking voucher as redeemed after Stripe payment:', cleanVoucherCode);
-                        
+
                         // Update all_vouchers table
                         const updateAllVouchersSql = `
                             UPDATE all_vouchers 
@@ -7375,7 +7376,7 @@ app.post('/api/createBooking', (req, res) => {
                                 console.log('✅ all_vouchers updated successfully');
                             }
                         });
-                        
+
                         // Update voucher_codes table
                         const updateVoucherCodesSql = `
                             UPDATE voucher_codes 
@@ -7390,7 +7391,7 @@ app.post('/api/createBooking', (req, res) => {
                                 console.log('✅ voucher_codes updated successfully - marked as inactive');
                             }
                         });
-                        
+
                         // Update redeemed_voucher column in all_booking
                         const updateBookingSql = `
                             UPDATE all_booking 
@@ -7405,7 +7406,7 @@ app.post('/api/createBooking', (req, res) => {
                             }
                         });
                     }
-                    
+
                     // Send automatic booking confirmation email
                     // Always try to send email - function will handle missing email gracefully
                     console.log('========================================');
@@ -7415,7 +7416,7 @@ app.post('/api/createBooking', (req, res) => {
                     console.log('📧 [createBooking] Passenger emails:', passengerData.map(p => p.email).filter(Boolean));
                     console.log('📧 [createBooking] Calling sendAutomaticBookingConfirmationEmail...');
                     console.log('========================================');
-                    
+
                     // Call email function immediately and log the call
                     try {
                         const emailOptions = deriveEmailOptionsForAutoSend();
@@ -7424,7 +7425,7 @@ app.post('/api/createBooking', (req, res) => {
                     } catch (emailError) {
                         console.error('❌ [createBooking] Error calling sendAutomaticBookingConfirmationEmail:', emailError);
                     }
-                    
+
                     res.status(201).json({ success: true, message: 'Booking created successfully!', bookingId: bookingId, created_at: createdAt });
                 });
             }
@@ -7505,7 +7506,7 @@ app.post('/api/createBooking', (req, res) => {
 // Endpoint to update expires dates for Flexible Weekday and Weekday Morning
 app.post('/api/update-expires-dates', (req, res) => {
     console.log('=== UPDATE EXPIRES DATES ENDPOINT CALLED ===');
-    
+
     const updateBookingSql = `
         UPDATE all_booking 
         SET expires = DATE_ADD(created_at, INTERVAL 18 MONTH) 
@@ -7513,7 +7514,7 @@ app.post('/api/update-expires-dates', (req, res) => {
           AND experience = 'Shared Flight' 
           AND expires > DATE_ADD(created_at, INTERVAL 18 MONTH)
     `;
-    
+
     const updateVoucherSql = `
         UPDATE all_vouchers 
         SET expires = DATE_ADD(created_at, INTERVAL 18 MONTH) 
@@ -7521,15 +7522,15 @@ app.post('/api/update-expires-dates', (req, res) => {
           AND experience_type = 'Shared Flight' 
           AND expires > DATE_ADD(created_at, INTERVAL 18 MONTH)
     `;
-    
+
     con.query(updateBookingSql, (err, bookingResult) => {
         if (err) {
             console.error('Error updating all_booking:', err);
             return res.status(500).json({ success: false, error: 'Failed to update all_booking' });
         }
-        
+
         console.log('Updated all_booking records:', bookingResult.affectedRows);
-        
+
         // Show sample updated records
         const sampleSql = `
             SELECT 
@@ -7545,15 +7546,15 @@ app.post('/api/update-expires-dates', (req, res) => {
             ORDER BY created_at DESC
             LIMIT 10
         `;
-        
+
         con.query(sampleSql, (err, sampleResult) => {
             if (err) {
                 console.error('Error fetching sample records:', err);
                 return res.status(500).json({ success: false, error: 'Failed to fetch sample records' });
             }
-            
-            res.json({ 
-                success: true, 
+
+            res.json({
+                success: true,
                 message: 'Expires dates updated successfully',
                 updated_bookings: bookingResult.affectedRows,
                 sample_records: sampleResult
@@ -7622,12 +7623,12 @@ app.post('/api/createVoucher', (req, res) => {
     console.log('Timestamp:', new Date().toISOString());
     console.log('voucher_type_detail from request:', req.body.voucher_type_detail);
     console.log('voucher_type from request:', req.body.voucher_type);
-    
+
     // Helper function
     function emptyToNull(val) {
         return (val === '' || val === undefined) ? null : val;
     }
-    
+
     // Extract request data
     const {
         name = '',
@@ -7688,7 +7689,7 @@ app.post('/api/createVoucher', (req, res) => {
             console.log(`Item ${index + 1}:`, item);
         });
     }
-    
+
     console.log('=== ADDITIONAL INFO DEBUG (createVoucher) ===');
     console.log('additionalInfo received:', additionalInfo);
     console.log('typeof additionalInfo:', typeof additionalInfo);
@@ -7721,45 +7722,45 @@ app.post('/api/createVoucher', (req, res) => {
         console.log('Recipient name:', recipient_name);
         console.log('Recipient email:', recipient_email);
         console.log('Recipient phone:', recipient_phone);
-        
+
         // For Gift Vouchers, use explicit purchaser fields if provided, otherwise fall back to main contact fields
         if (purchaser_name && purchaser_name.trim() !== '') {
             finalPurchaserName = purchaser_name;
         } else {
             finalPurchaserName = name;
         }
-        
+
         if (purchaser_email && purchaser_email.trim() !== '') {
             finalPurchaserEmail = purchaser_email;
         } else {
             finalPurchaserEmail = email;
         }
-        
+
         if (purchaser_phone && purchaser_phone.trim() !== '') {
             finalPurchaserPhone = purchaser_phone;
         } else {
             finalPurchaserPhone = phone;
         }
-        
+
         if (purchaser_mobile && purchaser_mobile.trim() !== '') {
             finalPurchaserMobile = purchaser_mobile;
         } else {
             finalPurchaserMobile = mobile;
         }
-        
+
         console.log('Setting purchaser info:', {
             name: finalPurchaserName,
             email: finalPurchaserEmail,
             phone: finalPurchaserPhone,
             mobile: finalPurchaserMobile
         });
-        
+
         // Set recipient info from recipient fields (Recipient Details section)
         // NO fallback logic - keep purchaser and recipient separate
         finalRecipientName = recipient_name;
         finalRecipientEmail = recipient_email;
         finalRecipientPhone = recipient_phone;
-        
+
         console.log('Final purchaser info:', { name: finalPurchaserName, email: finalPurchaserEmail, phone: finalPurchaserPhone, mobile: finalPurchaserMobile });
         console.log('Final recipient info:', { name: finalRecipientName, email: finalRecipientEmail, phone: finalRecipientPhone });
     } else {
@@ -7772,40 +7773,40 @@ app.post('/api/createVoucher', (req, res) => {
     }
 
     const now = moment().format('YYYY-MM-DD HH:mm:ss');
-    
-        // Determine the actual voucher type based on the input (declare first to avoid ReferenceError)
-        let actualVoucherType = '';
-    
-                    // Check if there's a specific voucher type detail in the request
-        if (req.body.voucher_type_detail && req.body.voucher_type_detail.trim() !== '') {
-            actualVoucherType = req.body.voucher_type_detail.trim();
-            console.log('Using voucher_type_detail from request:', actualVoucherType);
-        } else if (voucher_type === 'Weekday Morning' || voucher_type === 'Flexible Weekday' || voucher_type === 'Any Day Flight') {
-            // If the frontend sends the specific voucher type directly
-            actualVoucherType = voucher_type;
-            console.log('Using voucher_type directly:', actualVoucherType);
-        } else if (voucher_type && typeof voucher_type === 'string') {
-            // Some older flows send voucher_type already as the concrete type
-            actualVoucherType = voucher_type;
-            console.log('Fallback: using voucher_type as actualVoucherType:', actualVoucherType);
-        } else {
-            // Last-chance mapping from bookingData if present (when invoked via createBookingFromSession)
-            try {
-                const maybeBooking = req.body.bookingData || {};
-                const title = maybeBooking?.selectedVoucherType?.title;
-                if (title === 'Weekday Morning' || title === 'Flexible Weekday' || title === 'Any Day Flight') {
-                    actualVoucherType = title;
-                    console.log('Mapped actualVoucherType from bookingData.selectedVoucherType:', actualVoucherType);
-                }
-            } catch (e) {
-                // ignore
+
+    // Determine the actual voucher type based on the input (declare first to avoid ReferenceError)
+    let actualVoucherType = '';
+
+    // Check if there's a specific voucher type detail in the request
+    if (req.body.voucher_type_detail && req.body.voucher_type_detail.trim() !== '') {
+        actualVoucherType = req.body.voucher_type_detail.trim();
+        console.log('Using voucher_type_detail from request:', actualVoucherType);
+    } else if (voucher_type === 'Weekday Morning' || voucher_type === 'Flexible Weekday' || voucher_type === 'Any Day Flight') {
+        // If the frontend sends the specific voucher type directly
+        actualVoucherType = voucher_type;
+        console.log('Using voucher_type directly:', actualVoucherType);
+    } else if (voucher_type && typeof voucher_type === 'string') {
+        // Some older flows send voucher_type already as the concrete type
+        actualVoucherType = voucher_type;
+        console.log('Fallback: using voucher_type as actualVoucherType:', actualVoucherType);
+    } else {
+        // Last-chance mapping from bookingData if present (when invoked via createBookingFromSession)
+        try {
+            const maybeBooking = req.body.bookingData || {};
+            const title = maybeBooking?.selectedVoucherType?.title;
+            if (title === 'Weekday Morning' || title === 'Flexible Weekday' || title === 'Any Day Flight') {
+                actualVoucherType = title;
+                console.log('Mapped actualVoucherType from bookingData.selectedVoucherType:', actualVoucherType);
             }
-            if (!actualVoucherType) {
-                console.error('ERROR: No voucher_type or voucher_type_detail provided.');
-                return res.status(400).json({ success: false, message: 'actualVoucherType is not defined' });
-            }
+        } catch (e) {
+            // ignore
         }
-        
+        if (!actualVoucherType) {
+            console.error('ERROR: No voucher_type or voucher_type_detail provided.');
+            return res.status(400).json({ success: false, message: 'actualVoucherType is not defined' });
+        }
+    }
+
     // Validate that the voucher type detail is one of the valid types
     const validVoucherTypes = ['Weekday Morning', 'Flexible Weekday', 'Any Day Flight'];
     if (!validVoucherTypes.includes(actualVoucherType)) {
@@ -7813,7 +7814,7 @@ app.post('/api/createVoucher', (req, res) => {
         console.error('Valid types are:', validVoucherTypes);
         return res.status(400).json({ success: false, error: `Invalid voucher type detail: ${actualVoucherType}. Valid types are: ${validVoucherTypes.join(', ')}` });
     }
-    
+
     console.log('Final actualVoucherType:', actualVoucherType);
 
     // Expiry: Any Day Flight = 24 months, others (Weekday Morning, Flexible Weekday) = 18 months
@@ -7822,55 +7823,55 @@ app.post('/api/createVoucher', (req, res) => {
 
     // First, check for duplicates to prevent multiple vouchers
     const duplicateCheckSql = `SELECT id FROM all_vouchers WHERE name = ? AND email = ? AND phone = ? AND voucher_type = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 MINUTE) LIMIT 1`;
-    
+
     con.query(duplicateCheckSql, [name, email, phone, voucher_type], (err, duplicateResult) => {
         if (err) {
             console.error('Error checking for duplicates:', err);
             return res.status(500).json({ success: false, error: 'Database query failed to check for duplicates' });
         }
-        
+
         if (duplicateResult && duplicateResult.length > 0) {
             console.log('=== DUPLICATE VOUCHER DETECTED ===');
             console.log('Duplicate voucher ID:', duplicateResult[0].id);
             console.log('Name:', name, 'Email:', email, 'Phone:', phone);
             return res.status(400).json({ success: false, error: 'A voucher with these details was already created recently. Please wait a moment before trying again.' });
         }
-        
+
         // Also check if this is a Stripe session that was already processed
         // Look for a voucher with the same payment details (name, email, paid amount) created very recently
         const stripeDuplicateCheckSql = `SELECT id FROM all_vouchers WHERE name = ? AND email = ? AND paid = ? AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE) LIMIT 1`;
-        
+
         con.query(stripeDuplicateCheckSql, [name, email, paid], (err, stripeDuplicateResult) => {
             if (err) {
                 console.error('Error checking for Stripe duplicates:', err);
                 return res.status(500).json({ success: false, error: 'Database query failed to check for Stripe duplicates' });
             }
-            
+
             if (stripeDuplicateResult && stripeDuplicateResult.length > 0) {
                 console.log('=== STRIPE DUPLICATE VOUCHER DETECTED ===');
                 console.log('Stripe duplicate voucher ID:', stripeDuplicateResult[0].id);
                 console.log('Name:', name, 'Email:', email, 'Paid:', paid);
                 return res.status(400).json({ success: false, error: 'A voucher with these payment details was already created recently. This may be a duplicate Stripe webhook call.' });
             }
-            
+
             // Additional check: if this looks like a Stripe payment (paid > 0), check if there's already a voucher
             // with the same name, email, and similar payment amount created very recently
             if (paid > 0) {
                 const recentVoucherCheckSql = `SELECT id FROM all_vouchers WHERE name = ? AND email = ? AND created_at > DATE_SUB(NOW(), INTERVAL 2 MINUTE) LIMIT 1`;
-                
+
                 con.query(recentVoucherCheckSql, [name, email], (err, recentResult) => {
                     if (err) {
                         console.error('Error checking for recent vouchers:', err);
                         return res.status(500).json({ success: false, error: 'Database query failed to check for recent vouchers' });
                     }
-                    
+
                     if (recentResult && recentResult.length > 0) {
                         console.log('=== RECENT VOUCHER DETECTED (Possible Stripe Duplicate) ===');
                         console.log('Recent voucher ID:', recentResult[0].id);
                         console.log('Name:', name, 'Email:', email);
                         return res.status(400).json({ success: false, error: 'A voucher with these details was already created recently. Please wait a moment before trying again.' });
                     }
-                    
+
                     // No recent vouchers found, proceed with voucher creation
                     createVoucher();
                 });
@@ -7880,7 +7881,7 @@ app.post('/api/createVoucher', (req, res) => {
             }
         });
     });
-    
+
     function createVoucher() {
         // If this is a Redeem Voucher, handle voucher code usage first
         if (voucher_type === 'Redeem Voucher' && voucher_ref) {
@@ -7890,7 +7891,7 @@ app.post('/api/createVoucher', (req, res) => {
             insertVoucherRecord();
         }
     }
-    
+
     function handleRedeemVoucher() {
         // Check if voucher code exists and is valid
         const checkVoucherSql = `
@@ -7901,35 +7902,35 @@ app.post('/api/createVoucher', (req, res) => {
             AND (valid_until IS NULL OR valid_until >= NOW())
             AND (max_uses IS NULL OR current_uses < max_uses)
         `;
-        
+
         con.query(checkVoucherSql, [voucher_ref.toUpperCase()], (err, voucherResult) => {
             if (err) {
                 console.error('Error checking voucher code:', err);
                 return res.status(500).json({ success: false, error: 'Database query failed to check voucher code' });
             }
-            
+
             if (voucherResult.length === 0) {
                 return res.status(400).json({ success: false, error: 'Invalid or expired voucher code' });
             }
-            
+
             const voucher = voucherResult[0];
-            
+
             // Update voucher code usage
             const updateVoucherSql = `UPDATE voucher_codes SET current_uses = current_uses + 1 WHERE id = ?`;
-            
+
             con.query(updateVoucherSql, [voucher.id], (err, updateResult) => {
                 if (err) {
                     console.error('Error updating voucher code usage:', err);
                     return res.status(500).json({ success: false, error: 'Failed to update voucher code usage' });
                 }
-                
+
                 // Insert voucher usage record
                 const insertUsageSql = `
                     INSERT INTO voucher_code_usage 
                     (voucher_code_id, booking_id, customer_email, discount_applied, original_amount, final_amount) 
                     VALUES (?, ?, ?, ?, ?, ?)
                 `;
-                
+
                 const usageValues = [
                     voucher.id,
                     null, // booking_id henüz yok
@@ -7938,23 +7939,23 @@ app.post('/api/createVoucher', (req, res) => {
                     paid, // original_amount
                     paid  // final_amount
                 ];
-                
+
                 con.query(insertUsageSql, usageValues, (err, usageResult) => {
                     if (err) {
                         console.error('Error inserting voucher usage:', err);
                         // Usage kaydı başarısız olsa bile voucher oluşturmaya devam et
                     }
-                    
+
                     // Now create the main voucher record
                     insertVoucherRecord();
                 });
             });
         });
     }
-    
+
     function insertVoucherRecord() {
         console.log('=== INSERTING VOUCHER RECORD ===');
-        
+
         // Generate a unique voucher_ref for Flight Vouchers
         let finalVoucherRef = voucher_ref;
         if (!finalVoucherRef && voucher_type === 'Flight Voucher') {
@@ -7964,11 +7965,11 @@ app.post('/api/createVoucher', (req, res) => {
             finalVoucherRef = `FLT${timestamp}${random}`.toUpperCase();
             console.log('Generated voucher_ref for Flight Voucher:', finalVoucherRef);
         }
-        
+
         const insertSql = `INSERT INTO all_vouchers 
             (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, purchaser_name, purchaser_email, purchaser_phone, purchaser_mobile, numberOfPassengers, additional_information_json, add_to_booking_items)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-            
+
         const values = [
             emptyToNull(name),
             emptyToNull(weight),
@@ -8004,23 +8005,23 @@ app.post('/api/createVoucher', (req, res) => {
             (additional_information_json || additionalInfo || additional_information) ? JSON.stringify(additional_information_json || additionalInfo || additional_information) : null, // additional_information_json
             add_to_booking_items ? JSON.stringify(add_to_booking_items) : null // add_to_booking_items
         ];
-        
+
         // Values being inserted for voucher creation
-        
+
         con.query(insertSql, values, (err, result) => {
             if (err) {
                 console.error('Error creating voucher:', err);
                 return res.status(500).json({ success: false, error: 'Database query failed to create voucher' });
             }
-            
+
             console.log('=== VOUCHER CREATED SUCCESSFULLY ===');
             console.log('Voucher ID:', result.insertId);
             console.log('Name:', name);
             console.log('Email:', email);
-            
+
             // Additional information is already stored in additional_information_json column
             // No need to store in additional_information_answers table for vouchers
-            
+
             // For Flight Voucher, create booking record and generate voucher code
             if (voucher_type === 'Flight Voucher' || voucher_type === 'Any Day Flight' || voucher_type === 'Weekday Morning' || voucher_type === 'Flexible Weekday') {
                 console.log('=== CREATING BOOKING RECORD FOR FLIGHT VOUCHER ===');
@@ -8046,7 +8047,7 @@ app.post('/api/createVoucher', (req, res) => {
             }
         });
     }
-    
+
     // Create booking record for Flight Voucher
     function createBookingForFlightVoucher(voucherId, voucherRef, name, email, phone, weight, paid, voucherType) {
         console.log('=== CREATING BOOKING RECORD FOR FLIGHT VOUCHER ===');
@@ -8058,7 +8059,7 @@ app.post('/api/createVoucher', (req, res) => {
         console.log('Weight:', weight);
         console.log('Paid:', paid);
         console.log('Voucher Type:', voucherType);
-        
+
         // Define missing variables
         const flight_type = 'Shared Flight'; // Default flight type for vouchers
         const now = moment().format('YYYY-MM-DD HH:mm:ss');
@@ -8068,7 +8069,7 @@ app.post('/api/createVoucher', (req, res) => {
             durationMonths = 18;
         }
         const expiresFinal = moment().add(durationMonths, 'months').format('YYYY-MM-DD HH:mm:ss');
-        
+
         // Create booking record in all_booking table
         const bookingSql = `
             INSERT INTO all_booking (
@@ -8079,7 +8080,7 @@ app.post('/api/createVoucher', (req, res) => {
                 email, phone, weight, additional_information_json, flight_type_source
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
-        
+
         const bookingValues = [
             name, // name
             flight_type, // flight_type
@@ -8110,30 +8111,30 @@ app.post('/api/createVoucher', (req, res) => {
             null, // additional_information_json
             flight_type // flight_type_source (use flight_type for Flight Voucher)
         ];
-        
+
         con.query(bookingSql, bookingValues, (err, bookingResult) => {
             if (err) {
                 console.error('Error creating booking for Flight Voucher:', err);
                 return;
             }
-            
+
             console.log('=== BOOKING RECORD CREATED SUCCESSFULLY ===');
             console.log('Booking ID:', bookingResult.insertId);
             console.log('Voucher Ref:', voucherRef);
-            
+
             // Generate voucher code for the booking
             generateVoucherCodeForBooking(bookingResult.insertId, name, email, paid, voucherType);
-            
+
             // Now create passenger record
             createPassengerForFlightVoucher(bookingResult.insertId, name, weight, paid, passengerData);
-            
+
             // Send automatic booking confirmation email for Flight Voucher
             if (email) {
                 sendAutomaticBookingConfirmationEmail(bookingResult.insertId);
             }
         });
     }
-    
+
     // Create booking record for Redeem Voucher
     function createBookingForRedeemVoucher(voucherId, voucherCode, name, email, phone, weight, paid, voucherType) {
         console.log('=== CREATING BOOKING RECORD FOR REDEEM VOUCHER ===');
@@ -8145,7 +8146,7 @@ app.post('/api/createVoucher', (req, res) => {
         console.log('Weight:', weight);
         console.log('Paid:', paid);
         console.log('Voucher Type:', voucherType);
-        
+
         // Define variables for Redeem Voucher booking
         const flight_type_redeem = flight_type || 'Shared Flight'; // Use the flight type from request or default
         const now = moment().format('YYYY-MM-DD HH:mm:ss');
@@ -8155,7 +8156,7 @@ app.post('/api/createVoucher', (req, res) => {
             durationMonths = 18;
         }
         const expiresFinal = moment().add(durationMonths, 'months').format('YYYY-MM-DD HH:mm:ss');
-        
+
         // Create booking record in all_booking table for Redeem Voucher
         const bookingSql = `
             INSERT INTO all_booking (
@@ -8166,7 +8167,7 @@ app.post('/api/createVoucher', (req, res) => {
                 email, phone, weight, additional_information_json, flight_type_source
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
-        
+
         const bookingValues = [
             name, // name
             flight_type_redeem, // flight_type
@@ -8197,39 +8198,39 @@ app.post('/api/createVoucher', (req, res) => {
             (additional_information_json || additionalInfo || additional_information) ? JSON.stringify(additional_information_json || additionalInfo || additional_information) : null, // additional_information_json
             'Redeem Voucher' // flight_type_source (always 'Redeem Voucher' for this function)
         ];
-        
+
         con.query(bookingSql, bookingValues, (err, bookingResult) => {
             if (err) {
                 console.error('Error creating booking for Redeem Voucher:', err);
                 // Still send success response for voucher creation even if booking fails
-                return res.status(201).json({ 
-                    success: true, 
-                    message: 'Voucher redeemed successfully but booking creation failed', 
+                return res.status(201).json({
+                    success: true,
+                    message: 'Voucher redeemed successfully but booking creation failed',
                     voucherId: voucherId,
                     warning: 'Booking record could not be created'
                 });
             }
-            
+
             console.log('=== BOOKING CREATED FOR REDEEM VOUCHER ===');
             console.log('Booking ID:', bookingResult.insertId);
-            
+
             // Now mark the original voucher as redeemed in all_vouchers table
             updateVoucherRedemptionStatus(voucherCode, voucherId, bookingResult.insertId);
-            
+
             // Send automatic booking confirmation email for Redeem Voucher
             if (email) {
                 sendAutomaticBookingConfirmationEmail(bookingResult.insertId);
             }
         });
     }
-    
+
     // Update voucher redemption status in all_vouchers table
     function updateVoucherRedemptionStatus(voucherCode, voucherId, bookingId) {
         console.log('=== UPDATING VOUCHER REDEMPTION STATUS ===');
         console.log('Voucher Code:', voucherCode);
         console.log('Voucher ID:', voucherId);
         console.log('Booking ID:', bookingId);
-        
+
         // Update the original voucher to mark it as redeemed
         const updateVoucherSql = `
             UPDATE all_vouchers 
@@ -8241,7 +8242,7 @@ app.post('/api/createVoucher', (req, res) => {
                 LIMIT 1
             )
         `;
-        
+
         con.query(updateVoucherSql, [voucherCode, voucherCode], (err, updateResult) => {
             if (err) {
                 console.error('Error updating voucher redemption status:', err);
@@ -8249,18 +8250,18 @@ app.post('/api/createVoucher', (req, res) => {
                 console.log('Voucher redemption status updated successfully');
                 console.log('Affected rows:', updateResult.affectedRows);
             }
-            
+
             // Send final success response
-            res.status(201).json({ 
-                success: true, 
-                message: 'Voucher redeemed successfully and booking created!', 
+            res.status(201).json({
+                success: true,
+                message: 'Voucher redeemed successfully and booking created!',
                 voucherId: voucherId,
                 bookingId: bookingId,
                 voucherCode: voucherCode
             });
         });
     }
-    
+
     // Generate voucher code for booking
     function generateVoucherCodeForBooking(bookingId, name, email, paid, voucherType) {
         console.log('=== GENERATING VOUCHER CODE FOR BOOKING ===');
@@ -8269,7 +8270,7 @@ app.post('/api/createVoucher', (req, res) => {
         console.log('Email:', email);
         console.log('Paid:', paid);
         console.log('Voucher Type:', voucherType);
-        
+
         // Call the generate-voucher-code endpoint
         const requestData = {
             flight_category: voucherType,
@@ -8280,7 +8281,7 @@ app.post('/api/createVoucher', (req, res) => {
             voucher_type: 'Book Flight',
             paid_amount: paid
         };
-        
+
         fetch('http://localhost:3002/api/generate-voucher-code', {
             method: 'POST',
             headers: {
@@ -8288,35 +8289,35 @@ app.post('/api/createVoucher', (req, res) => {
             },
             body: JSON.stringify(requestData)
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.voucher_code) {
-                console.log('Voucher code generated successfully:', data.voucher_code);
-                
-                // Update the booking record with the voucher code
-                con.query('UPDATE all_booking SET voucher_code = ? WHERE id = ?', [data.voucher_code, bookingId], (err) => {
-                    if (err) {
-                        console.error('Error updating booking with voucher_code:', err);
-                    } else {
-                        console.log('Booking updated with voucher_code:', data.voucher_code);
-                    }
-                });
-            } else {
-                console.error('Failed to generate voucher code:', data);
-            }
-        })
-        .catch(error => {
-            console.error('Error calling generate-voucher-code endpoint:', error);
-        });
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.voucher_code) {
+                    console.log('Voucher code generated successfully:', data.voucher_code);
+
+                    // Update the booking record with the voucher code
+                    con.query('UPDATE all_booking SET voucher_code = ? WHERE id = ?', [data.voucher_code, bookingId], (err) => {
+                        if (err) {
+                            console.error('Error updating booking with voucher_code:', err);
+                        } else {
+                            console.log('Booking updated with voucher_code:', data.voucher_code);
+                        }
+                    });
+                } else {
+                    console.error('Failed to generate voucher code:', data);
+                }
+            })
+            .catch(error => {
+                console.error('Error calling generate-voucher-code endpoint:', error);
+            });
     }
-    
+
     // Create passenger records for Flight Voucher
     function createPassengerForFlightVoucher(bookingId, name, weight, paid, passengerDataArray) {
         // Creating passenger records for flight voucher
-        
+
         // Use passengerData if available, otherwise create from main contact info
         let passengersToCreate = [];
-        
+
         if (passengerDataArray && Array.isArray(passengerDataArray) && passengerDataArray.length > 0) {
             passengersToCreate = passengerDataArray.map((p, index) => ({
                 firstName: p.firstName || '',
@@ -8332,7 +8333,7 @@ app.post('/api/createVoucher', (req, res) => {
             const nameParts = name.trim().split(' ');
             const firstName = nameParts[0] || '';
             const lastName = nameParts.slice(1).join(' ') || '';
-            
+
             // Create passengers based on resolved passenger count
             for (let i = 0; i < resolvedPassengerCount; i++) {
                 passengersToCreate.push({
@@ -8346,11 +8347,11 @@ app.post('/api/createVoucher', (req, res) => {
                 });
             }
         }
-        
+
         if (passengersToCreate.length === 0) {
-            res.status(201).json({ 
-                success: true, 
-                message: 'Flight Voucher created successfully!', 
+            res.status(201).json({
+                success: true,
+                message: 'Flight Voucher created successfully!',
                 voucherId: voucherId,
                 voucherCode: voucherRef,
                 bookingId: bookingId,
@@ -8358,14 +8359,14 @@ app.post('/api/createVoucher', (req, res) => {
             });
             return;
         }
-        
+
         // Create passenger records using bulk insert
         const passengerSql = `
             INSERT INTO passenger (
                 booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund, price, created_at
             ) VALUES ?
         `;
-        
+
         const passengerValues = passengersToCreate.map(p => [
             bookingId, // booking_id
             p.firstName, // first_name
@@ -8378,21 +8379,21 @@ app.post('/api/createVoucher', (req, res) => {
             paid / passengersToCreate.length, // price (split equally among passengers)
             now // created_at
         ]);
-        
+
         con.query(passengerSql, [passengerValues], (err, passengerResult) => {
             if (err) {
                 console.error('Error creating passengers for Flight Voucher:', err);
                 // Even if passenger creation fails, send response with voucher ID
-                res.status(201).json({ 
-                    success: true, 
-                    message: 'Voucher created successfully!', 
+                res.status(201).json({
+                    success: true,
+                    message: 'Voucher created successfully!',
                     voucherId: voucherId,
                     voucherCode: voucherRef,
                     warning: 'Passenger record creation failed'
                 });
                 return;
             }
-            
+
             // Update the booking pax count to match the number of passengers created
             const updatePaxSql = `UPDATE all_booking SET pax = ? WHERE id = ?`;
             con.query(updatePaxSql, [passengersToCreate.length, bookingId], (err2) => {
@@ -8400,11 +8401,11 @@ app.post('/api/createVoucher', (req, res) => {
                     console.error('Error updating pax count:', err2);
                 }
             });
-            
+
             // Send success response
-            res.status(201).json({ 
-                success: true, 
-                message: 'Flight Voucher created successfully!', 
+            res.status(201).json({
+                success: true,
+                message: 'Flight Voucher created successfully!',
                 voucherId: voucherId,
                 voucherCode: voucherRef,
                 bookingId: bookingId,
@@ -8412,7 +8413,7 @@ app.post('/api/createVoucher', (req, res) => {
             });
         });
     }
-    
+
     // Generate voucher code for Flight Voucher after creation
     function generateVoucherCodeForFlightVoucher(voucherId, name, email, paid) {
         console.log('=== GENERATING VOUCHER CODE FOR FLIGHT VOUCHER ===');
@@ -8420,41 +8421,41 @@ app.post('/api/createVoucher', (req, res) => {
         console.log('Name:', name);
         console.log('Email:', email);
         console.log('Paid:', paid);
-        
+
         // Generate unique voucher code
         const voucherCode = generateUniqueVoucherCode();
-        
+
         // Update the voucher record with the generated code
         const updateSql = `UPDATE all_vouchers SET voucher_ref = ? WHERE id = ?`;
-        
+
         con.query(updateSql, [voucherCode, voucherId], (err, updateResult) => {
             if (err) {
                 console.error('Error updating voucher with code:', err);
                 // Even if update fails, send response with voucher ID
-                res.status(201).json({ 
-                    success: true, 
-                    message: 'Voucher created successfully!', 
+                res.status(201).json({
+                    success: true,
+                    message: 'Voucher created successfully!',
                     voucherId: voucherId,
                     voucherCode: null,
                     note: 'Voucher created but code generation failed'
                 });
                 return;
             }
-            
+
             console.log('=== VOUCHER CODE GENERATED SUCCESSFULLY ===');
             console.log('Voucher ID:', voucherId);
             console.log('Voucher Code:', voucherCode);
-            
+
             // Send success response with voucher code
-            res.status(201).json({ 
-                success: true, 
-                message: 'Voucher created successfully with code!', 
+            res.status(201).json({
+                success: true,
+                message: 'Voucher created successfully with code!',
                 voucherId: voucherId,
                 voucherCode: voucherCode
             });
         });
     }
-    
+
     // Generate unique voucher code
     function generateUniqueVoucherCode() {
         const prefix = 'FAT'; // Flight Voucher prefix
@@ -8467,55 +8468,55 @@ app.post('/api/createVoucher', (req, res) => {
 // Test endpoint to generate voucher code for existing voucher
 app.post('/api/generateVoucherCodeForExisting', (req, res) => {
     const { voucher_id } = req.body;
-    
+
     if (!voucher_id) {
         return res.status(400).json({ success: false, message: 'voucher_id is required' });
     }
-    
+
     // Check if voucher exists
     const checkSql = `SELECT id, name, email, paid, voucher_ref FROM all_vouchers WHERE id = ?`;
-    
+
     con.query(checkSql, [voucher_id], (err, voucherResult) => {
         if (err) {
             console.error('Error checking voucher:', err);
             return res.status(500).json({ success: false, error: 'Database query failed' });
         }
-        
+
         if (voucherResult.length === 0) {
             return res.status(404).json({ success: false, message: 'Voucher not found' });
         }
-        
+
         const voucher = voucherResult[0];
-        
+
         if (voucher.voucher_ref && voucher.voucher_ref.trim() !== '') {
             return res.status(400).json({ success: false, message: 'Voucher already has a code', voucherCode: voucher.voucher_ref });
         }
-        
+
         // Generate unique voucher code
         const voucherCode = generateUniqueVoucherCode();
-        
+
         // Update the voucher record with the generated code
         const updateSql = `UPDATE all_vouchers SET voucher_ref = ? WHERE id = ?`;
-        
+
         con.query(updateSql, [voucherCode, voucher_id], (err, updateResult) => {
             if (err) {
                 console.error('Error updating voucher with code:', err);
                 return res.status(500).json({ success: false, error: 'Failed to update voucher with code' });
             }
-            
+
             console.log('=== VOUCHER CODE GENERATED FOR EXISTING VOUCHER ===');
             console.log('Voucher ID:', voucher_id);
             console.log('Voucher Code:', voucherCode);
-            
-            res.json({ 
-                success: true, 
-                message: 'Voucher code generated successfully!', 
+
+            res.json({
+                success: true,
+                message: 'Voucher code generated successfully!',
                 voucherId: voucher_id,
                 voucherCode: voucherCode
             });
         });
     });
-    
+
     // Generate unique voucher code
     function generateUniqueVoucherCode() {
         const prefix = 'FAT'; // Flight Voucher prefix
@@ -8542,32 +8543,63 @@ app.get('/api/getBookingDetail', async (req, res) => {
             return res.status(404).json({ success: false, message: 'Booking not found' });
         }
         const booking = bookingRows[0];
-        
-        // If voucher_type is null or empty, try to get it from voucher
-        if ((!booking.voucher_type || booking.voucher_type.trim() === '') && booking.voucher_code) {
+
+        // Fetch voucher info (type, flight attempts) when booking has voucher_code
+        let voucherInfo = null;
+        if (booking.voucher_code) {
             try {
                 const [voucherRows] = await new Promise((resolve, reject) => {
-                    con.query('SELECT voucher_type FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [booking.voucher_code], (err, rows) => {
-                        if (err) reject(err);
-                        else resolve([rows]);
-                    });
+                    con.query(
+                        'SELECT id, voucher_type, book_flight, flight_attempts FROM all_vouchers WHERE voucher_ref = ? LIMIT 1',
+                        [booking.voucher_code],
+                        (err, rows) => {
+                            if (err) reject(err);
+                            else resolve([rows]);
+                        }
+                    );
                 });
-                if (voucherRows && voucherRows.length > 0 && voucherRows[0].voucher_type) {
-                    booking.voucher_type = voucherRows[0].voucher_type;
-                    console.log('✅ getBookingDetail - voucher_type fetched from voucher:', booking.voucher_type);
+                if (voucherRows && voucherRows.length > 0) {
+                    voucherInfo = voucherRows[0];
+                    if ((!booking.voucher_type || booking.voucher_type.trim() === '') && voucherInfo.voucher_type) {
+                        booking.voucher_type = voucherInfo.voucher_type;
+                        console.log('✅ getBookingDetail - voucher_type fetched from voucher:', booking.voucher_type);
+                    }
                 }
             } catch (voucherErr) {
-                console.warn('⚠️ getBookingDetail - Could not fetch voucher_type from voucher:', voucherErr.message);
+                console.warn('⚠️ getBookingDetail - Could not fetch voucher info:', voucherErr.message);
             }
         }
-        
+
         // DEBUG: Log flight_date to diagnose "Invalid Date" issue
         console.log('=== GET BOOKING DETAIL DEBUG ===');
         console.log('Booking ID:', booking_id);
         console.log('flight_date from DB:', booking.flight_date, 'Type:', typeof booking.flight_date);
         console.log('time_slot from DB:', booking.time_slot);
         console.log('voucher_type:', booking.voucher_type);
-        
+
+        // Normalize flight_attempts similar to getAllBookingData / customer portal
+        const isRedeemVoucher = Boolean(
+            booking.voucher_code &&
+            voucherInfo &&
+            (voucherInfo.book_flight === 'Gift Voucher' || voucherInfo.id)
+        );
+        let finalFlightAttempts = booking.flight_attempts;
+        if (isRedeemVoucher) {
+            if (finalFlightAttempts === 1 || finalFlightAttempts === null || finalFlightAttempts === undefined) {
+                finalFlightAttempts = 0;
+            }
+        }
+        if (finalFlightAttempts === null || finalFlightAttempts === undefined) {
+            finalFlightAttempts = isRedeemVoucher ? 0 : (voucherInfo?.flight_attempts ?? 0);
+        }
+        if (typeof finalFlightAttempts === 'string') {
+            const parsedAttempts = parseInt(finalFlightAttempts, 10);
+            finalFlightAttempts = Number.isNaN(parsedAttempts) ? 0 : parsedAttempts;
+        }
+        booking.flight_attempts = typeof finalFlightAttempts === 'number' && !Number.isNaN(finalFlightAttempts)
+            ? finalFlightAttempts
+            : 0;
+
         // Ensure preferred fields are always present and not null
         booking.preferred_location = booking.preferred_location || '';
         booking.preferred_time = booking.preferred_time || '';
@@ -8614,7 +8646,7 @@ app.get('/api/getBookingDetail', async (req, res) => {
                 else resolve([rows]);
             });
         });
-        
+
         // 4. Additional Information
         let additionalInformation = null;
         try {
@@ -8641,7 +8673,7 @@ app.get('/api/getBookingDetail', async (req, res) => {
                     else resolve([rows]);
                 });
             });
-            
+
             // Also get all available questions for this journey type to show what questions exist
             const [questionsRows] = await new Promise((resolve, reject) => {
                 const questionsSql = `
@@ -8670,7 +8702,7 @@ app.get('/api/getBookingDetail', async (req, res) => {
                     }
                 });
             });
-            
+
             // Format additional information
             const jsonData = (() => {
                 if (!booking.additional_information_json) return null;
@@ -8691,7 +8723,7 @@ app.get('/api/getBookingDetail', async (req, res) => {
                 try {
                     let parsedOptions = [];
                     let parsedJourneyTypes = [];
-                    
+
                     // Safely parse options
                     if (question.options) {
                         try {
@@ -8701,7 +8733,7 @@ app.get('/api/getBookingDetail', async (req, res) => {
                             parsedOptions = [];
                         }
                     }
-                    
+
                     // Safely parse journey_types
                     if (question.journey_types) {
                         try {
@@ -8711,7 +8743,7 @@ app.get('/api/getBookingDetail', async (req, res) => {
                             parsedJourneyTypes = [];
                         }
                     }
-                    
+
                     questionMap.set(question.id.toString(), {
                         id: question.id,
                         question_text: question.question_text,
@@ -8732,15 +8764,15 @@ app.get('/api/getBookingDetail', async (req, res) => {
             if (jsonData) {
                 console.log('Processing JSON data:', jsonData);
                 console.log('Question map keys:', Array.from(questionMap.keys()));
-                
+
                 Object.entries(jsonData).forEach(([key, value]) => {
                     if (key.startsWith('question_')) {
                         const questionId = key.replace('question_', '');
                         console.log('Processing question key:', key, 'questionId:', questionId);
-                        
+
                         const question = questionMap.get(questionId);
                         console.log('Found question for ID', questionId, ':', question);
-                        
+
                         if (question) {
                             jsonAnswers.push({
                                 question_id: parseInt(questionId),
@@ -8757,7 +8789,7 @@ app.get('/api/getBookingDetail', async (req, res) => {
                         }
                     }
                 });
-                
+
                 console.log('JSON answers created:', jsonAnswers);
             }
 
@@ -8769,7 +8801,7 @@ app.get('/api/getBookingDetail', async (req, res) => {
                     try {
                         let parsedOptions = [];
                         let parsedJourneyTypes = [];
-                        
+
                         // Safely parse options
                         if (question.options) {
                             try {
@@ -8779,7 +8811,7 @@ app.get('/api/getBookingDetail', async (req, res) => {
                                 parsedOptions = [];
                             }
                         }
-                        
+
                         // Safely parse journey_types
                         if (question.journey_types) {
                             if (Array.isArray(question.journey_types)) {
@@ -8793,7 +8825,7 @@ app.get('/api/getBookingDetail', async (req, res) => {
                                 }
                             }
                         }
-                        
+
                         return {
                             id: question.id,
                             question_text: question.question_text,
@@ -8864,7 +8896,7 @@ app.get('/api/getBookingDetail', async (req, res) => {
                 additional_information_json: jsonData
             };
         }
-        
+
         // Debug: Log what we're returning
         console.log('Returning additional information:', {
             questionsCount: additionalInformation.questions ? additionalInformation.questions.length : 0,
@@ -8873,7 +8905,7 @@ app.get('/api/getBookingDetail', async (req, res) => {
             answers: additionalInformation.answers,
             jsonData: additionalInformation.additional_information_json
         });
-        
+
         // For Private Charter, recalculate weather_refund_total_price (same logic as getAllBookingData)
         const isPrivateCharter = booking.experience === 'Private Charter' || booking.experience === 'Private';
         if (isPrivateCharter && booking.location) {
@@ -8885,11 +8917,11 @@ app.get('/api/getBookingDetail', async (req, res) => {
                         else resolve([rows]);
                     });
                 });
-                
+
                 if (activityRows && activityRows.length > 0) {
                     const activity = activityRows[0];
                     let pricingData = activity.private_charter_pricing;
-                    
+
                     if (typeof pricingData === 'string') {
                         try {
                             pricingData = JSON.parse(pricingData);
@@ -8898,16 +8930,16 @@ app.get('/api/getBookingDetail', async (req, res) => {
                             pricingData = null;
                         }
                     }
-                    
+
                     if (pricingData && typeof pricingData === 'object' && !Array.isArray(pricingData)) {
                         // Helper function to normalize voucher type for matching
                         const normalize = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ').replace(/[^a-z0-9\s]/g, '');
                         const voucherTypeNorm = normalize(booking.voucher_type);
-                        
+
                         // Find pricing for the voucher type
                         let voucherPricing = null;
                         let matchedKey = null;
-                        
+
                         // Try exact match first
                         for (const [key, value] of Object.entries(pricingData)) {
                             if (normalize(key) === voucherTypeNorm) {
@@ -8916,7 +8948,7 @@ app.get('/api/getBookingDetail', async (req, res) => {
                                 break;
                             }
                         }
-                        
+
                         // Try partial match if exact match failed
                         if (!voucherPricing) {
                             for (const [key, value] of Object.entries(pricingData)) {
@@ -8927,7 +8959,7 @@ app.get('/api/getBookingDetail', async (req, res) => {
                                 }
                             }
                         }
-                        
+
                         if (voucherPricing !== null && typeof voucherPricing === 'object') {
                             // Get price for passenger count (same logic as getAllBookingData)
                             const pax = parseInt(booking.pax) || 0;
@@ -8940,10 +8972,10 @@ app.get('/api/getBookingDetail', async (req, res) => {
                                 const parsed = parseFloat(val);
                                 return isNaN(parsed) ? null : parsed;
                             };
-                            
+
                             // Try direct lookup first (e.g., "2" or "2 passengers")
                             let voucherTypePrice = parsePrice(voucherPricing[String(pax)]);
-                            
+
                             // Try to match keys like "2 passengers", "3 passengers", etc.
                             if (voucherTypePrice === null) {
                                 for (const [key, value] of Object.entries(voucherPricing)) {
@@ -8957,12 +8989,12 @@ app.get('/api/getBookingDetail', async (req, res) => {
                                     }
                                 }
                             }
-                            
+
                             // If still no price found, try voucherPricing.price (fallback)
                             if (voucherTypePrice === null) {
                                 voucherTypePrice = parsePrice(voucherPricing.price);
                             }
-                            
+
                             if (voucherTypePrice !== null && voucherTypePrice > 0) {
                                 // Calculate weather_refund_total_price as 10% of voucher type price
                                 const paid = parseFloat(booking.paid) || 0;
@@ -8970,7 +9002,7 @@ app.get('/api/getBookingDetail', async (req, res) => {
                                 const weatherRefundPrice = parseFloat((voucherTypePrice * 0.1).toFixed(2));
                                 const totalWithWeatherRefund = voucherTypePrice + addOnPrice + weatherRefundPrice;
                                 const totalWithoutWeatherRefund = voucherTypePrice + addOnPrice;
-                                
+
                                 // Determine if weather refund was selected by comparing paid amount
                                 if (Math.abs(paid - totalWithWeatherRefund) <= 0.01) {
                                     // Paid amount exactly matches total with weather refund
@@ -9012,7 +9044,7 @@ app.get('/api/getBookingDetail', async (req, res) => {
                 }
             }
         }
-        
+
         res.json({
             success: true,
             booking,
@@ -9032,10 +9064,10 @@ app.post('/api/addPassenger', (req, res) => {
     if (!booking_id || !first_name || !last_name) {
         return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
-    
+
     const WEATHER_REFUND_PRICE = 47.5;
     const weatherRefundSelected = weather_refund === 1 || weather_refund === '1' || weather_refund === true;
-    
+
     // First, get current booking details including experience, location, activity_id, voucher_type, add_to_booking_items_total_price, choose_add_on, weather_refund_total_price, original_amount
     const getBookingSql = 'SELECT paid, pax, due, experience, location, activity_id, voucher_type, COALESCE(add_to_booking_items_total_price, 0) as add_on_price, COALESCE(weather_refund_total_price, 0) as weather_refund_price, COALESCE(original_amount, 0) as original_amount, choose_add_on FROM all_booking WHERE id = ? LIMIT 1';
     con.query(getBookingSql, [booking_id], (getErr, bookingRows) => {
@@ -9043,25 +9075,25 @@ app.post('/api/addPassenger', (req, res) => {
             console.error('Error fetching booking details:', getErr);
             return res.status(500).json({ success: false, message: 'Database error fetching booking' });
         }
-        
+
         if (!bookingRows || bookingRows.length === 0) {
             return res.status(404).json({ success: false, message: 'Booking not found' });
         }
-        
+
         const booking = bookingRows[0];
         const totalPaid = parseFloat(booking.paid) || 0;
         const addOnPrice = parseFloat(booking.add_on_price) || 0;
         const weatherRefundPrice = parseFloat(booking.weather_refund_price) || 0;
         const originalAmount = parseFloat(booking.original_amount) || 0;
         const chooseAddOn = booking.choose_add_on || '';
-        
+
         // If add_to_booking_items_total_price is 0 but choose_add_on exists, fetch from add_to_booking_items table
         let actualAddOnPrice = addOnPrice;
         if (addOnPrice === 0 && chooseAddOn && chooseAddOn !== '' && chooseAddOn !== 'null') {
             // We'll handle this in the calculation
             console.log('⚠️ Add-on item exists but price not stored, will fetch from add_to_booking_items table');
         }
-        
+
         // Calculate base paid (excluding add-on price and weather refund)
         const currentPaid = totalPaid - actualAddOnPrice - weatherRefundPrice;
         const currentPax = parseInt(booking.pax) || 1;
@@ -9069,7 +9101,7 @@ app.post('/api/addPassenger', (req, res) => {
         const experience = booking.experience || '';
         const location = booking.location || '';
         const voucherType = booking.voucher_type || '';
-        
+
         console.log('=== ADD PASSENGER - INITIAL INFO ===');
         console.log('Booking ID:', booking_id);
         console.log('Total Paid (with add-on):', totalPaid);
@@ -9081,10 +9113,10 @@ app.post('/api/addPassenger', (req, res) => {
         console.log('Location:', location);
         console.log('Voucher Type:', voucherType);
         console.log('Choose Add-on:', chooseAddOn);
-        
+
         // Check if this is a Private Charter booking
         const isPrivateCharter = experience === 'Private Charter' || experience.includes('Private');
-        
+
         if (isPrivateCharter && location) {
             // For Private Charter, get pricing from activity table based on passenger count
             const activitySql = 'SELECT private_charter_pricing FROM activity WHERE location = ? AND status = "Live" ORDER BY id DESC LIMIT 1';
@@ -9096,7 +9128,7 @@ app.post('/api/addPassenger', (req, res) => {
                     handlePassengerAddition(currentPaid / currentPax, null, null, null, null);
                     return;
                 }
-                
+
                 const activity = activityRows[0];
                 let pricingMap = {};
                 try {
@@ -9106,12 +9138,12 @@ app.post('/api/addPassenger', (req, res) => {
                     console.error('Error parsing private_charter_pricing:', e);
                     pricingMap = {};
                 }
-                
+
                 // New passenger count will be current + 1
                 const newPassengerCount = currentPax + 1;
                 console.log('New Passenger Count:', newPassengerCount);
                 console.log('Pricing Map:', pricingMap);
-                
+
                 // Helpers to normalise keys and extract passenger count
                 const normalizeKey = (s) => (s || '').toString().trim().toLowerCase();
                 const extractPassengerCount = (key) => {
@@ -9153,22 +9185,22 @@ app.post('/api/addPassenger', (req, res) => {
                 // Find the price for the new passenger count and voucher type
                 // The pricing map structure: { "Private Charter Flights": { "2 passengers": 900, "3 passengers": 1050, ... } }
                 let newTotalPrice = null;
-                
+
                 // Normalize voucher type for matching
                 const voucherTypeNormalized = normalizeKey(voucherType);
-                
+
                 // Try to find pricing for the voucher type (exact/partial match)
                 for (const [key, prices] of Object.entries(pricingMap)) {
                     const normalizedKey = normalizeKey(key);
                     const isPrivateKey = normalizedKey.includes('private') || normalizedKey.includes('proposal');
                     const matchesVoucherType = voucherTypeNormalized
                         ? normalizedKey === voucherTypeNormalized ||
-                          normalizedKey.includes(voucherTypeNormalized) ||
-                          voucherTypeNormalized.includes(normalizedKey)
+                        normalizedKey.includes(voucherTypeNormalized) ||
+                        voucherTypeNormalized.includes(normalizedKey)
                         : isPrivateKey;
-                    
+
                     if (!matchesVoucherType) continue;
-                    
+
                     const priceForCount = getPriceForCount(prices, newPassengerCount);
                     if (priceForCount !== null) {
                         newTotalPrice = priceForCount;
@@ -9176,7 +9208,7 @@ app.post('/api/addPassenger', (req, res) => {
                         break;
                     }
                 }
-                
+
                 // If still not found, attempt to find pricing regardless of voucher type (fallback)
                 if (newTotalPrice === null) {
                     for (const prices of Object.values(pricingMap)) {
@@ -9188,7 +9220,7 @@ app.post('/api/addPassenger', (req, res) => {
                         }
                     }
                 }
-                
+
                 // If no specific pricing found, fallback to current average
                 if (newTotalPrice === null) {
                     console.log('No activity pricing found, using equal division');
@@ -9206,7 +9238,7 @@ app.post('/api/addPassenger', (req, res) => {
                     console.log('Base Paid (excluding add-ons):', currentPaid);
                     console.log('New Due:', newDue);
                     console.log('New original_amount will be:', newTotalPrice);
-                    
+
                     // For Private Charter, newGuestPrice is not used (pass null)
                     handlePassengerAddition(0, newDue, newTotalPrice, null, null); // Pass newTotalPrice as 3rd param
                 }
@@ -9219,7 +9251,7 @@ app.post('/api/addPassenger', (req, res) => {
                 handlePassengerAddition(0, Math.max(0, currentDue), null, weatherRefundPrice, 0);
                 return;
             }
-            
+
             // For add-guest passengers: calculate price as originalAmount / currentPax (BEFORE adding new guest)
             // This is the price per passenger based on original amount divided by existing passenger count
             // The new guest will pay this same price
@@ -9236,19 +9268,19 @@ app.post('/api/addPassenger', (req, res) => {
                 newGuestPrice = basePricePerPassenger;
                 console.log('⚠️ Original Amount not available, using average price per passenger:', newGuestPrice);
             }
-            
+
             // Calculate new passenger's weather refund (if selected)
             const newPassengerWeatherRefund = weatherRefundSelected ? WEATHER_REFUND_PRICE : 0;
-            
+
             // Calculate new weather refund total (existing + new passenger's weather refund if selected)
             const newWeatherRefundTotal = weatherRefundPrice + newPassengerWeatherRefund;
-            
+
             // New due calculation for add-guest:
             // The new guest pays: newGuestPrice + weather refund (if selected)
             // New due = currentDue + newGuestPrice + newPassengerWeatherRefund
             // This adds the new guest's price to the existing due
             const newDue = currentDue + newGuestPrice + newPassengerWeatherRefund;
-            
+
             console.log('=== SHARED FLIGHT ADD-GUEST PRICING ===');
             console.log('Total Paid (includes existing weather refund):', totalPaid);
             console.log('Current Paid (base, excluding weather refund):', currentPaid);
@@ -9260,126 +9292,126 @@ app.post('/api/addPassenger', (req, res) => {
             console.log('New Passenger Weather Refund Price:', newPassengerWeatherRefund);
             console.log('New Weather Refund Total:', newWeatherRefundTotal);
             console.log('New Due (currentDue + newGuestPrice + newPassengerWeatherRefund):', newDue);
-            
+
             // Set absolute due and weather refund total (no original_amount update for shared flight)
             // Pass newGuestPrice as 5th parameter to store in passenger table
             handlePassengerAddition(0, newDue, null, newWeatherRefundTotal, newGuestPrice);
         }
-        
+
         // Helper function to handle passenger addition
         function handlePassengerAddition(pricePerPassenger, absoluteDue = null, newTotalPrice = null, newWeatherRefundTotal = null, newGuestPrice = null) {
-        
-    // passenger tablosunda email, phone, ticket_type, weight, weather_refund ve price bilgisi varsa ekle
-    // For add-guest passengers (Shared Flight), store the calculated price (originalAmount / currentPax)
-    // For Private Charter, price is typically 0 or calculated differently
-    const sql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund, price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
-    const priceToStore = newGuestPrice !== null ? newGuestPrice : (pricePerPassenger || 0);
-    const values = [booking_id, first_name, last_name, weight || null, email || null, phone || null, ticket_type || null, weatherRefundSelected ? 1 : 0, priceToStore];
-    con.query(sql, values, (err, result) => {
-        if (err) {
-            console.error('Error adding passenger:', err);
-            return res.status(500).json({ success: false, message: 'Database error' });
-        }
-            
-            // After insert, update pax count, due amount, and original_amount
-            // When absoluteDue is provided, set due directly (used for Private Charter and adjusted Shared logic)
-            // Otherwise (legacy Shared Flight flow), add pricePerPassenger to current due
-            let updateBookingSql, updateParams;
-            
-            if (absoluteDue !== null) {
-                if (newTotalPrice !== null) {
-                    // Private Charter: set due to absolute value from activity pricing
-                    // Also update original_amount to reflect base price (excluding add-ons and weather refund)
-                    updateBookingSql = `
+
+            // passenger tablosunda email, phone, ticket_type, weight, weather_refund ve price bilgisi varsa ekle
+            // For add-guest passengers (Shared Flight), store the calculated price (originalAmount / currentPax)
+            // For Private Charter, price is typically 0 or calculated differently
+            const sql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund, price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
+            const priceToStore = newGuestPrice !== null ? newGuestPrice : (pricePerPassenger || 0);
+            const values = [booking_id, first_name, last_name, weight || null, email || null, phone || null, ticket_type || null, weatherRefundSelected ? 1 : 0, priceToStore];
+            con.query(sql, values, (err, result) => {
+                if (err) {
+                    console.error('Error adding passenger:', err);
+                    return res.status(500).json({ success: false, message: 'Database error' });
+                }
+
+                // After insert, update pax count, due amount, and original_amount
+                // When absoluteDue is provided, set due directly (used for Private Charter and adjusted Shared logic)
+                // Otherwise (legacy Shared Flight flow), add pricePerPassenger to current due
+                let updateBookingSql, updateParams;
+
+                if (absoluteDue !== null) {
+                    if (newTotalPrice !== null) {
+                        // Private Charter: set due to absolute value from activity pricing
+                        // Also update original_amount to reflect base price (excluding add-ons and weather refund)
+                        updateBookingSql = `
                         UPDATE all_booking 
                         SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
                             due = ?,
                             original_amount = ?
                         WHERE id = ?
                     `;
-                    updateParams = [booking_id, absoluteDue, newTotalPrice, booking_id];
-                    console.log('Setting absolute due for Private Charter:', absoluteDue);
-                    console.log('Updating original_amount to:', newTotalPrice);
-                } else {
-                    // Shared Flight (absolute due provided): update due and weather_refund_total_price
-                    if (newWeatherRefundTotal !== null) {
-                        updateBookingSql = `
+                        updateParams = [booking_id, absoluteDue, newTotalPrice, booking_id];
+                        console.log('Setting absolute due for Private Charter:', absoluteDue);
+                        console.log('Updating original_amount to:', newTotalPrice);
+                    } else {
+                        // Shared Flight (absolute due provided): update due and weather_refund_total_price
+                        if (newWeatherRefundTotal !== null) {
+                            updateBookingSql = `
                             UPDATE all_booking 
                             SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
                                 due = ?,
                                 weather_refund_total_price = ?
                             WHERE id = ?
                         `;
-                        updateParams = [booking_id, absoluteDue, newWeatherRefundTotal, booking_id];
-                        console.log('Setting absolute due for Shared Flight:', absoluteDue);
-                        console.log('Updating weather_refund_total_price to:', newWeatherRefundTotal);
-                    } else {
-                        updateBookingSql = `
+                            updateParams = [booking_id, absoluteDue, newWeatherRefundTotal, booking_id];
+                            console.log('Setting absolute due for Shared Flight:', absoluteDue);
+                            console.log('Updating weather_refund_total_price to:', newWeatherRefundTotal);
+                        } else {
+                            updateBookingSql = `
                             UPDATE all_booking 
                             SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
                                 due = ?
                             WHERE id = ?
                         `;
-                        updateParams = [booking_id, absoluteDue, booking_id];
-                        console.log('Setting absolute due for Shared Flight:', absoluteDue);
+                            updateParams = [booking_id, absoluteDue, booking_id];
+                            console.log('Setting absolute due for Shared Flight:', absoluteDue);
+                        }
                     }
-                }
-            } else {
-                // Legacy Shared Flight path: add to current due
-                updateBookingSql = `
+                } else {
+                    // Legacy Shared Flight path: add to current due
+                    updateBookingSql = `
                 UPDATE all_booking 
                 SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
                     due = COALESCE(due, 0) + ?
                 WHERE id = ?
             `;
-                updateParams = [booking_id, pricePerPassenger, booking_id];
-                console.log('Adding to due for Shared Flight:', pricePerPassenger);
-            }
-            
-            con.query(updateBookingSql, updateParams, (err2, updateResult) => {
-            if (err2) {
-                    console.error('Error updating pax and due after addPassenger:', err2);
-                // Still return success for passenger creation
-                    return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: false, dueUpdated: false });
-            }
-                
-                const finalDue = absoluteDue !== null ? absoluteDue : (currentDue + pricePerPassenger);
-                console.log('✅ Updated booking - New due:', finalDue);
-                console.log('✅ Pax updated, rows affected:', updateResult.affectedRows);
-                
-			// Also recompute availability for this booking's slot
-			const bookingInfoSql = 'SELECT flight_date, time_slot, activity_id, location FROM all_booking WHERE id = ? LIMIT 1';
-			con.query(bookingInfoSql, [booking_id], (infoErr, infoRows) => {
-				if (infoErr) {
-					console.error('Error fetching booking info for availability update after addPassenger:', infoErr);
-                        return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: false, newDue: finalDue });
-				}
-				if (!infoRows || infoRows.length === 0) {
-                        return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: false, newDue: finalDue });
-				}
-				const row = infoRows[0];
-				const bookingDate = (row.flight_date ? dayjs(row.flight_date).format('YYYY-MM-DD') : null);
-				const bookingTime = (row.time_slot ? dayjs(`2000-01-01 ${row.time_slot}`).format('HH:mm') : (row.flight_date ? dayjs(row.flight_date).format('HH:mm') : null));
-				const activityId = row.activity_id;
-				if (bookingDate && bookingTime && activityId) {
-					updateSpecificAvailability(bookingDate, bookingTime, activityId, 1);
-                        return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: true, newDue: finalDue });
-				}
-				if (bookingDate && bookingTime && row.location && !activityId) {
-					const activitySql = 'SELECT id FROM activity WHERE location = ? AND status = "Live" LIMIT 1';
-					con.query(activitySql, [row.location], (actErr, actRows) => {
-						if (!actErr && actRows && actRows.length > 0) {
-							updateSpecificAvailability(bookingDate, bookingTime, actRows[0].id, 1);
-                                return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: true, newDue: finalDue });
-						}
+                    updateParams = [booking_id, pricePerPassenger, booking_id];
+                    console.log('Adding to due for Shared Flight:', pricePerPassenger);
+                }
+
+                con.query(updateBookingSql, updateParams, (err2, updateResult) => {
+                    if (err2) {
+                        console.error('Error updating pax and due after addPassenger:', err2);
+                        // Still return success for passenger creation
+                        return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: false, dueUpdated: false });
+                    }
+
+                    const finalDue = absoluteDue !== null ? absoluteDue : (currentDue + pricePerPassenger);
+                    console.log('✅ Updated booking - New due:', finalDue);
+                    console.log('✅ Pax updated, rows affected:', updateResult.affectedRows);
+
+                    // Also recompute availability for this booking's slot
+                    const bookingInfoSql = 'SELECT flight_date, time_slot, activity_id, location FROM all_booking WHERE id = ? LIMIT 1';
+                    con.query(bookingInfoSql, [booking_id], (infoErr, infoRows) => {
+                        if (infoErr) {
+                            console.error('Error fetching booking info for availability update after addPassenger:', infoErr);
                             return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: false, newDue: finalDue });
-					});
-					return; // response will be sent in callback above
-				}
-                    return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: false, newDue: finalDue });
+                        }
+                        if (!infoRows || infoRows.length === 0) {
+                            return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: false, newDue: finalDue });
+                        }
+                        const row = infoRows[0];
+                        const bookingDate = (row.flight_date ? dayjs(row.flight_date).format('YYYY-MM-DD') : null);
+                        const bookingTime = (row.time_slot ? dayjs(`2000-01-01 ${row.time_slot}`).format('HH:mm') : (row.flight_date ? dayjs(row.flight_date).format('HH:mm') : null));
+                        const activityId = row.activity_id;
+                        if (bookingDate && bookingTime && activityId) {
+                            updateSpecificAvailability(bookingDate, bookingTime, activityId, 1);
+                            return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: true, newDue: finalDue });
+                        }
+                        if (bookingDate && bookingTime && row.location && !activityId) {
+                            const activitySql = 'SELECT id FROM activity WHERE location = ? AND status = "Live" LIMIT 1';
+                            con.query(activitySql, [row.location], (actErr, actRows) => {
+                                if (!actErr && actRows && actRows.length > 0) {
+                                    updateSpecificAvailability(bookingDate, bookingTime, actRows[0].id, 1);
+                                    return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: true, newDue: finalDue });
+                                }
+                                return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: false, newDue: finalDue });
+                            });
+                            return; // response will be sent in callback above
+                        }
+                        return res.status(201).json({ success: true, passengerId: result.insertId, paxUpdated: true, dueUpdated: true, availabilityUpdated: false, newDue: finalDue });
+                    });
                 });
-			});
-        });
+            });
         }
     });
 });
@@ -9387,13 +9419,13 @@ app.post('/api/addPassenger', (req, res) => {
 // Delete Passenger from booking
 app.delete('/api/deletePassenger', (req, res) => {
     const { passenger_id, booking_id } = req.body;
-    
+
     if (!passenger_id || !booking_id) {
         return res.status(400).json({ success: false, message: 'passenger_id and booking_id are required' });
     }
-    
+
     const WEATHER_REFUND_PRICE = 47.5;
-    
+
     // First, get the passenger being deleted to check if they have weather refund
     const getPassengerSql = 'SELECT weather_refund FROM passenger WHERE id = ? AND booking_id = ?';
     con.query(getPassengerSql, [passenger_id, booking_id], (passErr, passengerRows) => {
@@ -9401,9 +9433,9 @@ app.delete('/api/deletePassenger', (req, res) => {
             console.error('Error fetching passenger details:', passErr);
             return res.status(500).json({ success: false, message: 'Database error fetching passenger' });
         }
-        
+
         const deletedPassengerHasWeatherRefund = passengerRows && passengerRows.length > 0 && Number(passengerRows[0].weather_refund) === 1;
-        
+
         // First, get current booking details including experience, location, voucher_type, add_to_booking_items_total_price, choose_add_on, weather_refund_total_price
         const getBookingSql = 'SELECT paid, pax, due, experience, location, voucher_type, COALESCE(add_to_booking_items_total_price, 0) as add_on_price, COALESCE(weather_refund_total_price, 0) as weather_refund_price, choose_add_on FROM all_booking WHERE id = ? LIMIT 1';
         con.query(getBookingSql, [booking_id], (getErr, bookingRows) => {
@@ -9411,294 +9443,294 @@ app.delete('/api/deletePassenger', (req, res) => {
                 console.error('Error fetching booking details:', getErr);
                 return res.status(500).json({ success: false, message: 'Database error fetching booking' });
             }
-            
+
             if (!bookingRows || bookingRows.length === 0) {
                 return res.status(404).json({ success: false, message: 'Booking not found' });
             }
-            
+
             const booking = bookingRows[0];
             const totalPaid = parseFloat(booking.paid) || 0;
             const addOnPrice = parseFloat(booking.add_on_price) || 0;
             const weatherRefundPrice = parseFloat(booking.weather_refund_price) || 0;
             const chooseAddOn = booking.choose_add_on || '';
-            
+
             // Calculate base paid (excluding add-on price and weather refund)
             const currentPaid = totalPaid - addOnPrice - weatherRefundPrice;
-        const currentPax = parseInt(booking.pax) || 1;
-        const currentDue = parseFloat(booking.due) || 0;
-        const experience = booking.experience || '';
-        const location = booking.location || '';
-        const voucherType = booking.voucher_type || '';
-        
-        console.log('=== DELETE PASSENGER - INITIAL INFO ===');
-        console.log('Booking ID:', booking_id);
-        console.log('Total Paid (with add-on):', totalPaid);
-        console.log('Add-on Price:', addOnPrice);
-        console.log('Base Paid (for passengers):', currentPaid);
-        console.log('Current Pax:', currentPax);
-        console.log('Current Due:', currentDue);
-        console.log('Experience:', experience);
-        console.log('Location:', location);
-        console.log('Voucher Type:', voucherType);
-        console.log('Choose Add-on:', chooseAddOn);
-        
-        // Delete the passenger
-    const deletePassengerSql = 'DELETE FROM passenger WHERE id = ? AND booking_id = ?';
-    con.query(deletePassengerSql, [passenger_id, booking_id], (err, result) => {
-        if (err) {
-            console.error('Error deleting passenger:', err);
-            return res.status(500).json({ success: false, message: 'Database error while deleting passenger' });
-        }
-        
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ success: false, message: 'Passenger not found or does not belong to this booking' });
-        }
-        
-            // Check if this is a Private Charter booking
-            const isPrivateCharter = experience === 'Private Charter' || experience.includes('Private');
-            
-            // Calculate new due based on experience type
-            if (isPrivateCharter && location) {
-                // For Private Charter, get pricing from activity table based on new passenger count
-                const activitySql = 'SELECT private_charter_pricing FROM activity WHERE location = ? AND status = "Live" ORDER BY id DESC LIMIT 1';
-                con.query(activitySql, [location], (actErr, activityRows) => {
-                    if (actErr || !activityRows || activityRows.length === 0) {
-                        console.error('Error fetching activity pricing:', actErr);
-                        // Fallback to simple subtraction
-                        handleDueUpdate(Math.max(0, currentDue - (currentPaid / currentPax)));
-                        return;
-                    }
-                    
-                    const activity = activityRows[0];
-                    let pricingMap = {};
-                    try {
-                        const raw = activity.private_charter_pricing;
-                        pricingMap = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
-                    } catch (e) {
-                        console.error('Error parsing private_charter_pricing:', e);
-                        pricingMap = {};
-                    }
-                    
-                    // New passenger count after deletion
-                    const newPassengerCount = currentPax - 1;
-                    console.log('New Passenger Count after deletion:', newPassengerCount);
-                    console.log('Pricing Map:', pricingMap);
-                    
-                    const normalizeKey = (s) => (s || '').toString().trim().toLowerCase();
-                    const extractPassengerCount = (key) => {
-                        if (typeof key === 'number') return key;
-                        if (typeof key === 'string') {
-                            const match = key.match(/\d+/);
-                            if (match) {
-                                const parsed = parseInt(match[0], 10);
-                                return isNaN(parsed) ? null : parsed;
+            const currentPax = parseInt(booking.pax) || 1;
+            const currentDue = parseFloat(booking.due) || 0;
+            const experience = booking.experience || '';
+            const location = booking.location || '';
+            const voucherType = booking.voucher_type || '';
+
+            console.log('=== DELETE PASSENGER - INITIAL INFO ===');
+            console.log('Booking ID:', booking_id);
+            console.log('Total Paid (with add-on):', totalPaid);
+            console.log('Add-on Price:', addOnPrice);
+            console.log('Base Paid (for passengers):', currentPaid);
+            console.log('Current Pax:', currentPax);
+            console.log('Current Due:', currentDue);
+            console.log('Experience:', experience);
+            console.log('Location:', location);
+            console.log('Voucher Type:', voucherType);
+            console.log('Choose Add-on:', chooseAddOn);
+
+            // Delete the passenger
+            const deletePassengerSql = 'DELETE FROM passenger WHERE id = ? AND booking_id = ?';
+            con.query(deletePassengerSql, [passenger_id, booking_id], (err, result) => {
+                if (err) {
+                    console.error('Error deleting passenger:', err);
+                    return res.status(500).json({ success: false, message: 'Database error while deleting passenger' });
+                }
+
+                if (result.affectedRows === 0) {
+                    return res.status(404).json({ success: false, message: 'Passenger not found or does not belong to this booking' });
+                }
+
+                // Check if this is a Private Charter booking
+                const isPrivateCharter = experience === 'Private Charter' || experience.includes('Private');
+
+                // Calculate new due based on experience type
+                if (isPrivateCharter && location) {
+                    // For Private Charter, get pricing from activity table based on new passenger count
+                    const activitySql = 'SELECT private_charter_pricing FROM activity WHERE location = ? AND status = "Live" ORDER BY id DESC LIMIT 1';
+                    con.query(activitySql, [location], (actErr, activityRows) => {
+                        if (actErr || !activityRows || activityRows.length === 0) {
+                            console.error('Error fetching activity pricing:', actErr);
+                            // Fallback to simple subtraction
+                            handleDueUpdate(Math.max(0, currentDue - (currentPaid / currentPax)));
+                            return;
+                        }
+
+                        const activity = activityRows[0];
+                        let pricingMap = {};
+                        try {
+                            const raw = activity.private_charter_pricing;
+                            pricingMap = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
+                        } catch (e) {
+                            console.error('Error parsing private_charter_pricing:', e);
+                            pricingMap = {};
+                        }
+
+                        // New passenger count after deletion
+                        const newPassengerCount = currentPax - 1;
+                        console.log('New Passenger Count after deletion:', newPassengerCount);
+                        console.log('Pricing Map:', pricingMap);
+
+                        const normalizeKey = (s) => (s || '').toString().trim().toLowerCase();
+                        const extractPassengerCount = (key) => {
+                            if (typeof key === 'number') return key;
+                            if (typeof key === 'string') {
+                                const match = key.match(/\d+/);
+                                if (match) {
+                                    const parsed = parseInt(match[0], 10);
+                                    return isNaN(parsed) ? null : parsed;
+                                }
                             }
-                        }
-                        return null;
-                    };
-                    const parsePrice = (val) => {
-                        if (val === undefined || val === null || val === '') return null;
-                        if (typeof val === 'string') {
-                            val = val.replace(/[^0-9.\-]/g, '').trim();
-                        }
-                        const parsed = parseFloat(val);
-                        return isNaN(parsed) ? null : parsed;
-                    };
-                    const getPriceForCount = (pricesObj, count) => {
-                        if (!pricesObj || typeof pricesObj !== 'object') return null;
-                        const direct = pricesObj[String(count)] ?? pricesObj[count];
-                        const directParsed = parsePrice(direct);
-                        if (directParsed !== null) return directParsed;
-                        for (const [k, v] of Object.entries(pricesObj)) {
-                            const extracted = extractPassengerCount(k);
-                            if (extracted === count) {
-                                const parsed = parsePrice(v);
-                                if (parsed !== null) return parsed;
+                            return null;
+                        };
+                        const parsePrice = (val) => {
+                            if (val === undefined || val === null || val === '') return null;
+                            if (typeof val === 'string') {
+                                val = val.replace(/[^0-9.\-]/g, '').trim();
                             }
-                        }
-                        return null;
-                    };
-                    
-                    let newTotalPrice = null;
-                    const voucherTypeNormalized = normalizeKey(voucherType);
-                    
-                    for (const [key, prices] of Object.entries(pricingMap)) {
-                        const normalizedKey = normalizeKey(key);
-                        const isPrivateKey = normalizedKey.includes('private') || normalizedKey.includes('proposal');
-                        const matchesVoucherType = voucherTypeNormalized
-                            ? normalizedKey === voucherTypeNormalized ||
-                              normalizedKey.includes(voucherTypeNormalized) ||
-                              voucherTypeNormalized.includes(normalizedKey)
-                            : isPrivateKey;
-                        
-                        if (!matchesVoucherType) continue;
-                        
-                        const priceForCount = getPriceForCount(prices, newPassengerCount);
-                        if (priceForCount !== null) {
-                            newTotalPrice = priceForCount;
-                            console.log(`Found price for ${newPassengerCount} passengers after deletion under key "${key}":`, newTotalPrice);
-                            break;
-                        }
-                    }
-                    
-                    if (newTotalPrice === null) {
-                        // Fallback to any pricing entry
-                        for (const prices of Object.values(pricingMap)) {
+                            const parsed = parseFloat(val);
+                            return isNaN(parsed) ? null : parsed;
+                        };
+                        const getPriceForCount = (pricesObj, count) => {
+                            if (!pricesObj || typeof pricesObj !== 'object') return null;
+                            const direct = pricesObj[String(count)] ?? pricesObj[count];
+                            const directParsed = parsePrice(direct);
+                            if (directParsed !== null) return directParsed;
+                            for (const [k, v] of Object.entries(pricesObj)) {
+                                const extracted = extractPassengerCount(k);
+                                if (extracted === count) {
+                                    const parsed = parsePrice(v);
+                                    if (parsed !== null) return parsed;
+                                }
+                            }
+                            return null;
+                        };
+
+                        let newTotalPrice = null;
+                        const voucherTypeNormalized = normalizeKey(voucherType);
+
+                        for (const [key, prices] of Object.entries(pricingMap)) {
+                            const normalizedKey = normalizeKey(key);
+                            const isPrivateKey = normalizedKey.includes('private') || normalizedKey.includes('proposal');
+                            const matchesVoucherType = voucherTypeNormalized
+                                ? normalizedKey === voucherTypeNormalized ||
+                                normalizedKey.includes(voucherTypeNormalized) ||
+                                voucherTypeNormalized.includes(normalizedKey)
+                                : isPrivateKey;
+
+                            if (!matchesVoucherType) continue;
+
                             const priceForCount = getPriceForCount(prices, newPassengerCount);
                             if (priceForCount !== null) {
                                 newTotalPrice = priceForCount;
-                                console.log(`Fallback pricing used after deletion for ${newPassengerCount} passengers:`, newTotalPrice);
+                                console.log(`Found price for ${newPassengerCount} passengers after deletion under key "${key}":`, newTotalPrice);
                                 break;
                             }
                         }
+
+                        if (newTotalPrice === null) {
+                            // Fallback to any pricing entry
+                            for (const prices of Object.values(pricingMap)) {
+                                const priceForCount = getPriceForCount(prices, newPassengerCount);
+                                if (priceForCount !== null) {
+                                    newTotalPrice = priceForCount;
+                                    console.log(`Fallback pricing used after deletion for ${newPassengerCount} passengers:`, newTotalPrice);
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (newTotalPrice === null) {
+                            console.log('No activity pricing found for new count, using simple subtraction');
+                            handleDueUpdate(Math.max(0, currentDue - (currentPaid / currentPax)), null);
+                        } else {
+                            // Calculate new due: newTotalPrice - currentPaid (base, excluding add-ons)
+                            const newDue = Math.max(0, newTotalPrice - currentPaid);
+                            console.log('=== PRIVATE CHARTER DELETE PRICING ===');
+                            console.log('New Total Price from Activity:', newTotalPrice);
+                            console.log('Base Paid (excluding add-ons):', currentPaid);
+                            console.log('New Due:', newDue);
+                            console.log('New original_amount will be:', newTotalPrice);
+                            handleDueUpdate(newDue, newTotalPrice);
+                        }
+                    });
+                } else {
+                    // For Shared Flight, recompute due based on per-passenger price
+                    const newPassengerCount = currentPax - 1;
+                    if (newPassengerCount <= 0) {
+                        console.warn('Invalid passenger count after deletion (Shared Flight). Setting due to 0.');
+                        // Calculate new weather refund total (remove deleted passenger's weather refund if they had it)
+                        const newWeatherRefundTotal = Math.max(0, weatherRefundPrice - (deletedPassengerHasWeatherRefund ? WEATHER_REFUND_PRICE : 0));
+                        handleDueUpdate(0, null, newWeatherRefundTotal);
+                        return;
                     }
-                    
-                    if (newTotalPrice === null) {
-                        console.log('No activity pricing found for new count, using simple subtraction');
-                        handleDueUpdate(Math.max(0, currentDue - (currentPaid / currentPax)), null);
-                    } else {
-                        // Calculate new due: newTotalPrice - currentPaid (base, excluding add-ons)
-                        const newDue = Math.max(0, newTotalPrice - currentPaid);
-                        console.log('=== PRIVATE CHARTER DELETE PRICING ===');
-                        console.log('New Total Price from Activity:', newTotalPrice);
-                        console.log('Base Paid (excluding add-ons):', currentPaid);
-                        console.log('New Due:', newDue);
-                        console.log('New original_amount will be:', newTotalPrice);
-                        handleDueUpdate(newDue, newTotalPrice);
-                    }
-                });
-            } else {
-                // For Shared Flight, recompute due based on per-passenger price
-                const newPassengerCount = currentPax - 1;
-                if (newPassengerCount <= 0) {
-                    console.warn('Invalid passenger count after deletion (Shared Flight). Setting due to 0.');
+
+                    // Base price per passenger is total (paid + due) divided by current passenger count
+                    // Exclude weather refund from base calculation
+                    const basePricePerPassenger = (currentPaid + currentDue) / currentPax;
+                    const newBaseTotal = basePricePerPassenger * newPassengerCount;
+
                     // Calculate new weather refund total (remove deleted passenger's weather refund if they had it)
-                    const newWeatherRefundTotal = Math.max(0, weatherRefundPrice - (deletedPassengerHasWeatherRefund ? WEATHER_REFUND_PRICE : 0));
-                    handleDueUpdate(0, null, newWeatherRefundTotal);
-                    return;
+                    const deletedPassengerWeatherRefund = deletedPassengerHasWeatherRefund ? WEATHER_REFUND_PRICE : 0;
+                    const newWeatherRefundTotal = Math.max(0, weatherRefundPrice - deletedPassengerWeatherRefund);
+
+                    // New due calculation:
+                    // If deleted passenger had weather refund, it should be removed from due
+                    // Because totalPaid already includes the deleted passenger's weather refund
+                    // So we need to subtract it from due
+                    const newDue = Math.max(0, newBaseTotal - currentPaid - deletedPassengerWeatherRefund);
+
+                    console.log('=== SHARED FLIGHT DELETE PRICING ===');
+                    console.log('Total Paid (includes deleted passenger weather refund):', totalPaid);
+                    console.log('Current Paid (base, excluding weather refund):', currentPaid);
+                    console.log('Current Due:', currentDue);
+                    console.log('Current Pax:', currentPax);
+                    console.log('Current Weather Refund Total:', weatherRefundPrice);
+                    console.log('Base Price Per Passenger:', basePricePerPassenger);
+                    console.log('New Passenger Count:', newPassengerCount);
+                    console.log('New Base Total (excluding weather refund):', newBaseTotal);
+                    console.log('Deleted Passenger Has Weather Refund:', deletedPassengerHasWeatherRefund);
+                    console.log('Deleted Passenger Weather Refund Price:', deletedPassengerWeatherRefund);
+                    console.log('New Weather Refund Total:', newWeatherRefundTotal);
+                    console.log('New Due after deletion (base - deleted passenger weather refund):', newDue);
+
+                    handleDueUpdate(newDue, null, newWeatherRefundTotal);
                 }
-                
-                // Base price per passenger is total (paid + due) divided by current passenger count
-                // Exclude weather refund from base calculation
-                const basePricePerPassenger = (currentPaid + currentDue) / currentPax;
-                const newBaseTotal = basePricePerPassenger * newPassengerCount;
-                
-                // Calculate new weather refund total (remove deleted passenger's weather refund if they had it)
-                const deletedPassengerWeatherRefund = deletedPassengerHasWeatherRefund ? WEATHER_REFUND_PRICE : 0;
-                const newWeatherRefundTotal = Math.max(0, weatherRefundPrice - deletedPassengerWeatherRefund);
-                
-                // New due calculation:
-                // If deleted passenger had weather refund, it should be removed from due
-                // Because totalPaid already includes the deleted passenger's weather refund
-                // So we need to subtract it from due
-                const newDue = Math.max(0, newBaseTotal - currentPaid - deletedPassengerWeatherRefund);
-                
-                console.log('=== SHARED FLIGHT DELETE PRICING ===');
-                console.log('Total Paid (includes deleted passenger weather refund):', totalPaid);
-                console.log('Current Paid (base, excluding weather refund):', currentPaid);
-                console.log('Current Due:', currentDue);
-                console.log('Current Pax:', currentPax);
-                console.log('Current Weather Refund Total:', weatherRefundPrice);
-                console.log('Base Price Per Passenger:', basePricePerPassenger);
-                console.log('New Passenger Count:', newPassengerCount);
-                console.log('New Base Total (excluding weather refund):', newBaseTotal);
-                console.log('Deleted Passenger Has Weather Refund:', deletedPassengerHasWeatherRefund);
-                console.log('Deleted Passenger Weather Refund Price:', deletedPassengerWeatherRefund);
-                console.log('New Weather Refund Total:', newWeatherRefundTotal);
-                console.log('New Due after deletion (base - deleted passenger weather refund):', newDue);
-                
-                handleDueUpdate(newDue, null, newWeatherRefundTotal);
-            }
-            
-            // Helper function to update due and original_amount in database
-            function handleDueUpdate(newDue, newTotalPrice = null, newWeatherRefundTotal = null) {
-            
-            console.log('Final New Due:', newDue);
-            if (newTotalPrice !== null) {
-                console.log('Updating original_amount to:', newTotalPrice);
-            }
-            if (newWeatherRefundTotal !== null) {
-                console.log('Updating weather_refund_total_price to:', newWeatherRefundTotal);
-            }
-            
-            let updateBookingSql, updateParams;
-            
-            if (newTotalPrice !== null) {
-                // Update both due and original_amount for Private Charter
-                updateBookingSql = `
+
+                // Helper function to update due and original_amount in database
+                function handleDueUpdate(newDue, newTotalPrice = null, newWeatherRefundTotal = null) {
+
+                    console.log('Final New Due:', newDue);
+                    if (newTotalPrice !== null) {
+                        console.log('Updating original_amount to:', newTotalPrice);
+                    }
+                    if (newWeatherRefundTotal !== null) {
+                        console.log('Updating weather_refund_total_price to:', newWeatherRefundTotal);
+                    }
+
+                    let updateBookingSql, updateParams;
+
+                    if (newTotalPrice !== null) {
+                        // Update both due and original_amount for Private Charter
+                        updateBookingSql = `
                     UPDATE all_booking 
                     SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
                         due = ?,
                         original_amount = ?
                     WHERE id = ?
                 `;
-                updateParams = [booking_id, newDue, newTotalPrice, booking_id];
-            } else if (newWeatherRefundTotal !== null) {
-                // Update due and weather_refund_total_price for Shared Flight
-                updateBookingSql = `
+                        updateParams = [booking_id, newDue, newTotalPrice, booking_id];
+                    } else if (newWeatherRefundTotal !== null) {
+                        // Update due and weather_refund_total_price for Shared Flight
+                        updateBookingSql = `
                     UPDATE all_booking 
                     SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
                         due = ?,
                         weather_refund_total_price = ?
                     WHERE id = ?
                 `;
-                updateParams = [booking_id, newDue, newWeatherRefundTotal, booking_id];
-            } else {
-                // Update only due for Shared Flight (legacy path)
-                updateBookingSql = `
+                        updateParams = [booking_id, newDue, newWeatherRefundTotal, booking_id];
+                    } else {
+                        // Update only due for Shared Flight (legacy path)
+                        updateBookingSql = `
                 UPDATE all_booking 
                 SET pax = (SELECT COUNT(*) FROM passenger WHERE booking_id = ?),
                     due = ?
                 WHERE id = ?
             `;
-                updateParams = [booking_id, newDue, booking_id];
-            }
-            
-            con.query(updateBookingSql, updateParams, (err2) => {
-            if (err2) {
-                    console.error('Error updating pax and due after deletePassenger:', err2);
-                // Still return success for passenger deletion
-                    return res.status(200).json({ success: true, message: 'Passenger deleted but pax/due update failed', paxUpdated: false, dueUpdated: false });
-            }
-            
-                console.log('✅ Updated booking - New due:', newDue);
-            
-            
-		// Recompute availability for this booking's slot
-		const bookingInfoSql = 'SELECT pax, flight_date, time_slot, activity_id, location FROM all_booking WHERE id = ? LIMIT 1';
-		con.query(bookingInfoSql, [booking_id], (infoErr, infoRows) => {
-			if (infoErr) {
-				console.error('Error fetching booking info for availability update after deletePassenger:', infoErr);
-                        return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, dueUpdated: true, availabilityUpdated: false, newDue: newDue });
-			}
-			if (!infoRows || infoRows.length === 0) {
-                        return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, dueUpdated: true, availabilityUpdated: false, newDue: newDue });
-			}
-			const row = infoRows[0];
-			const bookingDate = (row.flight_date ? dayjs(row.flight_date).format('YYYY-MM-DD') : null);
-			const bookingTime = (row.time_slot ? dayjs(`2000-01-01 ${row.time_slot}`).format('HH:mm') : (row.flight_date ? dayjs(row.flight_date).format('HH:mm') : null));
-			const activityId = row.activity_id;
-			if (bookingDate && bookingTime && activityId) {
-				updateSpecificAvailability(bookingDate, bookingTime, activityId, 1);
-                        return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, dueUpdated: true, availabilityUpdated: true, remainingPax: row.pax, newDue: newDue });
-			}
-			if (bookingDate && bookingTime && row.location && !activityId) {
-				const activitySql = 'SELECT id FROM activity WHERE location = ? AND status = "Live" LIMIT 1';
-				con.query(activitySql, [row.location], (actErr, actRows) => {
-					if (!actErr && actRows && actRows.length > 0) {
-						updateSpecificAvailability(bookingDate, bookingTime, actRows[0].id, 1);
+                        updateParams = [booking_id, newDue, booking_id];
+                    }
+
+                    con.query(updateBookingSql, updateParams, (err2) => {
+                        if (err2) {
+                            console.error('Error updating pax and due after deletePassenger:', err2);
+                            // Still return success for passenger deletion
+                            return res.status(200).json({ success: true, message: 'Passenger deleted but pax/due update failed', paxUpdated: false, dueUpdated: false });
+                        }
+
+                        console.log('✅ Updated booking - New due:', newDue);
+
+
+                        // Recompute availability for this booking's slot
+                        const bookingInfoSql = 'SELECT pax, flight_date, time_slot, activity_id, location FROM all_booking WHERE id = ? LIMIT 1';
+                        con.query(bookingInfoSql, [booking_id], (infoErr, infoRows) => {
+                            if (infoErr) {
+                                console.error('Error fetching booking info for availability update after deletePassenger:', infoErr);
+                                return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, dueUpdated: true, availabilityUpdated: false, newDue: newDue });
+                            }
+                            if (!infoRows || infoRows.length === 0) {
+                                return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, dueUpdated: true, availabilityUpdated: false, newDue: newDue });
+                            }
+                            const row = infoRows[0];
+                            const bookingDate = (row.flight_date ? dayjs(row.flight_date).format('YYYY-MM-DD') : null);
+                            const bookingTime = (row.time_slot ? dayjs(`2000-01-01 ${row.time_slot}`).format('HH:mm') : (row.flight_date ? dayjs(row.flight_date).format('HH:mm') : null));
+                            const activityId = row.activity_id;
+                            if (bookingDate && bookingTime && activityId) {
+                                updateSpecificAvailability(bookingDate, bookingTime, activityId, 1);
                                 return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, dueUpdated: true, availabilityUpdated: true, remainingPax: row.pax, newDue: newDue });
-					}
+                            }
+                            if (bookingDate && bookingTime && row.location && !activityId) {
+                                const activitySql = 'SELECT id FROM activity WHERE location = ? AND status = "Live" LIMIT 1';
+                                con.query(activitySql, [row.location], (actErr, actRows) => {
+                                    if (!actErr && actRows && actRows.length > 0) {
+                                        updateSpecificAvailability(bookingDate, bookingTime, actRows[0].id, 1);
+                                        return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, dueUpdated: true, availabilityUpdated: true, remainingPax: row.pax, newDue: newDue });
+                                    }
+                                    return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, dueUpdated: true, availabilityUpdated: false, remainingPax: row.pax, newDue: newDue });
+                                });
+                                return; // response will be sent in callback above
+                            }
                             return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, dueUpdated: true, availabilityUpdated: false, remainingPax: row.pax, newDue: newDue });
-				});
-				return; // response will be sent in callback above
-			}
-                    return res.status(200).json({ success: true, message: 'Passenger deleted successfully', paxUpdated: true, dueUpdated: true, availabilityUpdated: false, remainingPax: row.pax, newDue: newDue });
-                });
-		});
-            }
+                        });
+                    });
+                }
+            });
         });
-    });
     });
 });
 
@@ -9761,20 +9793,20 @@ const handleFlightAttemptsIncrement = async (booking_id) => {
             console.log('No voucher code found for booking:', booking_id);
             return;
         }
-        
+
         console.log('Handling flight attempts increment for voucher:', voucherCode, 'booking:', booking_id);
-        
+
         // Get current attempts and increment
         const [voucherRows] = await new Promise((resolve, reject) => {
             con.query("SELECT flight_attempts, booking_references FROM all_vouchers WHERE voucher_code = ?", [voucherCode], (err, rows) => {
                 if (err) reject(err); else resolve([rows]);
             });
         });
-        
+
         if (voucherRows && voucherRows.length > 0) {
             const currentAttempts = parseInt(voucherRows[0].flight_attempts || 0, 10);
             const newAttempts = currentAttempts + 1;
-            
+
             // Update booking_references to link this attempt to the specific booking
             let bookingRefs = [];
             try {
@@ -9782,21 +9814,29 @@ const handleFlightAttemptsIncrement = async (booking_id) => {
             } catch (e) {
                 console.warn('Failed to parse booking_references:', e);
             }
-            
+
             // Add this booking to the references
             bookingRefs.push({
                 booking_id: booking_id,
                 cancelled_at: new Date().toISOString(),
                 attempt_number: newAttempts
             });
-            
+
             await new Promise((resolve, reject) => {
-                con.query("UPDATE all_vouchers SET flight_attempts = ?, booking_references = ? WHERE voucher_code = ?", 
+                con.query("UPDATE all_vouchers SET flight_attempts = ?, booking_references = ? WHERE voucher_code = ?",
                     [newAttempts, JSON.stringify(bookingRefs), voucherCode], (err, result) => {
-                    if (err) reject(err); else resolve(result);
-                });
+                        if (err) reject(err); else resolve(result);
+                    });
             });
-            
+
+            // Update all_booking table as well to keep it in sync
+            await new Promise((resolve, reject) => {
+                con.query("UPDATE all_booking SET flight_attempts = ? WHERE id = ?",
+                    [newAttempts, booking_id], (err, result) => {
+                        if (err) reject(err); else resolve(result);
+                    });
+            });
+
             console.log(`Incremented flight_attempts for voucher ${voucherCode} to ${newAttempts} due to booking ${booking_id} cancellation`);
         }
     } catch (e) {
@@ -9823,7 +9863,7 @@ const refreshAvailabilityForBooking = (booking_id) => {
             const bookingTime = booking.time_slot || booking.flight_date;
             const activityId = booking.activity_id;
             const bookingStatus = booking.status;
-            
+
             console.log('🔄 refreshAvailabilityForBooking booking info:', {
                 booking_id,
                 bookingDate,
@@ -9833,13 +9873,13 @@ const refreshAvailabilityForBooking = (booking_id) => {
                 status: bookingStatus,
                 pax: booking.pax
             });
-            
+
             // Only refresh if booking has a flight_date (scheduled booking)
             if (!bookingDate) {
                 console.log('🔄 refreshAvailabilityForBooking: skipping - no flight_date');
                 return;
             }
-            
+
             const triggerUpdate = (finalActivityId) => {
                 if (!bookingDate || !bookingTime || !finalActivityId) {
                     console.warn('refreshAvailabilityForBooking: missing params', { booking_id, bookingDate, bookingTime, finalActivityId });
@@ -9854,7 +9894,7 @@ const refreshAvailabilityForBooking = (booking_id) => {
                 // updateSpecificAvailability will recalculate from all bookings, excluding cancelled ones
                 updateSpecificAvailability(bookingDate, bookingTime, finalActivityId, booking.pax || 1);
             };
-            
+
             if (activityId) {
                 triggerUpdate(activityId);
             } else if (booking.location) {
@@ -9886,7 +9926,7 @@ const refreshAvailabilitySlot = (slotInfo = {}) => {
         const bookingTime = slotInfo.time_slot || slotInfo.flight_date;
         const activityId = slotInfo.activity_id;
         const location = slotInfo.location;
-        
+
         const triggerUpdate = (finalActivityId) => {
             if (!bookingDate || !bookingTime || !finalActivityId) {
                 console.warn('refreshAvailabilitySlot: missing params', { bookingDate, bookingTime, finalActivityId });
@@ -9894,7 +9934,7 @@ const refreshAvailabilitySlot = (slotInfo = {}) => {
             }
             updateSpecificAvailability(bookingDate, bookingTime, finalActivityId, 1);
         };
-        
+
         if (activityId) {
             triggerUpdate(activityId);
         } else if (location) {
@@ -9920,22 +9960,22 @@ const refreshAvailabilitySlot = (slotInfo = {}) => {
 
 app.patch('/api/updateBookingField', (req, res) => {
     const { booking_id, field, value } = req.body;
-    
+
     // Debug: API çağrısını logla
     console.log('updateBookingField API çağrısı:', { booking_id, field, value });
-    
+
     const allowedFields = ['name', 'phone', 'email', 'expires', 'weight', 'status', 'flight_attempts', 'choose_add_on', 'additional_notes', 'preferred_day', 'preferred_location', 'preferred_time', 'paid', 'activity_id', 'location', 'flight_type', 'flight_date', 'experience_types']; // Add new fields
     if (!booking_id || !field || !allowedFields.includes(field)) {
         console.log('updateBookingField - Geçersiz istek:', { booking_id, field, value });
         return res.status(400).json({ success: false, message: 'Invalid request' });
     }
-    
+
     const slotFields = new Set(['flight_date', 'activity_id', 'time_slot', 'location']);
     let previousSlot = null;
     let sql;
     let params;
     let normalizedValue = value;
-    
+
     const performUpdate = () => {
         if (field === 'weight') {
             // passenger tablosunda ana yolcunun weight bilgisini güncelle
@@ -9955,46 +9995,46 @@ app.patch('/api/updateBookingField', (req, res) => {
                     normalizedValue = 'Pending';
                 }
             }
-            
+
             sql = `UPDATE all_booking SET ${field} = ? WHERE id = ?`;
             params = [normalizedValue, booking_id];
         }
-        
+
         if (typeof normalizedValue === 'undefined') {
             normalizedValue = value;
         }
-        
+
         console.log('updateBookingField - SQL:', sql);
         console.log('updateBookingField - Params:', params);
-        
+
         con.query(sql, params, (err, result) => {
             if (err) {
                 console.error('Error updating booking field:', err);
                 return res.status(500).json({ success: false, message: 'Database error' });
             }
-            
+
             console.log('updateBookingField - Database güncelleme başarılı:', { field, value, affectedRows: result.affectedRows });
-            
+
             const refreshNewSlot = (field === 'status') || slotFields.has(field);
             const refreshOldSlot = previousSlot && slotFields.has(field);
-            
+
             const finalizeResponse = () => {
                 res.json({ success: true });
             };
-            
+
             if (field === 'status') {
                 // Helper function to proceed with availability refresh after history update
                 const proceedWithAvailabilityRefresh = () => {
                     // Always refresh availability when status changes (especially for Cancelled)
                     // This ensures availability is updated when a booking is cancelled
                     console.log('🔄 updateBookingField - Status changed to:', normalizedValue, '- refreshing availability');
-                    
+
                     // If we have previous slot info, refresh it first (in case flight_date changed)
                     if (refreshOldSlot && previousSlot) {
                         console.log('🔄 updateBookingField - Refreshing old slot:', previousSlot);
                         refreshAvailabilitySlot(previousSlot);
                     }
-                    
+
                     // Always refresh current booking's availability slot
                     // This is critical for cancelled bookings to free up availability
                     if (refreshNewSlot) {
@@ -10006,10 +10046,10 @@ app.patch('/api/updateBookingField', (req, res) => {
                         console.log('🔄 updateBookingField - Force refreshing availability (no previous slot):', booking_id);
                         refreshAvailabilityForBooking(booking_id);
                     }
-                    
+
                     finalizeResponse();
                 };
-                
+
                 // If status is Cancelled, update the last entry (any status) instead of creating a new one
                 if (normalizedValue === 'Cancelled') {
                     // Find the last entry for this booking (any status except Cancelled)
@@ -10078,12 +10118,12 @@ app.patch('/api/updateBookingField', (req, res) => {
                 if (refreshNewSlot) {
                     refreshAvailabilityForBooking(booking_id);
                 }
-                
+
                 finalizeResponse();
             }
         });
     };
-    
+
     if (field === 'weight') {
         // passenger tablosunda ana yolcunun weight bilgisini güncelle
         performUpdate();
@@ -10119,7 +10159,7 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
     console.log('🔑 Customer Portal - Endpoint called with token:', token);
     console.log('🔑 Customer Portal - Request URL:', req.url);
     console.log('🔑 Customer Portal - Request method:', req.method);
-    
+
     if (!token) {
         console.error('❌ Customer Portal - Token is missing');
         return res.status(400).json({ success: false, message: 'Token is required' });
@@ -10127,7 +10167,7 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
 
     try {
         console.log('🔑 Customer Portal - Token received (raw):', token);
-        
+
         // URL decode the token first (handles %3D for =, etc.)
         try {
             token = decodeURIComponent(token);
@@ -10136,7 +10176,7 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             console.error('Error URL decoding token:', urlDecodeErr);
             // Continue with original token if URL decode fails
         }
-        
+
         // Decode the base64 token
         let decoded;
         try {
@@ -10151,7 +10191,7 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         // Parse the decoded string (format: "id|voucher_ref|email|created_at")
         const parts = decoded.split('|');
         console.log('🔑 Customer Portal - Token parts:', parts);
-        
+
         if (parts.length < 1) {
             return res.status(400).json({ success: false, message: 'Invalid token content' });
         }
@@ -10160,7 +10200,7 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         const voucherRef = parts.length > 1 && parts[1] ? parts[1].trim() : null;
         const email = parts.length > 2 && parts[2] ? parts[2].trim() : null;
         const createdAt = parts.length > 3 && parts[3] ? parts[3].trim() : null;
-        
+
         console.log('🔑 Customer Portal - Parsed values:', { bookingId, voucherRef, email, createdAt });
 
         // Try to find booking by ID first
@@ -10216,7 +10256,7 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 });
             });
             console.log('🔍 Customer Portal - Search by email/date (exact):', email, createdAt, 'Found:', emailRowsExact?.length || 0);
-            
+
             if (emailRowsExact && emailRowsExact.length > 0) {
                 booking = emailRowsExact[0];
                 console.log('✅ Customer Portal - Booking found by email/date:', booking.id);
@@ -10229,13 +10269,13 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                     });
                 });
                 console.log('🔍 Customer Portal - Search by email only:', email, 'Found:', emailRows?.length || 0);
-            if (emailRows && emailRows.length > 0) {
-                booking = emailRows[0];
+                if (emailRows && emailRows.length > 0) {
+                    booking = emailRows[0];
                     console.log('✅ Customer Portal - Booking found by email only:', booking.id);
                 }
             }
         }
-        
+
         // If still not found, try to find by voucher code from all_vouchers table and then find booking
         if (!booking && voucherRef) {
             try {
@@ -10275,8 +10315,8 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 });
                 console.log('🔍 Customer Portal - Other bookings with this email:', anyBooking);
             }
-            return res.status(404).json({ 
-                success: false, 
+            return res.status(404).json({
+                success: false,
                 message: 'Booking not found',
                 debug: {
                     searchedBy: {
@@ -10288,7 +10328,7 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 }
             });
         }
-        
+
         console.log('✅ Customer Portal - Booking found:', booking.id);
 
         // Get voucher_type from all_vouchers if booking was created from redeem voucher
@@ -10326,7 +10366,7 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         if (booking.voucher_code) {
             try {
                 const [voucherCheckRows] = await new Promise((resolve, reject) => {
-                    con.query('SELECT id, book_flight FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [booking.voucher_code], (err, rows) => {
+                    con.query('SELECT id, book_flight, flight_attempts FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [booking.voucher_code], (err, rows) => {
                         if (err) reject(err);
                         else resolve([rows]);
                     });
@@ -10340,10 +10380,10 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         }
 
         // Use flight_attempts from all_booking table (same as getAllBookingData)
-        let finalFlightAttempts = booking.flight_attempts !== null && booking.flight_attempts !== undefined 
-            ? booking.flight_attempts 
+        let finalFlightAttempts = booking.flight_attempts !== null && booking.flight_attempts !== undefined
+            ? booking.flight_attempts
             : 0;
-        
+
         // For bookings created from redeem voucher, flight_attempts should start from 0, not 1
         // This matches getAllBookingData logic
         if (isRedeemVoucher && booking.voucher_code) {
@@ -10353,10 +10393,10 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 finalFlightAttempts = 0;
             }
         }
-        
+
         // Ensure finalFlightAttempts is a number
-        finalFlightAttempts = finalFlightAttempts !== null && finalFlightAttempts !== undefined 
-            ? finalFlightAttempts 
+        finalFlightAttempts = finalFlightAttempts !== null && finalFlightAttempts !== undefined
+            ? finalFlightAttempts
             : (isRedeemVoucher ? 0 : booking.flight_attempts || 0);
 
         // Format the response
@@ -10395,9 +10435,9 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         console.error('❌ Customer Portal - Error fetching booking:', error);
         console.error('❌ Customer Portal - Error stack:', error.stack);
         console.error('❌ Customer Portal - Token that caused error:', req.params.token);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Internal server error', 
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
             error: error.message,
             details: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
@@ -10415,9 +10455,9 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
     console.log('🔄 Customer Portal Reschedule - Activity ID:', activity_id);
 
     if (!bookingId || !flight_date) {
-        return res.status(400).json({ 
-            success: false, 
-            message: 'Booking ID and flight date are required' 
+        return res.status(400).json({
+            success: false,
+            message: 'Booking ID and flight date are required'
         });
     }
 
@@ -10431,9 +10471,9 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
         });
 
         if (!bookingRows || bookingRows.length === 0) {
-            return res.status(404).json({ 
-                success: false, 
-                message: 'Booking not found' 
+            return res.status(404).json({
+                success: false,
+                message: 'Booking not found'
             });
         }
 
@@ -10445,9 +10485,9 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
         const hoursUntilFlight = newFlightDate.diff(now, 'hour');
 
         if (hoursUntilFlight <= 120) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Flight must be rescheduled at least 120 hours (5 days) in advance' 
+            return res.status(400).json({
+                success: false,
+                message: 'Flight must be rescheduled at least 120 hours (5 days) in advance'
             });
         }
 
@@ -10461,7 +10501,7 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
                 time_slot = TIME(?)
             WHERE id = ?
         `;
-        
+
         await new Promise((resolve, reject) => {
             con.query(updateSql, [flight_date, location || booking.location, activity_id || booking.activity_id, flight_date, bookingId], (err, result) => {
                 if (err) {
@@ -10478,7 +10518,7 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
             INSERT INTO booking_status_history (booking_id, status, changed_at, notes)
             VALUES (?, 'Scheduled', NOW(), 'Rescheduled via Customer Portal')
         `;
-        
+
         await new Promise((resolve, reject) => {
             con.query(historySql, [bookingId], (err, result) => {
                 if (err) {
@@ -10507,23 +10547,38 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
             });
         });
 
-        // Get flight attempts count
-        let flightAttemptsCount = 0;
-        try {
-            const [historyRows] = await new Promise((resolve, reject) => {
-                con.query(`
-                    SELECT COUNT(*) as count 
-                    FROM booking_status_history 
-                    WHERE booking_id = ? AND status = 'Scheduled'
-                `, [bookingId], (err, rows) => {
-                    if (err) reject(err);
-                    else resolve([rows]);
+        // Get flight attempts from all_booking (updatedBooking)
+        // Check if this is a redeem voucher booking
+        let isRedeemVoucher = false;
+        if (updatedBooking.voucher_code) {
+            try {
+                const [voucherCheckRows] = await new Promise((resolve, reject) => {
+                    con.query('SELECT id, book_flight FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [updatedBooking.voucher_code], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
                 });
-            });
-            flightAttemptsCount = historyRows && historyRows.length > 0 ? (historyRows[0].count || 0) : 0;
-        } catch (historyErr) {
-            console.error('Error counting flight attempts:', historyErr);
+                if (voucherCheckRows && voucherCheckRows.length > 0) {
+                    isRedeemVoucher = voucherCheckRows[0].book_flight === 'Gift Voucher' || !!voucherCheckRows[0].id;
+                }
+            } catch (voucherCheckErr) {
+                console.warn('Error checking if redeem voucher:', voucherCheckErr);
+            }
         }
+
+        let flightAttemptsCount = updatedBooking.flight_attempts !== null && updatedBooking.flight_attempts !== undefined
+            ? updatedBooking.flight_attempts
+            : 0;
+
+        if (isRedeemVoucher && updatedBooking.voucher_code) {
+            if (flightAttemptsCount === 1 || flightAttemptsCount === null || flightAttemptsCount === undefined) {
+                flightAttemptsCount = 0;
+            }
+        }
+
+        flightAttemptsCount = flightAttemptsCount !== null && flightAttemptsCount !== undefined
+            ? flightAttemptsCount
+            : (isRedeemVoucher ? 0 : updatedBooking.flight_attempts || 0);
 
         const response = {
             success: true,
@@ -10558,10 +10613,10 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
         res.json(response);
     } catch (error) {
         console.error('❌ Customer Portal Reschedule - Error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Failed to reschedule flight', 
-            error: error.message 
+        res.status(500).json({
+            success: false,
+            message: 'Failed to reschedule flight',
+            error: error.message
         });
     }
 });
@@ -10577,9 +10632,9 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
     console.log('📍 Customer Portal Change Location - Activity ID:', activity_id);
 
     if (!bookingId || !location) {
-        return res.status(400).json({ 
-            success: false, 
-            message: 'Booking ID and location are required' 
+        return res.status(400).json({
+            success: false,
+            message: 'Booking ID and location are required'
         });
     }
 
@@ -10593,9 +10648,9 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
         });
 
         if (!bookingRows || bookingRows.length === 0) {
-            return res.status(404).json({ 
-                success: false, 
-                message: 'Booking not found' 
+            return res.status(404).json({
+                success: false,
+                message: 'Booking not found'
             });
         }
 
@@ -10603,7 +10658,7 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
 
         // Find activity for the new location
         let newActivityId = activity_id || booking.activity_id;
-        
+
         if (!newActivityId) {
             const [activityRows] = await new Promise((resolve, reject) => {
                 con.query('SELECT id FROM activity WHERE location = ? AND status = ? LIMIT 1', [location, 'Live'], (err, rows) => {
@@ -10619,9 +10674,9 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
 
         // If still no activity ID found, return error
         if (!newActivityId) {
-            return res.status(400).json({ 
-                success: false, 
-                message: `No active activity found for location: ${location}` 
+            return res.status(400).json({
+                success: false,
+                message: `No active activity found for location: ${location}`
             });
         }
 
@@ -10635,12 +10690,12 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
         if (flight_date) {
             const newFlightDate = dayjs(flight_date);
             const now = dayjs();
-            
+
             // Check if new flight date is in the past
             if (newFlightDate.isBefore(now)) {
-                return res.status(400).json({ 
-                    success: false, 
-                    message: 'Cannot schedule flight to a past date.' 
+                return res.status(400).json({
+                    success: false,
+                    message: 'Cannot schedule flight to a past date.'
                 });
             }
 
@@ -10649,16 +10704,16 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
             if (oldFlightDate) {
                 const hoursUntilCurrentFlight = oldFlightDate.diff(now, 'hour');
                 if (hoursUntilCurrentFlight <= 120) {
-                    return res.status(400).json({ 
-                        success: false, 
-                        message: 'Flights cannot be rescheduled within 120 hours (5 days) of the original flight date.' 
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Flights cannot be rescheduled within 120 hours (5 days) of the original flight date.'
                     });
                 }
             }
 
             updateFields.push('flight_date = ?', 'status = ?');
             updateValues.push(flight_date, 'Scheduled');
-            
+
             // Extract time from flight_date if it includes time
             if (flight_date && flight_date.includes(' ')) {
                 try {
@@ -10694,13 +10749,13 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
             SET ${updateFields.join(', ')}
             WHERE id = ?
         `;
-        
+
         const finalUpdateValues = [...updateValues];
         finalUpdateValues.push(bookingId);
-        
+
         console.log('🔍 Update SQL:', updateSql);
         console.log('🔍 Update Values:', JSON.stringify(finalUpdateValues, null, 2));
-        
+
         await new Promise((resolve, reject) => {
             con.query(updateSql, finalUpdateValues, (err, result) => {
                 if (err) {
@@ -10727,10 +10782,10 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
                     WHERE id = ?
                 `;
                 const timeSlotUpdateValues = [...timeSlotValues, bookingId];
-                
+
                 console.log('🔍 Time Slot Update SQL:', timeSlotSql);
                 console.log('🔍 Time Slot Update Values:', JSON.stringify(timeSlotUpdateValues, null, 2));
-                
+
                 await new Promise((resolve, reject) => {
                     con.query(timeSlotSql, timeSlotUpdateValues, (err, result) => {
                         if (err) {
@@ -10754,14 +10809,14 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
             INSERT INTO booking_status_history (booking_id, status, changed_at, notes)
             VALUES (?, ?, NOW(), ?)
         `;
-        
+
         let historyNote = `Location changed to ${location} via Customer Portal`;
         if (flight_date) {
             const oldDate = booking.flight_date ? dayjs(booking.flight_date).format('DD/MM/YYYY HH:mm') : 'N/A';
             const newDate = dayjs(flight_date).format('DD/MM/YYYY HH:mm');
             historyNote = `Location changed to ${location} and flight rescheduled from ${oldDate} to ${newDate} via Customer Portal`;
         }
-        
+
         await new Promise((resolve, reject) => {
             con.query(historySql, [bookingId, booking.status || 'Scheduled', historyNote], (err, result) => {
                 if (err) {
@@ -10781,9 +10836,9 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
         });
 
         if (!updatedBookingRows || updatedBookingRows.length === 0) {
-            return res.status(500).json({ 
-                success: false, 
-                message: 'Failed to retrieve updated booking data' 
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to retrieve updated booking data'
             });
         }
 
@@ -10849,9 +10904,9 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
     } catch (error) {
         console.error('❌ Customer Portal Change Location - Error:', error);
         console.error('❌ Customer Portal Change Location - Error Stack:', error.stack);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Failed to change location', 
+        res.status(500).json({
+            success: false,
+            message: 'Failed to change location',
             error: error.message,
             details: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
@@ -10865,7 +10920,7 @@ app.patch('/api/updatePassengerField', (req, res) => {
     if (!passenger_id || !field || !allowedFields.includes(field)) {
         return res.status(400).json({ success: false, message: 'Invalid request' });
     }
-    
+
     // First, get the passenger's booking_id and current name values
     const getPassengerSql = `SELECT booking_id, first_name, last_name FROM passenger WHERE id = ?`;
     con.query(getPassengerSql, [passenger_id], (err, passengerRows) => {
@@ -10873,14 +10928,14 @@ app.patch('/api/updatePassengerField', (req, res) => {
             console.error('Error fetching passenger:', err);
             return res.status(500).json({ success: false, message: 'Database error' });
         }
-        
+
         if (!passengerRows || passengerRows.length === 0) {
             return res.status(404).json({ success: false, message: 'Passenger not found' });
         }
-        
+
         const passenger = passengerRows[0];
         const booking_id = passenger.booking_id;
-        
+
         // Determine the new first_name and last_name values after update
         let newFirstName = passenger.first_name;
         let newLastName = passenger.last_name;
@@ -10889,15 +10944,15 @@ app.patch('/api/updatePassengerField', (req, res) => {
         } else if (field === 'last_name') {
             newLastName = value;
         }
-        
+
         // Update the passenger field
         const updateSql = `UPDATE passenger SET ${field} = ? WHERE id = ?`;
         con.query(updateSql, [value, passenger_id], (err, result) => {
-        if (err) {
-            console.error('Error updating passenger field:', err);
-            return res.status(500).json({ success: false, message: 'Database error' });
+            if (err) {
+                console.error('Error updating passenger field:', err);
+                return res.status(500).json({ success: false, message: 'Database error' });
             }
-            
+
             // If first_name or last_name was updated, check if this is the first passenger
             // and update the booking name accordingly
             if (field === 'first_name' || field === 'last_name') {
@@ -10909,22 +10964,22 @@ app.patch('/api/updatePassengerField', (req, res) => {
                         // Don't fail the request, just log the error
                         return res.json({ success: true });
                     }
-                    
+
                     if (firstPassengerRows && firstPassengerRows.length > 0) {
                         const firstPassengerId = firstPassengerRows[0].id;
                         // If this is the first passenger, update booking name
                         if (firstPassengerId == passenger_id) {
                             // Use the calculated new name values
                             const newName = `${newFirstName || ''} ${newLastName || ''}`.trim();
-                            
+
                             // Update booking name
                             const updateBookingNameSql = `UPDATE all_booking SET name = ? WHERE id = ?`;
                             con.query(updateBookingNameSql, [newName, booking_id], (err, bookingResult) => {
                                 if (err) {
                                     console.error('Error updating booking name:', err);
                                     // Don't fail the request, just log the error
-        }
-        res.json({ success: true });
+                                }
+                                res.json({ success: true });
                             });
                         } else {
                             res.json({ success: true });
@@ -10950,7 +11005,7 @@ app.patch('/api/updateVoucherPassengerField', (req, res) => {
         console.log('Validation failed:', { voucher_id, passenger_index, field, value });
         return res.status(400).json({ success: false, message: 'Invalid request' });
     }
-    
+
     // First, get the current voucher_passenger_details
     const getSql = `SELECT voucher_passenger_details FROM all_vouchers WHERE id = ?`;
     con.query(getSql, [voucher_id], (err, rows) => {
@@ -10958,43 +11013,43 @@ app.patch('/api/updateVoucherPassengerField', (req, res) => {
             console.error('Error fetching voucher passenger details:', err);
             return res.status(500).json({ success: false, message: 'Database error' });
         }
-        
+
         if (rows.length === 0) {
             return res.status(404).json({ success: false, message: 'Voucher not found' });
         }
-        
+
         // Parse existing passenger details
         let passengerDetails = [];
         try {
             const rawDetails = rows[0].voucher_passenger_details;
             if (rawDetails) {
-                passengerDetails = typeof rawDetails === 'string' 
-                    ? JSON.parse(rawDetails) 
+                passengerDetails = typeof rawDetails === 'string'
+                    ? JSON.parse(rawDetails)
                     : rawDetails;
             }
         } catch (e) {
             console.warn('Failed to parse voucher_passenger_details:', e);
             passengerDetails = [];
         }
-        
+
         // Ensure passengerDetails is an array
         if (!Array.isArray(passengerDetails)) {
             passengerDetails = [];
         }
-        
+
         // Ensure the passenger index exists
         if (passenger_index >= passengerDetails.length || passenger_index < 0) {
             return res.status(400).json({ success: false, message: 'Invalid passenger index' });
         }
-        
+
         // Ensure the passenger object exists
         if (!passengerDetails[passenger_index]) {
             passengerDetails[passenger_index] = {};
         }
-        
+
         // Update the specific field for the passenger at the given index
         passengerDetails[passenger_index][field] = value;
-        
+
         // Update the voucher_passenger_details column
         const updateSql = `UPDATE all_vouchers SET voucher_passenger_details = ? WHERE id = ?`;
         con.query(updateSql, [JSON.stringify(passengerDetails), voucher_id], (updateErr, updateResult) => {
@@ -11002,14 +11057,14 @@ app.patch('/api/updateVoucherPassengerField', (req, res) => {
                 console.error('Error updating voucher passenger details:', updateErr);
                 return res.status(500).json({ success: false, message: 'Database error' });
             }
-            
+
             // If price was updated, also update the voucher's paid amount
             if (field === 'price') {
                 const totalPrice = passengerDetails.reduce((sum, p) => {
                     const price = parseFloat(p.price) || 0;
                     return sum + price;
                 }, 0);
-                
+
                 const updatePaidSql = `UPDATE all_vouchers SET paid = ? WHERE id = ?`;
                 con.query(updatePaidSql, [totalPrice, voucher_id], (paidErr) => {
                     if (paidErr) {
@@ -11017,7 +11072,7 @@ app.patch('/api/updateVoucherPassengerField', (req, res) => {
                     }
                 });
             }
-            
+
             res.json({ success: true, passengerDetails });
         });
     });
@@ -11028,11 +11083,11 @@ app.post('/api/addVoucherPassenger', (req, res) => {
     console.log('=== addVoucherPassenger ENDPOINT CALLED ===');
     console.log('Request body:', req.body);
     const { voucher_id, first_name, last_name, weight, price } = req.body;
-    
+
     if (!voucher_id || !first_name || !last_name) {
         return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
-    
+
     // First, get the current voucher_passenger_details
     const getSql = `SELECT voucher_passenger_details, paid FROM all_vouchers WHERE id = ?`;
     con.query(getSql, [voucher_id], (err, rows) => {
@@ -11040,30 +11095,30 @@ app.post('/api/addVoucherPassenger', (req, res) => {
             console.error('Error fetching voucher passenger details:', err);
             return res.status(500).json({ success: false, message: 'Database error' });
         }
-        
+
         if (rows.length === 0) {
             return res.status(404).json({ success: false, message: 'Voucher not found' });
         }
-        
+
         // Parse existing passenger details
         let passengerDetails = [];
         try {
             const rawDetails = rows[0].voucher_passenger_details;
             if (rawDetails) {
-                passengerDetails = typeof rawDetails === 'string' 
-                    ? JSON.parse(rawDetails) 
+                passengerDetails = typeof rawDetails === 'string'
+                    ? JSON.parse(rawDetails)
                     : rawDetails;
             }
         } catch (e) {
             console.warn('Failed to parse voucher_passenger_details:', e);
             passengerDetails = [];
         }
-        
+
         // Ensure passengerDetails is an array
         if (!Array.isArray(passengerDetails)) {
             passengerDetails = [];
         }
-        
+
         // Calculate price per passenger if not provided
         let passengerPrice = price;
         if (!passengerPrice || passengerPrice === '') {
@@ -11073,7 +11128,7 @@ app.post('/api/addVoucherPassenger', (req, res) => {
             // Otherwise, set to 0 (will be updated later)
             passengerPrice = currentPassengerCount > 0 ? (currentPaid / (currentPassengerCount + 1)).toFixed(2) : 0;
         }
-        
+
         // Add new passenger
         const newPassenger = {
             first_name: first_name,
@@ -11081,15 +11136,15 @@ app.post('/api/addVoucherPassenger', (req, res) => {
             weight: weight || null,
             price: passengerPrice || null
         };
-        
+
         passengerDetails.push(newPassenger);
-        
+
         // Calculate new total paid amount
         const totalPrice = passengerDetails.reduce((sum, p) => {
             const pPrice = parseFloat(p.price) || 0;
             return sum + pPrice;
         }, 0);
-        
+
         // Update the voucher_passenger_details column
         const updateSql = `UPDATE all_vouchers SET voucher_passenger_details = ?, paid = ? WHERE id = ?`;
         con.query(updateSql, [JSON.stringify(passengerDetails), totalPrice, voucher_id], (updateErr, updateResult) => {
@@ -11097,7 +11152,7 @@ app.post('/api/addVoucherPassenger', (req, res) => {
                 console.error('Error updating voucher passenger details:', updateErr);
                 return res.status(500).json({ success: false, message: 'Database error' });
             }
-            
+
             res.json({ success: true, passengerDetails, newPassenger });
         });
     });
@@ -11124,7 +11179,7 @@ app.get('/api/analytics', async (req, res) => {
     con.query(attemptsSql, [], (err, rows) => {
         if (err) return res.status(500).json({ error: 'Failed to fetch booking attempts' });
         const total = rows.length;
-        let first=0, second=0, third=0, fourth=0, fifth=0, sixthPlus=0;
+        let first = 0, second = 0, third = 0, fourth = 0, fifth = 0, sixthPlus = 0;
         rows.forEach(r => {
             // Fallback: if flight_attempts is undefined/null, treat as 1
             const att = Number((r.flight_attempts !== undefined && r.flight_attempts !== null) ? r.flight_attempts : 1);
@@ -11135,7 +11190,7 @@ app.get('/api/analytics', async (req, res) => {
             else if (att === 5) fifth++;
             else sixthPlus++;
         });
-        const pct = n => total ? Math.round((n/total)*100) : 0;
+        const pct = n => total ? Math.round((n / total) * 100) : 0;
         const bookingAttempts = {
             first: pct(first),
             second: pct(second),
@@ -11156,21 +11211,21 @@ app.get('/api/analytics', async (req, res) => {
             if (errFindQ) {
                 console.warn('Could not find "hear about us" question:', errFindQ);
             }
-            
+
             const hearAboutUsQuestionId = questionRows && questionRows.length > 0 ? questionRows[0].id : null;
             console.log('Found "hear about us" question_id:', hearAboutUsQuestionId);
-            
+
             // Get source data from multiple sources:
             // 1. Legacy hear_about_us column from all_booking
             // 2. additional_information_answers table for bookings
             // 3. all_vouchers table (additional_information_json and legacy fields)
-            
+
             const sourceDataMap = {};
             // Declare variables in upper scope so they're accessible in all callbacks
             let salesBySource = [];
             let nonRedemption = { value: 0, percent: 0 };
             let addOns = [];
-            
+
             // 1. Get from legacy hear_about_us column in all_booking
             const legacySourceSql = `
             SELECT hear_about_us, COUNT(*) as count
@@ -11181,7 +11236,7 @@ app.get('/api/analytics', async (req, res) => {
             ${dateFilter()}
             GROUP BY hear_about_us
         `;
-            
+
             con.query(legacySourceSql, [], (errLegacy, legacyRows) => {
                 if (errLegacy) {
                     console.warn('Error fetching legacy hear_about_us:', errLegacy);
@@ -11193,7 +11248,7 @@ app.get('/api/analytics', async (req, res) => {
                         }
                     });
                 }
-                
+
                 // 2. Get from additional_information_answers for bookings
                 if (hearAboutUsQuestionId) {
                     const answersSourceSql = `
@@ -11207,7 +11262,7 @@ app.get('/api/analytics', async (req, res) => {
                         ${dateFilter('ab.flight_date')}
                         GROUP BY aia.answer
                     `;
-                    
+
                     con.query(answersSourceSql, [hearAboutUsQuestionId], (errAnswers, answerRows) => {
                         if (errAnswers) {
                             console.warn('Error fetching answers from additional_information_answers:', errAnswers);
@@ -11219,7 +11274,7 @@ app.get('/api/analytics', async (req, res) => {
                                 }
                             });
                         }
-                        
+
                         // 3. Get from all_vouchers (both additional_information_json and legacy fields)
                         // For vouchers, we count each voucher that has source information
                         const vouchersSourceSql = `
@@ -11231,21 +11286,21 @@ app.get('/api/analytics', async (req, res) => {
                             WHERE v.created_at IS NOT NULL
                             ${dateFilter('v.created_at')}
                         `;
-                        
+
                         con.query(vouchersSourceSql, [], (errVouchers, voucherRows) => {
                             if (errVouchers) {
                                 console.warn('Error fetching vouchers source data:', errVouchers);
                             } else {
                                 voucherRows.forEach(row => {
                                     let source = null;
-                                    
+
                                     // First try additional_information_json
                                     if (row.additional_information_json) {
                                         try {
-                                            const jsonData = typeof row.additional_information_json === 'string' 
-                                                ? JSON.parse(row.additional_information_json) 
+                                            const jsonData = typeof row.additional_information_json === 'string'
+                                                ? JSON.parse(row.additional_information_json)
                                                 : row.additional_information_json;
-                                            
+
                                             if (hearAboutUsQuestionId && jsonData[`question_${hearAboutUsQuestionId}`]) {
                                                 source = jsonData[`question_${hearAboutUsQuestionId}`];
                                             }
@@ -11253,19 +11308,19 @@ app.get('/api/analytics', async (req, res) => {
                                             console.warn('Error parsing voucher additional_information_json:', e);
                                         }
                                     }
-                                    
+
                                     // Fallback to legacy hear_about_us
                                     if (!source && row.hear_about_us) {
                                         source = row.hear_about_us;
                                     }
-                                    
+
                                     if (source && source.trim()) {
                                         source = source.trim();
                                         sourceDataMap[source] = (sourceDataMap[source] || 0) + 1;
                                     }
                                 });
                             }
-                            
+
                             // Calculate totals and percentages
                             const totalSrc = Object.values(sourceDataMap).reduce((sum, count) => sum + count, 0);
                             salesBySource = Object.entries(sourceDataMap)
@@ -11275,60 +11330,60 @@ app.get('/api/analytics', async (req, res) => {
                                     count: count
                                 }))
                                 .sort((a, b) => b.count - a.count); // Sort by count descending
-                            
+
                             console.log('Sales by Source calculated:', salesBySource);
-                            
+
                             // Continue with next query (Non Redemption)
-            const nonRedemptionSql = `
+                            const nonRedemptionSql = `
                 SELECT COUNT(*) as total, SUM(CASE WHEN status = 'Expired' THEN 1 ELSE 0 END) as expired
                 FROM all_booking
                 WHERE 1=1 ${dateFilter('expires')}
             `;
-            con.query(nonRedemptionSql, [], (err3, nonRows) => {
-                if (err3) return res.status(500).json({ error: 'Failed to fetch non redemption' });
-                const total = nonRows[0]?.total || 0;
-                const expired = nonRows[0]?.expired || 0;
+                            con.query(nonRedemptionSql, [], (err3, nonRows) => {
+                                if (err3) return res.status(500).json({ error: 'Failed to fetch non redemption' });
+                                const total = nonRows[0]?.total || 0;
+                                const expired = nonRows[0]?.expired || 0;
                                 nonRedemption = {
-                    value: expired,
-                    percent: total ? Math.round((expired/total)*100) : 0
-                };
-                // 4. Add Ons (sum revenue by add on name)
-                const addOnSql = `
+                                    value: expired,
+                                    percent: total ? Math.round((expired / total) * 100) : 0
+                                };
+                                // 4. Add Ons (sum revenue by add on name)
+                                const addOnSql = `
                     SELECT choose_add_on
                     FROM all_booking
                     WHERE choose_add_on IS NOT NULL AND choose_add_on != '' ${dateFilter()}
                 `;
-                con.query(addOnSql, [], (err4, addOnRows) => {
-                    if (err4) return res.status(500).json({ error: 'Failed to fetch add ons' });
-                    const addOnMap = {};
-                    addOnRows.forEach(row => {
-                        try {
-                            if (!row.choose_add_on || typeof row.choose_add_on !== 'string' || row.choose_add_on.trim() === '') return;
-                            let arr = [];
-                            try {
-                                if (row.choose_add_on && row.choose_add_on.trim() !== "" && row.choose_add_on.startsWith("[")) {
-                                    arr = JSON.parse(row.choose_add_on);
-                                }
-                            } catch (e) { 
-                                console.error('AddOn JSON parse error:', e); 
-                                arr = []; 
-                            }
-                            if (Array.isArray(arr)) {
-                                arr.forEach(a => {
-                                    if (!a.name || !a.price) return;
-                                    if (!addOnMap[a.name]) addOnMap[a.name] = 0;
-                                    addOnMap[a.name] += Number(a.price);
-                                });
-                            }
-                        } catch (e) { console.error('AddOn JSON parse error:', e); }
-                    });
+                                con.query(addOnSql, [], (err4, addOnRows) => {
+                                    if (err4) return res.status(500).json({ error: 'Failed to fetch add ons' });
+                                    const addOnMap = {};
+                                    addOnRows.forEach(row => {
+                                        try {
+                                            if (!row.choose_add_on || typeof row.choose_add_on !== 'string' || row.choose_add_on.trim() === '') return;
+                                            let arr = [];
+                                            try {
+                                                if (row.choose_add_on && row.choose_add_on.trim() !== "" && row.choose_add_on.startsWith("[")) {
+                                                    arr = JSON.parse(row.choose_add_on);
+                                                }
+                                            } catch (e) {
+                                                console.error('AddOn JSON parse error:', e);
+                                                arr = [];
+                                            }
+                                            if (Array.isArray(arr)) {
+                                                arr.forEach(a => {
+                                                    if (!a.name || !a.price) return;
+                                                    if (!addOnMap[a.name]) addOnMap[a.name] = 0;
+                                                    addOnMap[a.name] += Number(a.price);
+                                                });
+                                            }
+                                        } catch (e) { console.error('AddOn JSON parse error:', e); }
+                                    });
                                     addOns = Object.entries(addOnMap).map(([name, value]) => ({ name, value: Math.round(value) }));
-                    // 5. Sales by Location
+                                    // 5. Sales by Location
                                     // Get location data from multiple sources:
                                     // 1. all_booking table (for Book Flight Date and Redeem Voucher bookings)
                                     // 2. all_vouchers table (for Buy Flight Voucher and Buy Gift Voucher)
                                     const locationDataMap = {};
-                                    
+
                                     // 1. Get from all_booking table
                                     const bookingLocSql = `
                         SELECT location, COUNT(*) as count
@@ -11338,21 +11393,21 @@ app.get('/api/analytics', async (req, res) => {
                                         ${dateFilter()}
                         GROUP BY location
                     `;
-                                    
+
                                     con.query(bookingLocSql, [], (errBookingLoc, bookingLocRows) => {
-                                if (errBookingLoc) {
-                                    console.warn('Error fetching booking locations:', errBookingLoc);
-                                } else {
-                                    bookingLocRows.forEach(row => {
-                                        const location = (row.location || '').trim();
-                                        if (location) {
-                                            locationDataMap[location] = (locationDataMap[location] || 0) + row.count;
+                                        if (errBookingLoc) {
+                                            console.warn('Error fetching booking locations:', errBookingLoc);
+                                        } else {
+                                            bookingLocRows.forEach(row => {
+                                                const location = (row.location || '').trim();
+                                                if (location) {
+                                                    locationDataMap[location] = (locationDataMap[location] || 0) + row.count;
+                                                }
+                                            });
                                         }
-                                    });
-                                }
-                                
-                                // 2. Get from all_vouchers table (preferred_location)
-                                const voucherLocSql = `
+
+                                        // 2. Get from all_vouchers table (preferred_location)
+                                        const voucherLocSql = `
                                     SELECT preferred_location, COUNT(*) as count
                                     FROM all_vouchers
                                     WHERE created_at IS NOT NULL
@@ -11360,21 +11415,21 @@ app.get('/api/analytics', async (req, res) => {
                                     ${dateFilter('created_at')}
                                     GROUP BY preferred_location
                                 `;
-                                
-                                con.query(voucherLocSql, [], (errVoucherLoc, voucherLocRows) => {
-                                    if (errVoucherLoc) {
-                                        console.warn('Error fetching voucher locations:', errVoucherLoc);
-                                    } else {
-                                        voucherLocRows.forEach(row => {
-                                            const location = (row.preferred_location || '').trim();
-                                            if (location) {
-                                                locationDataMap[location] = (locationDataMap[location] || 0) + row.count;
+
+                                        con.query(voucherLocSql, [], (errVoucherLoc, voucherLocRows) => {
+                                            if (errVoucherLoc) {
+                                                console.warn('Error fetching voucher locations:', errVoucherLoc);
+                                            } else {
+                                                voucherLocRows.forEach(row => {
+                                                    const location = (row.preferred_location || '').trim();
+                                                    if (location) {
+                                                        locationDataMap[location] = (locationDataMap[location] || 0) + row.count;
+                                                    }
+                                                });
                                             }
-                                        });
-                                    }
-                                    
-                                    // Also check all_vouchers.location field if it exists
-                                    const voucherLocSql2 = `
+
+                                            // Also check all_vouchers.location field if it exists
+                                            const voucherLocSql2 = `
                                         SELECT location, COUNT(*) as count
                                         FROM all_vouchers
                                         WHERE created_at IS NOT NULL
@@ -11383,103 +11438,103 @@ app.get('/api/analytics', async (req, res) => {
                                         ${dateFilter('created_at')}
                                         GROUP BY location
                                     `;
-                                    
-                                    con.query(voucherLocSql2, [], (errVoucherLoc2, voucherLocRows2) => {
-                                        if (errVoucherLoc2) {
-                                            console.warn('Error fetching voucher locations (location field):', errVoucherLoc2);
-                                        } else {
-                                            voucherLocRows2.forEach(row => {
-                                                const location = (row.location || '').trim();
-                                                if (location) {
-                                                    locationDataMap[location] = (locationDataMap[location] || 0) + row.count;
+
+                                            con.query(voucherLocSql2, [], (errVoucherLoc2, voucherLocRows2) => {
+                                                if (errVoucherLoc2) {
+                                                    console.warn('Error fetching voucher locations (location field):', errVoucherLoc2);
+                                                } else {
+                                                    voucherLocRows2.forEach(row => {
+                                                        const location = (row.location || '').trim();
+                                                        if (location) {
+                                                            locationDataMap[location] = (locationDataMap[location] || 0) + row.count;
+                                                        }
+                                                    });
                                                 }
-                                            });
-                                        }
-                                        
-                                        // Calculate totals and percentages
-                                        const totalLoc = Object.values(locationDataMap).reduce((sum, count) => sum + count, 0);
-                                        const salesByLocation = Object.entries(locationDataMap)
-                                            .map(([location, count]) => ({
-                                                location: location || 'Other',
-                                                percent: totalLoc ? Math.round((count / totalLoc) * 100) : 0,
-                                                count: count
-                                            }))
-                                            .sort((a, b) => b.count - a.count); // Sort by count descending
-                                        
-                                        console.log('Sales by Location calculated:', salesByLocation);
-                                        
-                        // 6. Sales by Booking Type
-                        const typeSql = `
+
+                                                // Calculate totals and percentages
+                                                const totalLoc = Object.values(locationDataMap).reduce((sum, count) => sum + count, 0);
+                                                const salesByLocation = Object.entries(locationDataMap)
+                                                    .map(([location, count]) => ({
+                                                        location: location || 'Other',
+                                                        percent: totalLoc ? Math.round((count / totalLoc) * 100) : 0,
+                                                        count: count
+                                                    }))
+                                                    .sort((a, b) => b.count - a.count); // Sort by count descending
+
+                                                console.log('Sales by Location calculated:', salesByLocation);
+
+                                                // 6. Sales by Booking Type
+                                                const typeSql = `
                             SELECT flight_type, COUNT(*) as count
                             FROM all_booking
                             WHERE flight_date IS NOT NULL AND status IN ('Flown', 'Confirmed', 'Scheduled') ${dateFilter()}
                             GROUP BY flight_type
                         `;
-                        con.query(typeSql, [], (err6, typeRows) => {
-                            if (err6) return res.status(500).json({ error: 'Failed to fetch sales by booking type' });
-                            const totalType = typeRows.reduce((sum, r) => sum + r.count, 0);
-                            const salesByBookingType = typeRows.map(r => ({
-                                type: r.flight_type || 'Other',
-                                percent: totalType ? Math.round((r.count/totalType)*100) : 0
-                            }));
-                            // 7. Liability by Location
-                            const liabilityLocSql = `
+                                                con.query(typeSql, [], (err6, typeRows) => {
+                                                    if (err6) return res.status(500).json({ error: 'Failed to fetch sales by booking type' });
+                                                    const totalType = typeRows.reduce((sum, r) => sum + r.count, 0);
+                                                    const salesByBookingType = typeRows.map(r => ({
+                                                        type: r.flight_type || 'Other',
+                                                        percent: totalType ? Math.round((r.count / totalType) * 100) : 0
+                                                    }));
+                                                    // 7. Liability by Location
+                                                    const liabilityLocSql = `
                                 SELECT location, SUM(paid) as value
                                 FROM all_booking
                                 WHERE paid IS NOT NULL AND paid > 0 ${dateFilter()}
                                 GROUP BY location
                             `;
-                            con.query(liabilityLocSql, [], (err7, liabLocRows) => {
-                                if (err7) return res.status(500).json({ error: 'Failed to fetch liability by location' });
-                                const liabilityByLocation = liabLocRows.map(r => ({
-                                    location: r.location || 'Other',
-                                    value: Math.round(r.value || 0)
-                                }));
-                                // 8. Liability by Flight Type
-                                const liabilityTypeSql = `
+                                                    con.query(liabilityLocSql, [], (err7, liabLocRows) => {
+                                                        if (err7) return res.status(500).json({ error: 'Failed to fetch liability by location' });
+                                                        const liabilityByLocation = liabLocRows.map(r => ({
+                                                            location: r.location || 'Other',
+                                                            value: Math.round(r.value || 0)
+                                                        }));
+                                                        // 8. Liability by Flight Type
+                                                        const liabilityTypeSql = `
                                     SELECT flight_type, SUM(paid) as value
                                     FROM all_booking
                                     WHERE paid IS NOT NULL AND paid > 0 ${dateFilter()}
                                     GROUP BY flight_type
                                 `;
-                                con.query(liabilityTypeSql, [], (err8, liabTypeRows) => {
-                                    if (err8) return res.status(500).json({ error: 'Failed to fetch liability by flight type' });
-                                    const liabilityByFlightType = liabTypeRows.map(r => ({
-                                        type: r.flight_type || 'Other',
-                                        value: Math.round(r.value || 0)
-                                    }));
-                                    // 9. Refundable Liability (paid for WX Refundable, not expired)
-                                    const refundableSql = `
+                                                        con.query(liabilityTypeSql, [], (err8, liabTypeRows) => {
+                                                            if (err8) return res.status(500).json({ error: 'Failed to fetch liability by flight type' });
+                                                            const liabilityByFlightType = liabTypeRows.map(r => ({
+                                                                type: r.flight_type || 'Other',
+                                                                value: Math.round(r.value || 0)
+                                                            }));
+                                                            // 9. Refundable Liability (paid for WX Refundable, not expired)
+                                                            const refundableSql = `
                                         SELECT choose_add_on, paid, status
                                         FROM all_booking
                                         WHERE paid IS NOT NULL AND paid > 0 AND status != 'Expired' ${dateFilter()}
                                     `;
-                                    con.query(refundableSql, [], (err9, refRows) => {
-                                        if (err9) return res.status(500).json({ error: 'Failed to fetch refundable liability' });
-                                        let refundableLiability = 0;
-                                        refRows.forEach(row => {
-                                            try {
-                                                if (!row.choose_add_on || typeof row.choose_add_on !== 'string' || row.choose_add_on.trim() === '') return;
-                                                let arr = [];
-                                                try {
-                                                    if (row.choose_add_on && row.choose_add_on.trim() !== "" && row.choose_add_on.startsWith("[")) {
-                                                        arr = JSON.parse(row.choose_add_on);
-                                                    }
-                                                } catch (e) { 
-                                                    console.error('Refundable JSON parse error:', e); 
-                                                    arr = []; 
-                                                }
-                                                if (Array.isArray(arr)) {
-                                                    arr.forEach(a => {
-                                                        if (a.name && a.name.toLowerCase().includes('wx')) {
-                                                            refundableLiability += Number(row.paid) - (Number(a.price) || 47.5);
-                                                        }
-                                                    });
-                                                }
-                                            } catch (e) { console.error('Refundable JSON parse error:', e); }
-                                        });
-                                        // 10. Flown Flights by Location (only after manifest date and not cancelled)
-                                        const flownSql = `
+                                                            con.query(refundableSql, [], (err9, refRows) => {
+                                                                if (err9) return res.status(500).json({ error: 'Failed to fetch refundable liability' });
+                                                                let refundableLiability = 0;
+                                                                refRows.forEach(row => {
+                                                                    try {
+                                                                        if (!row.choose_add_on || typeof row.choose_add_on !== 'string' || row.choose_add_on.trim() === '') return;
+                                                                        let arr = [];
+                                                                        try {
+                                                                            if (row.choose_add_on && row.choose_add_on.trim() !== "" && row.choose_add_on.startsWith("[")) {
+                                                                                arr = JSON.parse(row.choose_add_on);
+                                                                            }
+                                                                        } catch (e) {
+                                                                            console.error('Refundable JSON parse error:', e);
+                                                                            arr = [];
+                                                                        }
+                                                                        if (Array.isArray(arr)) {
+                                                                            arr.forEach(a => {
+                                                                                if (a.name && a.name.toLowerCase().includes('wx')) {
+                                                                                    refundableLiability += Number(row.paid) - (Number(a.price) || 47.5);
+                                                                                }
+                                                                            });
+                                                                        }
+                                                                    } catch (e) { console.error('Refundable JSON parse error:', e); }
+                                                                });
+                                                                // 10. Flown Flights by Location (only after manifest date and not cancelled)
+                                                                const flownSql = `
                                             SELECT location, COUNT(*) as count
                                             FROM all_booking
                                             WHERE status != 'Cancelled' 
@@ -11488,36 +11543,36 @@ app.get('/api/analytics', async (req, res) => {
                                             ${dateFilter()}
                                             GROUP BY location
                                         `;
-                                        con.query(flownSql, [], (err10, flownRows) => {
-                                            if (err10) return res.status(500).json({ error: 'Failed to fetch flown flights by location' });
-                                            const flownFlightsByLocation = flownRows.map(r => ({
-                                                location: r.location || 'Other',
-                                                count: r.count
-                                            }));
-                                            // Return all real analytics
-                                            res.json({
-                                                bookingAttempts,
-                                                salesBySource,
-                                                nonRedemption,
-                                                addOns,
-                                                salesByLocation,
-                                                salesByBookingType,
-                                                liabilityByLocation,
-                                                liabilityByFlightType,
-                                                refundableLiability: Math.round(refundableLiability),
-                                                flownFlightsByLocation
+                                                                con.query(flownSql, [], (err10, flownRows) => {
+                                                                    if (err10) return res.status(500).json({ error: 'Failed to fetch flown flights by location' });
+                                                                    const flownFlightsByLocation = flownRows.map(r => ({
+                                                                        location: r.location || 'Other',
+                                                                        count: r.count
+                                                                    }));
+                                                                    // Return all real analytics
+                                                                    res.json({
+                                                                        bookingAttempts,
+                                                                        salesBySource,
+                                                                        nonRedemption,
+                                                                        addOns,
+                                                                        salesByLocation,
+                                                                        salesByBookingType,
+                                                                        liabilityByLocation,
+                                                                        liabilityByFlightType,
+                                                                        refundableLiability: Math.round(refundableLiability),
+                                                                        flownFlightsByLocation
+                                                                    });
+                                                                });
+                                                            });
+                                                        });
+                                                    });
+                                                });
                                             });
                                         });
                                     });
                                 });
                             });
                         });
-                    });
-                });
-            });
-        });
-                    });
-                    });
                     });
                 }
             });
@@ -11535,7 +11590,7 @@ app.post("/api/createActivity", upload.single('image'), (req, res) => {
     if (!activity_name || !capacity || !location || !flight_type || !status || !weekday_morning_price || !flexible_weekday_price || !any_day_flight_price || !shared_flight_from_price || !private_charter_from_price) {
         return res.status(400).json({ success: false, message: "Eksik bilgi!" });
     }
-    
+
     // Validate and format flight_type
     let formattedFlightType = flight_type;
     if (Array.isArray(flight_type)) {
@@ -11544,7 +11599,7 @@ app.post("/api/createActivity", upload.single('image'), (req, res) => {
         // Ensure it's properly formatted
         formattedFlightType = flight_type.split(',').map(type => type.trim()).join(',');
     }
-    
+
     // Validate and format private_charter_voucher_types
     let formattedPrivateCharterVoucherTypes = private_charter_voucher_types;
     if (Array.isArray(private_charter_voucher_types)) {
@@ -11553,7 +11608,7 @@ app.post("/api/createActivity", upload.single('image'), (req, res) => {
         // Ensure it's properly formatted
         formattedPrivateCharterVoucherTypes = private_charter_voucher_types.split(',').map(type => type.trim()).join(',');
     }
-    
+
     const sql = `
         INSERT INTO activity (activity_name, capacity, start_date, end_date, event_time, location, flight_type, voucher_type, private_charter_voucher_types, private_charter_pricing, status, image, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price)
         VALUES (?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -11580,7 +11635,7 @@ app.get("/api/activity/:id", (req, res) => {
 app.get('/api/locationVoucherTypes/:location', (req, res) => {
     const { location } = req.params;
     if (!location) return res.status(400).json({ success: false, message: 'Location is required' });
-    
+
     const sql = `
         SELECT voucher_type
         FROM activity 
@@ -11593,14 +11648,14 @@ app.get('/api/locationVoucherTypes/:location', (req, res) => {
         if (!result || result.length === 0) {
             return res.status(404).json({ success: false, message: "No voucher types found for this location" });
         }
-        
+
         const voucherTypes = result[0].voucher_type;
         let voucherTypesArray = [];
-        
+
         if (voucherTypes && voucherTypes !== 'All') {
             voucherTypesArray = voucherTypes.split(',').map(type => type.trim());
         }
-        
+
         res.json({ success: true, data: voucherTypesArray });
     });
 });
@@ -11613,7 +11668,7 @@ app.put("/api/activity/:id", upload.single('image'), (req, res) => {
     if (req.file) {
         image = `/uploads/activities/${req.file.filename}`;
     }
-    
+
     // Validate and format flight_type
     let formattedFlightType = flight_type;
     if (Array.isArray(flight_type)) {
@@ -11622,7 +11677,7 @@ app.put("/api/activity/:id", upload.single('image'), (req, res) => {
         // Ensure it's properly formatted
         formattedFlightType = flight_type.split(',').map(type => type.trim()).join(',');
     }
-    
+
     // Eğer yeni fotoğraf yoksa, mevcut image değerini koru
     const getImageSql = "SELECT image FROM activity WHERE id = ?";
     con.query(getImageSql, [id], (err, result) => {
@@ -11663,10 +11718,10 @@ app.get('/api/activeLocations', (req, res) => {
     `;
     con.query(sql, (err, result) => {
         if (err) return res.status(500).json({ success: false, message: "Database error" });
-        
+
         // Log the results for debugging
         console.log('Active locations with images:', result);
-        
+
         res.json({ success: true, data: result });
     });
 });
@@ -11675,10 +11730,10 @@ app.get('/api/activeLocations', (req, res) => {
 app.get('/api/locationPricing/:location', (req, res) => {
     const { location } = req.params;
     if (!location) return res.status(400).json({ success: false, message: 'Location is required' });
-    
+
     console.log('=== /api/locationPricing called ===');
     console.log('Location:', location);
-    
+
     const sql = `
         SELECT weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price, flight_type
         FROM activity 
@@ -11692,10 +11747,10 @@ app.get('/api/locationPricing/:location', (req, res) => {
             console.log('No pricing found for location:', location);
             return res.status(404).json({ success: false, message: "No pricing found for this location" });
         }
-        
+
         const pricing = result[0];
         console.log('Raw pricing data:', pricing);
-        
+
         // Process flight_type to map to experience names
         let flightTypes = [];
         let experiences = [];
@@ -11705,7 +11760,7 @@ app.get('/api/locationPricing/:location', (req, res) => {
             } else if (Array.isArray(pricing.flight_type)) {
                 flightTypes = pricing.flight_type;
             }
-            
+
             // Map flight types to experience names
             experiences = flightTypes.map(type => {
                 if (type === 'Private') return 'Private Charter';
@@ -11713,13 +11768,13 @@ app.get('/api/locationPricing/:location', (req, res) => {
                 return type; // Keep original if not mapped
             });
         }
-        
+
         console.log('Processed flight types:', flightTypes);
         console.log('Processed experiences:', experiences);
         console.log('=== /api/locationPricing response ===');
-        
-        res.json({ 
-            success: true, 
+
+        res.json({
+            success: true,
             data: {
                 weekday_morning_price: pricing.weekday_morning_price,
                 flexible_weekday_price: pricing.flexible_weekday_price,
@@ -11872,18 +11927,18 @@ app.post('/api/activity/:id/availabilities', (req, res) => {
         .catch(error => {
             console.error('Error creating availabilities:', error);
             res.status(500).json({ success: false, message: 'Database error', error });
-    });
+        });
 });
 
 // Get Availabilities for an activity
 app.get('/api/activity/:id/availabilities', (req, res) => {
     const { id } = req.params;
     if (!id) return res.status(400).json({ success: false, message: 'Eksik bilgi!' });
-    
+
     console.log(`Fetching availabilities for activity ${id}`);
-    
+
     // Single optimized query with JOINs - FIXED to use time_slot and SUM(pax)
-const optimizedSql = `
+    const optimizedSql = `
         SELECT 
             aa.*,
             a.location,
@@ -11914,15 +11969,15 @@ const optimizedSql = `
         WHERE aa.activity_id = ? 
         ORDER BY aa.date, aa.time
 `;
-    
+
     con.query(optimizedSql, [id], (err, result) => {
         if (err) {
             console.error('Error fetching availabilities:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err });
         }
-        
+
         console.log(`Found ${result.length} availabilities for activity ${id}`);
-        
+
         // Log some sample results for debugging
         if (result.length > 0) {
             console.log('Sample availability records:');
@@ -11930,13 +11985,13 @@ const optimizedSql = `
                 console.log(`  ${index + 1}. ID: ${row.id}, Date: ${row.date}, Time: ${row.time}, Available: ${row.available}, Status: ${row.status}, Total Booked: ${row.total_booked}`);
             });
         }
-        
+
         // Process results and update database if needed
         const processedResult = result.map(row => {
             // IMPORTANT: Only calculate availability for this specific time slot, not for the entire date
             // The booking count should be specific to this date+time combination, not just the date
             const needsUpdate = row.calculated_status !== row.status || row.calculated_available !== row.available;
-            
+
             // Update database if needed (non-blocking) - but only for this specific record
             if (needsUpdate) {
                 console.log(`Updating availability ${row.id}: date=${row.date}, time=${row.time}, status=${row.calculated_status}, available=${row.calculated_available}`);
@@ -11949,7 +12004,7 @@ const optimizedSql = `
                     }
                 });
             }
-            
+
             return {
                 ...row,
                 date: row.date ? dayjs(row.date).format('YYYY-MM-DD') : row.date,
@@ -11958,7 +12013,7 @@ const optimizedSql = `
                 status: row.calculated_status
             };
         });
-        
+
         console.log(`Processed ${processedResult.length} availabilities`);
         res.json({ success: true, data: processedResult });
     });
@@ -11967,11 +12022,11 @@ const optimizedSql = `
 // Get availabilities filtered by location, flight type, and voucher types
 app.get('/api/availabilities/filter', (req, res) => {
     const { location, flightType, voucherTypes, date, time, activityId } = req.query;
-    
+
     if (!location && !activityId) {
         return res.status(400).json({ success: false, message: 'Location or activityId is required' });
     }
-    
+
     // Debug: Log what flight types exist in the database for this filter
     const debugSql = `
         SELECT DISTINCT aa.flight_types, aa.voucher_types, COUNT(*) as count
@@ -11980,13 +12035,13 @@ app.get('/api/availabilities/filter', (req, res) => {
         WHERE ${activityId ? 'aa.activity_id = ?' : 'a.location = ?'} AND a.status = 'Live' AND aa.status = 'open'
         GROUP BY aa.flight_types, aa.voucher_types
     `;
-    
+
     con.query(debugSql, [activityId || location], (debugErr, debugResult) => {
         if (!debugErr) {
             console.log('Available flight_types and voucher_types in database for', activityId ? `activity ${activityId}` : location, ':', debugResult);
         }
     });
-    
+
     // Additional debug: Check what's actually in the database
     const debugSql2 = `
         SELECT aa.id, aa.date, aa.time, aa.status, aa.available, aa.capacity, a.location, a.status as activity_status
@@ -11996,13 +12051,13 @@ app.get('/api/availabilities/filter', (req, res) => {
         ORDER BY aa.date, aa.time
         LIMIT 10
     `;
-    
+
     con.query(debugSql2, [activityId || location], (debugErr2, debugResult2) => {
         if (!debugErr2) {
             console.log('Raw database data for', activityId ? `activity ${activityId}` : location, ':', debugResult2);
         }
     });
-    
+
     const parseList = (value) => {
         if (!value) return [];
         if (Array.isArray(value)) return value;
@@ -12044,9 +12099,9 @@ app.get('/api/availabilities/filter', (req, res) => {
             AND a.location = booking_counts.location
         WHERE ${activityId ? 'aa.activity_id = ?' : 'a.location = ?'} AND a.status = 'Live'
     `;
-    
+
     const params = [activityId || location];
-    
+
     if (flightType && flightType !== 'All') {
         sql += ` AND (aa.flight_types = 'All' OR aa.flight_types = ? OR FIND_IN_SET(?, aa.flight_types) > 0)`;
         params.push(flightType, flightType);
@@ -12054,7 +12109,7 @@ app.get('/api/availabilities/filter', (req, res) => {
         // If no flight type specified, show all flight types
         sql += ` AND (aa.flight_types = 'All' OR aa.flight_types IS NOT NULL)`;
     }
-    
+
     if (voucherTypes && voucherTypes !== 'All') {
         sql += ` AND (aa.voucher_types = 'All' OR aa.voucher_types = ? OR FIND_IN_SET(?, aa.voucher_types) > 0)`;
         params.push(voucherTypes, voucherTypes);
@@ -12062,58 +12117,58 @@ app.get('/api/availabilities/filter', (req, res) => {
         // If no voucher type specified, show all voucher types
         sql += ` AND (aa.voucher_types = 'All' OR aa.voucher_types IS NOT NULL)`;
     }
-    
+
     if (date) {
         sql += ` AND aa.date = ?`;
         params.push(date);
     }
-    
+
     if (time) {
         sql += ` AND aa.time = ?`;
         params.push(time);
     }
-    
+
     sql += ` ORDER BY aa.date, aa.time`;
-    
+
     con.query(sql, params, (err, result) => {
         if (err) {
             console.error('Error fetching filtered availabilities:', err);
             return res.status(500).json({ success: false, message: 'Database error' });
         }
-        
+
         // Normalize date format to YYYY-MM-DD using local timezone to prevent 1-day offset
         const normalizedResult = result.map(row => {
             if (!row.date) return row;
-            
+
             // Parse the date and create a new date in local timezone
             const dateObj = new Date(row.date);
             const year = dateObj.getFullYear();
             const month = String(dateObj.getMonth() + 1).padStart(2, '0');
             const day = String(dateObj.getDate()).padStart(2, '0');
             const localDateString = `${year}-${month}-${day}`;
-            
+
             // Calculate held seats for this slot
             const holdKey = `${row.activity_id}_${localDateString}_${row.time}`;
             let heldSeats = 0;
             const now = Date.now();
-            
+
             for (const [key, hold] of availabilityHolds.entries()) {
                 if (key.startsWith(holdKey) && now <= hold.expiresAt) {
                     heldSeats += hold.seats;
                 }
             }
-            
+
             const voucherTypesArray = parseList(row.voucher_types);
             const flightTypesArray = parseList(row.flight_types);
-            
+
             // Use calculated values from booking counts (same logic as /api/activity/:id/availabilities)
             const totalBooked = Number(row.total_booked) || 0;
             const calculatedAvailable = Number(row.calculated_available) || 0;
             const calculatedStatus = row.calculated_status || row.status;
-            
+
             // Final available = calculated_available - heldSeats
             const finalAvailable = Math.max(0, calculatedAvailable - heldSeats);
-            
+
             return {
                 ...row,
                 date: localDateString,
@@ -12127,28 +12182,28 @@ app.get('/api/availabilities/filter', (req, res) => {
                 flight_types_array: flightTypesArray
             };
         });
-        
-        console.log('Filtered availabilities response:', { 
-            location, 
+
+        console.log('Filtered availabilities response:', {
+            location,
             activityId,
-            flightType, 
-            voucherTypes, 
+            flightType,
+            voucherTypes,
             count: normalizedResult.length,
             sql: sql,
             params: params,
-            sampleData: normalizedResult.slice(0, 3).map(r => ({ 
-                id: r.id, 
-                date: r.date, 
+            sampleData: normalizedResult.slice(0, 3).map(r => ({
+                id: r.id,
+                date: r.date,
                 status: r.status,
                 available: r.available,
                 actualAvailable: r.actualAvailable,
                 heldSeats: r.heldSeats,
                 capacity: r.capacity,
-                flight_types: r.flight_types, 
+                flight_types: r.flight_types,
                 voucher_types: r.voucher_types
             }))
         });
-        
+
         return res.json({ success: true, data: normalizedResult || [] });
     });
 });
@@ -12161,14 +12216,14 @@ app.get('/api/activities', (req, res) => {
             console.error('Database error in /api/activities:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err });
         }
-        
+
         // Ensure result is always an array
         const activities = Array.isArray(result) ? result : [];
-        
+
         console.log('Activities endpoint called, returning:', activities.length, 'activities');
-        
-        res.json({ 
-            success: true, 
+
+        res.json({
+            success: true,
             data: activities,
             count: activities.length,
             timestamp: new Date().toISOString()
@@ -12217,28 +12272,28 @@ app.delete('/api/availability/:id', (req, res) => {
 app.patch('/api/availability/:id/status', (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
-    
+
     if (!id || !status) {
         return res.status(400).json({ success: false, message: 'Missing availability id or status' });
     }
-    
+
     if (status !== 'Open' && status !== 'Closed') {
         return res.status(400).json({ success: false, message: 'Status must be either "Open" or "Closed"' });
     }
-    
+
     const sql = 'UPDATE activity_availability SET status = ? WHERE id = ?';
     con.query(sql, [status, id], (err, result) => {
         if (err) {
             console.error('Error updating availability status:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err });
         }
-        
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: 'Availability not found' });
         }
-        
-        res.json({ 
-            success: true, 
+
+        res.json({
+            success: true,
             message: `Availability status updated to ${status}`,
             data: { id, status }
         });
@@ -12256,15 +12311,15 @@ app.post('/api/updateAvailabilityStatus', (req, res) => {
         END
         WHERE available = 0 OR available > 0
     `;
-    
+
     con.query(sql, (err, result) => {
         if (err) {
             console.error('Error auto-updating availability status:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err });
         }
-        
-        res.json({ 
-            success: true, 
+
+        res.json({
+            success: true,
             message: 'Availability statuses updated automatically',
             affectedRows: result.affectedRows
         });
@@ -12275,7 +12330,7 @@ app.post('/api/updateAvailabilityStatus', (req, res) => {
 app.post('/api/activity/:id/updateAvailabilityStatus', (req, res) => {
     const { id } = req.params;
     if (!id) return res.status(400).json({ success: false, message: 'Missing activity ID' });
-    
+
     const sql = `
         UPDATE activity_availability aa
         JOIN (
@@ -12304,18 +12359,18 @@ app.post('/api/activity/:id/updateAvailabilityStatus', (req, res) => {
             aa.available = GREATEST(0, aa.capacity - booking_counts.total_booked)
         WHERE aa.activity_id = ?
     `;
-    
+
     console.log(`Updating availability status for activity ${id}`);
-    
+
     con.query(sql, [id, id], (err, result) => {
         if (err) {
             console.error('Error updating availability status for activity:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err });
         }
-        
+
         console.log(`Updated ${result.affectedRows} availability statuses for activity ${id}`);
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             message: `Updated ${result.affectedRows} availability statuses for activity ${id}`,
             affectedRows: result.affectedRows
         });
@@ -12358,12 +12413,12 @@ app.get('/api/activity/:id/rebook-availabilities', (req, res) => {
 app.post('/api/date-request', (req, res) => {
     const { name, phone, email, location, flight_type, requested_date } = req.body;
     console.log('POST /api/date-request called with:', { name, phone, email, location, flight_type, requested_date });
-    
+
     if (!name || !email || !location || !flight_type || !requested_date) {
         console.log('Missing required fields');
         return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
-    
+
     const sql = 'INSERT INTO date_request (name, phone, email, location, flight_type, requested_date) VALUES (?, ?, ?, ?, ?, ?)';
     con.query(sql, [name, phone, email, location, flight_type, requested_date], (err, result) => {
         if (err) {
@@ -12408,7 +12463,7 @@ app.get('/api/getVoucherDetail', async (req, res) => {
             return res.status(200).json({ success: true, voucher: { id, voucher_ref }, booking: null, passengers: [], notes: [] });
         }
         const voucher = voucherRows[0];
-        
+
         // Parse booking_references JSON if it exists
         if (voucher.booking_references) {
             try {
@@ -12420,12 +12475,12 @@ app.get('/api/getVoucherDetail', async (req, res) => {
         } else {
             voucher.booking_references = [];
         }
-        
+
         // Parse voucher_passenger_details JSON if it exists
         if (voucher.voucher_passenger_details) {
             try {
-                voucher.passenger_details = typeof voucher.voucher_passenger_details === 'string' 
-                    ? JSON.parse(voucher.voucher_passenger_details) 
+                voucher.passenger_details = typeof voucher.voucher_passenger_details === 'string'
+                    ? JSON.parse(voucher.voucher_passenger_details)
                     : voucher.voucher_passenger_details;
             } catch (e) {
                 console.warn('Failed to parse voucher_passenger_details for voucher:', voucher.id, e);
@@ -12434,7 +12489,7 @@ app.get('/api/getVoucherDetail', async (req, res) => {
         } else {
             voucher.passenger_details = [];
         }
-        
+
         // 2. İlgili booking (varsa)
         let booking = null;
         let passengers = [];
@@ -12466,7 +12521,7 @@ app.get('/api/getVoucherDetail', async (req, res) => {
                 notes = notesRows;
             }
         }
-        
+
         // Get voucher-specific notes
         let voucherNotes = [];
         const [voucherNotesRows] = await new Promise((resolve, reject) => {
@@ -12476,10 +12531,10 @@ app.get('/api/getVoucherDetail', async (req, res) => {
             });
         });
         voucherNotes = voucherNotesRows;
-        
+
         // Combine booking notes and voucher notes
         const allNotes = [...notes, ...voucherNotes.map(vn => ({ ...vn, source: 'voucher', notes: vn.note }))];
-        
+
         res.json({
             success: true,
             voucher,
@@ -12498,7 +12553,7 @@ app.post("/api/getActivityId", (req, res) => {
     const { location } = req.body;
     console.log('=== /api/getActivityId called ===');
     console.log('Location:', location);
-    
+
     if (!location) {
         return res.status(400).json({ success: false, message: "Eksik bilgi!" });
     }
@@ -12511,7 +12566,7 @@ app.post("/api/getActivityId", (req, res) => {
         }
         const activity = activities[0];
         console.log('Activity found - ID:', activity.id, 'Location:', activity.location);
-        
+
         // Şimdi availability'leri çek
         const availSql = 'SELECT id, DATE_FORMAT(date, "%Y-%m-%d") as date, time, capacity, available, status FROM activity_availability WHERE activity_id = ? AND status = "Open" AND date >= CURDATE() ORDER BY date, time';
         con.query(availSql, [activity.id], (err2, availabilities) => {
@@ -12562,23 +12617,23 @@ app.patch("/api/updateAdminNote", (req, res) => {
 // Update Voucher Field
 app.patch("/api/updateVoucherField", (req, res) => {
     const { voucher_id, field, value } = req.body;
-    
+
     // Add field validation for security
     const allowedFields = [
-        'name', 'email', 'mobile', 'phone', 'paid', 'weight', 'expires', 
+        'name', 'email', 'mobile', 'phone', 'paid', 'weight', 'expires',
         'flight_type', 'voucher_type', 'status', 'flight_attempts',
         'experience_type', 'book_flight',
         'purchaser_name', 'purchaser_email', 'purchaser_phone', 'purchaser_mobile'
     ];
-    
+
     if (!voucher_id || !field) {
         return res.status(400).json({ success: false, message: "Missing voucher_id or field" });
     }
-    
+
     if (!allowedFields.includes(field)) {
         return res.status(400).json({ success: false, message: "Field not allowed" });
     }
-    
+
     const sql = `UPDATE all_vouchers SET ${field} = ? WHERE id = ?`;
     con.query(sql, [value, voucher_id], (err, result) => {
         if (err) {
@@ -12610,19 +12665,19 @@ app.delete("/api/deleteAdminNote", (req, res) => {
 // Add Voucher Note
 app.post("/api/addVoucherNote", (req, res) => {
     const { date, note, voucher_id } = req.body;
-    
+
     if (!date || !note || !voucher_id) {
         return res.status(400).json({ success: false, message: "Missing date, note, or voucher_id" });
     }
-    
+
     console.log('Adding voucher note for voucher_id:', voucher_id, 'note:', note);
-    
+
     // Check if voucher_id is in format "voucher_XXXXXX" (new format) or numeric (old format)
     if (voucher_id.toString().startsWith('voucher_')) {
         // Extract voucher_ref from the ID format "voucher_FAT25WOS" -> "FAT25WOS"
         const voucher_ref = voucher_id.replace('voucher_', '');
         console.log('Using voucher_ref based storage for voucher_ref:', voucher_ref);
-        
+
         // Use a separate table or storage mechanism for voucher_ref based notes
         const sql = "INSERT INTO voucher_ref_notes (date, note, voucher_ref) VALUES (?, ?, ?)";
         con.query(sql, [date, note, voucher_ref], (err, result) => {
@@ -12680,11 +12735,11 @@ app.post("/api/addVoucherNote", (req, res) => {
 // Update Voucher Note
 app.patch("/api/updateVoucherNote", (req, res) => {
     const { id, note } = req.body;
-    
+
     if (!id || !note) {
         return res.status(400).json({ success: false, message: "Missing id or note" });
     }
-    
+
     const sql = "UPDATE voucher_notes SET note = ? WHERE id = ?";
     con.query(sql, [note, id], (err, result) => {
         if (err) {
@@ -12698,24 +12753,24 @@ app.patch("/api/updateVoucherNote", (req, res) => {
 // Update Voucher Ref Note (for voucher_ref_notes table)
 app.patch("/api/updateVoucherRefNote", (req, res) => {
     const { id, note, voucher_ref } = req.body;
-    
+
     if (!id || !note) {
         return res.status(400).json({ success: false, message: "Missing id or note" });
     }
-    
+
     console.log('Updating voucher ref note:', { id, note, voucher_ref });
-    
+
     const sql = "UPDATE voucher_ref_notes SET note = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
     con.query(sql, [note, id], (err, result) => {
         if (err) {
             console.error("Error updating voucher ref note:", err);
             return res.status(500).json({ success: false, message: "Database error" });
         }
-        
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: "Note not found" });
         }
-        
+
         console.log('Successfully updated voucher ref note:', result);
         res.json({ success: true });
     });
@@ -12724,11 +12779,11 @@ app.patch("/api/updateVoucherRefNote", (req, res) => {
 // Delete Voucher Note
 app.delete("/api/deleteVoucherNote", (req, res) => {
     const { id } = req.body;
-    
+
     if (!id) {
         return res.status(400).json({ success: false, message: "Missing id" });
     }
-    
+
     const sql = "DELETE FROM voucher_notes WHERE id = ?";
     con.query(sql, [id], (err, result) => {
         if (err) {
@@ -12742,24 +12797,24 @@ app.delete("/api/deleteVoucherNote", (req, res) => {
 // Delete Voucher Ref Note (for voucher_ref_notes table)
 app.delete("/api/deleteVoucherRefNote", (req, res) => {
     const { id, voucher_ref } = req.body;
-    
+
     if (!id) {
         return res.status(400).json({ success: false, message: "Missing id" });
     }
-    
+
     console.log('Deleting voucher ref note:', { id, voucher_ref });
-    
+
     const sql = "DELETE FROM voucher_ref_notes WHERE id = ?";
     con.query(sql, [id], (err, result) => {
         if (err) {
             console.error("Error deleting voucher ref note:", err);
             return res.status(500).json({ success: false, message: "Database error" });
         }
-        
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: "Note not found" });
         }
-        
+
         console.log('Successfully deleted voucher ref note:', result);
         res.json({ success: true });
     });
@@ -12768,19 +12823,19 @@ app.delete("/api/deleteVoucherRefNote", (req, res) => {
 // Get Voucher Notes
 app.get("/api/getVoucherNotes", (req, res) => {
     const { voucher_id } = req.query;
-    
+
     if (!voucher_id) {
         return res.status(400).json({ success: false, message: "Missing voucher_id" });
     }
-    
+
     console.log('Getting voucher notes for voucher_id:', voucher_id);
-    
+
     // Check if voucher_id is in format "voucher_XXXXXX" (new format) or numeric (old format)
     if (voucher_id.toString().startsWith('voucher_')) {
         // Extract voucher_ref from the ID format "voucher_FAT25WOS" -> "FAT25WOS"
         const voucher_ref = voucher_id.replace('voucher_', '');
         console.log('Getting notes from voucher_ref_notes for voucher_ref:', voucher_ref);
-        
+
         const sql = "SELECT * FROM voucher_ref_notes WHERE voucher_ref = ? ORDER BY date DESC";
         con.query(sql, [voucher_ref], (err, result) => {
             if (err) {
@@ -12819,7 +12874,7 @@ app.get("/api/debugVouchers", (req, res) => {
 // Test endpoint to add Gift Voucher for testing
 app.post("/api/addTestGiftVoucher", (req, res) => {
     console.log('Adding test Gift Voucher...');
-    
+
     const insertSql = `INSERT INTO all_vouchers (
         name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, 
         expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, 
@@ -12827,7 +12882,7 @@ app.post("/api/addTestGiftVoucher", (req, res) => {
         preferred_time, preferred_day, flight_attempts, status, purchaser_name, 
         purchaser_email, purchaser_phone, purchaser_mobile, add_to_booking_items
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    
+
     const values = [
         'Gift Voucher - Book Flight',                    // name
         '75kg',                                         // weight  
@@ -12859,16 +12914,16 @@ app.post("/api/addTestGiftVoucher", (req, res) => {
         '01234567890',                                 // purchaser_mobile
         null                                           // add_to_booking_items (test data)
     ];
-    
+
     con.query(insertSql, values, (err, result) => {
         if (err) {
             console.error("Error inserting test gift voucher:", err);
             return res.status(500).json({ success: false, message: "Database error" });
         }
-        
+
         console.log('✅ Test Gift Voucher added with ID:', result.insertId);
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             message: "Test Gift Voucher added successfully",
             id: result.insertId,
             voucher_ref: 'GIFT25001'
@@ -12879,13 +12934,13 @@ app.post("/api/addTestGiftVoucher", (req, res) => {
 // Find Voucher by Voucher Ref
 app.get("/api/findVoucherByRef", (req, res) => {
     const { voucher_ref } = req.query;
-    
+
     if (!voucher_ref) {
         return res.status(400).json({ success: false, message: "Missing voucher_ref" });
     }
-    
+
     console.log('Searching for voucher with voucher_ref:', voucher_ref);
-    
+
     // First try all_vouchers table
     const voucherSql = "SELECT * FROM all_vouchers WHERE voucher_ref = ? LIMIT 1";
     con.query(voucherSql, [voucher_ref], (err, voucherResult) => {
@@ -12893,14 +12948,14 @@ app.get("/api/findVoucherByRef", (req, res) => {
             console.error("Error searching all_vouchers table:", err);
             return res.status(500).json({ success: false, message: "Database error" });
         }
-        
+
         console.log('Query result from all_vouchers:', voucherResult);
-        
+
         if (voucherResult && voucherResult.length > 0) {
             console.log('Found voucher in all_vouchers table:', voucherResult[0]);
             return res.json({ success: true, voucher: voucherResult[0], source: 'all_vouchers' });
         }
-        
+
         // If not found in all_vouchers, try all_booking table (for Book Flight vouchers)
         console.log('Voucher not found in all_vouchers, searching all_booking table...');
         const bookingSql = "SELECT id, voucher_code as voucher_ref, name, email, phone as mobile, paid, created_at FROM all_booking WHERE voucher_code = ?";
@@ -12909,7 +12964,7 @@ app.get("/api/findVoucherByRef", (req, res) => {
                 console.error("Error searching all_booking table:", err);
                 return res.status(500).json({ success: false, message: "Database error" });
             }
-            
+
             if (bookingResult && bookingResult.length > 0) {
                 console.log('Found voucher in all_booking table:', bookingResult[0]);
                 // For booking-based vouchers, we'll use a special ID format
@@ -12920,7 +12975,7 @@ app.get("/api/findVoucherByRef", (req, res) => {
                 };
                 return res.json({ success: true, voucher: bookingVoucher, source: 'all_booking' });
             }
-            
+
             console.log('Voucher not found in either table');
             return res.json({ success: false, message: "Voucher not found in all_vouchers or all_booking tables" });
         });
@@ -12930,10 +12985,10 @@ app.get("/api/findVoucherByRef", (req, res) => {
 // Update Manifest Status and Availability
 app.patch("/api/updateManifestStatus", async (req, res) => {
     const { booking_id, new_status, old_status, flight_date, location, total_pax } = req.body;
-    
+
     // Debug: API çağrısını logla
     console.log('updateManifestStatus API çağrısı:', { booking_id, new_status, old_status, flight_date, location, total_pax });
-    
+
     if (!booking_id || !new_status || !old_status || !flight_date || !location) {
         console.log('updateManifestStatus - Eksik alanlar:', { booking_id, new_status, old_status, flight_date, location });
         return res.status(400).json({ success: false, message: "Missing required fields" });
@@ -12953,25 +13008,25 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
                 });
                 const voucherCode = rows && rows[0] ? rows[0].voucher_code : null;
                 if (!voucherCode) return;
-                
+
                 // Only increment attempts if:
                 // 1. Status is being changed to 'Cancelled'
                 // 2. The voucher was redeemed (not just purchased)
                 // 3. This is a voucher-based booking
                 const shouldIncrement = new_status === 'Cancelled' && voucherCode;
                 if (!shouldIncrement) return;
-                
+
                 // Get current attempts and increment
                 const [voucherRows] = await new Promise((resolve, reject) => {
                     con.query("SELECT flight_attempts, booking_references FROM all_vouchers WHERE voucher_code = ?", [voucherCode], (err, rows) => {
                         if (err) reject(err); else resolve([rows]);
                     });
                 });
-                
+
                 if (voucherRows && voucherRows.length > 0) {
                     const currentAttempts = parseInt(voucherRows[0].flight_attempts || 0, 10);
                     const newAttempts = currentAttempts + 1;
-                    
+
                     // Update booking_references to link this attempt to the specific booking
                     let bookingRefs = [];
                     try {
@@ -12979,21 +13034,21 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
                     } catch (e) {
                         console.warn('Failed to parse booking_references:', e);
                     }
-                    
+
                     // Add this booking to the references
                     bookingRefs.push({
                         booking_id: booking_id,
                         cancelled_at: new Date().toISOString(),
                         attempt_number: newAttempts
                     });
-                    
+
                     await new Promise((resolve, reject) => {
-                        con.query("UPDATE all_vouchers SET flight_attempts = ?, booking_references = ? WHERE voucher_code = ?", 
+                        con.query("UPDATE all_vouchers SET flight_attempts = ?, booking_references = ? WHERE voucher_code = ?",
                             [newAttempts, JSON.stringify(bookingRefs), voucherCode], (err, result) => {
-                            if (err) reject(err); else resolve(result);
-                        });
+                                if (err) reject(err); else resolve(result);
+                            });
                     });
-                    
+
                     console.log(`Incremented flight_attempts for voucher ${voucherCode} to ${newAttempts} due to booking ${booking_id} cancellation`);
                 }
             } catch (e) {
@@ -13105,8 +13160,8 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
             });
         });
 
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             message: "Status and availability updated successfully",
             newAvailable: newAvailable
         });
@@ -13125,7 +13180,7 @@ const updateAvailabilityStatus = async () => {
         // This function is now only used for maintenance purposes
         // Specific availability updates are handled by updateSpecificAvailability function
         console.log('updateAvailabilityStatus called - this function is deprecated for booking operations');
-        
+
         // Only update status for records that need it, but don't change availability numbers
         const sql = `
             UPDATE activity_availability 
@@ -13136,7 +13191,7 @@ const updateAvailabilityStatus = async () => {
             END
             WHERE (available = 0 OR available > 0) AND (status IS NULL OR status = '')
         `;
-        
+
         con.query(sql, (err, result) => {
             if (err) {
                 console.error('Error auto-updating availability status:', err);
@@ -13154,7 +13209,7 @@ const updateAvailabilityStatus = async () => {
 const checkAndFixDuplicateAvailability = async () => {
     try {
         console.log('=== CHECKING FOR DUPLICATE AVAILABILITY RECORDS ===');
-        
+
         // Find duplicate records
         const duplicateSql = `
             SELECT date, time, activity_id, COUNT(*) as count
@@ -13162,46 +13217,46 @@ const checkAndFixDuplicateAvailability = async () => {
             GROUP BY date, time, activity_id 
             HAVING COUNT(*) > 1
         `;
-        
+
         con.query(duplicateSql, (err, duplicates) => {
             if (err) {
                 console.error('Error checking for duplicates:', err);
                 return;
             }
-            
+
             if (duplicates.length === 0) {
                 console.log('No duplicate availability records found');
                 return;
             }
-            
+
             console.log(`Found ${duplicates.length} duplicate combinations:`);
             duplicates.forEach((dup, index) => {
                 console.log(`  ${index + 1}. date=${dup.date}, time=${dup.time}, activity_id=${dup.activity_id}, count=${dup.count}`);
             });
-            
+
             // For each duplicate, keep only one record and delete the others
             // Use a simpler approach to avoid deadlocks
             duplicates.forEach((dup, index) => {
                 // First, get the ID of the record to keep
                 const getKeepIdSql = `SELECT id FROM activity_availability WHERE date = ? AND time = ? AND activity_id = ? ORDER BY id ASC LIMIT 1`;
-                
+
                 con.query(getKeepIdSql, [dup.date, dup.time, dup.activity_id], (getErr, getResult) => {
                     if (getErr) {
                         console.error(`Error getting keep ID for ${dup.date} ${dup.time} activity_id=${dup.activity_id}:`, getErr);
                         return;
                     }
-                    
+
                     if (getResult.length === 0) {
                         console.error(`No records found for ${dup.date} ${dup.time} activity_id=${dup.activity_id}`);
                         return;
                     }
-                    
+
                     const keepId = getResult[0].id;
                     console.log(`Keeping record ID ${keepId} for ${dup.date} ${dup.time} activity_id=${dup.activity_id}`);
-                    
+
                     // Delete all other records for this date/time/activity combination
                     const deleteDuplicatesSql = `DELETE FROM activity_availability WHERE date = ? AND time = ? AND activity_id = ? AND id != ?`;
-                    
+
                     con.query(deleteDuplicatesSql, [dup.date, dup.time, dup.activity_id, keepId], (deleteErr, deleteResult) => {
                         if (deleteErr) {
                             console.error(`Error removing duplicates for ${dup.date} ${dup.time} activity_id=${dup.activity_id}:`, deleteErr);
@@ -13212,7 +13267,7 @@ const checkAndFixDuplicateAvailability = async () => {
                 });
             });
         });
-        
+
         console.log('=== DUPLICATE CHECK COMPLETE ===');
     } catch (error) {
         console.error('Error in checkAndFixDuplicateAvailability:', error);
@@ -13237,10 +13292,10 @@ app.get('/api/email-templates', (req, res) => {
 // Create new email template
 app.post('/api/email-templates', (req, res) => {
     const { name, subject, body, category, sms_enabled } = req.body;
-    
+
     const sql = 'INSERT INTO email_templates (name, subject, body, category, sms_enabled, edited, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())';
     const values = [name, subject, body || '', category, sms_enabled ? 1 : 0, 0];
-    
+
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error creating email template:', err);
@@ -13254,10 +13309,10 @@ app.post('/api/email-templates', (req, res) => {
 app.put('/api/email-templates/:id', (req, res) => {
     const { id } = req.params;
     const { name, subject, body, category, sms_enabled } = req.body;
-    
+
     const sql = 'UPDATE email_templates SET name = ?, subject = ?, body = ?, category = ?, sms_enabled = ?, edited = 1, updated_at = NOW() WHERE id = ?';
     const values = [name, subject, body || '', category, sms_enabled ? 1 : 0, id];
-    
+
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error updating email template:', err);
@@ -13270,7 +13325,7 @@ app.put('/api/email-templates/:id', (req, res) => {
 // Delete email template
 app.delete('/api/email-templates/:id', (req, res) => {
     const { id } = req.params;
-    
+
     con.query('DELETE FROM email_templates WHERE id = ?', [id], (err, result) => {
         if (err) {
             console.error('Error deleting email template:', err);
@@ -13295,10 +13350,10 @@ app.get('/api/customer-portal-contents', (req, res) => {
 // Create new customer portal content
 app.post('/api/customer-portal-contents', (req, res) => {
     const { header, body, sort_order, is_active } = req.body;
-    
+
     const sql = 'INSERT INTO customer_portal_contents (header, body, sort_order, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())';
     const values = [header || '', body || '', sort_order || 0, is_active !== undefined ? (is_active ? 1 : 0) : 1];
-    
+
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error creating customer portal content:', err);
@@ -13312,10 +13367,10 @@ app.post('/api/customer-portal-contents', (req, res) => {
 app.put('/api/customer-portal-contents/:id', (req, res) => {
     const { id } = req.params;
     const { header, body, sort_order, is_active } = req.body;
-    
+
     const sql = 'UPDATE customer_portal_contents SET header = ?, body = ?, sort_order = ?, is_active = ?, updated_at = NOW() WHERE id = ?';
     const values = [header || '', body || '', sort_order || 0, is_active !== undefined ? (is_active ? 1 : 0) : 1, id];
-    
+
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error updating customer portal content:', err);
@@ -13328,7 +13383,7 @@ app.put('/api/customer-portal-contents/:id', (req, res) => {
 // Delete customer portal content
 app.delete('/api/customer-portal-contents/:id', (req, res) => {
     const { id } = req.params;
-    
+
     con.query('DELETE FROM customer_portal_contents WHERE id = ?', [id], (err, result) => {
         if (err) {
             console.error('Error deleting customer portal content:', err);
@@ -13350,16 +13405,16 @@ app.get(/^\/(?!api\/).*/, (req, res) => {
 const PORT = process.env.PORT || 3002;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
-    
+
     // Run database migrations on server start
     runDatabaseMigrations();
-    
+
     // Check and fix duplicate availability records
     checkAndFixDuplicateAvailability();
-    
+
     // Run initial availability status update (maintenance only)
     updateAvailabilityStatus();
-    
+
     // Set up periodic updates every 5 minutes (maintenance only)
     setInterval(updateAvailabilityStatus, 5 * 60 * 1000);
 });
@@ -13367,7 +13422,7 @@ app.listen(PORT, '0.0.0.0', () => {
 app.delete('/api/deleteBooking/:id', (req, res) => {
     const { id } = req.params;
     if (!id) return res.status(400).json({ success: false, message: 'Missing booking id' });
-    
+
     // First get the booking details to know which time slot to restore
     const getBookingSql = 'SELECT activity_id, flight_date FROM all_booking WHERE id = ?';
     con.query(getBookingSql, [id], (err, bookingResult) => {
@@ -13375,17 +13430,17 @@ app.delete('/api/deleteBooking/:id', (req, res) => {
             console.error('Error getting booking details:', err);
             return res.status(500).json({ success: false, message: 'Database error' });
         }
-        
+
         if (bookingResult.length === 0) {
             return res.status(404).json({ success: false, message: 'Booking not found' });
         }
-        
+
         const booking = bookingResult[0];
-        
+
         // Parse the flight_date to extract date and time
         let bookingDate = null;
         let bookingTime = null;
-        
+
         if (booking.flight_date) {
             if (typeof booking.flight_date === 'string' && booking.flight_date.includes(' ')) {
                 const parts = booking.flight_date.split(' ');
@@ -13396,7 +13451,7 @@ app.delete('/api/deleteBooking/:id', (req, res) => {
                 bookingTime = null;
             }
         }
-        
+
         // Delete the booking (passengers will be deleted automatically due to ON DELETE CASCADE)
         const deleteSql = 'DELETE FROM all_booking WHERE id = ?';
         con.query(deleteSql, [id], (err, deleteResult) => {
@@ -13404,11 +13459,11 @@ app.delete('/api/deleteBooking/:id', (req, res) => {
                 console.error('Error deleting booking:', err);
                 return res.status(500).json({ success: false, message: 'Database error' });
             }
-            
+
             if (deleteResult.affectedRows === 0) {
                 return res.status(404).json({ success: false, message: 'Booking not found' });
             }
-            
+
             // Restore availability for the specific time slot if we have date and time
             if (bookingDate && bookingTime && booking.activity_id) {
                 const restoreAvailabilitySql = `
@@ -13416,7 +13471,7 @@ app.delete('/api/deleteBooking/:id', (req, res) => {
                     SET available_seats = available_seats + 1 
                     WHERE activity_id = ? AND date = ? AND time = ?
                 `;
-                
+
                 con.query(restoreAvailabilitySql, [booking.activity_id, bookingDate, bookingTime], (restoreErr) => {
                     if (restoreErr) {
                         console.error('Error restoring availability:', restoreErr);
@@ -13425,7 +13480,7 @@ app.delete('/api/deleteBooking/:id', (req, res) => {
                     } else {
                         console.log('Availability restored for activity_id:', booking.activity_id, 'date:', bookingDate, 'time:', bookingTime);
                     }
-                    
+
                     res.json({ success: true, message: 'Booking deleted successfully and availability restored' });
                 });
             } else {
@@ -13471,7 +13526,7 @@ async function createBookingFromWebhook(bookingData) {
             }
             return val;
         }
-        
+
         let {
             activitySelect,
             chooseLocation,
@@ -13510,7 +13565,7 @@ async function createBookingFromWebhook(bookingData) {
         const passengerName = `${passengerData[0].firstName} ${passengerData[0].lastName}`;
         const now = moment();
         let expiresDate = null;
-        
+
         // DEBUG: Log passenger data
         console.log('=== CREATE BOOKING FROM WEBHOOK DEBUG ===');
         console.log('passengerData:', passengerData);
@@ -13519,7 +13574,7 @@ async function createBookingFromWebhook(bookingData) {
         console.log('selectedTime:', selectedTime);
         console.log('chooseFlightType:', chooseFlightType);
         console.log('chooseLocation:', chooseLocation);
-        
+
         // Determine actualVoucherType for expiry calculation
         let actualVoucherType = '';
         if (bookingData.voucher_type && typeof bookingData.voucher_type === 'string') {
@@ -13534,7 +13589,7 @@ async function createBookingFromWebhook(bookingData) {
         function insertBookingAndPassengers(expiresDateFinal) {
             const nowDate = moment().format('YYYY-MM-DD HH:mm:ss');
             const mainPassenger = passengerData[0] || {};
-            
+
             let bookingDateTime = selectedDate;
             if (selectedTime && selectedDate) {
                 let datePart = selectedDate;
@@ -13556,7 +13611,7 @@ async function createBookingFromWebhook(bookingData) {
                     return sum + price;
                 }, 0);
             }
-            
+
             // Calculate weather refund total price (only for Shared Flight)
             const WEATHER_REFUND_PRICE = 47.5;
             const isSharedFlight = chooseFlightType && (chooseFlightType.type === 'Shared Flight' || chooseFlightType.type?.includes('Shared'));
@@ -13570,10 +13625,10 @@ async function createBookingFromWebhook(bookingData) {
             console.log('=== WEBHOOK WEATHER REFUND CALCULATION ===');
             console.log('Is Shared Flight:', isSharedFlight);
             console.log('Weather Refund Total Price:', weather_refund_total_price);
-            
+
             // Use actual passenger count from passengerData array
             const actualPaxCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
-            
+
             // Calculate original_amount: passenger_count * base_price_per_passenger
             // Base price depends on voucher_type (Any Day Flight = 220, etc.)
             const BASE_PRICE_PER_PASSENGER = 220; // Default for Any Day Flight
@@ -13585,7 +13640,7 @@ async function createBookingFromWebhook(bookingData) {
 
             // Determine flight_type_source: 'Redeem Voucher' if activitySelect is 'Redeem Voucher', otherwise use flight_type/experience
             const flight_type_source = activitySelect === 'Redeem Voucher' ? 'Redeem Voucher' : (chooseFlightType?.type || null);
-            
+
             // For redeem voucher bookings, flight_attempts should start from 0
             const finalFlightAttempts = activitySelect === 'Redeem Voucher' ? 0 : (flight_attempts !== undefined ? flight_attempts : 0);
 
@@ -13604,7 +13659,7 @@ async function createBookingFromWebhook(bookingData) {
             console.log('passengerData.length:', passengerData?.length);
             console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
             console.log('actualPaxCount (FINAL):', actualPaxCount);
-            
+
             const bookingValues = [
                 passengerName,
                 chooseFlightType.type,
@@ -13647,10 +13702,10 @@ async function createBookingFromWebhook(bookingData) {
                     console.error('Webhook booking insertion error:', err);
                     return reject(err);
                 }
-                
+
                 const bookingId = result.insertId;
                 console.log('Webhook booking created successfully, ID:', bookingId);
-                
+
                 // Save user session data if provided (can be in bookingData or passed separately)
                 const userSessionData = bookingData.userSessionData || bookingData._userSessionData;
                 if (userSessionData && userSessionData.session_id) {
@@ -13662,7 +13717,7 @@ async function createBookingFromWebhook(bookingData) {
                         ip_address: ipAddress,
                         booking_clicks: 1 // Increment booking clicks
                     };
-                    
+
                     // Save user session asynchronously
                     const host = process.env.API_BASE_URL || 'http://localhost:3002';
                     axios.post(`${host}/api/save-user-session`, userSessionPayload)
@@ -13673,14 +13728,14 @@ async function createBookingFromWebhook(bookingData) {
                             console.error('Error saving user session:', err.message);
                         });
                 }
-                
+
                 // Update availability if date and time are provided
                 if (selectedDate && selectedTime && bookingData.activity_id) {
                     const bookingDate = moment(selectedDate).format('YYYY-MM-DD');
                     const bookingTime = selectedTime;
                     // Use actual passenger count from passengerData array (real passenger count entered by user)
                     const actualPassengerCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
-                    
+
                     console.log('=== WEBHOOK BOOKING AVAILABILITY UPDATE ===');
                     console.log('passengerData RECEIVED:', JSON.stringify(passengerData, null, 2));
                     console.log('passengerData type:', typeof passengerData);
@@ -13690,7 +13745,7 @@ async function createBookingFromWebhook(bookingData) {
                     console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
                     console.log('Date:', bookingDate, 'Time:', bookingTime, 'Activity ID:', bookingData.activity_id);
                     console.log('Actual Passenger Count (FINAL):', actualPassengerCount);
-                    
+
                     updateSpecificAvailability(bookingDate, bookingTime, bookingData.activity_id, actualPassengerCount);
                 } else if (selectedDate && selectedTime && chooseLocation) {
                     // Get activity_id first, then update availability
@@ -13698,41 +13753,41 @@ async function createBookingFromWebhook(bookingData) {
                     const bookingTime = selectedTime;
                     // Use actual passenger count from passengerData array (real passenger count entered by user)
                     const actualPassengerCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
-                    
+
                     const activitySql = `SELECT id FROM activity WHERE location = ? AND status = 'Live' LIMIT 1`;
                     con.query(activitySql, [chooseLocation], (activityErr, activityResult) => {
                         if (activityErr) {
                             console.error('Error getting activity_id for webhook availability update:', activityErr);
                         } else if (activityResult.length > 0) {
                             const activityId = activityResult[0].id;
-                            
+
                             console.log('=== WEBHOOK BOOKING AVAILABILITY UPDATE (alt sorgu) ===');
                             console.log('Date:', bookingDate, 'Time:', bookingTime, 'Activity ID:', activityId);
                             console.log('passengerData length:', passengerData?.length);
                             console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
                             console.log('Actual Passenger Count (FINAL):', actualPassengerCount);
-                            
+
                             updateSpecificAvailability(bookingDate, bookingTime, activityId, actualPassengerCount);
                         } else {
                             console.error('No activity found for location:', chooseLocation);
                         }
                     });
                 }
-                
+
                 // Now create passenger records
                 if (passengerData && passengerData.length > 0) {
-            const passengerSql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund) VALUES ?';
+                    const passengerSql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund) VALUES ?';
                     const passengerValues = passengerData.map(p => [
                         bookingId,
                         p.firstName || '',
                         p.lastName || '',
-                (p.weight === '' ? null : p.weight || null),
-                (p.email === '' ? null : p.email || null),
-                (p.phone === '' ? null : p.phone || null),
+                        (p.weight === '' ? null : p.weight || null),
+                        (p.email === '' ? null : p.email || null),
+                        (p.phone === '' ? null : p.phone || null),
                         p.ticketType || chooseFlightType.type,
                         p.weatherRefund ? 1 : 0
                     ]);
-                    
+
                     con.query(passengerSql, [passengerValues], (passengerErr, passengerResult) => {
                         if (passengerErr) {
                             console.error('Error creating passengers in webhook:', passengerErr);
@@ -13741,11 +13796,11 @@ async function createBookingFromWebhook(bookingData) {
                         } else {
                             console.log('Webhook passengers created successfully, count:', passengerResult.affectedRows);
                         }
-                        
+
                         // Store additional information answers if available
                         if (additionalInfo && typeof additionalInfo === 'object') {
                             const additionalInfoAnswers = [];
-                            
+
                             // Process additionalInfo object to extract question answers
                             Object.keys(additionalInfo).forEach(key => {
                                 if (key.startsWith('question_') && additionalInfo[key]) {
@@ -13753,7 +13808,7 @@ async function createBookingFromWebhook(bookingData) {
                                     additionalInfoAnswers.push([bookingId, questionId, additionalInfo[key]]);
                                 }
                             });
-                            
+
                             if (additionalInfoAnswers.length > 0) {
                                 const additionalInfoSql = 'INSERT INTO additional_information_answers (booking_id, question_id, answer) VALUES ?';
                                 con.query(additionalInfoSql, [additionalInfoAnswers], (additionalInfoErr) => {
@@ -13764,7 +13819,7 @@ async function createBookingFromWebhook(bookingData) {
                                     }
                                 });
                             }
-                            
+
                             // Also update the JSON field in all_booking for backward compatibility
                             const jsonData = { ...additionalInfo };
                             con.query(
@@ -13779,27 +13834,27 @@ async function createBookingFromWebhook(bookingData) {
                                 }
                             );
                         }
-                        
+
                         // Send automatic booking confirmation email for webhook booking
                         const bookingEmail = (passengerData && passengerData[0]) ? passengerData[0].email : null;
                         if (bookingEmail) {
                             sendAutomaticBookingConfirmationEmail(bookingId);
                         }
-                        
+
                         resolve(bookingId);
                     });
                 } else {
                     // Store additional information answers even if no passengers
                     if (additionalInfo && typeof additionalInfo === 'object') {
                         const additionalInfoAnswers = [];
-                        
+
                         Object.keys(additionalInfo).forEach(key => {
                             if (key.startsWith('question_') && additionalInfo[key]) {
                                 const questionId = key.replace('question_', '');
                                 additionalInfoAnswers.push([bookingId, questionId, additionalInfo[key]]);
                             }
                         });
-                        
+
                         if (additionalInfoAnswers.length > 0) {
                             const additionalInfoSql = 'INSERT INTO additional_information_answers (booking_id, question_id, answer) VALUES ?';
                             con.query(additionalInfoSql, [additionalInfoAnswers], (additionalInfoErr) => {
@@ -13810,7 +13865,7 @@ async function createBookingFromWebhook(bookingData) {
                                 }
                             });
                         }
-                        
+
                         // Also update the JSON field in all_booking for backward compatibility
                         const jsonData = { ...additionalInfo };
                         con.query(
@@ -13825,17 +13880,17 @@ async function createBookingFromWebhook(bookingData) {
                             }
                         );
                     }
-                    
+
                     // Send automatic booking confirmation email for webhook booking (no passengers case)
                     const bookingEmailNoPassengers = bookingData?.passengerData?.[0]?.email || null;
                     if (bookingEmailNoPassengers) {
                         sendAutomaticBookingConfirmationEmail(bookingId);
                     }
-                    
+
                     resolve(bookingId);
                 }
             });
-            
+
             // Update availability for the specific time slot after booking creation
             // Remove chooseFlightType.passengerCount check - we'll use passengerData.length instead
             if (selectedDate && selectedTime && chooseFlightType && chooseLocation) {
@@ -13845,10 +13900,10 @@ async function createBookingFromWebhook(bookingData) {
                 console.log('chooseFlightType:', chooseFlightType);
                 console.log('chooseLocation:', chooseLocation);
                 console.log('passengerData length:', Array.isArray(passengerData) ? passengerData.length : 0);
-                
+
                 let bookingDate = selectedDate;
                 let bookingTime = selectedTime;
-                
+
                 // Parse date if it's a string with time
                 if (typeof selectedDate === 'string' && selectedDate.includes(' ')) {
                     const parts = selectedDate.split(' ');
@@ -13862,10 +13917,10 @@ async function createBookingFromWebhook(bookingData) {
                 } else if (selectedDate instanceof Date) {
                     bookingDate = moment(selectedDate).format('YYYY-MM-DD');
                 }
-                
+
                 console.log('Parsed bookingDate:', bookingDate);
                 console.log('Parsed bookingTime:', bookingTime);
-                
+
                 if (bookingDate && bookingTime) {
                     // Get activity_id for the location
                     const activitySql = `SELECT id FROM activity WHERE location = ? AND status = 'Live' LIMIT 1`;
@@ -13875,7 +13930,7 @@ async function createBookingFromWebhook(bookingData) {
                         } else if (activityResult.length > 0) {
                             const activityId = activityResult[0].id;
                             console.log('Found activity_id for availability update:', activityId);
-                            
+
                             // Update availability for this specific time slot
                             // Use actual passenger count from passengerData array
                             const actualPassengerCount = (Array.isArray(passengerData) ? passengerData.length : 1);
@@ -13916,7 +13971,7 @@ async function createVoucherFromWebhook(voucherData) {
             }
             return val;
         }
-        
+
         const {
             name = '',
             weight = '',
@@ -13962,7 +14017,7 @@ async function createVoucherFromWebhook(voucherData) {
             flight_type
         });
         voucherData.numberOfPassengers = resolvedPassengerCount;
-        
+
         // Normalize book_flight: prioritize recipient signals (Gift Voucher) vs purchaser-only (Flight Voucher)
         let normalizedBookFlight = book_flight;
         if (!normalizedBookFlight || normalizedBookFlight === '') {
@@ -13979,14 +14034,14 @@ async function createVoucherFromWebhook(voucherData) {
         } else {
             const normalizedBookFlightLower = normalizedBookFlight.toLowerCase();
             if (normalizedBookFlightLower.includes('gift') || normalizedBookFlightLower === 'buy gift') {
-            // Normalize variations to 'Gift Voucher'
-            normalizedBookFlight = 'Gift Voucher';
+                // Normalize variations to 'Gift Voucher'
+                normalizedBookFlight = 'Gift Voucher';
             } else if (normalizedBookFlightLower.includes('flight voucher') || normalizedBookFlightLower === 'buy flight voucher') {
                 // Normalize variations (e.g., Buy Flight Voucher) to standard Flight Voucher label
                 normalizedBookFlight = 'Flight Voucher';
             }
         }
-        
+
         console.log('=== BOOK_FLIGHT NORMALIZATION IN WEBHOOK ===');
         console.log('Original book_flight from webhook:', book_flight);
         console.log('voucher_type:', voucher_type);
@@ -14014,7 +14069,7 @@ async function createVoucherFromWebhook(voucherData) {
         // Start with a safe default for expiry; will be recalculated after resolving actualVoucherType
         let expiryMonthsWebhook = (flight_type === 'Private Charter') ? 18 : 24;
         let expiresFinal = expires && expires !== '' ? expires : moment().add(expiryMonthsWebhook, 'months').format('YYYY-MM-DD HH:mm:ss');
-        
+
         console.log('Webhook voucher data received:', voucherData);
         console.log('voucher_type_detail from webhook:', voucherData.voucher_type_detail);
         console.log('voucher_type from webhook:', voucher_type);
@@ -14024,7 +14079,7 @@ async function createVoucherFromWebhook(voucherData) {
         console.log('add_to_booking_items from webhook:', add_to_booking_items);
         console.log('typeof additionalInfo:', typeof additionalInfo);
         console.log('typeof add_to_booking_items:', typeof add_to_booking_items);
-        
+
         // Check if there's a specific voucher type detail in the request
         if (voucherData.voucher_type_detail && voucherData.voucher_type_detail.trim() !== '') {
             actualVoucherType = voucherData.voucher_type_detail.trim();
@@ -14045,7 +14100,7 @@ async function createVoucherFromWebhook(voucherData) {
             console.error('voucherData received:', voucherData);
             return reject(new Error('Missing voucher type detail. Please select a specific voucher type before proceeding.'));
         }
-        
+
         // Do not restrict to shared-only voucher types.
         // Accept any non-empty voucher_type_detail so Private Charter (e.g., Proposal Flight) works too.
         // Keep a soft log for unexpected blanks only.
@@ -14053,7 +14108,7 @@ async function createVoucherFromWebhook(voucherData) {
             console.error('ERROR: Missing voucher type detail after resolution.');
             return reject(new Error('Missing voucher type detail.'));
         }
-        
+
         console.log('Final actualVoucherType from webhook:', actualVoucherType);
 
         // Recompute expiry months now that actualVoucherType is known (for Shared Flight cases)
@@ -14075,13 +14130,13 @@ async function createVoucherFromWebhook(voucherData) {
             AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE) 
             LIMIT 1
         `;
-        
+
         con.query(duplicateCheckSql, [name, email, paid, voucher_type, actualVoucherType], (err, duplicateResult) => {
             if (err) {
                 console.error('Error checking for webhook duplicates:', err);
                 return reject(err);
             }
-            
+
             if (duplicateResult && duplicateResult.length > 0) {
                 console.log('=== WEBHOOK DUPLICATE VOUCHER DETECTED ===');
                 console.log('Duplicate voucher ID:', duplicateResult[0].id);
@@ -14090,37 +14145,37 @@ async function createVoucherFromWebhook(voucherData) {
                 resolve(duplicateResult[0].id);
                 return;
             }
-            
-                // Ensure additionalInfo is properly stored as JSON
-                let finalAdditionalInfoJson = null;
-                if (additionalInfo) {
-                    // If additionalInfo is already a string, try to parse it
-                    if (typeof additionalInfo === 'string') {
-                        try {
-                            finalAdditionalInfoJson = JSON.parse(additionalInfo);
-                        } catch (e) {
-                            logToFile('Failed to parse additionalInfo string:', e);
-                            finalAdditionalInfoJson = additionalInfo;
-                        }
-                    } else {
-                        // If it's an object, use it directly
+
+            // Ensure additionalInfo is properly stored as JSON
+            let finalAdditionalInfoJson = null;
+            if (additionalInfo) {
+                // If additionalInfo is already a string, try to parse it
+                if (typeof additionalInfo === 'string') {
+                    try {
+                        finalAdditionalInfoJson = JSON.parse(additionalInfo);
+                    } catch (e) {
+                        logToFile('Failed to parse additionalInfo string:', e);
                         finalAdditionalInfoJson = additionalInfo;
                     }
+                } else {
+                    // If it's an object, use it directly
+                    finalAdditionalInfoJson = additionalInfo;
                 }
+            }
 
-                // Log the data we're about to insert
-                logToFile('Inserting voucher with data:', {
-                    additionalInfo,
-                    additional_information_json,
-                    finalAdditionalInfoJson,
-                    add_to_booking_items
-                });
+            // Log the data we're about to insert
+            logToFile('Inserting voucher with data:', {
+                additionalInfo,
+                additional_information_json,
+                finalAdditionalInfoJson,
+                add_to_booking_items
+            });
 
-                // No duplicates found, proceed with voucher creation
-                const insertSql = `INSERT INTO all_vouchers 
+            // No duplicates found, proceed with voucher creation
+            const insertSql = `INSERT INTO all_vouchers 
                     (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, numberOfPassengers, additional_information_json, add_to_booking_items, voucher_passenger_details)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-                const values = [
+            const values = [
                 emptyToNull(name),
                 emptyToNull(weight),
                 emptyToNull(flight_type), // This will go to experience_type column
@@ -14157,7 +14212,7 @@ async function createVoucherFromWebhook(voucherData) {
                     weather_refund: !!p.weatherRefund
                 }))) : null
             ];
-            
+
             // Always create a SINGLE voucher regardless of passenger count (reverted behavior)
             {
                 // Single voucher creation (original logic)
@@ -14167,65 +14222,65 @@ async function createVoucherFromWebhook(voucherData) {
                     const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
                     return `${prefix}${randomPart}`;
                 };
-                
+
                 const uniqueVoucherCode = generateVoucherCode();
                 console.log(`🎁 Generating single voucher code: ${uniqueVoucherCode}`);
-                
+
                 // Update values array with unique voucher code
                 const updatedValues = [...values];
                 updatedValues[10] = uniqueVoucherCode; // voucher_ref is at index 10
-                
+
                 con.query(insertSql, updatedValues, (err, result) => {
-                if (err) {
-                    console.error('Webhook voucher insertion error:', err);
-                    return reject(err);
-                }
+                    if (err) {
+                        console.error('Webhook voucher insertion error:', err);
+                        return reject(err);
+                    }
                     console.log(`Webhook voucher created successfully, ID: ${result.insertId}, Code: ${uniqueVoucherCode}`);
-                
-                // Store additional information answers if available
-                if (additionalInfo && typeof additionalInfo === 'object') {
-                    const additionalInfoAnswers = [];
-                    
-                    // Process additionalInfo object to extract question answers
-                    Object.keys(additionalInfo).forEach(key => {
-                        if (key.startsWith('question_') && additionalInfo[key]) {
-                            const questionId = key.replace('question_', '');
-                            additionalInfoAnswers.push([result.insertId, questionId, additionalInfo[key]]);
-                        }
-                    });
-                    
-                    if (additionalInfoAnswers.length > 0) {
-                        const additionalInfoSql = 'INSERT INTO additional_information_answers (booking_id, question_id, answer) VALUES ?';
-                        con.query(additionalInfoSql, [additionalInfoAnswers], (additionalInfoErr) => {
-                            if (additionalInfoErr) {
-                                console.error('Error storing additional information answers for webhook voucher:', additionalInfoErr);
-                            } else {
-                                console.log('Additional information answers stored successfully for webhook voucher');
+
+                    // Store additional information answers if available
+                    if (additionalInfo && typeof additionalInfo === 'object') {
+                        const additionalInfoAnswers = [];
+
+                        // Process additionalInfo object to extract question answers
+                        Object.keys(additionalInfo).forEach(key => {
+                            if (key.startsWith('question_') && additionalInfo[key]) {
+                                const questionId = key.replace('question_', '');
+                                additionalInfoAnswers.push([result.insertId, questionId, additionalInfo[key]]);
                             }
                         });
+
+                        if (additionalInfoAnswers.length > 0) {
+                            const additionalInfoSql = 'INSERT INTO additional_information_answers (booking_id, question_id, answer) VALUES ?';
+                            con.query(additionalInfoSql, [additionalInfoAnswers], (additionalInfoErr) => {
+                                if (additionalInfoErr) {
+                                    console.error('Error storing additional information answers for webhook voucher:', additionalInfoErr);
+                                } else {
+                                    console.log('Additional information answers stored successfully for webhook voucher');
+                                }
+                            });
+                        }
                     }
-                }
-                
-                // Send automatic flight voucher confirmation email for Flight Voucher type
-                if (normalizedBookFlight === 'Flight Voucher') {
-                    console.log('📧 Sending automatic Flight Voucher Confirmation email for voucher ID:', result.insertId);
-                    sendAutomaticFlightVoucherConfirmationEmail(result.insertId);
-                }
-                
-                // Send automatic gift voucher confirmation email for Gift Voucher type
-                if (normalizedBookFlight === 'Gift Voucher') {
-                    const webhookRecipientEmail = (recipient_email || '').trim();
-                    console.log('📧 Sending automatic Gift Voucher Confirmation email for voucher ID:', result.insertId);
-                    sendAutomaticGiftVoucherConfirmationEmail(result.insertId);
-                    if (webhookRecipientEmail) {
-                        scheduleReceivedGiftVoucherEmail(result.insertId, webhookRecipientEmail).catch((err) => {
-                            console.error('Error scheduling Received GV email:', err);
-                        });
+
+                    // Send automatic flight voucher confirmation email for Flight Voucher type
+                    if (normalizedBookFlight === 'Flight Voucher') {
+                        console.log('📧 Sending automatic Flight Voucher Confirmation email for voucher ID:', result.insertId);
+                        sendAutomaticFlightVoucherConfirmationEmail(result.insertId);
                     }
-                }
-                
-                resolve(result.insertId);
-            });
+
+                    // Send automatic gift voucher confirmation email for Gift Voucher type
+                    if (normalizedBookFlight === 'Gift Voucher') {
+                        const webhookRecipientEmail = (recipient_email || '').trim();
+                        console.log('📧 Sending automatic Gift Voucher Confirmation email for voucher ID:', result.insertId);
+                        sendAutomaticGiftVoucherConfirmationEmail(result.insertId);
+                        if (webhookRecipientEmail) {
+                            scheduleReceivedGiftVoucherEmail(result.insertId, webhookRecipientEmail).catch((err) => {
+                                console.error('Error scheduling Received GV email:', err);
+                            });
+                        }
+                    }
+
+                    resolve(result.insertId);
+                });
             }
         });
     });
@@ -14235,16 +14290,16 @@ async function createVoucherFromWebhook(voucherData) {
 app.post('/api/create-checkout-session', async (req, res) => {
     try {
         console.log('Create checkout session request received:', req.body);
-        
+
         // Stripe secret key kontrolü
         if (!stripeSecretKey) {
             console.error('STRIPE_SECRET_KEY environment variable is not set');
-            return res.status(500).json({ 
-                success: false, 
-                message: 'Stripe configuration error: Secret key not found' 
+            return res.status(500).json({
+                success: false,
+                message: 'Stripe configuration error: Secret key not found'
             });
         }
-        
+
         const { totalPrice, currency = 'GBP', bookingData, voucherData, type, userSessionData } = req.body;
         if (totalPrice === undefined || totalPrice === null || isNaN(Number(totalPrice))) {
             return res.status(400).json({ success: false, message: 'Invalid totalPrice' });
@@ -14252,7 +14307,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
         if (!bookingData && !voucherData) {
             return res.status(400).json({ success: false, message: 'Eksik veri: bookingData veya voucherData gereklidir.' });
         }
-        
+
         // Save user session data if provided
         if (userSessionData && userSessionData.session_id) {
             const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.connection.remoteAddress || null;
@@ -14260,7 +14315,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
                 ...userSessionData,
                 ip_address: ipAddress || userSessionData.ip_address || null
             };
-            
+
             // Save user session asynchronously (don't wait for it)
             axios.post(`${req.protocol}://${req.get('host')}/api/save-user-session`, userSessionPayload)
                 .then(() => {
@@ -14270,7 +14325,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
                     console.error('Error saving user session:', err.message);
                 });
         }
-        
+
         // Debug: Log activity_id in bookingData
         if (bookingData) {
             console.log('=== BOOKING DATA DEBUG (create-checkout-session) ===');
@@ -14278,7 +14333,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
             console.log('bookingData.chooseLocation:', bookingData.chooseLocation);
             console.log('bookingData.activitySelect:', bookingData.activitySelect);
         }
-        
+
         // Debug: Log numberOfPassengers in voucherData
         if (voucherData) {
             console.log('=== VOUCHER DATA DEBUG (create-checkout-session) ===');
@@ -14294,15 +14349,15 @@ app.post('/api/create-checkout-session', async (req, res) => {
             console.log('typeof voucherData.add_to_booking_items:', typeof voucherData.add_to_booking_items);
             console.log('voucherData.add_to_booking_items length:', voucherData.add_to_booking_items ? voucherData.add_to_booking_items.length : 'add_to_booking_items is null/undefined');
         }
-        
+
         console.log('Processing payment:', { totalPrice, type, hasBookingData: !!bookingData, hasVoucherData: !!voucherData });
-        
+
         // Stripe fiyatı kuruş cinsinden ister
         const amount = Math.round(Number(totalPrice) * 100);
         if (!Number.isFinite(amount) || amount <= 0) {
             return res.status(400).json({ success: false, message: 'Invalid amount' });
         }
-        
+
         // Environment'a göre URL'leri ayarla
         // Prefer request origin (or explicit env override) so local/dev/prod return to the same host that initiated checkout
         const isProd = process.env.NODE_ENV === 'production';
@@ -14313,9 +14368,9 @@ app.post('/api/create-checkout-session', async (req, res) => {
             if (match) derivedOrigin = match[0];
         }
         const baseUrl = process.env.CHECKOUT_RETURN_BASE_URL || derivedOrigin || (isProd ? 'https://flyawayballooning-book.com' : 'http://localhost:3000');
-        
+
         console.log('Creating Stripe session with:', { amount, baseUrl, isProd });
-        
+
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             line_items: [
@@ -14339,9 +14394,9 @@ app.post('/api/create-checkout-session', async (req, res) => {
                 session_id: 'PLACEHOLDER' // Will be updated below
             }
         });
-        
+
         console.log('Stripe session created:', session.id);
-        
+
         // bookingData veya voucherData'yı session_id ile store'da sakla
         const session_id = session.id;
         // Normalize voucherData to ensure additional information persists through webhook
@@ -14374,12 +14429,12 @@ app.post('/api/create-checkout-session', async (req, res) => {
         } catch (e) {
             console.warn('Failed to write session log:', e);
         }
-        
+
         // Stripe metadata'ya session_id ekle
         await stripe.checkout.sessions.update(session_id, {
             metadata: { session_id }
         });
-        
+
         console.log('Session stored and metadata updated');
         console.log('Session store contents:', Object.keys(stripeSessionStore));
         console.log('Sending response:', { success: true, sessionId: session_id });
@@ -14397,9 +14452,9 @@ app.post('/api/create-checkout-session', async (req, res) => {
             nodeEnv: process.env.NODE_ENV
         };
         console.error('Error details:', details);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Stripe Checkout Session oluşturulamadı', 
+        res.status(500).json({
+            success: false,
+            message: 'Stripe Checkout Session oluşturulamadı',
             error: details
         });
     }
@@ -14428,7 +14483,7 @@ app.get('/api/stripe/diagnostics', async (req, res) => {
 app.get('/api/locationPricing/:location', (req, res) => {
     const { location } = req.params;
     if (!location) return res.status(400).json({ success: false, message: 'Location is required' });
-    
+
     const sql = `
         SELECT weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price, flight_type
         FROM activity 
@@ -14441,9 +14496,9 @@ app.get('/api/locationPricing/:location', (req, res) => {
         if (!result || result.length === 0) {
             return res.status(404).json({ success: false, message: "No pricing found for this location" });
         }
-        
+
         const pricing = result[0];
-        
+
         // Process flight_type to map to experience names
         let flightTypes = [];
         let experiences = [];
@@ -14453,7 +14508,7 @@ app.get('/api/locationPricing/:location', (req, res) => {
             } else if (Array.isArray(pricing.flight_type)) {
                 flightTypes = pricing.flight_type;
             }
-            
+
             // Map flight types to experience names
             experiences = flightTypes.map(type => {
                 if (type === 'Private') return 'Private Charter';
@@ -14461,9 +14516,9 @@ app.get('/api/locationPricing/:location', (req, res) => {
                 return type; // Keep original if not mapped
             });
         }
-        
-        res.json({ 
-            success: true, 
+
+        res.json({
+            success: true,
             data: {
                 weekday_morning_price: pricing.weekday_morning_price,
                 flexible_weekday_price: pricing.flexible_weekday_price,
@@ -14487,18 +14542,18 @@ app.get('/api/availabilityBySlot', (req, res) => {
     con.query(sql, [activity_id, date, time], (err, rows) => {
         if (err) return res.status(500).json({ success: false, message: 'Database error' });
         if (!rows || rows.length === 0) return res.json({ success: true, data: null });
-        
+
         // Calculate held seats for this slot
         const holdKey = `${activity_id}_${date}_${time}`;
         let heldSeats = 0;
         const now = Date.now();
-        
+
         for (const [key, hold] of availabilityHolds.entries()) {
             if (key.startsWith(holdKey) && now <= hold.expiresAt) {
                 heldSeats += hold.seats;
             }
         }
-        
+
         // Return availability minus held seats
         const availabilityData = {
             ...rows[0],
@@ -14506,7 +14561,7 @@ app.get('/api/availabilityBySlot', (req, res) => {
             actualAvailable: rows[0].available,
             heldSeats: heldSeats
         };
-        
+
         return res.json({ success: true, data: availabilityData });
     });
 });
@@ -14514,15 +14569,15 @@ app.get('/api/availabilityBySlot', (req, res) => {
 // Hold availability for a specific slot
 app.post('/api/holdAvailability', (req, res) => {
     const { activity_id, date, time, seats, sessionId } = req.body;
-    
+
     if (!activity_id || !date || !time || !seats || !sessionId) {
         return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
-    
+
     // Create unique hold key
     const holdKey = `${activity_id}_${date}_${time}_${sessionId}`;
     const expiresAt = Date.now() + (5 * 60 * 1000); // 5 minutes
-    
+
     // Store the hold
     availabilityHolds.set(holdKey, {
         activity_id,
@@ -14533,12 +14588,12 @@ app.post('/api/holdAvailability', (req, res) => {
         expiresAt,
         createdAt: Date.now()
     });
-    
+
     console.log(`🔒 Hold created for ${seats} seat(s) at ${date} ${time} (session: ${sessionId}, expires in 5 min)`);
     console.log(`🔒 Hold details:`, { activity_id, date, time, seats, sessionId, holdKey });
-    
-    res.json({ 
-        success: true, 
+
+    res.json({
+        success: true,
         message: 'Availability held',
         holdKey,
         expiresAt,
@@ -14549,13 +14604,13 @@ app.post('/api/holdAvailability', (req, res) => {
 // Release availability hold
 app.post('/api/releaseHold', (req, res) => {
     const { sessionId, activity_id, date, time } = req.body;
-    
+
     if (!sessionId) {
         return res.status(400).json({ success: false, message: 'sessionId is required' });
     }
-    
+
     let released = false;
-    
+
     // If specific slot provided, release only that hold
     if (activity_id && date && time) {
         const holdKey = `${activity_id}_${date}_${time}_${sessionId}`;
@@ -14574,9 +14629,9 @@ app.post('/api/releaseHold', (req, res) => {
             }
         }
     }
-    
-    res.json({ 
-        success: true, 
+
+    res.json({
+        success: true,
         message: released ? 'Hold(s) released' : 'No holds found',
         released
     });
@@ -14593,7 +14648,7 @@ app.post('/api/test-webhook', (req, res) => {
 app.post('/api/createTestBooking', (req, res) => {
     console.log('Create test booking endpoint hit!');
     console.log('Request body:', req.body);
-    
+
     const testBookingData = {
         activitySelect: 'Book Flight',
         chooseLocation: 'Somerset',
@@ -14613,7 +14668,7 @@ app.post('/api/createTestBooking', (req, res) => {
         totalPrice: 180,
         additionalInfo: { notes: 'Test booking' }
     };
-    
+
     createBookingFromWebhook(testBookingData)
         .then(bookingId => {
             console.log('Test booking created successfully, ID:', bookingId);
@@ -14629,11 +14684,11 @@ app.post('/api/createBookingFromSession', async (req, res) => {
     try {
         const { session_id, type } = req.body;
         console.log('Create booking from session endpoint hit:', { session_id, type });
-        
+
         if (!session_id) {
             return res.status(400).json({ success: false, message: 'Session ID is required' });
         }
-        
+
         const storeData = stripeSessionStore[session_id];
         if (!storeData) {
             console.error('Session data not found for session_id:', session_id);
@@ -14648,12 +14703,12 @@ app.post('/api/createBookingFromSession', async (req, res) => {
             }
             return res.status(400).json({ success: false, message: 'Session data not found' });
         }
-        
+
         console.log('Found session data:', storeData);
         if (storeData.voucherData) {
             storeData.voucherData.numberOfPassengers = derivePassengerCount(storeData.voucherData);
         }
-        
+
         // If already processed by webhook or previous call, short-circuit
         if (storeData.processed) {
             if (type === 'booking' && storeData.bookingData?.booking_id) {
@@ -14663,7 +14718,7 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                 return res.json({ success: true, id: storeData.voucherData.voucher_id, message: 'voucher already created', voucher_code: storeData.voucherData.generated_voucher_code || null });
             }
         }
-        
+
         let result;
         let voucherCode = null;
         if (type === 'booking' && storeData.bookingData) {
@@ -14691,7 +14746,7 @@ app.post('/api/createBookingFromSession', async (req, res) => {
             console.log('selectedTime:', storeData.bookingData.selectedTime);
             console.log('chooseLocation:', storeData.bookingData.chooseLocation);
             console.log('chooseFlightType:', storeData.bookingData.chooseFlightType);
-            
+
             // Ensure voucher_type_detail is present for createBookingFromWebhook
             try {
                 if (!storeData.bookingData.voucher_type_detail && storeData.bookingData.selectedVoucherType?.title) {
@@ -14713,12 +14768,12 @@ app.post('/api/createBookingFromSession', async (req, res) => {
             try {
                 result = await createBookingFromWebhook(storeData.bookingData);
                 console.log('Booking created successfully, ID:', result);
-                
+
                 // Save payment history from Stripe session
                 try {
                     const session = await stripe.checkout.sessions.retrieve(session_id);
                     await savePaymentHistory(session, result, null);
-                    
+
                     // Update booking with stripe_session_id
                     con.query(
                         'UPDATE all_booking SET stripe_session_id = ? WHERE id = ?',
@@ -14735,7 +14790,7 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                     console.error('Error saving payment history in createBookingFromSession:', paymentHistoryError);
                     // Continue even if payment history fails - booking is still valid
                 }
-                
+
                 // Save user session data if provided
                 if (storeData.userSessionData && storeData.userSessionData.session_id) {
                     const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.connection.remoteAddress || null;
@@ -14745,7 +14800,7 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                         ip_address: ipAddress || storeData.userSessionData.ip_address || null,
                         booking_clicks: 1 // Increment booking clicks
                     };
-                    
+
                     // Save user session asynchronously
                     axios.post(`${req.protocol}://${req.get('host')}/api/save-user-session`, userSessionPayload)
                         .then(() => {
@@ -14755,14 +14810,14 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                             console.error('Error saving user session:', err.message);
                         });
                 }
-                
+
                 // mark processed and store id to avoid duplicates
                 storeData.processed = true;
                 storeData.bookingData.booking_id = result;
             } finally {
                 storeData.processing = false;
             }
-            
+
             // For Book Flight, generate voucher code
             try {
                 console.log('=== GENERATING VOUCHER CODE FOR BOOK FLIGHT ===');
@@ -14774,7 +14829,7 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                 console.log('chooseLocation:', storeData.bookingData.chooseLocation);
                 console.log('chooseFlightType:', storeData.bookingData.chooseFlightType);
                 console.log('totalPrice:', storeData.bookingData.totalPrice);
-                
+
                 // Determine flight category from booking data
                 let flightCategory = 'Any Day Flight'; // Default
                 if (storeData.bookingData.selectedVoucherType) {
@@ -14782,7 +14837,7 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                     const voucherTypeTitle = storeData.bookingData.selectedVoucherType.title;
                     console.log('Voucher Type Title:', voucherTypeTitle);
                     console.log('Full selectedVoucherType:', JSON.stringify(storeData.bookingData.selectedVoucherType, null, 2));
-                    
+
                     if (voucherTypeTitle === 'Weekday Morning') {
                         flightCategory = 'Weekday Morning';
                     } else if (voucherTypeTitle === 'Flexible Weekday') {
@@ -14790,12 +14845,12 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                     } else if (voucherTypeTitle === 'Any Day Flight') {
                         flightCategory = 'Any Day Flight';
                     }
-                    
+
                     console.log('Mapped Flight Category:', flightCategory);
                 } else {
                     console.log('No selectedVoucherType found in bookingData');
                 }
-                
+
                 // Generate voucher code
                 const voucherCodeRequest = {
                     flight_category: flightCategory,
@@ -14807,12 +14862,12 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                     paid_amount: storeData.bookingData.totalPrice || 0,
                     expires_date: null // Will use default (1 year)
                 };
-                
+
                 console.log('=== VOUCHER CODE REQUEST ===');
                 console.log('Request data:', JSON.stringify(voucherCodeRequest, null, 2));
-                
+
                 const voucherCodeResponse = await axios.post(`${req.protocol}://${req.get('host')}/api/generate-voucher-code`, voucherCodeRequest);
-                
+
                 if (voucherCodeResponse.data.success) {
                     console.log('Book Flight voucher code generated successfully:', voucherCodeResponse.data.voucher_code);
                     voucherCode = voucherCodeResponse.data.voucher_code;
@@ -14864,7 +14919,7 @@ app.post('/api/createBookingFromSession', async (req, res) => {
             }
         } else if (type === 'voucher' && storeData.voucherData) {
             console.log('Creating voucher from session data');
-            
+
             // Check if session was already processed by webhook
             if (storeData.processed) {
                 console.log('Session already processed by webhook, using existing data');
@@ -14873,7 +14928,7 @@ app.post('/api/createBookingFromSession', async (req, res) => {
             } else {
                 // Additional check: look for existing voucher in database to prevent duplicates
                 const existingVoucherSql = `SELECT id FROM all_vouchers WHERE name = ? AND email = ? AND paid = ? AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE) LIMIT 1`;
-                
+
                 try {
                     const existingVoucher = await new Promise((resolve, reject) => {
                         con.query(existingVoucherSql, [storeData.voucherData.name, storeData.voucherData.email, storeData.voucherData.paid], (err, result) => {
@@ -14881,7 +14936,7 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                             else resolve(result);
                         });
                     });
-                    
+
                     if (existingVoucher && existingVoucher.length > 0) {
                         console.log('Voucher already exists in database, using existing ID:', existingVoucher[0].id);
                         result = existingVoucher[0].id;
@@ -14907,13 +14962,13 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                         // Voucher code generation is now handled by frontend only
                         // Webhook only creates the voucher entry
                         console.log('Voucher code generation skipped - will be handled by frontend');
-                        
+
                         // For Buy Gift vouchers, also generate voucher code (Shared + Private Charter)
                         console.log('=== VOUCHER CODE GENERATION CHECK ===');
                         console.log('storeData.voucherData.voucher_type:', storeData.voucherData.voucher_type);
                         console.log('storeData.voucherData.book_flight:', storeData.voucherData.book_flight);
                         console.log('Checking if Buy Gift or Gift Voucher...');
-                        
+
                         if (
                             storeData.voucherData.voucher_type === 'Buy Gift' ||
                             storeData.voucherData.voucher_type === 'Gift Voucher' ||
@@ -14922,20 +14977,20 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                         ) {
                             try {
                                 console.log('Generating voucher code for voucher type:', storeData.voucherData.voucher_type);
-                                
+
                                 // Determine flight category from voucher data
                                 // Use the selected voucher type detail as category (works for Shared and Private Charter)
                                 let flightCategory = storeData.voucherData.voucher_type_detail || 'Any Day Flight';
-                                
+
                                 // For Buy Gift Voucher, generate multiple voucher codes based on passenger count
                                 const passengerCount = derivePassengerCount(storeData.voucherData);
                                 storeData.voucherData.numberOfPassengers = passengerCount;
                                 // If passengerCount > 1, always generate multiple codes regardless of labels
                                 const isBuyGiftVoucher = (passengerCount > 1) ||
-                                                       storeData.voucherData.book_flight === 'Gift Voucher' || 
-                                                       storeData.voucherData.voucher_type === 'Buy Gift' || 
-                                                       storeData.voucherData.voucher_type === 'Buy Gift Voucher';
-                                
+                                    storeData.voucherData.book_flight === 'Gift Voucher' ||
+                                    storeData.voucherData.voucher_type === 'Buy Gift' ||
+                                    storeData.voucherData.voucher_type === 'Buy Gift Voucher';
+
                                 console.log('🎁 Voucher type check:', {
                                     book_flight: storeData.voucherData.book_flight,
                                     voucher_type: storeData.voucherData.voucher_type,
@@ -14943,12 +14998,12 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                                     isBuyGiftVoucher: isBuyGiftVoucher,
                                     storeData: storeData.voucherData // Log the entire voucherData object
                                 });
-                                
+
                                 if (isBuyGiftVoucher && passengerCount > 1) {
                                     console.log(`🎁 Generating ${passengerCount} voucher codes for Buy Gift Voucher`);
-                                    
+
                                     const voucherCodes = [];
-                                    
+
                                     // Generate multiple voucher codes
                                     for (let i = 0; i < passengerCount; i++) {
                                         try {
@@ -14962,7 +15017,7 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                                                 paid_amount: storeData.voucherData.paid || 0,
                                                 expires_date: storeData.voucherData.expires || null
                                             });
-                                            
+
                                             if (voucherCodeResponse.data.success) {
                                                 voucherCodes.push(voucherCodeResponse.data.voucher_code);
                                                 console.log(`🎁 Voucher code ${i + 1} generated:`, voucherCodeResponse.data.voucher_code);
@@ -14973,12 +15028,12 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                                             console.error(`Error generating voucher code ${i + 1}:`, codeError);
                                         }
                                     }
-                                    
+
                                     if (voucherCodes.length > 0) {
                                         console.log(`🎁 Multiple codes were generated previously (${voucherCodes.length}); reverting to SINGLE-VOUCHER behavior using the first code only.`);
                                         // Use only the first code
                                         voucherCode = voucherCodes[0];
-                                        
+
                                         // Store only the single code in session data
                                         storeData.voucherData.generated_voucher_code = voucherCode;
                                         storeData.voucherData.generated_voucher_codes = null;
@@ -15032,28 +15087,28 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                                     }
                                 } else {
                                     // Single voucher code generation (original logic)
-                                const voucherCodeResponse = await axios.post(`${req.protocol}://${req.get('host')}/api/generate-voucher-code`, {
-                                    flight_category: flightCategory,
-                                    customer_name: storeData.voucherData.name || 'Unknown Customer',
-                                    customer_email: storeData.voucherData.email || '',
-                                    location: storeData.voucherData.preferred_location || 'Somerset',
-                                    // Pass through actual experience type (Shared Flight or Private Charter)
-                                    experience_type: storeData.voucherData.flight_type || 'Shared Flight',
-                                    voucher_type: storeData.voucherData.voucher_type || 'Flight Voucher',
-                                    paid_amount: storeData.voucherData.paid || 0,
-                                    expires_date: storeData.voucherData.expires || null
-                                });
-                                
-                                if (voucherCodeResponse.data.success) {
-                                    console.log('Voucher code generated successfully for', storeData.voucherData.voucher_type, ':', voucherCodeResponse.data.voucher_code);
-                                    voucherCode = voucherCodeResponse.data.voucher_code;
-                                    
-                                    // Store the voucher code in the session data to prevent regeneration
-                                    storeData.voucherData.generated_voucher_code = voucherCode;
+                                    const voucherCodeResponse = await axios.post(`${req.protocol}://${req.get('host')}/api/generate-voucher-code`, {
+                                        flight_category: flightCategory,
+                                        customer_name: storeData.voucherData.name || 'Unknown Customer',
+                                        customer_email: storeData.voucherData.email || '',
+                                        location: storeData.voucherData.preferred_location || 'Somerset',
+                                        // Pass through actual experience type (Shared Flight or Private Charter)
+                                        experience_type: storeData.voucherData.flight_type || 'Shared Flight',
+                                        voucher_type: storeData.voucherData.voucher_type || 'Flight Voucher',
+                                        paid_amount: storeData.voucherData.paid || 0,
+                                        expires_date: storeData.voucherData.expires || null
+                                    });
 
-                                    // Persist single code into the most recent matching voucher
-                                    try {
-                                        const findSql = `
+                                    if (voucherCodeResponse.data.success) {
+                                        console.log('Voucher code generated successfully for', storeData.voucherData.voucher_type, ':', voucherCodeResponse.data.voucher_code);
+                                        voucherCode = voucherCodeResponse.data.voucher_code;
+
+                                        // Store the voucher code in the session data to prevent regeneration
+                                        storeData.voucherData.generated_voucher_code = voucherCode;
+
+                                        // Persist single code into the most recent matching voucher
+                                        try {
+                                            const findSql = `
                                             SELECT id
                                             FROM all_vouchers
                                             WHERE (name = ? AND email = ?) OR (purchaser_name = ? AND purchaser_email = ?)
@@ -15063,42 +15118,42 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                                             ORDER BY created_at ASC
                                             LIMIT 1
                                         `;
-                                        const findParams = [
-                                            storeData.voucherData.name || '',
-                                            storeData.voucherData.email || '',
-                                            storeData.voucherData.purchaser_name || storeData.voucherData.name || '',
-                                            storeData.voucherData.purchaser_email || storeData.voucherData.email || '',
-                                            storeData.voucherData.paid || 0
-                                        ];
-                                        const rows = await new Promise((resolve, reject) => {
-                                            con.query(findSql, findParams, (err, result) => err ? reject(err) : resolve(result));
-                                        });
-                                        if (rows && rows.length > 0) {
-                                            const updateSql = 'UPDATE all_vouchers SET voucher_ref = ? WHERE id = ?';
-                                            await new Promise((resolve) => {
-                                                con.query(updateSql, [voucherCode, rows[0].id], (err) => {
-                                                    if (err) console.error('Error updating single voucher_ref:', err, rows[0]);
-                                                    else console.log('✅ voucher_ref updated (single):', voucherCode, '-> id', rows[0].id);
-                                                    resolve();
-                                                });
+                                            const findParams = [
+                                                storeData.voucherData.name || '',
+                                                storeData.voucherData.email || '',
+                                                storeData.voucherData.purchaser_name || storeData.voucherData.name || '',
+                                                storeData.voucherData.purchaser_email || storeData.voucherData.email || '',
+                                                storeData.voucherData.paid || 0
+                                            ];
+                                            const rows = await new Promise((resolve, reject) => {
+                                                con.query(findSql, findParams, (err, result) => err ? reject(err) : resolve(result));
                                             });
-                                            // Ensure paid is set correctly
-                                            const paidAmount = Number(storeData.voucherData.paid || totalPrice || 0);
-                                            if (paidAmount > 0) {
+                                            if (rows && rows.length > 0) {
+                                                const updateSql = 'UPDATE all_vouchers SET voucher_ref = ? WHERE id = ?';
                                                 await new Promise((resolve) => {
-                                                    con.query('UPDATE all_vouchers SET paid = ? WHERE id = ?', [paidAmount, rows[0].id], (err) => {
-                                                        if (err) console.error('Error updating paid (single):', err);
-                                                        else console.log('✅ paid updated (single):', paidAmount, '-> id', rows[0].id);
+                                                    con.query(updateSql, [voucherCode, rows[0].id], (err) => {
+                                                        if (err) console.error('Error updating single voucher_ref:', err, rows[0]);
+                                                        else console.log('✅ voucher_ref updated (single):', voucherCode, '-> id', rows[0].id);
                                                         resolve();
                                                     });
                                                 });
+                                                // Ensure paid is set correctly
+                                                const paidAmount = Number(storeData.voucherData.paid || totalPrice || 0);
+                                                if (paidAmount > 0) {
+                                                    await new Promise((resolve) => {
+                                                        con.query('UPDATE all_vouchers SET paid = ? WHERE id = ?', [paidAmount, rows[0].id], (err) => {
+                                                            if (err) console.error('Error updating paid (single):', err);
+                                                            else console.log('✅ paid updated (single):', paidAmount, '-> id', rows[0].id);
+                                                            resolve();
+                                                        });
+                                                    });
+                                                }
                                             }
+                                        } catch (persistErr) {
+                                            console.error('Error persisting single generated voucher code to all_vouchers:', persistErr);
                                         }
-                                    } catch (persistErr) {
-                                        console.error('Error persisting single generated voucher code to all_vouchers:', persistErr);
-                                    }
-                                } else {
-                                    console.error('Failed to generate voucher code for', storeData.voucherData.voucher_type, ':', voucherCodeResponse.data.message);
+                                    } else {
+                                        console.error('Failed to generate voucher code for', storeData.voucherData.voucher_type, ':', voucherCodeResponse.data.message);
                                     }
                                 }
                             } catch (voucherCodeError) {
@@ -15106,7 +15161,7 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                                 // Continue even if code generation fails
                             }
                         }
-                        
+
                         // Mark session as processed to prevent duplicate creation
                         storeData.processed = true;
                     }
@@ -15121,10 +15176,10 @@ app.post('/api/createBookingFromSession', async (req, res) => {
         } else {
             return res.status(400).json({ success: false, message: 'Invalid type or missing data' });
         }
-        
+
         // Clean up session data (keep minimal info to allow status checks for a short time)
         stripeSessionStore[session_id] = { ...stripeSessionStore[session_id], processed: true };
-        
+
         // Determine the correct voucher code based on type
         let finalVoucherCode = null;
         if (type === 'booking') {
@@ -15132,17 +15187,17 @@ app.post('/api/createBookingFromSession', async (req, res) => {
         } else if (type === 'voucher') {
             finalVoucherCode = storeData.voucherData?.generated_voucher_code || null;
         }
-        
+
         console.log('=== FINAL RESPONSE DEBUG ===');
         console.log('Type:', type);
         console.log('voucherCode:', voucherCode);
         console.log('storeData.bookingData?.voucher_code:', storeData.bookingData?.voucher_code);
         console.log('storeData.voucherData?.generated_voucher_code:', storeData.voucherData?.generated_voucher_code);
         console.log('finalVoucherCode:', finalVoucherCode);
-        
-        res.json({ 
-            success: true, 
-            id: result, 
+
+        res.json({
+            success: true,
+            id: result,
             message: `${type} created successfully`,
             voucher_code: finalVoucherCode,
             voucher_codes: storeData.voucherData?.generated_voucher_codes || null, // Array of multiple voucher codes
@@ -15161,11 +15216,11 @@ app.post('/api/createBookingFromSession', async (req, res) => {
 // Get multiple voucher codes for a purchaser (for admin panel)
 app.get('/api/voucher-codes/:purchaserId', (req, res) => {
     const { purchaserId } = req.params;
-    
+
     if (!purchaserId) {
         return res.status(400).json({ success: false, message: 'Purchaser ID is required' });
     }
-    
+
     // Get all vouchers for this purchaser (same name, email, paid amount, created within 1 minute)
     const sql = `
         SELECT v1.*, v2.voucher_ref as related_voucher_ref
@@ -15178,27 +15233,27 @@ app.get('/api/voucher-codes/:purchaserId', (req, res) => {
         WHERE v1.id = ?
         ORDER BY v1.created_at ASC
     `;
-    
+
     con.query(sql, [purchaserId], (err, result) => {
         if (err) {
             console.error('Error fetching voucher codes:', err);
             return res.status(500).json({ success: false, message: 'Database error' });
         }
-        
+
         if (!result || result.length === 0) {
             return res.status(404).json({ success: false, message: 'Voucher not found' });
         }
-        
+
         // Group vouchers by purchaser (same name, email, paid amount, created within 1 minute)
-        const purchaserVouchers = result.filter(v => 
-            v.name === result[0].name && 
-            v.email === result[0].email && 
+        const purchaserVouchers = result.filter(v =>
+            v.name === result[0].name &&
+            v.email === result[0].email &&
             v.paid === result[0].paid &&
             Math.abs(new Date(v.created_at) - new Date(result[0].created_at)) <= 60000 // 1 minute
         );
-        
+
         const voucherCodes = purchaserVouchers.map(v => v.voucher_ref).filter(ref => ref && ref !== '-');
-        
+
         res.json({
             success: true,
             data: {
@@ -15218,7 +15273,7 @@ app.get('/api/voucher-codes/:purchaserId', (req, res) => {
 app.post('/api/fix-journey-types', async (req, res) => {
     try {
         console.log('=== FIXING JOURNEY_TYPES DATA ===');
-        
+
         // First, check what broken data we have
         const [brokenData] = await new Promise((resolve, reject) => {
             con.query(`
@@ -15234,12 +15289,12 @@ app.post('/api/fix-journey-types', async (req, res) => {
                 else resolve([result]);
             });
         });
-        
+
         console.log('Broken records found:', brokenData.length);
         brokenData.forEach(record => {
             console.log(`ID: ${record.id}, Text: ${record.question_text.substring(0, 50)}..., Journey Types: ${record.journey_types}`);
         });
-        
+
         // Check specific problematic records (13, 14, 16)
         const [specificRecords] = await new Promise((resolve, reject) => {
             con.query(`
@@ -15252,12 +15307,12 @@ app.post('/api/fix-journey-types', async (req, res) => {
                 else resolve([result]);
             });
         });
-        
+
         console.log('Specific records before fix:');
         specificRecords.forEach(record => {
             console.log(`ID: ${record.id}, Valid JSON: ${record.is_valid}, Journey Types: ${record.journey_types}`);
         });
-        
+
         // Fix the broken journey_types data
         const [updateResult] = await new Promise((resolve, reject) => {
             con.query(`
@@ -15275,9 +15330,9 @@ app.post('/api/fix-journey-types', async (req, res) => {
                 else resolve([result]);
             });
         });
-        
+
         console.log(`Updated ${updateResult.affectedRows} records`);
-        
+
         // Verify the fix
         const [fixedRecords] = await new Promise((resolve, reject) => {
             con.query(`
@@ -15290,12 +15345,12 @@ app.post('/api/fix-journey-types', async (req, res) => {
                 else resolve([result]);
             });
         });
-        
+
         console.log('Specific records after fix:');
         fixedRecords.forEach(record => {
             console.log(`ID: ${record.id}, Valid JSON: ${record.is_valid}, Journey Types: ${record.journey_types}`);
         });
-        
+
         // Check all journey_types are now valid JSON
         const [allValid] = await new Promise((resolve, reject) => {
             con.query(`
@@ -15308,14 +15363,14 @@ app.post('/api/fix-journey-types', async (req, res) => {
                 else resolve([result]);
             });
         });
-        
+
         console.log(`Total records with journey_types: ${allValid[0].total}`);
         console.log(`Valid JSON records: ${allValid[0].valid_count}`);
-        
+
         const totalRecords = parseInt(allValid[0].total);
         const validRecords = parseInt(allValid[0].valid_count);
         const success = totalRecords === validRecords;
-        
+
         res.json({
             success: success,
             message: success ? 'All journey_types are now valid JSON!' : 'Some records still have invalid JSON',
@@ -15323,7 +15378,7 @@ app.post('/api/fix-journey-types', async (req, res) => {
             totalRecords: totalRecords,
             validRecords: validRecords
         });
-        
+
     } catch (error) {
         console.error('Error fixing journey_types:', error);
         res.status(500).json({
@@ -15338,7 +15393,7 @@ app.post('/api/fix-journey-types', async (req, res) => {
 app.get('/api/debug/activity/:id/bookings', (req, res) => {
     const { id } = req.params;
     if (!id) return res.status(400).json({ success: false, message: 'Missing activity ID' });
-    
+
     // Check all_booking data
     const bookingSql = `
         SELECT 
@@ -15353,7 +15408,7 @@ app.get('/api/debug/activity/:id/bookings', (req, res) => {
         WHERE activity_id = ?
         ORDER BY flight_date, time_slot
     `;
-    
+
     // Check activity_availability data
     const availabilitySql = `
         SELECT 
@@ -15369,19 +15424,19 @@ app.get('/api/debug/activity/:id/bookings', (req, res) => {
         WHERE activity_id = ?
         ORDER BY date, time
     `;
-    
+
     con.query(bookingSql, [id], (bookingErr, bookingResult) => {
         if (bookingErr) {
             console.error('Error fetching booking data:', bookingErr);
             return res.status(500).json({ success: false, message: 'Database error', error: bookingErr });
         }
-        
+
         con.query(availabilitySql, [id], (availabilityErr, availabilityResult) => {
             if (availabilityErr) {
                 console.error('Error fetching availability data:', availabilityErr);
                 return res.status(500).json({ success: false, message: 'Database error', error: availabilityErr });
             }
-            
+
             res.json({
                 success: true,
                 data: {
@@ -15397,10 +15452,10 @@ app.get('/api/debug/activity/:id/bookings', (req, res) => {
 // Simple test endpoint to check booking data
 app.get('/api/test/booking-count/:activityId/:date/:time', (req, res) => {
     const { activityId, date, time } = req.params;
-    
+
     console.log(`\n=== Test endpoint called ===`);
     console.log(`Activity ID: ${activityId}, Date: ${date}, Time: ${time}`);
-    
+
     // First, get all bookings for this activity to debug
     const debugSql = `
         SELECT 
@@ -15414,15 +15469,15 @@ app.get('/api/test/booking-count/:activityId/:date/:time', (req, res) => {
         WHERE activity_id = ?
         ORDER BY flight_date, time_slot
     `;
-    
+
     con.query(debugSql, [activityId], (debugErr, debugResult) => {
         if (debugErr) {
             console.error('Debug query error:', debugErr);
             return res.status(500).json({ success: false, error: debugErr.message });
         }
-        
+
         console.log('All bookings for this activity:', debugResult);
-        
+
         // Then, get specific booking count
         const testSql = `
             SELECT 
@@ -15436,18 +15491,18 @@ app.get('/api/test/booking-count/:activityId/:date/:time', (req, res) => {
             AND DATE(ab.flight_date) = DATE(?)
             AND TIME(ab.time_slot) = TIME(?)
         `;
-        
+
         console.log(`Test query params: activity_id=${activityId}, date=${date}, time=${time}`);
-        
+
         con.query(testSql, [activityId, date, time], (err, result) => {
             if (err) {
                 console.error('Test query error:', err);
                 return res.status(500).json({ success: false, error: err.message });
             }
-            
+
             const totalBooked = result[0].total_booked || 0;
             console.log(`Result: totalBooked=${totalBooked}, bookingIds=${result[0].booking_ids}`);
-            
+
             res.json({
                 success: true,
                 data: {
@@ -15474,9 +15529,9 @@ app.get('/api/test/booking-count/:activityId/:date/:time', (req, res) => {
 app.post('/api/activity/:id/updateAvailableCounts', (req, res) => {
     const { id } = req.params;
     if (!id) return res.status(400).json({ success: false, message: 'Missing activity ID' });
-    
+
     console.log(`Updating available counts for activity ${id}`);
-    
+
     // First, get all availabilities for this activity
     const getAvailabilitiesSql = `
         SELECT aa.id, aa.date, aa.time, aa.capacity, aa.available, aa.status, a.location
@@ -15484,15 +15539,15 @@ app.post('/api/activity/:id/updateAvailableCounts', (req, res) => {
         JOIN activity a ON aa.activity_id = a.id 
         WHERE aa.activity_id = ?
     `;
-    
+
     con.query(getAvailabilitiesSql, [id], (err, availabilities) => {
         if (err) {
             console.error('Error fetching availabilities:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err });
         }
-        
+
         console.log(`Found ${availabilities.length} availabilities to update`);
-        
+
         let updatedCount = 0;
         const updatePromises = availabilities.map(availability => {
             return new Promise((resolve) => {
@@ -15504,18 +15559,18 @@ app.post('/api/activity/:id/updateAvailableCounts', (req, res) => {
                     AND ab.location = ?
                     AND TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i') = TIME_FORMAT(TIME(?), '%H:%i')
                 `;
-                
+
                 con.query(getBookingCountSql, [availability.date, availability.location, availability.time], (bookingErr, bookingResult) => {
                     if (bookingErr) {
                         console.error('Error getting passenger count:', bookingErr);
                         resolve(false);
                         return;
                     }
-                    
+
                     const totalBooked = bookingResult[0].total_booked || 0;
                     const newAvailable = Math.max(0, availability.capacity - totalBooked);
                     const newStatus = totalBooked >= availability.capacity ? 'Closed' : 'Open';
-                    
+
                     // Only update if something changed
                     if (newAvailable !== availability.available || newStatus !== availability.status) {
                         const updateSql = `
@@ -15523,7 +15578,7 @@ app.post('/api/activity/:id/updateAvailableCounts', (req, res) => {
                             SET available = ?, booked = ?, status = ? 
                             WHERE id = ?
                         `;
-                        
+
                         con.query(updateSql, [newAvailable, totalBooked, newStatus, availability.id], (updateErr) => {
                             if (updateErr) {
                                 console.error('Error updating availability:', updateErr);
@@ -15540,7 +15595,7 @@ app.post('/api/activity/:id/updateAvailableCounts', (req, res) => {
                 });
             });
         });
-        
+
         Promise.all(updatePromises).then(() => {
             console.log(`Updated ${updatedCount} availabilities for activity ${id}`);
             res.json({
@@ -15628,7 +15683,7 @@ app.post('/api/createTestBooking', (req, res) => {
         voucher_type: 'Weekday Morning',
         created_at: new Date()
     };
-    
+
     const sql = `
         INSERT INTO all_booking (
             customer_name, 
@@ -15643,7 +15698,7 @@ app.post('/api/createTestBooking', (req, res) => {
             created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    
+
     const values = [
         testBooking.customer_name,
         testBooking.email,
@@ -15656,13 +15711,13 @@ app.post('/api/createTestBooking', (req, res) => {
         testBooking.voucher_type,
         testBooking.created_at
     ];
-    
+
     con.query(sql, values, (err, result) => {
         if (err) {
             console.error('Error creating test booking:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err });
         }
-        
+
         console.log('Test booking created with ID:', result.insertId);
         res.json({ success: true, message: 'Test booking created', bookingId: result.insertId });
     });
@@ -15670,13 +15725,13 @@ app.post('/api/createTestBooking', (req, res) => {
 // Database migration function
 const runDatabaseMigrations = () => {
     console.log('Running database migrations...');
-    
+
     // Add numberOfPassengers column to all_vouchers table
     const addNumberOfPassengersColumn = `
         ALTER TABLE all_vouchers 
         ADD COLUMN numberOfPassengers INT DEFAULT 1 COMMENT 'Number of passengers for this voucher'
     `;
-    
+
     con.query(addNumberOfPassengersColumn, (err, result) => {
         if (err) {
             console.error('Error adding numberOfPassengers column:', err);
@@ -15684,14 +15739,14 @@ const runDatabaseMigrations = () => {
             console.log('✅ numberOfPassengers column added successfully');
         }
     });
-    
+
     // Update existing records to have default value of 1
     const updateExistingRecords = `
         UPDATE all_vouchers 
         SET numberOfPassengers = 1 
         WHERE numberOfPassengers IS NULL
     `;
-    
+
     con.query(updateExistingRecords, (err, result) => {
         if (err) {
             console.error('Error updating existing records:', err);
@@ -15699,7 +15754,7 @@ const runDatabaseMigrations = () => {
             console.log(`✅ Updated ${result.affectedRows} existing records with default numberOfPassengers value`);
         }
     });
-    
+
     // Ensure image_text_tag exists on voucher_types
     const checkImageTextTagSql = `
         SELECT COUNT(*) as cnt
@@ -15749,7 +15804,7 @@ const runDatabaseMigrations = () => {
             console.log('✅ image_text_tag column already exists on private_charter_voucher_types');
         }
     });
-    
+
     // Create passengers table if it doesn't exist
     const createPassengersTable = `
         CREATE TABLE IF NOT EXISTS passengers (
@@ -15766,7 +15821,7 @@ const runDatabaseMigrations = () => {
             FOREIGN KEY (booking_id) REFERENCES all_booking(id) ON DELETE CASCADE
         )
     `;
-    
+
     con.query(createPassengersTable, (err) => {
         if (err) {
             console.error('Error creating passengers table:', err);
@@ -15774,7 +15829,7 @@ const runDatabaseMigrations = () => {
             console.log('✅ Passengers table ready');
         }
     });
-    
+
     // Check if experience column exists
     const checkExperienceColumn = "SHOW COLUMNS FROM all_booking LIKE 'experience'";
     con.query(checkExperienceColumn, (err, result) => {
@@ -15782,7 +15837,7 @@ const runDatabaseMigrations = () => {
             console.error('Error checking experience column:', err);
             return;
         }
-        
+
         if (result.length === 0) {
             console.log('Adding experience column...');
             const addExperienceColumn = "ALTER TABLE all_booking ADD COLUMN experience VARCHAR(100) DEFAULT 'Shared Flight' COMMENT 'Selected experience (Shared Flight, Private Charter)'";
@@ -15797,7 +15852,7 @@ const runDatabaseMigrations = () => {
             console.log('✅ Experience column already exists');
         }
     });
-    
+
     // Check if voucher_type column exists
     const checkVoucherTypeColumn = "SHOW COLUMNS FROM all_booking LIKE 'voucher_type'";
     con.query(checkVoucherTypeColumn, (err, result) => {
@@ -15805,7 +15860,7 @@ const runDatabaseMigrations = () => {
             console.error('Error checking voucher_type column:', err);
             return;
         }
-        
+
         if (result.length === 0) {
             console.log('Adding voucher_type column...');
             const addVoucherTypeColumn = "ALTER TABLE all_booking ADD COLUMN voucher_type VARCHAR(100) DEFAULT 'Any Day Flight' COMMENT 'Selected voucher type (Weekday Morning, Flexible Weekday, Any Day Flight)'";
@@ -15820,7 +15875,7 @@ const runDatabaseMigrations = () => {
             console.log('✅ Voucher type column already exists');
         }
     });
-    
+
     // Check if flight_type_source column exists
     const checkFlightTypeSourceColumn = "SHOW COLUMNS FROM all_booking LIKE 'flight_type_source'";
     con.query(checkFlightTypeSourceColumn, (err, result) => {
@@ -15828,7 +15883,7 @@ const runDatabaseMigrations = () => {
             console.error('Error checking flight_type_source column:', err);
             return;
         }
-        
+
         if (result.length === 0) {
             console.log('Adding flight_type_source column...');
             const addFlightTypeSourceColumn = "ALTER TABLE all_booking ADD COLUMN flight_type_source VARCHAR(100) DEFAULT NULL COMMENT 'Source of flight type: Redeem Voucher, Buy Gift Voucher, or flight_type/experience value'";
@@ -15843,7 +15898,7 @@ const runDatabaseMigrations = () => {
             console.log('✅ Flight type source column already exists');
         }
     });
-    
+
     // Ensure activity_availability table has proper constraints
     const checkAvailabilityConstraints = "SHOW INDEX FROM activity_availability WHERE Key_name = 'unique_date_time_activity'";
     con.query(checkAvailabilityConstraints, (err, result) => {
@@ -15851,7 +15906,7 @@ const runDatabaseMigrations = () => {
             console.error('Error checking availability constraints:', err);
             return;
         }
-        
+
         if (result.length === 0) {
             console.log('Adding unique constraint to activity_availability...');
             const addUniqueConstraint = "ALTER TABLE activity_availability ADD UNIQUE INDEX unique_date_time_activity (date, time, activity_id)";
@@ -15980,10 +16035,10 @@ const runDatabaseMigrations = () => {
             console.error('Error checking purchaser fields in all_vouchers:', err);
             return;
         }
-        
+
         if (result.length === 0) {
             console.log('Adding purchaser fields to all_vouchers table...');
-            
+
             // Add purchaser_name column
             const addPurchaserName = "ALTER TABLE all_vouchers ADD COLUMN purchaser_name VARCHAR(255) COMMENT 'Name of the person who purchased the voucher' AFTER name";
             con.query(addPurchaserName, (err) => {
@@ -15991,7 +16046,7 @@ const runDatabaseMigrations = () => {
                     console.error('Error adding purchaser_name column:', err);
                 } else {
                     console.log('✅ purchaser_name column added successfully');
-                    
+
                     // Add purchaser_email column
                     const addPurchaserEmail = "ALTER TABLE all_vouchers ADD COLUMN purchaser_email VARCHAR(255) COMMENT 'Email of the person who purchased the voucher' AFTER purchaser_name";
                     con.query(addPurchaserEmail, (err) => {
@@ -15999,7 +16054,7 @@ const runDatabaseMigrations = () => {
                             console.error('Error adding purchaser_email column:', err);
                         } else {
                             console.log('✅ purchaser_email column added successfully');
-                            
+
                             // Add purchaser_phone column
                             const addPurchaserPhone = "ALTER TABLE all_vouchers ADD COLUMN purchaser_phone VARCHAR(50) COMMENT 'Phone number of the person who purchased the voucher' AFTER purchaser_email";
                             con.query(addPurchaserPhone, (err) => {
@@ -16007,7 +16062,7 @@ const runDatabaseMigrations = () => {
                                     console.error('Error adding purchaser_phone column:', err);
                                 } else {
                                     console.log('✅ purchaser_phone column added successfully');
-                                    
+
                                     // Add purchaser_mobile column
                                     const addPurchaserMobile = "ALTER TABLE all_vouchers ADD COLUMN purchaser_mobile VARCHAR(50) COMMENT 'Mobile number of the person who purchased the voucher' AFTER purchaser_phone";
                                     con.query(addPurchaserMobile, (err) => {
@@ -16015,7 +16070,7 @@ const runDatabaseMigrations = () => {
                                             console.error('Error adding purchaser_mobile column:', err);
                                         } else {
                                             console.log('✅ purchaser_mobile column added successfully');
-                                            
+
                                             // Add indexes for better performance
                                             const addIndexes = "ALTER TABLE all_vouchers ADD INDEX idx_purchaser_name (purchaser_name), ADD INDEX idx_purchaser_email (purchaser_email), ADD INDEX idx_purchaser_phone (purchaser_phone)";
                                             con.query(addIndexes, (err) => {
@@ -16023,7 +16078,7 @@ const runDatabaseMigrations = () => {
                                                     console.error('Error adding purchaser indexes:', err);
                                                 } else {
                                                     console.log('✅ purchaser indexes added successfully');
-                                                    
+
                                                     // Update existing Gift Voucher records to populate purchaser fields
                                                     const updateExistingRecords = "UPDATE all_vouchers SET purchaser_name = name, purchaser_email = email, purchaser_phone = phone, purchaser_mobile = mobile WHERE book_flight = 'Gift Voucher' AND (purchaser_name IS NULL OR purchaser_name = '')";
                                                     con.query(updateExistingRecords, (err) => {
@@ -16062,7 +16117,7 @@ const runDatabaseMigrations = () => {
             INDEX idx_is_active (is_active)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `;
-    
+
     con.query(createCustomerPortalContentsTable, (err) => {
         if (err) {
             console.error('Error creating customer_portal_contents table:', err);
@@ -16099,7 +16154,7 @@ const runDatabaseMigrations = () => {
             INDEX idx_created_at (created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `;
-    
+
     con.query(createPaymentHistoryTable, (err) => {
         if (err) {
             console.error('Error creating payment_history table:', err);
@@ -16115,7 +16170,7 @@ const runDatabaseMigrations = () => {
             console.error('Error checking stripe_session_id column:', err);
             return;
         }
-        
+
         if (result.length === 0) {
             console.log('Adding stripe_session_id column to all_booking...');
             const addStripeSessionIdColumn = "ALTER TABLE all_booking ADD COLUMN stripe_session_id VARCHAR(255) DEFAULT NULL COMMENT 'Stripe Checkout Session ID for payment tracking'";
@@ -16162,7 +16217,7 @@ const runDatabaseMigrations = () => {
             INDEX idx_first_seen (first_seen)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `;
-    
+
     con.query(createUserSessionsTable, (err) => {
         if (err) {
             console.error('Error creating user_sessions table:', err);
@@ -16178,7 +16233,7 @@ const runDatabaseMigrations = () => {
             console.error('Error checking user_session_id column:', err);
             return;
         }
-        
+
         if (result.length === 0) {
             console.log('Adding user_session_id column to all_booking...');
             const addUserSessionIdColumn = "ALTER TABLE all_booking ADD COLUMN user_session_id VARCHAR(255) DEFAULT NULL COMMENT 'User session ID for tracking user activity'";
@@ -16271,58 +16326,58 @@ const addVoucherColumnsToBooking = `
 // Run purchaser/recipient data fix migration
 const runPurchaserRecipientDataFix = () => {
     console.log('🔧 Running purchaser/recipient data fix migration...');
-    
+
     // Check if purchaser_name column exists
     const checkPurchaserFields = "SHOW COLUMNS FROM all_vouchers LIKE 'purchaser_name'";
-    
+
     con.query(checkPurchaserFields, (err, result) => {
         if (err) {
             console.error('Error checking purchaser fields:', err);
             return;
         }
-        
+
         if (result.length === 0) {
             console.log('📝 Adding purchaser fields to all_vouchers table...');
-            
+
             // Add purchaser_name column
             const addPurchaserName = "ALTER TABLE all_vouchers ADD COLUMN purchaser_name VARCHAR(255) COMMENT 'Name of the person who purchased the voucher' AFTER name";
-            
+
             con.query(addPurchaserName, (err, result) => {
                 if (err) {
                     console.error('Error adding purchaser_name column:', err);
                 } else {
                     console.log('✅ purchaser_name column added successfully');
-                    
+
                     // Add purchaser_email column
                     const addPurchaserEmail = "ALTER TABLE all_vouchers ADD COLUMN purchaser_email VARCHAR(255) COMMENT 'Email of the person who purchased the voucher' AFTER purchaser_name";
-                    
+
                     con.query(addPurchaserEmail, (err, result) => {
                         if (err) {
                             console.error('Error adding purchaser_email column:', err);
                         } else {
                             console.log('✅ purchaser_email column added successfully');
-                            
+
                             // Add purchaser_phone column
                             const addPurchaserPhone = "ALTER TABLE all_vouchers ADD COLUMN purchaser_phone VARCHAR(50) COMMENT 'Phone number of the person who purchased the voucher' AFTER purchaser_email";
-                            
+
                             con.query(addPurchaserPhone, (err, result) => {
                                 if (err) {
                                     console.error('Error adding purchaser_phone column:', err);
                                 } else {
                                     console.log('✅ purchaser_phone column added successfully');
-                                    
+
                                     // Add purchaser_mobile column
                                     const addPurchaserMobile = "ALTER TABLE all_vouchers ADD COLUMN purchaser_mobile VARCHAR(50) COMMENT 'Mobile number of the person who purchased the voucher' AFTER purchaser_phone";
-                                    
+
                                     con.query(addPurchaserMobile, (err, result) => {
                                         if (err) {
                                             console.error('Error adding purchaser_mobile column:', err);
                                         } else {
                                             console.log('✅ purchaser_mobile column added successfully');
-                                            
+
                                             // Index'ler kaldırıldı - gereksiz karmaşıklık
                                             console.log('✅ Purchaser columns added successfully');
-                                            
+
                                             // Fix existing data
                                             fixExistingPurchaserData();
                                         }
@@ -16343,7 +16398,7 @@ const runPurchaserRecipientDataFix = () => {
 // Fix existing purchaser data
 const fixExistingPurchaserData = () => {
     console.log('🔧 Fixing existing purchaser/recipient data...');
-    
+
     // Fix Gift Vouchers where purchaser and recipient data are mixed up
     const updateGiftVouchers = `
         UPDATE all_vouchers 
@@ -16355,13 +16410,13 @@ const fixExistingPurchaserData = () => {
         WHERE book_flight = 'Gift Voucher' 
         AND (purchaser_name IS NULL OR purchaser_name = '' OR purchaser_name = recipient_name)
     `;
-    
+
     con.query(updateGiftVouchers, (err, result) => {
         if (err) {
             console.error('Error updating Gift Voucher purchaser data:', err);
         } else {
             console.log(`✅ Updated ${result.affectedRows} Gift Voucher records with correct purchaser data`);
-            
+
             // Fix non-Gift Vouchers
             const updateNonGiftVouchers = `
                 UPDATE all_vouchers 
@@ -16373,7 +16428,7 @@ const fixExistingPurchaserData = () => {
                 WHERE book_flight != 'Gift Voucher' 
                 AND (purchaser_name IS NULL OR purchaser_name = '')
             `;
-            
+
             con.query(updateNonGiftVouchers, (err, result) => {
                 if (err) {
                     console.error('Error updating non-Gift Voucher purchaser data:', err);
@@ -16389,14 +16444,14 @@ const fixExistingPurchaserData = () => {
 // Add additional_information columns to all_vouchers table
 const addAdditionalInfoToVouchers = () => {
     console.log('🔍 Checking if additional_information columns exist in all_vouchers table...');
-    
+
     const checkAdditionalInfo = "SHOW COLUMNS FROM all_vouchers LIKE 'additional_information'";
     con.query(checkAdditionalInfo, (err, result) => {
         if (err) {
             console.error('Error checking additional_information column in all_vouchers:', err);
         } else if (result.length === 0) {
             console.log('📝 Adding additional_information columns to all_vouchers table...');
-            
+
             // Add additional_information column
             const addAdditionalInfo = "ALTER TABLE all_vouchers ADD COLUMN additional_information JSON COMMENT 'Additional information questions and answers' AFTER numberOfPassengers";
             con.query(addAdditionalInfo, (err) => {
@@ -16404,7 +16459,7 @@ const addAdditionalInfoToVouchers = () => {
                     console.error('Error adding additional_information column to all_vouchers:', err);
                 } else {
                     console.log('✅ additional_information column added to all_vouchers successfully');
-                    
+
                     // Add additional_information_json column
                     const addAdditionalInfoJson = "ALTER TABLE all_vouchers ADD COLUMN additional_information_json JSON COMMENT 'Additional information in JSON format' AFTER additional_information";
                     con.query(addAdditionalInfoJson, (err) => {
@@ -16426,7 +16481,7 @@ const addAdditionalInfoToVouchers = () => {
 // Run voucher code migrations
 const runVoucherCodeMigrations = () => {
     console.log('Running voucher code migrations...');
-    
+
     // Create voucher_codes table
     con.query(createVoucherCodesTable, (err) => {
         if (err) {
@@ -16435,7 +16490,7 @@ const runVoucherCodeMigrations = () => {
             console.log('✅ Voucher codes table ready');
         }
     });
-    
+
     // Create voucher_code_usage table
     con.query(createVoucherCodeUsageTable, (err) => {
         if (err) {
@@ -16444,7 +16499,7 @@ const runVoucherCodeMigrations = () => {
             console.log('✅ Voucher code usage table ready');
         }
     });
-    
+
     // Create voucher_notes table
     con.query(createVoucherNotesTable, (err) => {
         if (err) {
@@ -16453,12 +16508,12 @@ const runVoucherCodeMigrations = () => {
             console.log('✅ Voucher notes table ready');
         }
     });
-    
+
     // Add voucher columns to all_booking table (one by one to handle existing columns)
     const addVoucherCodeColumn = "ALTER TABLE all_booking ADD COLUMN voucher_code VARCHAR(50) DEFAULT NULL COMMENT 'Applied voucher code'";
     const addVoucherDiscountColumn = "ALTER TABLE all_booking ADD COLUMN voucher_discount DECIMAL(10,2) DEFAULT 0 COMMENT 'Discount amount from voucher code'";
     const addOriginalAmountColumn = "ALTER TABLE all_booking ADD COLUMN original_amount DECIMAL(10,2) DEFAULT NULL COMMENT 'Original amount before voucher discount'";
-    
+
     // Add voucher_code column
     con.query(addVoucherCodeColumn, (err) => {
         if (err && err.code !== 'ER_DUP_FIELDNAME') {
@@ -16469,7 +16524,7 @@ const runVoucherCodeMigrations = () => {
             console.log('✅ voucher_code column added');
         }
     });
-    
+
     // Add voucher_discount column
     con.query(addVoucherDiscountColumn, (err) => {
         if (err && err.code !== 'ER_DUP_FIELDNAME') {
@@ -16480,7 +16535,7 @@ const runVoucherCodeMigrations = () => {
             console.log('✅ voucher_discount column added');
         }
     });
-    
+
     // Add original_amount column
     con.query(addOriginalAmountColumn, (err) => {
         if (err && err.code !== 'ER_DUP_FIELDNAME') {
@@ -16491,7 +16546,7 @@ const runVoucherCodeMigrations = () => {
             console.log('✅ original_amount column added');
         }
     });
-    
+
     // Insert sample voucher codes if table is empty
     const checkVoucherCodes = "SELECT COUNT(*) as count FROM voucher_codes";
     con.query(checkVoucherCodes, (err, result) => {
@@ -16499,7 +16554,7 @@ const runVoucherCodeMigrations = () => {
             console.error('Error checking voucher codes count:', err);
             return;
         }
-        
+
         if (result[0].count === 0) {
             console.log('Inserting sample voucher codes...');
             const sampleVouchers = `
@@ -16509,7 +16564,7 @@ const runVoucherCodeMigrations = () => {
                 ('SAVE20', 'Save £20', 'fixed_amount', 20.00, 200.00, NULL, '2024-01-01', '2025-12-31', 200, 'United Kingdom', 'Private Charter', 'Any Day Flight'),
                 ('FIRSTFLIGHT', 'First Flight 25%', 'percentage', 25.00, 100.00, 100.00, '2024-01-01', '2025-12-31', 75, 'Somerset,United Kingdom', 'Shared Flight', 'Weekday Morning')
             `;
-            
+
             con.query(sampleVouchers, (err) => {
                 if (err) {
                     console.error('Error inserting sample voucher codes:', err);
@@ -16537,7 +16592,7 @@ addAdditionalInfoToVouchers();
 // Debug endpoint to check voucher data
 app.get('/api/debug/voucher-data/:id', (req, res) => {
     const { id } = req.params;
-    
+
     const sql = `
         SELECT 
             id, name, email, 
@@ -16547,17 +16602,17 @@ app.get('/api/debug/voucher-data/:id', (req, res) => {
         FROM all_vouchers 
         WHERE id = ?
     `;
-    
+
     con.query(sql, [id], (err, result) => {
         if (err) {
             console.error('Error fetching voucher data:', err);
             return res.status(500).json({ success: false, error: err.message });
         }
-        
+
         if (result.length === 0) {
             return res.status(404).json({ success: false, message: 'Voucher not found' });
         }
-        
+
         const voucher = result[0];
         console.log('=== DEBUG VOUCHER DATA ===');
         console.log('Voucher ID:', voucher.id);
@@ -16566,7 +16621,7 @@ app.get('/api/debug/voucher-data/:id', (req, res) => {
         console.log('additional_information_json:', voucher.additional_information_json);
         console.log('add_to_booking_items:', voucher.add_to_booking_items);
         console.log('Created at:', voucher.created_at);
-        
+
         res.json({
             success: true,
             data: {
@@ -16589,7 +16644,7 @@ app.get('/api/debug/table-structure', (req, res) => {
             console.error('Error checking table structure:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err });
         }
-        
+
         console.log('Table structure:', result);
         res.json({ success: true, data: result });
     });
@@ -16603,7 +16658,7 @@ app.get('/api/debug/vouchers-table-structure', (req, res) => {
             console.error('Error checking all_vouchers table structure:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err });
         }
-        
+
         console.log('All vouchers table structure:', result);
         res.json({ success: true, data: result });
     });
@@ -16668,7 +16723,7 @@ runPilotAssignmentMigrations();
 // Update existing date_request table with missing columns
 const updateDateRequestTable = () => {
     console.log('Checking date_request table structure...');
-    
+
     // Check if phone column exists
     const checkPhoneColumn = "SHOW COLUMNS FROM date_request LIKE 'phone'";
     con.query(checkPhoneColumn, (err, result) => {
@@ -16676,7 +16731,7 @@ const updateDateRequestTable = () => {
             console.error('Error checking phone column:', err);
             return;
         }
-        
+
         if (result.length === 0) {
             console.log('Adding phone column to date_request...');
             const addPhoneColumn = "ALTER TABLE date_request ADD COLUMN phone VARCHAR(50) NOT NULL COMMENT 'Customer phone number' AFTER name";
@@ -16691,7 +16746,7 @@ const updateDateRequestTable = () => {
             console.log('✅ Phone column already exists in date_request');
         }
     });
-    
+
     // Check if location column exists
     const checkLocationColumn = "SHOW COLUMNS FROM date_request LIKE 'location'";
     con.query(checkLocationColumn, (err, result) => {
@@ -16699,7 +16754,7 @@ const updateDateRequestTable = () => {
             console.error('Error checking location column:', err);
             return;
         }
-        
+
         if (result.length === 0) {
             console.log('Adding location column to date_request...');
             const addLocationColumn = "ALTER TABLE date_request ADD COLUMN location VARCHAR(255) NOT NULL COMMENT 'Requested location' AFTER phone";
@@ -16714,7 +16769,7 @@ const updateDateRequestTable = () => {
             console.log('✅ Location column already exists in date_request');
         }
     });
-    
+
     // Check if flight_type column exists
     const checkFlightTypeColumn = "SHOW COLUMNS FROM date_request LIKE 'flight_type'";
     con.query(checkFlightTypeColumn, (err, result) => {
@@ -16722,7 +16777,7 @@ const updateDateRequestTable = () => {
             console.error('Error checking flight_type column:', err);
             return;
         }
-        
+
         if (result.length === 0) {
             console.log('Adding flight_type column to date_request...');
             const addFlightTypeColumn = "ALTER TABLE date_request ADD COLUMN flight_type VARCHAR(100) NOT NULL COMMENT 'Type of flight' AFTER location";
@@ -16737,7 +16792,7 @@ const updateDateRequestTable = () => {
             console.log('✅ Flight type column already exists in date_request');
         }
     });
-    
+
     // Check if notes column exists
     const checkNotesColumn = "SHOW COLUMNS FROM date_request LIKE 'notes'";
     con.query(checkNotesColumn, (err, result) => {
@@ -16745,7 +16800,7 @@ const updateDateRequestTable = () => {
             console.error('Error checking notes column:', err);
             return;
         }
-        
+
         if (result.length === 0) {
             console.log('Adding notes column to date_request...');
             const addNotesColumn = "ALTER TABLE date_request ADD COLUMN notes TEXT COMMENT 'Additional notes' AFTER status";
@@ -16760,7 +16815,7 @@ const updateDateRequestTable = () => {
             console.log('✅ Notes column already exists in date_request');
         }
     });
-    
+
     // Check if updated_at column exists
     const checkUpdatedAtColumn = "SHOW COLUMNS FROM date_request LIKE 'updated_at'";
     con.query(checkUpdatedAtColumn, (err, result) => {
@@ -16768,7 +16823,7 @@ const updateDateRequestTable = () => {
             console.error('Error checking updated_at column:', err);
             return;
         }
-        
+
         if (result.length === 0) {
             console.log('Adding updated_at column to date_request...');
             const addUpdatedAtColumn = "ALTER TABLE date_request ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Last updated' AFTER created_at";
@@ -16791,9 +16846,9 @@ updateDateRequestTable();
 app.get('/api/crew-assignments', (req, res) => {
     const { date } = req.query;
     if (!date) return res.status(400).json({ success: false, message: 'date is required (YYYY-MM-DD)' });
-    
+
     console.log('Fetching crew assignments for date:', date);
-    
+
     const sql = `
         SELECT fca.*, c.first_name, c.last_name 
         FROM flight_crew_assignments fca
@@ -16801,13 +16856,13 @@ app.get('/api/crew-assignments', (req, res) => {
         WHERE fca.date = ?
         ORDER BY fca.time ASC
     `;
-    
+
     con.query(sql, [date], (err, result) => {
         if (err) {
             console.error('Error fetching crew assignments:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         console.log('Crew assignments found for date', date, ':', result);
         res.json({ success: true, data: result });
     });
@@ -16819,9 +16874,9 @@ app.post('/api/crew-assignment', (req, res) => {
     if (!activity_id || !date || !time) {
         return res.status(400).json({ success: false, message: 'activity_id, date, time are required' });
     }
-    
+
     console.log('Saving crew assignment:', { activity_id, date, time, crew_id });
-    
+
     // If crew_id is null, delete the assignment
     if (crew_id === null || crew_id === undefined) {
         const deleteSql = 'DELETE FROM flight_crew_assignments WHERE activity_id = ? AND date = ? AND time = ?';
@@ -16831,15 +16886,15 @@ app.post('/api/crew-assignment', (req, res) => {
                 return res.status(500).json({ success: false, message: 'Database error', error: err.message });
             }
             console.log('Crew assignment deleted successfully:', result);
-            res.json({ 
-                success: true, 
+            res.json({
+                success: true,
                 message: 'Crew assignment cleared',
                 data: { activity_id, date, time, crew_id: null }
             });
         });
         return;
     }
-    
+
     // Validate that the crew member exists
     const validateCrewSql = 'SELECT id FROM crew WHERE id = ? AND is_active = 1';
     con.query(validateCrewSql, [crew_id], (validateErr, validateResult) => {
@@ -16847,27 +16902,27 @@ app.post('/api/crew-assignment', (req, res) => {
             console.error('Error validating crew member:', validateErr);
             return res.status(500).json({ success: false, message: 'Database error', error: validateErr.message });
         }
-        
+
         if (validateResult.length === 0) {
             return res.status(400).json({ success: false, message: 'Invalid crew member ID' });
         }
-        
+
         const sql = `
             INSERT INTO flight_crew_assignments (activity_id, date, time, crew_id)
             VALUES (?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE crew_id = VALUES(crew_id), updated_at = CURRENT_TIMESTAMP
         `;
-        
+
         con.query(sql, [activity_id, date, time, crew_id], (err, result) => {
             if (err) {
                 console.error('Error upserting crew assignment:', err);
                 return res.status(500).json({ success: false, message: 'Database error', error: err.message });
             }
             console.log('Crew assignment saved successfully:', result);
-            
+
             // Return the saved assignment data
-            res.json({ 
-                success: true, 
+            res.json({
+                success: true,
                 message: 'Crew assignment saved',
                 data: { activity_id, date, time, crew_id }
             });
@@ -16879,9 +16934,9 @@ app.post('/api/crew-assignment', (req, res) => {
 app.get('/api/pilot-assignments', (req, res) => {
     const { date } = req.query;
     if (!date) return res.status(400).json({ success: false, message: 'date is required (YYYY-MM-DD)' });
-    
+
     console.log('Fetching pilot assignments for date:', date);
-    
+
     const sql = `
         SELECT fpa.*, p.first_name, p.last_name 
         FROM flight_pilot_assignments fpa
@@ -16889,13 +16944,13 @@ app.get('/api/pilot-assignments', (req, res) => {
         WHERE fpa.date = ?
         ORDER BY fpa.time ASC
     `;
-    
+
     con.query(sql, [date], (err, result) => {
         if (err) {
             console.error('Error fetching pilot assignments:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         console.log('Pilot assignments found for date', date, ':', result);
         res.json({ success: true, data: result });
     });
@@ -16907,9 +16962,9 @@ app.post('/api/pilot-assignment', (req, res) => {
     if (!activity_id || !date || !time) {
         return res.status(400).json({ success: false, message: 'activity_id, date, time are required' });
     }
-    
+
     console.log('Saving pilot assignment:', { activity_id, date, time, pilot_id });
-    
+
     // If pilot_id is null, delete the assignment
     if (pilot_id === null || pilot_id === undefined) {
         const deleteSql = 'DELETE FROM flight_pilot_assignments WHERE activity_id = ? AND date = ? AND time = ?';
@@ -16919,15 +16974,15 @@ app.post('/api/pilot-assignment', (req, res) => {
                 return res.status(500).json({ success: false, message: 'Database error', error: err.message });
             }
             console.log('Pilot assignment deleted successfully:', result);
-            res.json({ 
-                success: true, 
+            res.json({
+                success: true,
                 message: 'Pilot assignment cleared',
                 data: { activity_id, date, time, pilot_id: null }
             });
         });
         return;
     }
-    
+
     // Validate that the pilot exists
     const validatePilotSql = 'SELECT id FROM pilots WHERE id = ? AND is_active = 1';
     con.query(validatePilotSql, [pilot_id], (validateErr, validateResult) => {
@@ -16935,27 +16990,27 @@ app.post('/api/pilot-assignment', (req, res) => {
             console.error('Error validating pilot:', validateErr);
             return res.status(500).json({ success: false, message: 'Database error', error: validateErr.message });
         }
-        
+
         if (validateResult.length === 0) {
             return res.status(400).json({ success: false, message: 'Invalid pilot ID' });
         }
-        
+
         const sql = `
             INSERT INTO flight_pilot_assignments (activity_id, date, time, pilot_id)
             VALUES (?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE pilot_id = VALUES(pilot_id), updated_at = CURRENT_TIMESTAMP
         `;
-        
+
         con.query(sql, [activity_id, date, time, pilot_id], (err, result) => {
             if (err) {
                 console.error('Error upserting pilot assignment:', err);
                 return res.status(500).json({ success: false, message: 'Database error', error: err.message });
             }
             console.log('Pilot assignment saved successfully:', result);
-            
+
             // Return the saved assignment data
-            res.json({ 
-                success: true, 
+            res.json({
+                success: true,
                 message: 'Pilot assignment saved',
                 data: { activity_id, date, time, pilot_id }
             });
@@ -16970,26 +17025,26 @@ app.get('/api/debug/crew-assignments', (req, res) => {
         if (err) {
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         if (tables.length === 0) {
             return res.json({ success: false, message: 'Table does not exist', tables: [] });
         }
-        
+
         // Check table structure
         con.query("DESCRIBE flight_crew_assignments", (err, structure) => {
             if (err) {
                 return res.status(500).json({ success: false, message: 'Error describing table', error: err.message });
             }
-            
+
             // Check if table has data
             con.query("SELECT COUNT(*) as count FROM flight_crew_assignments", (err, countResult) => {
                 if (err) {
                     return res.status(500).json({ success: false, message: 'Error counting records', error: err.message });
                 }
-                
-                res.json({ 
-                    success: true, 
-                    tableExists: true, 
+
+                res.json({
+                    success: true,
+                    tableExists: true,
                     structure: structure,
                     recordCount: countResult[0].count
                 });
@@ -17006,19 +17061,19 @@ app.post('/api/debug/crew-assignments/test', (req, res) => {
         time: '17:00:00',
         crew_id: 1 // Use a valid crew ID from your system
     };
-    
+
     const sql = `
         INSERT INTO flight_crew_assignments (activity_id, date, time, crew_id)
         VALUES (?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE crew_id = VALUES(crew_id), updated_at = CURRENT_TIMESTAMP
     `;
-    
+
     con.query(sql, [testData.activity_id, testData.date, testData.time, testData.crew_id], (err, result) => {
         if (err) {
             console.error('Error inserting test crew assignment:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         console.log('Test crew assignment inserted:', result);
         res.json({ success: true, message: 'Test crew assignment inserted', result });
     });
@@ -17027,40 +17082,40 @@ app.post('/api/debug/crew-assignments/test', (req, res) => {
 // Get activities with flight types for ballooning-book
 app.get('/api/activities/flight-types', (req, res) => {
     const { location } = req.query;
-    
+
     console.log('=== /api/activities/flight-types called ===');
     console.log('Location filter:', location);
-    
+
     let sql = 'SELECT id, activity_name, location, flight_type, status, private_charter_pricing, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price FROM activity WHERE status = "Live"';
     const params = [];
-    
+
     if (location) {
         sql += ' AND location = ?';
         params.push(location);
     }
-    
+
     sql += ' ORDER BY location, activity_name';
-    
+
     console.log('SQL query:', sql);
     console.log('SQL params:', params);
-    
+
     con.query(sql, params, (err, result) => {
         if (err) {
             console.error('Error fetching activities with flight types:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         console.log('Raw database result:', result);
         console.log('Raw database result - private_charter_pricing fields:', result.map(r => ({ id: r.id, name: r.activity_name, pricing: r.private_charter_pricing })));
-        console.log('Raw database result - shared flight pricing fields:', result.map(r => ({ 
-            id: r.id, 
-            name: r.activity_name, 
+        console.log('Raw database result - shared flight pricing fields:', result.map(r => ({
+            id: r.id,
+            name: r.activity_name,
             weekday_morning_price: r.weekday_morning_price,
             flexible_weekday_price: r.flexible_weekday_price,
             any_day_flight_price: r.any_day_flight_price,
             shared_flight_from_price: r.shared_flight_from_price
         })));
-        
+
         // Process flight types to map them to experience names
         const processedActivities = result.map(activity => {
             let flightTypes = [];
@@ -17072,29 +17127,29 @@ app.get('/api/activities/flight-types', (req, res) => {
                     flightTypes = activity.flight_type;
                 }
             }
-            
+
             // Map flight types to experience names
             const experiences = flightTypes.map(type => {
                 if (type === 'Private') return 'Private Charter';
                 if (type === 'Shared') return 'Shared Flight';
                 return type; // Keep original if not mapped
             });
-            
+
             console.log(`Activity ${activity.activity_name}: flight_type="${activity.flight_type}" -> flightTypes=${JSON.stringify(flightTypes)} -> experiences=${JSON.stringify(experiences)}`);
-            
+
             return {
                 ...activity,
                 flight_type: flightTypes,
                 experiences: experiences
             };
         });
-        
+
         console.log('Processed activities:', processedActivities);
         console.log('=== /api/activities/flight-types response ===');
-        
-        res.json({ 
-            success: true, 
-            data: processedActivities 
+
+        res.json({
+            success: true,
+            data: processedActivities
         });
     });
 });
@@ -17102,7 +17157,7 @@ app.get('/api/activities/flight-types', (req, res) => {
 // Get additional information answers for a specific booking
 app.get('/api/booking/:bookingId/additional-information', async (req, res) => {
     const { bookingId } = req.params;
-    
+
     try {
         // Get the additional information answers for this booking
         const answersSql = `
@@ -17121,14 +17176,14 @@ app.get('/api/booking/:bookingId/additional-information', async (req, res) => {
             WHERE aia.booking_id = ?
             ORDER BY aiq.sort_order, aiq.id
         `;
-        
+
         const answers = await new Promise((resolve, reject) => {
             con.query(answersSql, [bookingId], (err, result) => {
                 if (err) reject(err);
                 else resolve(result);
             });
         });
-        
+
         // Also get the legacy additional information fields from the booking
         const bookingSql = `
             SELECT 
@@ -17140,14 +17195,14 @@ app.get('/api/booking/:bookingId/additional-information', async (req, res) => {
             FROM all_booking 
             WHERE id = ?
         `;
-        
+
         const booking = await new Promise((resolve, reject) => {
             con.query(bookingSql, [bookingId], (err, result) => {
                 if (err) reject(err);
                 else resolve(result[0] || {});
             });
         });
-        
+
         // Format the response
         const formattedAnswers = answers.map(answer => ({
             question_id: answer.question_id,
@@ -17159,7 +17214,7 @@ app.get('/api/booking/:bookingId/additional-information', async (req, res) => {
             category: answer.category,
             created_at: answer.created_at
         }));
-        
+
         res.json({
             success: true,
             data: {
@@ -17173,13 +17228,13 @@ app.get('/api/booking/:bookingId/additional-information', async (req, res) => {
                 additional_information_json: booking.additional_information_json ? JSON.parse(booking.additional_information_json) : null
             }
         });
-        
+
     } catch (error) {
         console.error('Error fetching additional information:', error);
-        res.status(500).json({ 
-            success: false, 
+        res.status(500).json({
+            success: false,
             message: 'Error fetching additional information',
-            error: error.message 
+            error: error.message
         });
     }
 });
@@ -17188,7 +17243,7 @@ app.get('/api/booking/:bookingId/additional-information', async (req, res) => {
 app.post('/api/booking/:bookingId/additional-information', async (req, res) => {
     const { bookingId } = req.params;
     const { answers } = req.body;
-    
+
     try {
         // Validate booking exists
         const bookingExists = await new Promise((resolve, reject) => {
@@ -17197,14 +17252,14 @@ app.post('/api/booking/:bookingId/additional-information', async (req, res) => {
                 else resolve(result.length > 0);
             });
         });
-        
+
         if (!bookingExists) {
-            return res.status(404).json({ 
-                success: false, 
-                message: 'Booking not found' 
+            return res.status(404).json({
+                success: false,
+                message: 'Booking not found'
             });
         }
-        
+
         // Delete existing answers for this booking
         await new Promise((resolve, reject) => {
             con.query('DELETE FROM additional_information_answers WHERE booking_id = ?', [bookingId], (err) => {
@@ -17212,14 +17267,14 @@ app.post('/api/booking/:bookingId/additional-information', async (req, res) => {
                 else resolve();
             });
         });
-        
+
         // Insert new answers
         if (answers && Array.isArray(answers) && answers.length > 0) {
             const insertSql = 'INSERT INTO additional_information_answers (booking_id, question_id, answer) VALUES ?';
             const insertValues = answers
                 .filter(answer => answer.question_id && answer.answer)
                 .map(answer => [bookingId, answer.question_id, answer.answer]);
-            
+
             if (insertValues.length > 0) {
                 await new Promise((resolve, reject) => {
                     con.query(insertSql, [insertValues], (err) => {
@@ -17229,13 +17284,13 @@ app.post('/api/booking/:bookingId/additional-information', async (req, res) => {
                 });
             }
         }
-        
+
         // Also update the JSON field in all_booking for backward compatibility
         const jsonData = answers ? answers.reduce((acc, answer) => {
             acc[`question_${answer.question_id}`] = answer.answer;
             return acc;
         }, {}) : {};
-        
+
         await new Promise((resolve, reject) => {
             con.query(
                 'UPDATE all_booking SET additional_information_json = ? WHERE id = ?',
@@ -17246,18 +17301,18 @@ app.post('/api/booking/:bookingId/additional-information', async (req, res) => {
                 }
             );
         });
-        
+
         res.json({
             success: true,
             message: 'Additional information saved successfully'
         });
-        
+
     } catch (error) {
         console.error('Error saving additional information:', error);
-        res.status(500).json({ 
-            success: false, 
+        res.status(500).json({
+            success: false,
             message: 'Error saving additional information',
-            error: error.message 
+            error: error.message
         });
     }
 });
@@ -17281,20 +17336,20 @@ app.get('/api/additional-information-questions', (req, res) => {
         WHERE is_active = 1 
         ORDER BY sort_order, id
     `;
-    
+
     con.query(sql, (err, result) => {
         if (err) {
             console.error('Error fetching additional information questions:', err);
-            return res.status(500).json({ 
-                success: false, 
-                message: 'Database error', 
-                error: err.message 
+            return res.status(500).json({
+                success: false,
+                message: 'Database error',
+                error: err.message
             });
         }
-        
-        res.json({ 
-            success: true, 
-            data: result 
+
+        res.json({
+            success: true,
+            data: result
         });
     });
 });
@@ -17302,7 +17357,7 @@ app.get('/api/additional-information-questions', (req, res) => {
 // Update existing Gift Voucher records to populate purchaser fields correctly
 app.post('/api/updateGiftVoucherPurchaserInfo', (req, res) => {
     console.log('=== UPDATING GIFT VOUCHER PURCHASER INFO ===');
-    
+
     // Update all Gift Voucher records to set purchaser fields correctly
     // For Gift Vouchers, purchaser info should come from the main contact fields (name, email, phone, mobile)
     // Recipient info should remain separate
@@ -17316,20 +17371,20 @@ app.post('/api/updateGiftVoucherPurchaserInfo', (req, res) => {
         WHERE book_flight = 'Gift Voucher' 
         AND (purchaser_name IS NULL OR purchaser_name = '' OR purchaser_name = recipient_name)
     `;
-    
+
     con.query(updateSql, (err, result) => {
         if (err) {
             console.error('Error updating Gift Voucher purchaser info:', err);
-            return res.status(500).json({ 
-                success: false, 
+            return res.status(500).json({
+                success: false,
                 message: 'Database error updating purchaser info',
-                error: err.message 
+                error: err.message
             });
         }
-        
+
         console.log('✅ Gift Voucher purchaser info updated successfully');
         console.log('Records affected:', result.affectedRows);
-        
+
         res.json({
             success: true,
             message: 'Gift Voucher purchaser info updated successfully',
@@ -17341,11 +17396,11 @@ app.post('/api/updateGiftVoucherPurchaserInfo', (req, res) => {
 // Fix Gift Voucher data structure - separate purchaser and recipient info properly
 app.post('/api/fixGiftVoucherDataStructure', (req, res) => {
     console.log('=== FIXING GIFT VOUCHER DATA STRUCTURE ===');
-    
+
     // For Gift Vouchers, we need to properly separate purchaser and recipient info
     // Current issue: name field contains recipient info, but should contain purchaser info
     // Solution: Update name field to be purchaser info, keep recipient_* fields as is
-    
+
     const fixSql = `
         UPDATE all_vouchers 
         SET 
@@ -17358,20 +17413,20 @@ app.post('/api/fixGiftVoucherDataStructure', (req, res) => {
         AND purchaser_name != ''
         AND purchaser_name != recipient_name
     `;
-    
+
     con.query(fixSql, (err, result) => {
         if (err) {
             console.error('Error fixing Gift Voucher data structure:', err);
-            return res.status(500).json({ 
-                success: false, 
+            return res.status(500).json({
+                success: false,
                 message: 'Database error fixing data structure',
-                error: err.message 
+                error: err.message
             });
         }
-        
+
         console.log('✅ Gift Voucher data structure fixed successfully');
         console.log('Records affected:', result.affectedRows);
-        
+
         res.json({
             success: true,
             message: 'Gift Voucher data structure fixed successfully',
@@ -17383,10 +17438,10 @@ app.post('/api/fixGiftVoucherDataStructure', (req, res) => {
 // Manually set purchaser info for Gift Vouchers based on business logic
 app.post('/api/setGiftVoucherPurchaserInfo', (req, res) => {
     console.log('=== SETTING GIFT VOUCHER PURCHASER INFO ===');
-    
+
     // For Gift Vouchers, we need to set purchaser info manually
     // Since the current data structure is incorrect, we'll set purchaser info based on business logic
-    
+
     const setPurchaserSql = `
         UPDATE all_vouchers 
         SET 
@@ -17397,20 +17452,20 @@ app.post('/api/setGiftVoucherPurchaserInfo', (req, res) => {
         WHERE book_flight = 'Gift Voucher' 
         AND (purchaser_name = recipient_name OR purchaser_name IS NULL OR purchaser_name = '')
     `;
-    
+
     con.query(setPurchaserSql, (err, result) => {
         if (err) {
             console.error('Error setting Gift Voucher purchaser info:', err);
-            return res.status(500).json({ 
-                success: false, 
+            return res.status(500).json({
+                success: false,
                 message: 'Database error setting purchaser info',
-                error: err.message 
+                error: err.message
             });
         }
-        
+
         console.log('✅ Gift Voucher purchaser info set successfully');
         console.log('Records affected:', result.affectedRows);
-        
+
         res.json({
             success: true,
             message: 'Gift Voucher purchaser info set successfully',
@@ -17422,11 +17477,11 @@ app.post('/api/setGiftVoucherPurchaserInfo', (req, res) => {
 // Fix existing Gift Voucher records to properly separate purchaser and recipient info
 app.post('/api/fixGiftVoucherDataSeparation', (req, res) => {
     console.log('=== FIXING GIFT VOUCHER DATA SEPARATION ===');
-    
+
     // For existing Gift Voucher records, we need to properly separate purchaser and recipient info
     // Current issue: purchaser and recipient fields contain the same data
     // Solution: Set purchaser info to be different from recipient info
-    
+
     const fixSeparationSql = `
         UPDATE all_vouchers 
         SET 
@@ -17439,20 +17494,20 @@ app.post('/api/fixGiftVoucherDataSeparation', (req, res) => {
         AND recipient_name IS NOT NULL 
         AND recipient_name != ''
     `;
-    
+
     con.query(fixSeparationSql, (err, result) => {
         if (err) {
             console.error('Error fixing Gift Voucher data separation:', err);
-            return res.status(500).json({ 
-                success: false, 
+            return res.status(500).json({
+                success: false,
                 message: 'Database error fixing data separation',
-                error: err.message 
+                error: err.message
             });
         }
-        
+
         console.log('✅ Gift Voucher data separation fixed successfully');
         console.log('Records affected:', result.affectedRows);
-        
+
         res.json({
             success: true,
             message: 'Gift Voucher data separation fixed successfully',
@@ -17464,18 +17519,18 @@ app.post('/api/fixGiftVoucherDataSeparation', (req, res) => {
 // Update voucher field endpoint
 app.patch('/api/updateVoucherField', (req, res) => {
     console.log('=== UPDATING VOUCHER FIELD ===');
-    
+
     const { voucher_id, field, value } = req.body;
-    
+
     if (!voucher_id || !field) {
         return res.status(400).json({
             success: false,
             message: 'Missing required fields: voucher_id and field'
         });
     }
-    
+
     console.log('Updating voucher:', { voucher_id, field, value });
-    
+
     // Validate field names
     const allowedFields = [
         'name', 'weight', 'paid', 'email', 'phone', 'mobile', 'expires',
@@ -17488,10 +17543,10 @@ app.patch('/api/updateVoucherField', (req, res) => {
             message: `Field '${field}' is not allowed to be updated`
         });
     }
-    
+
     // Update voucher field
     const updateSql = `UPDATE all_vouchers SET ${field} = ? WHERE id = ?`;
-    
+
     con.query(updateSql, [value, voucher_id], (err, result) => {
         if (err) {
             console.error('Error updating voucher field:', err);
@@ -17501,17 +17556,17 @@ app.patch('/api/updateVoucherField', (req, res) => {
                 error: err.message
             });
         }
-        
+
         if (result.affectedRows === 0) {
             return res.status(404).json({
                 success: false,
                 message: 'Voucher not found or no changes made'
             });
         }
-        
+
         console.log('✅ Voucher field updated successfully');
         console.log('Voucher ID:', voucher_id, 'Field:', field, 'New Value:', value);
-        
+
         res.json({
             success: true,
             message: 'Voucher field updated successfully',
@@ -17526,27 +17581,27 @@ app.patch('/api/updateVoucherField', (req, res) => {
 // Database migration endpoint for terms_and_conditions table
 app.post('/api/migrate-terms-table', (req, res) => {
     console.log('POST /api/migrate-terms-table called');
-    
+
     const migrationQueries = [
         // Add experience_ids column (check if exists first)
         `SELECT COUNT(*) as count FROM INFORMATION_SCHEMA.COLUMNS 
          WHERE TABLE_SCHEMA = DATABASE() 
          AND TABLE_NAME = 'terms_and_conditions' 
          AND COLUMN_NAME = 'experience_ids'`,
-        
+
         // Add private_voucher_type_ids column (check if exists first)
         `SELECT COUNT(*) as count FROM INFORMATION_SCHEMA.COLUMNS 
          WHERE TABLE_SCHEMA = DATABASE() 
          AND TABLE_NAME = 'terms_and_conditions' 
          AND COLUMN_NAME = 'private_voucher_type_ids'`,
-        
+
         // Add voucher_type_id column (check if exists first)
         `SELECT COUNT(*) as count FROM INFORMATION_SCHEMA.COLUMNS 
          WHERE TABLE_SCHEMA = DATABASE() 
          AND TABLE_NAME = 'terms_and_conditions' 
          AND COLUMN_NAME = 'voucher_type_id'`
     ];
-    
+
     let completedQueries = 0;
     let errors = [];
     let columnExists = {
@@ -17554,11 +17609,11 @@ app.post('/api/migrate-terms-table', (req, res) => {
         private_voucher_type_ids: false,
         voucher_type_id: false
     };
-    
+
     // First, check which columns exist
     migrationQueries.forEach((query, index) => {
         console.log(`Checking column existence ${index + 1}:`, query);
-        
+
         con.query(query, (err, result) => {
             if (err) {
                 console.error(`Error checking column ${index + 1}:`, err);
@@ -17569,31 +17624,31 @@ app.post('/api/migrate-terms-table', (req, res) => {
                 columnExists[columnName] = result[0].count > 0;
                 console.log(`Column ${columnName} exists:`, columnExists[columnName]);
             }
-            
+
             completedQueries++;
-            
+
             if (completedQueries === migrationQueries.length) {
                 // Now add missing columns
                 addMissingColumns();
             }
         });
     });
-    
+
     function addMissingColumns() {
         const addColumnQueries = [];
-        
+
         if (!columnExists.experience_ids) {
             addColumnQueries.push(`ALTER TABLE terms_and_conditions ADD COLUMN experience_ids JSON DEFAULT NULL COMMENT 'Array of experience IDs this applies to'`);
         }
-        
+
         if (!columnExists.private_voucher_type_ids) {
             addColumnQueries.push(`ALTER TABLE terms_and_conditions ADD COLUMN private_voucher_type_ids JSON DEFAULT NULL COMMENT 'Array of private charter voucher type IDs this applies to'`);
         }
-        
+
         if (!columnExists.voucher_type_id) {
             addColumnQueries.push(`ALTER TABLE terms_and_conditions ADD COLUMN voucher_type_id INT DEFAULT NULL COMMENT 'Single voucher type ID for backward compatibility'`);
         }
-        
+
         if (addColumnQueries.length === 0) {
             console.log('All required columns already exist');
             res.json({
@@ -17602,12 +17657,12 @@ app.post('/api/migrate-terms-table', (req, res) => {
             });
             return;
         }
-        
+
         let addColumnCompleted = 0;
-        
+
         addColumnQueries.forEach((query, index) => {
             console.log(`Adding column ${index + 1}:`, query);
-            
+
             con.query(query, (err, result) => {
                 if (err) {
                     console.error(`Error adding column ${index + 1}:`, err);
@@ -17615,9 +17670,9 @@ app.post('/api/migrate-terms-table', (req, res) => {
                 } else {
                     console.log(`Column added successfully ${index + 1}:`, result);
                 }
-                
+
                 addColumnCompleted++;
-                
+
                 if (addColumnCompleted === addColumnQueries.length) {
                     // Update existing records
                     updateExistingRecords();
@@ -17625,19 +17680,19 @@ app.post('/api/migrate-terms-table', (req, res) => {
             });
         });
     }
-    
+
     function updateExistingRecords() {
         const updateQueries = [
             `UPDATE terms_and_conditions SET experience_ids = '[]' WHERE experience_ids IS NULL`,
             `UPDATE terms_and_conditions SET private_voucher_type_ids = '[]' WHERE private_voucher_type_ids IS NULL`,
             `UPDATE terms_and_conditions SET voucher_type_id = JSON_UNQUOTE(JSON_EXTRACT(voucher_type_ids, '$[0]')) WHERE voucher_type_id IS NULL AND voucher_type_ids IS NOT NULL AND voucher_type_ids != '[]'`
         ];
-        
+
         let updateCompleted = 0;
-        
+
         updateQueries.forEach((query, index) => {
             console.log(`Updating records ${index + 1}:`, query);
-            
+
             con.query(query, (err, result) => {
                 if (err) {
                     console.error(`Error updating records ${index + 1}:`, err);
@@ -17645,9 +17700,9 @@ app.post('/api/migrate-terms-table', (req, res) => {
                 } else {
                     console.log(`Records updated successfully ${index + 1}:`, result);
                 }
-                
+
                 updateCompleted++;
-                
+
                 if (updateCompleted === updateQueries.length) {
                     // Final response
                     if (errors.length > 0) {
@@ -17872,7 +17927,7 @@ function getBookingConfirmationReceiptHtml(booking = {}) {
     const location = escapeHtml(booking.location || 'Bath');
     const experience = escapeHtml(booking.flight_type || booking.experience || 'Flight Experience');
     const guestCount = receiptItems.length > 0 ? receiptItems.length : (booking.pax || 0);
-    
+
     // Format flight date and time for receipt (DD/MM/YYYY HH:mm format)
     let flightDateTime = null;
     if (booking.flight_date) {
@@ -17976,10 +18031,10 @@ function buildEmailLayout({ subject, headline = '', heroImage, highlightHtml = '
     let baseUrl = process.env.BASE_URL;
     if (!baseUrl) {
         // Check if we're in production (NODE_ENV or check domain)
-        const isProduction = process.env.NODE_ENV === 'production' || 
-                            process.env.NODE_ENV === 'PRODUCTION' ||
-                            !process.env.NODE_ENV; // Default to production if not set
-        
+        const isProduction = process.env.NODE_ENV === 'production' ||
+            process.env.NODE_ENV === 'PRODUCTION' ||
+            !process.env.NODE_ENV; // Default to production if not set
+
         if (isProduction) {
             // Use production domain
             baseUrl = 'https://flyawayballooning-system.com';
@@ -17988,13 +18043,13 @@ function buildEmailLayout({ subject, headline = '', heroImage, highlightHtml = '
             baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3002';
         }
     }
-    
+
     // Ensure baseUrl doesn't end with slash
     baseUrl = baseUrl.replace(/\/$/, '');
-    
+
     const defaultHeroImageUrl = `${baseUrl}/uploads/email/emailImage.jpg`;
     const heroImageUrl = heroImage || defaultHeroImageUrl;
-    
+
     // Debug logging for email image URL
     console.log('📧 Email image URL:', {
         baseUrl,
@@ -18107,12 +18162,12 @@ function extractMessageFromTemplateBody(html = '') {
         .replace(/<!DOCTYPE[^>]*>/gi, '')
         .replace(/<\/?(html|head|body)[^>]*>/gi, '')
         .trim();
-    
+
     // If [Receipt] prompt exists, return entire body so text after the prompt is kept
     if (sanitized.toLowerCase().indexOf('[receipt]') !== -1) {
         return sanitized;
     }
-    
+
     // Legacy behavior: clip at receipt marker comments
     const receiptMarkerStart = '<!-- RECEIPT_SECTION_START -->';
     const markerIndex = sanitized.indexOf(receiptMarkerStart);
@@ -18125,26 +18180,26 @@ function extractMessageFromTemplateBody(html = '') {
 // Helper function to replace prompts in HTML (matches frontend replacePrompts)
 function replacePrompts(html = '', booking = {}) {
     if (!html || !booking) return html;
-    
+
     const bookingName = booking.name || booking.customer_name || '';
     const nameParts = bookingName.trim().split(/\s+/);
     const firstName = nameParts.length > 0 ? nameParts[0] : bookingName;
     const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
     const fullName = bookingName || 'Guest';
-    
+
     const recipientNameRaw = booking.recipient_name || booking.recipientName || (booking.recipient && booking.recipient.name) || '';
     const recipientFirstName = recipientNameRaw && recipientNameRaw.trim() ? recipientNameRaw.trim().split(/\s+/)[0] : '';
-    
+
     let result = html;
     result = result.replace(/\[First Name\]/gi, escapeHtml(firstName));
     result = result.replace(/\[Last Name\]/gi, escapeHtml(lastName));
     result = result.replace(/\[Full Name\]/gi, escapeHtml(fullName));
-    
+
     result = result.replace(/\[First Name of Recipient\]/gi, escapeHtml(recipientFirstName || ''));
     result = result.replace(/\[Email\]/gi, escapeHtml(booking.email || booking.customer_email || ''));
     result = result.replace(/\[Phone\]/gi, escapeHtml(booking.phone || booking.customer_phone || ''));
     result = result.replace(/\[Booking ID\]/gi, escapeHtml(booking.id ? String(booking.id) : ''));
-    
+
     const flightDate = booking.flight_date || booking.flightDate || '';
     if (flightDate) {
         try {
@@ -18156,12 +18211,12 @@ function replacePrompts(html = '', booking = {}) {
     } else {
         result = result.replace(/\[Flight Date\]/gi, '');
     }
-    
+
     result = result.replace(/\[Location\]/gi, escapeHtml(booking.location || ''));
     result = result.replace(/\[Voucher Code\]/gi, escapeHtml(booking.voucher_code || booking.voucherCode || ''));
-    
+
     const customerPortalLink = getCustomerPortalLink(booking);
-    
+
     // Replace [Customer Portal Link:Link Text] format (with custom link text)
     result = result.replace(
         /\[Customer Portal Link:([^\]]+)\]/gi,
@@ -18171,7 +18226,7 @@ function replacePrompts(html = '', booking = {}) {
             return `<a href="${customerPortalLink}" target="_blank" rel="noopener noreferrer">${escapedLinkText}</a>`;
         }
     );
-    
+
     // Replace [Customer Portal Link] (without custom text, use URL as text)
     result = result.replace(
         /\[Customer Portal Link\]/gi,
@@ -18179,18 +18234,18 @@ function replacePrompts(html = '', booking = {}) {
             ? `<a href="${customerPortalLink}" target="_blank" rel="noopener noreferrer">${customerPortalLink}</a>`
             : ''
     );
-    
+
     // Replace [Experience Data] or [experience data] or [EXPERIENCE DATA]
     // Format: "20/11/2025 09:00" (DD/MM/YYYY HH:mm) - matches "Booked For" format
     let experienceData = '';
     const flightDateForExp = booking.flight_date || booking.flightDate || '';
     const timeSlotForExp = booking.time_slot || booking.timeSlot || '';
-    
+
     if (flightDateForExp) {
         try {
             // Parse flight_date using moment
             const dateObj = moment(flightDateForExp);
-            
+
             // Get time from time_slot if available, otherwise from flight_date
             let timeStr = '';
             if (timeSlotForExp) {
@@ -18203,10 +18258,10 @@ function replacePrompts(html = '', booking = {}) {
                     timeStr = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
                 }
             }
-            
+
             // Format date as DD/MM/YYYY
             const formattedDate = dateObj.format('DD/MM/YYYY');
-            
+
             // Combine date and time
             if (timeStr) {
                 experienceData = `${formattedDate} ${timeStr}`;
@@ -18219,7 +18274,7 @@ function replacePrompts(html = '', booking = {}) {
         }
     }
     result = result.replace(/\[Experience Data\]/gi, escapeHtml(experienceData));
-    
+
     // Replace [Receipt] or [receipt] or [RECEIPT] with receipt HTML
     // Use replace directly with global flag to replace all occurrences
     const receiptPromptRegex = /\[Receipt\]/gi;
@@ -18229,7 +18284,7 @@ function replacePrompts(html = '', booking = {}) {
         // Replace all occurrences of [Receipt] (case-insensitive)
         result = result.replace(receiptPromptRegex, receiptHtml);
     }
-    
+
     return result;
 }
 
@@ -18292,23 +18347,23 @@ function resolveBodyHtml(template = {}, fallbackParagraphsHtml = '') {
 function generateBookingConfirmationEmail(booking, template = null) {
     const customerName = booking.name || booking.customer_name || 'Guest';
     const subject = template?.subject || '🎈 Your flight is confirmed';
-    
+
     // Get message HTML from template if available, otherwise use default
     let messageHtml = '';
     if (template && template.body && template.body.trim() !== '') {
         const rawBody = String(template.body).trim();
-        
+
         // Template body from Settings page is already HTML from RichTextEditor
         // It may contain inline styles and formatting, which we should preserve
         // Only remove DOCTYPE, html, head, body tags if they exist (they usually don't from RichTextEditor)
         messageHtml = sanitizeTemplateHtml(rawBody);
-        
+
         // If sanitization removed everything (shouldn't happen), use raw body
         if (!messageHtml || messageHtml.trim() === '') {
             console.warn('⚠️ Template body became empty after sanitization, using raw body');
             messageHtml = rawBody;
         }
-        
+
         console.log('📧 Using template body from database:', {
             templateName: template.name,
             templateId: template.id,
@@ -18318,22 +18373,22 @@ function generateBookingConfirmationEmail(booking, template = null) {
             messageHtmlPreview: messageHtml.substring(0, 150)
         });
     }
-    
+
     // If no template message, use default
     if (!messageHtml || messageHtml.trim() === '') {
         console.log('📧 Using default message HTML (template body is empty or not found)');
         messageHtml = getBookingConfirmationMessageHtml(booking);
     }
-    
+
     // Replace prompts in the message (including [Receipt] if present)
     const messageWithPrompts = replacePrompts(messageHtml, booking);
-    
+
     // Check if [Receipt] prompt exists in the original message
     // Only use messageWithPrompts (which already has receipt if prompt was present)
     // Do NOT add receipt if [Receipt] prompt was not in the template
     const hasReceiptPrompt = (messageHtml || '').toLowerCase().indexOf('[receipt]') !== -1;
     const bodyHtml = messageWithPrompts;
-    
+
     // Build email layout (matches frontend buildEmailLayout)
     return buildEmailLayout({
         subject,
@@ -18352,21 +18407,21 @@ function generateBookingConfirmationEmail(booking, template = null) {
 function generateFlightVoucherConfirmationEmail(voucher, template = null) {
     const customerName = voucher.name || voucher.customer_name || 'Guest';
     const subject = template?.subject || '🎈 Your Flight Voucher is ready';
-    
+
     // Get message HTML from template if available, otherwise use default
     let messageHtml = '';
     if (template && template.body && template.body.trim() !== '') {
         const rawBody = String(template.body).trim();
-        
+
         // Template body from Settings page is already HTML from RichTextEditor
         messageHtml = sanitizeTemplateHtml(rawBody);
-        
+
         // If sanitization removed everything, use raw body
         if (!messageHtml || messageHtml.trim() === '') {
             console.warn('⚠️ Template body became empty after sanitization, using raw body');
             messageHtml = rawBody;
         }
-        
+
         console.log('📧 Using Flight Voucher Confirmation template body from database:', {
             templateName: template.name,
             templateId: template.id,
@@ -18376,17 +18431,17 @@ function generateFlightVoucherConfirmationEmail(voucher, template = null) {
             messageHtmlPreview: messageHtml.substring(0, 150)
         });
     }
-    
+
     // If no template message, use default
     if (!messageHtml || messageHtml.trim() === '') {
         console.log('📧 Using default Flight Voucher Confirmation message HTML (template body is empty or not found)');
         messageHtml = getFlightVoucherMessageHtml(voucher);
     }
-    
+
     // Replace prompts in the message
     const messageWithPrompts = replacePrompts(messageHtml, voucher);
     const bodyHtml = messageWithPrompts;
-    
+
     // Build email layout (matches frontend buildEmailLayout)
     return buildEmailLayout({
         subject,
@@ -18405,21 +18460,21 @@ function generateFlightVoucherConfirmationEmail(voucher, template = null) {
 function generateGiftVoucherConfirmationEmail(voucher, template = null) {
     const customerName = voucher.name || voucher.customer_name || 'Guest';
     const subject = template?.subject || '🎁 Your Gift Voucher is ready';
-    
+
     // Get message HTML from template if available, otherwise use default
     let messageHtml = '';
     if (template && template.body && template.body.trim() !== '') {
         const rawBody = String(template.body).trim();
-        
+
         // Template body from Settings page is already HTML from RichTextEditor
         messageHtml = sanitizeTemplateHtml(rawBody);
-        
+
         // If sanitization removed everything, use raw body
         if (!messageHtml || messageHtml.trim() === '') {
             console.warn('⚠️ Template body became empty after sanitization, using raw body');
             messageHtml = rawBody;
         }
-        
+
         console.log('📧 Using Gift Voucher Confirmation template body from database:', {
             templateName: template.name,
             templateId: template.id,
@@ -18429,17 +18484,17 @@ function generateGiftVoucherConfirmationEmail(voucher, template = null) {
             messageHtmlPreview: messageHtml.substring(0, 150)
         });
     }
-    
+
     // If no template message, use default
     if (!messageHtml || messageHtml.trim() === '') {
         console.log('📧 Using default Gift Voucher Confirmation message HTML (template body is empty or not found)');
         messageHtml = getGiftVoucherMessageHtml(voucher);
     }
-    
+
     // Replace prompts in the message
     const messageWithPrompts = replacePrompts(messageHtml, voucher);
     const bodyHtml = messageWithPrompts;
-    
+
     // Build email layout (matches frontend buildEmailLayout)
     return buildEmailLayout({
         subject,
@@ -18460,28 +18515,28 @@ async function scheduleReceivedGiftVoucherEmail(voucherId, recipientEmail, delay
             console.warn('⚠️ [scheduleReceivedGiftVoucherEmail] SendGrid API key not configured, skipping scheduled email.');
             return;
         }
-        
+
         const delaySeconds = Math.max(1, Math.floor(delayHours * 3600));
         const sendAtUnix = Math.floor(Date.now() / 1000) + delaySeconds;
-        
+
         const voucher = await new Promise((resolve, reject) => {
             con.query('SELECT * FROM all_vouchers WHERE id = ?', [voucherId], (err, rows) => {
                 if (err) return reject(err);
                 resolve(rows && rows[0] ? rows[0] : null);
             });
         });
-        
+
         if (!voucher) {
             console.warn('[scheduleReceivedGiftVoucherEmail] Voucher not found for ID:', voucherId);
             return;
         }
-        
+
         const finalRecipientEmail = (recipientEmail || voucher.recipient_email || '').trim();
         if (!finalRecipientEmail) {
             console.warn('[scheduleReceivedGiftVoucherEmail] No recipient email found for voucher ID:', voucherId);
             return;
         }
-        
+
         const template = await new Promise((resolve) => {
             con.query(`SELECT * FROM email_templates WHERE name = 'Received GV' LIMIT 1`, (err, rows) => {
                 if (err) {
@@ -18491,7 +18546,7 @@ async function scheduleReceivedGiftVoucherEmail(voucherId, recipientEmail, delay
                 resolve(rows && rows[0] ? rows[0] : null);
             });
         });
-        
+
         const defaultSubject = '🎁 You’ve received a Fly Away Ballooning gift voucher!';
         let messageHtml = '';
         if (template && template.body && template.body.trim() !== '') {
@@ -18503,7 +18558,7 @@ async function scheduleReceivedGiftVoucherEmail(voucherId, recipientEmail, delay
                 <p>Voucher Reference: <strong>${escapeHtml(voucher.voucher_ref || '—')}</strong></p>
                 <p>We can’t wait to welcome you on board!</p>`;
         }
-        
+
         const messageWithPrompts = replacePrompts(messageHtml, voucher);
         const bodyHtml = buildEmailLayout({
             subject: template?.subject || defaultSubject,
@@ -18512,7 +18567,7 @@ async function scheduleReceivedGiftVoucherEmail(voucherId, recipientEmail, delay
             signatureLines: ['Fly Away Ballooning Team']
         });
         const textBody = convertHtmlToText(bodyHtml);
-        
+
         const emailPayload = {
             to: finalRecipientEmail,
             from: {
@@ -18530,11 +18585,11 @@ async function scheduleReceivedGiftVoucherEmail(voucherId, recipientEmail, delay
                 context_id: voucherId ? String(voucherId) : finalRecipientEmail
             }
         };
-        
+
         console.log('📧 [scheduleReceivedGiftVoucherEmail] Scheduling Received GV email for voucher:', voucherId, 'sendAt (unix):', sendAtUnix);
         const response = await sgMail.send(emailPayload);
         const messageId = response[0]?.headers?.['x-message-id'] || null;
-        
+
         ensureEmailLogsSchema(() => {
             const logSql = `
                 INSERT INTO email_logs (
@@ -18585,33 +18640,33 @@ async function sendAutomaticBookingConfirmationEmail(bookingId, options = {}) {
     console.log('📧 [sendAutomaticBookingConfirmationEmail] Booking ID:', bookingId);
     console.log('📧 [sendAutomaticBookingConfirmationEmail] Timestamp:', new Date().toISOString());
     console.log('========================================');
-    
+
     try {
         console.log('📧 [sendAutomaticBookingConfirmationEmail] Starting email send for booking ID:', bookingId);
-        
+
         // Check if SendGrid is configured
         if (!process.env.SENDGRID_API_KEY) {
             console.warn('⚠️ [sendAutomaticBookingConfirmationEmail] SendGrid API key not configured, skipping automatic email');
             console.warn('⚠️ [sendAutomaticBookingConfirmationEmail] SENDGRID_API_KEY exists:', !!process.env.SENDGRID_API_KEY);
             return;
         }
-        
+
         console.log('✅ [sendAutomaticBookingConfirmationEmail] SendGrid API key is configured');
-        
+
         // Fetch booking details
         const bookingQuery = `SELECT * FROM all_booking WHERE id = ?`;
-        
+
         con.query(bookingQuery, [bookingId], async (err, bookingRows) => {
             if (err) {
                 console.error('❌ [sendAutomaticBookingConfirmationEmail] Error fetching booking for email:', err);
                 return;
             }
-            
+
             if (!bookingRows || bookingRows.length === 0) {
                 console.warn('⚠️ [sendAutomaticBookingConfirmationEmail] Booking not found for email:', bookingId);
                 return;
             }
-            
+
             const booking = bookingRows[0];
             console.log('📋 [sendAutomaticBookingConfirmationEmail] Booking found:', {
                 id: booking.id,
@@ -18619,7 +18674,7 @@ async function sendAutomaticBookingConfirmationEmail(bookingId, options = {}) {
                 email: booking.email,
                 flight_date: booking.flight_date
             });
-            
+
             // Fetch passengers for this booking
             const passengerQuery = `SELECT * FROM passenger WHERE booking_id = ?`;
             con.query(passengerQuery, [bookingId], (passengerErr, passengerRows) => {
@@ -18634,7 +18689,7 @@ async function sendAutomaticBookingConfirmationEmail(bookingId, options = {}) {
                         console.log('📧 [sendAutomaticBookingConfirmationEmail] Passenger emails:', booking.passengers.map(p => p.email).filter(Boolean));
                     }
                 }
-                
+
                 // If booking.email is empty, try to get email from passengers
                 if (!booking.email || !booking.email.trim()) {
                     console.log('⚠️ [sendAutomaticBookingConfirmationEmail] Booking email is empty, trying to get from passengers');
@@ -18656,10 +18711,10 @@ async function sendAutomaticBookingConfirmationEmail(bookingId, options = {}) {
                 } else {
                     console.log('✅ [sendAutomaticBookingConfirmationEmail] Booking email found:', booking.email);
                 }
-                
+
                 // Continue with email sending only if email is available
                 if (booking.email && booking.email.trim()) {
-                sendEmailToCustomerAndOwner(booking, bookingId, options);
+                    sendEmailToCustomerAndOwner(booking, bookingId, options);
                 } else {
                     console.error('❌ [sendAutomaticBookingConfirmationEmail] Cannot send email - no email address available for booking:', bookingId);
                 }
@@ -18679,29 +18734,29 @@ async function sendAutomaticFlightVoucherConfirmationEmail(voucherId) {
             console.warn('SendGrid API key not configured, skipping automatic email');
             return;
         }
-        
+
         // Fetch voucher details
         const voucherQuery = `SELECT * FROM all_vouchers WHERE id = ?`;
-        
+
         con.query(voucherQuery, [voucherId], async (err, voucherRows) => {
             if (err) {
                 console.error('Error fetching voucher for email:', err);
                 return;
             }
-            
+
             if (!voucherRows || voucherRows.length === 0) {
                 console.warn('Voucher not found for email:', voucherId);
                 return;
             }
-            
+
             const voucher = voucherRows[0];
-            
+
             // Only send email for Flight Voucher type (not Gift Voucher)
             if (voucher.book_flight !== 'Flight Voucher') {
                 console.log('Skipping automatic email - not a Flight Voucher:', voucher.book_flight);
                 return;
             }
-            
+
             // Continue with email sending
             sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId);
         });
@@ -18719,23 +18774,23 @@ async function sendAutomaticGiftVoucherConfirmationEmail(voucherId, purchasingCo
             console.warn('SendGrid API key not configured, skipping automatic email');
             return;
         }
-        
+
         // Fetch voucher details
         const voucherQuery = `SELECT * FROM all_vouchers WHERE id = ?`;
-        
+
         con.query(voucherQuery, [voucherId], async (err, voucherRows) => {
             if (err) {
                 console.error('Error fetching voucher for email:', err);
                 return;
             }
-            
+
             if (!voucherRows || voucherRows.length === 0) {
                 console.warn('Voucher not found for email:', voucherId);
                 return;
             }
-            
+
             const voucher = voucherRows[0];
-            
+
             const lowerBookFlight = (voucher.book_flight || '').toLowerCase();
             const lowerVoucherType = (voucher.voucher_type || '').toLowerCase();
             if (!(lowerBookFlight.includes('gift') || lowerVoucherType.includes('gift'))) {
@@ -18760,7 +18815,7 @@ async function sendAutomaticGiftVoucherConfirmationEmail(voucherId, purchasingCo
             if (overrideName && overrideName.trim()) {
                 voucher.name = overrideName.trim();
             }
-            
+
             // Continue with email sending
             sendGiftVoucherEmailToCustomerAndOwner(voucher, voucherId);
         });
@@ -18775,7 +18830,7 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
     try {
         console.log('📧 [sendEmailToCustomerAndOwner] Starting email send process for booking ID:', bookingId);
         console.log('📧 [sendEmailToCustomerAndOwner] Booking email:', booking.email);
-        
+
         const {
             templateName = 'Booking Confirmation',
             templateType = 'booking_confirmation_automatic',
@@ -18787,7 +18842,7 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
             ownerMessageLead = 'New booking confirmation sent to customer.',
             textBodyFallback = null
         } = options || {};
-        
+
         // Check if email is provided
         if (!booking.email || !booking.email.trim()) {
             console.warn('⚠️ [sendEmailToCustomerAndOwner] No email address for booking:', bookingId);
@@ -18799,14 +18854,14 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
             });
             return;
         }
-        
+
         // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(booking.email.trim())) {
             console.warn('⚠️ [sendEmailToCustomerAndOwner] Invalid email format for booking:', bookingId, 'Email:', booking.email);
             return;
         }
-        
+
         // Fetch template from database
         const templateQuery = `SELECT * FROM email_templates WHERE name = ? LIMIT 1`;
         con.query(templateQuery, [templateName], (templateErr, templateRows) => {
@@ -18814,9 +18869,9 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
                 console.error(`❌ Error fetching ${templateName} template:`, templateErr);
                 // Continue with default template if fetch fails
             }
-            
+
             const template = templateRows && templateRows.length > 0 ? templateRows[0] : null;
-            
+
             // Debug logging
             if (template) {
                 console.log(`✅ Found ${templateName} template:`, {
@@ -18830,7 +18885,7 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
             } else {
                 console.log(`⚠️ ${templateName} template not found in database, using default`);
             }
-            
+
             // Generate email HTML using database template (or default if template not found)
             const htmlBody = generateBookingConfirmationEmail(booking, template);
             const defaultTextBody = `Thank you for choosing Fly Away Ballooning! Your flight is confirmed for ${booking.flight_date ? moment(booking.flight_date).format('MMMM D, YYYY [at] h:mm A') : 'TBD'} at ${booking.location || 'Bath'}. We'll be in touch closer to the flight with weather updates.`;
@@ -18841,9 +18896,9 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
                 ? String(fallbackText)
                 : '';
             const textBody = normalizedFallbackText.trim() !== '' ? normalizedFallbackText : defaultTextBody;
-            
+
             const subject = template?.subject || subjectFallback;
-            
+
             // Prepare email content for customer
             const customerEmailContent = {
                 to: booking.email,
@@ -18859,7 +18914,7 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
                     template_type: templateType
                 }
             };
-            
+
             // Prepare email content for business owner (same content, different recipient)
             const ownerSubject = `${ownerSubjectPrefix}${booking.name || 'Guest'} (Booking ID: ${bookingId})`;
             const ownerEmailContent = {
@@ -18880,7 +18935,7 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
                     template_type: ownerTemplateType
                 }
             };
-            
+
             // Send emails asynchronously
             (async () => {
                 try {
@@ -18892,18 +18947,18 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
                         hasHtml: !!customerEmailContent.html,
                         htmlLength: customerEmailContent.html ? customerEmailContent.html.length : 0
                     });
-                    
+
                     const customerResponse = await sgMail.send(customerEmailContent);
                     console.log('✅ [sendEmailToCustomerAndOwner] Automatic booking confirmation email sent to customer successfully');
                     console.log('✅ [sendEmailToCustomerAndOwner] Response status:', customerResponse[0].statusCode);
                     console.log('✅ [sendEmailToCustomerAndOwner] Response headers:', customerResponse[0].headers);
-                    
+
                     // Send email to business owner
                     console.log('📧 [sendEmailToCustomerAndOwner] Sending automatic booking confirmation email to business owner: info@flyawayballooning.com');
                     const ownerResponse = await sgMail.send(ownerEmailContent);
                     console.log('✅ [sendEmailToCustomerAndOwner] Automatic booking confirmation email sent to business owner successfully');
                     console.log('✅ [sendEmailToCustomerAndOwner] Owner response status:', ownerResponse[0].statusCode);
-                    
+
                     // Log email activity for customer
                     const logSql = `
                         INSERT INTO email_logs (
@@ -18943,7 +18998,7 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
                             console.error('Error logging automatic customer email:', logErr);
                         }
                     });
-                    
+
                     // Log email activity for business owner
                     const ownerMessageId = ownerResponse[0]?.headers?.['x-message-id'];
                     con.query(logSql, [
@@ -18990,7 +19045,7 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
             console.warn('No email address for voucher:', voucherId);
             return;
         }
-        
+
         // Fetch "Flight Voucher Confirmation" template from database
         const templateQuery = `SELECT * FROM email_templates WHERE name = 'Flight Voucher Confirmation' LIMIT 1`;
         con.query(templateQuery, (templateErr, templateRows) => {
@@ -18998,9 +19053,9 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                 console.error('❌ Error fetching Flight Voucher Confirmation template:', templateErr);
                 // Continue with default template if fetch fails
             }
-            
+
             const template = templateRows && templateRows.length > 0 ? templateRows[0] : null;
-            
+
             // Debug logging
             if (template) {
                 console.log('✅ Found Flight Voucher Confirmation template:', {
@@ -19014,13 +19069,13 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
             } else {
                 console.log('⚠️ Flight Voucher Confirmation template not found in database, using default');
             }
-            
+
             // Generate email HTML using database template (or default if template not found)
             const htmlBody = generateFlightVoucherConfirmationEmail(voucher, template);
             const textBody = `Thank you for choosing Fly Away Ballooning! Your hot air balloon experience voucher has been purchased. What an extraordinary gift — the experience awaits you or your lucky recipient!`;
-            
+
             const subject = template?.subject || '🎈 Your Flight Voucher is ready';
-            
+
             // Prepare email content for customer
             const customerEmailContent = {
                 to: voucher.email,
@@ -19036,7 +19091,7 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                     template_type: 'flight_voucher_confirmation_automatic'
                 }
             };
-            
+
             // Prepare email content for business owner (same content, different recipient)
             const ownerEmailContent = {
                 to: 'info@flyawayballooning.com',
@@ -19056,7 +19111,7 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                     template_type: 'flight_voucher_confirmation_automatic_owner'
                 }
             };
-            
+
             // Send emails asynchronously
             (async () => {
                 try {
@@ -19064,12 +19119,12 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                     console.log('📧 Sending automatic flight voucher confirmation email to customer:', voucher.email);
                     const customerResponse = await sgMail.send(customerEmailContent);
                     console.log('✅ Automatic flight voucher confirmation email sent to customer successfully:', customerResponse[0].statusCode);
-                    
+
                     // Send email to business owner
                     console.log('📧 Sending automatic flight voucher confirmation email to business owner: info@flyawayballooning.com');
                     const ownerResponse = await sgMail.send(ownerEmailContent);
                     console.log('✅ Automatic flight voucher confirmation email sent to business owner successfully:', ownerResponse[0].statusCode);
-                    
+
                     // Log email activity for customer
                     const logSql = `
                         INSERT INTO email_logs (
@@ -19109,7 +19164,7 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                             console.error('Error logging automatic customer email:', logErr);
                         }
                     });
-                    
+
                     // Log email activity for business owner
                     const ownerMessageId = ownerResponse[0]?.headers?.['x-message-id'];
                     con.query(logSql, [
@@ -19146,7 +19201,7 @@ async function sendGiftVoucherEmailToCustomerAndOwner(voucher, voucherId) {
             console.warn('No email address for voucher:', voucherId);
             return;
         }
-        
+
         // Fetch "Gift Voucher Confirmation" template from database
         const templateQuery = `SELECT * FROM email_templates WHERE name = 'Gift Voucher Confirmation' LIMIT 1`;
         con.query(templateQuery, (templateErr, templateRows) => {
@@ -19154,9 +19209,9 @@ async function sendGiftVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                 console.error('❌ Error fetching Gift Voucher Confirmation template:', templateErr);
                 // Continue with default template if fetch fails
             }
-            
+
             const template = templateRows && templateRows.length > 0 ? templateRows[0] : null;
-            
+
             // Debug logging
             if (template) {
                 console.log('✅ Found Gift Voucher Confirmation template:', {
@@ -19170,13 +19225,13 @@ async function sendGiftVoucherEmailToCustomerAndOwner(voucher, voucherId) {
             } else {
                 console.log('⚠️ Gift Voucher Confirmation template not found in database, using default');
             }
-            
+
             // Generate email HTML using database template (or default if template not found)
             const htmlBody = generateGiftVoucherConfirmationEmail(voucher, template);
             const textBody = `Thanks for choosing Fly Away Ballooning — your gift voucher is confirmed and ready to deliver!`;
-            
+
             const subject = template?.subject || '🎁 Your Gift Voucher is ready';
-            
+
             // Prepare email content for customer
             const customerEmailContent = {
                 to: voucher.email,
@@ -19192,7 +19247,7 @@ async function sendGiftVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                     template_type: 'gift_voucher_confirmation_automatic'
                 }
             };
-            
+
             // Prepare email content for business owner (same content, different recipient)
             const ownerEmailContent = {
                 to: 'info@flyawayballooning.com',
@@ -19212,7 +19267,7 @@ async function sendGiftVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                     template_type: 'gift_voucher_confirmation_automatic_owner'
                 }
             };
-            
+
             // Send emails asynchronously
             (async () => {
                 try {
@@ -19220,12 +19275,12 @@ async function sendGiftVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                     console.log('📧 Sending automatic gift voucher confirmation email to customer:', voucher.email);
                     const customerResponse = await sgMail.send(customerEmailContent);
                     console.log('✅ Automatic gift voucher confirmation email sent to customer successfully:', customerResponse[0].statusCode);
-                    
+
                     // Send email to business owner
                     console.log('📧 Sending automatic gift voucher confirmation email to business owner: info@flyawayballooning.com');
                     const ownerResponse = await sgMail.send(ownerEmailContent);
                     console.log('✅ Automatic gift voucher confirmation email sent to business owner successfully:', ownerResponse[0].statusCode);
-                    
+
                     // Log email activity for customer
                     const logSql = `
                         INSERT INTO email_logs (
@@ -19265,7 +19320,7 @@ async function sendGiftVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                             console.error('Error logging automatic customer email:', logErr);
                         }
                     });
-                    
+
                     // Log email activity for business owner
                     const ownerMessageId = ownerResponse[0]?.headers?.['x-message-id'];
                     con.query(logSql, [
@@ -19298,7 +19353,7 @@ async function sendGiftVoucherEmailToCustomerAndOwner(voucher, voucherId) {
 app.post('/api/sendBookingEmail', async (req, res) => {
     console.log('POST /api/sendBookingEmail called');
     const { bookingId, to, subject, message, template, bookingData } = req.body;
-    
+
     try {
         // Validate required fields
         if (!to || !subject || !message) {
@@ -19355,9 +19410,9 @@ app.post('/api/sendBookingEmail', async (req, res) => {
         // Send email via SendGrid
         console.log('Sending email via SendGrid to:', to);
         const response = await sgMail.send(emailContent);
-        
+
         console.log('SendGrid response:', response[0].statusCode);
-        
+
         // Log email activity (bookingId may be null)
         {
             const logSql = `
@@ -19414,7 +19469,7 @@ app.post('/api/sendBookingEmail', async (req, res) => {
 
     } catch (error) {
         console.error('Error sending email:', error);
-        
+
         // Handle SendGrid specific errors
         if (error.response) {
             console.error('SendGrid error response:', error.response.body);
@@ -19436,14 +19491,14 @@ app.post('/api/sendBookingEmail', async (req, res) => {
 // Get email logs for a booking
 app.get('/api/bookingEmails/:bookingId', (req, res) => {
     const { bookingId } = req.params;
-    
+
     const sql = `
         SELECT * FROM email_logs 
         WHERE (booking_id = ? AND context_type = 'booking')
            OR (context_type = 'booking' AND context_id = ?)
         ORDER BY sent_at DESC
     `;
-    
+
     con.query(sql, [bookingId, String(bookingId)], (err, result) => {
         if (err) {
             console.error('Error fetching email logs:', err);
@@ -19453,7 +19508,7 @@ app.get('/api/bookingEmails/:bookingId', (req, res) => {
                 error: err.message
             });
         }
-        
+
         res.json({
             success: true,
             data: result || []
@@ -19538,7 +19593,7 @@ app.post('/api/sendgrid/webhook', (req, res) => {
             } else if (eventType === 'click') {
                 updateSql = `UPDATE email_logs SET clicks = clicks + 1, status = 'click', last_event = 'click', last_event_at = ? WHERE ${messageId ? 'message_id = ?' : 'recipient_email = ?'} ORDER BY sent_at DESC LIMIT 1`;
                 params = [eventTime, messageId || email];
-            } else if (['delivered','processed','deferred','dropped','bounce','blocked','spamreport','unsubscribe'].includes(eventType)) {
+            } else if (['delivered', 'processed', 'deferred', 'dropped', 'bounce', 'blocked', 'spamreport', 'unsubscribe'].includes(eventType)) {
                 updateSql = `UPDATE email_logs SET status = ?, last_event = ?, last_event_at = ? WHERE ${messageId ? 'message_id = ?' : 'recipient_email = ?'} ORDER BY sent_at DESC LIMIT 1`;
                 params = [eventType, eventType, eventTime, messageId || email];
             }
@@ -19688,7 +19743,7 @@ app.get('/api/diagnostics/twilio', (req, res) => {
 // FIX REDEEMED VOUCHERS: Update all_vouchers table for bookings that have voucher_code
 app.post('/api/fix-redeemed-vouchers', (req, res) => {
     console.log('=== FIXING REDEEMED VOUCHERS ===');
-    
+
     // Get all bookings that have a voucher_code
     const selectSql = `
         SELECT b.id, b.name, b.voucher_code, v.redeemed, v.voucher_ref
@@ -19699,21 +19754,21 @@ app.post('/api/fix-redeemed-vouchers', (req, res) => {
           AND (v.redeemed IS NULL OR v.redeemed != 'Yes')
         LIMIT 100
     `;
-    
+
     con.query(selectSql, (err, bookings) => {
         if (err) {
             console.error('Error selecting bookings:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         if (!bookings || bookings.length === 0) {
             return res.json({ success: true, message: 'No vouchers to fix', updated: 0 });
         }
-        
+
         console.log(`Found ${bookings.length} vouchers to mark as redeemed`);
-        
+
         let updated = 0;
-        
+
         const updatePromises = bookings.map(booking => {
             return new Promise((resolve) => {
                 const updateSql = `
@@ -19721,7 +19776,7 @@ app.post('/api/fix-redeemed-vouchers', (req, res) => {
                     SET redeemed = 'Yes' 
                     WHERE voucher_ref = ?
                 `;
-                
+
                 con.query(updateSql, [booking.voucher_code], (updateErr, result) => {
                     if (updateErr) {
                         console.error(`Error updating voucher ${booking.voucher_code}:`, updateErr);
@@ -19738,7 +19793,7 @@ app.post('/api/fix-redeemed-vouchers', (req, res) => {
                 });
             });
         });
-        
+
         Promise.all(updatePromises).then(() => {
             res.json({
                 success: true,
@@ -19753,27 +19808,27 @@ app.post('/api/fix-redeemed-vouchers', (req, res) => {
 // DIAGNOSTICS: Check voucher redemption status
 app.get('/api/check-voucher-status', (req, res) => {
     const voucherCode = req.query.voucher_code;
-    
+
     if (!voucherCode) {
         return res.status(400).json({ success: false, message: 'voucher_code parameter required' });
     }
-    
+
     const sql = `
         SELECT v.voucher_ref, v.redeemed, v.name as voucher_name, b.id as booking_id, b.name as booking_name, b.flight_date
         FROM all_vouchers v
         LEFT JOIN all_booking b ON b.voucher_code = v.voucher_ref
         WHERE v.voucher_ref = ?
     `;
-    
+
     con.query(sql, [voucherCode], (err, result) => {
         if (err) {
             return res.status(500).json({ success: false, error: err.message });
         }
-        
+
         if (!result || result.length === 0) {
             return res.json({ success: true, found: false, message: 'Voucher not found in all_vouchers table' });
         }
-        
+
         res.json({ success: true, found: true, voucher: result[0] });
     });
 });
@@ -19781,7 +19836,7 @@ app.get('/api/check-voucher-status', (req, res) => {
 // DIAGNOSTICS: Check flight_date values
 app.get('/api/check-flight-dates', (req, res) => {
     const voucherCode = req.query.voucher_code || null;
-    
+
     let sql, params;
     if (voucherCode) {
         sql = `
@@ -19800,12 +19855,12 @@ app.get('/api/check-flight-dates', (req, res) => {
         `;
         params = [];
     }
-    
+
     con.query(sql, params, (err, bookings) => {
         if (err) {
             return res.status(500).json({ success: false, error: err.message });
         }
-        
+
         const formatted = bookings.map(b => ({
             id: b.id,
             name: b.name,
@@ -19815,7 +19870,7 @@ app.get('/api/check-flight-dates', (req, res) => {
             location: b.location,
             voucher_code: b.voucher_code
         }));
-        
+
         res.json({ success: true, bookings: formatted });
     });
 });
@@ -19823,7 +19878,7 @@ app.get('/api/check-flight-dates', (req, res) => {
 // FIX FLIGHT_DATE: Migrate existing bookings where flight_date is NULL or invalid
 app.post('/api/fix-flight-dates', (req, res) => {
     console.log('=== FIXING FLIGHT DATES ===');
-    
+
     // Get all bookings where flight_date contains invalid format (ISO string mixed with time)
     const selectSql = `
         SELECT id, name, flight_date, time_slot, location, created_at 
@@ -19837,39 +19892,39 @@ app.post('/api/fix-flight-dates', (req, res) => {
            )
         LIMIT 100
     `;
-    
+
     con.query(selectSql, (err, bookings) => {
         if (err) {
             console.error('Error selecting bookings:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
         }
-        
+
         if (!bookings || bookings.length === 0) {
             return res.json({ success: true, message: 'No bookings to fix', updated: 0 });
         }
-        
+
         console.log(`Found ${bookings.length} bookings to fix`);
-        
+
         let updated = 0;
         let errors = [];
-        
+
         const updatePromises = bookings.map(booking => {
             return new Promise((resolve) => {
                 let newFlightDate = null;
-                
+
                 try {
                     const flightDateStr = booking.flight_date ? booking.flight_date.toString() : '';
-                    
+
                     // Case 1: Invalid format like "2025-10-15T22:00:00.000Z 15:00:00"
                     if (flightDateStr.includes('T') && flightDateStr.includes('Z')) {
                         // Extract the ISO date part and the time part after the Z
                         const parts = flightDateStr.split(/\s+/);
-                        
+
                         if (parts.length >= 2) {
                             // Parse the ISO date: "2025-10-15T22:00:00.000Z"
                             const isoDateMatch = parts[0].match(/(\d{4})-(\d{2})-(\d{2})T/);
                             const timePart = parts[1]; // "15:00:00"
-                            
+
                             if (isoDateMatch && timePart) {
                                 const [_, year, month, day] = isoDateMatch;
                                 newFlightDate = `${year}-${month}-${day} ${timePart}`;
@@ -19886,14 +19941,14 @@ app.post('/api/fix-flight-dates', (req, res) => {
                     // Case 2: Parse time_slot if flight_date is empty
                     else if (booking.time_slot) {
                         const timeSlotStr = booking.time_slot.toString();
-                        
+
                         // Try to parse DD/MM/YYYY H:MM AM/PM format
                         const match = timeSlotStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
-                        
+
                         if (match) {
                             const [_, day, month, year, hour, minute, ampm] = match;
                             let hour24 = parseInt(hour, 10);
-                            
+
                             // Convert to 24-hour format if AM/PM is present
                             if (ampm) {
                                 if (ampm.toUpperCase() === 'PM' && hour24 !== 12) {
@@ -19902,7 +19957,7 @@ app.post('/api/fix-flight-dates', (req, res) => {
                                     hour24 = 0;
                                 }
                             }
-                            
+
                             // Format as YYYY-MM-DD HH:MM:SS
                             newFlightDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')} ${String(hour24).padStart(2, '0')}:${minute}:00`;
                         }
@@ -19913,16 +19968,16 @@ app.post('/api/fix-flight-dates', (req, res) => {
                     resolve(false);
                     return;
                 }
-                
+
                 if (!newFlightDate) {
                     console.log(`Skipping booking ${booking.id} - could not parse flight_date: ${booking.flight_date}`);
                     resolve(false);
                     return;
                 }
-                
+
                 // Update flight_date
                 const updateSql = `UPDATE all_booking SET flight_date = ? WHERE id = ?`;
-                
+
                 con.query(updateSql, [newFlightDate, booking.id], (updateErr) => {
                     if (updateErr) {
                         console.error(`Error updating booking ${booking.id}:`, updateErr);
@@ -19936,7 +19991,7 @@ app.post('/api/fix-flight-dates', (req, res) => {
                 });
             });
         });
-        
+
         Promise.all(updatePromises).then(() => {
             res.json({
                 success: true,

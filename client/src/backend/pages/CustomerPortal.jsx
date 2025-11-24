@@ -32,7 +32,7 @@ const CustomerPortal = () => {
     const [selectedActivityId, setSelectedActivityId] = useState(null);
     const [cancelFlightDialogOpen, setCancelFlightDialogOpen] = useState(false);
     const [cancellingFlight, setCancellingFlight] = useState(false);
-    
+
     // Passenger edit states
     const [editingPassenger, setEditingPassenger] = useState(null);
     const [editPassengerFirstName, setEditPassengerFirstName] = useState('');
@@ -58,7 +58,7 @@ const CustomerPortal = () => {
             console.log('🔍 Customer Portal - Fetching booking data with token:', token);
             console.log('🔍 Customer Portal - Encoded token:', encodedToken);
             const response = await axios.get(`/api/customer-portal-booking/${encodedToken}`);
-            
+
             console.log('✅ Customer Portal - Response received:', response.data);
             if (response.data.success) {
                 setBookingData(response.data.data);
@@ -71,10 +71,10 @@ const CustomerPortal = () => {
             console.error('❌ Customer Portal - Error response:', err.response);
             console.error('❌ Customer Portal - Error status:', err.response?.status);
             console.error('❌ Customer Portal - Error data:', err.response?.data);
-            const errorMessage = err.response?.data?.message || 
-                               (err.response?.status === 404 ? 'Booking not found. Please check your link.' : 
-                                err.response?.status === 500 ? 'Server error. Please try again later.' :
-                                'Error loading booking data. Please try again later.');
+            const errorMessage = err.response?.data?.message ||
+                (err.response?.status === 404 ? 'Booking not found. Please check your link.' :
+                    err.response?.status === 500 ? 'Server error. Please try again later.' :
+                        'Error loading booking data. Please try again later.');
             setError(errorMessage);
         } finally {
             setLoading(false);
@@ -83,7 +83,7 @@ const CustomerPortal = () => {
 
     useEffect(() => {
         fetchBookingData();
-        
+
         // Fetch customer portal contents
         const fetchPortalContents = async () => {
             try {
@@ -100,9 +100,9 @@ const CustomerPortal = () => {
                 setPortalContents([]);
             }
         };
-        
+
         fetchPortalContents();
-        
+
         // Fetch available locations
         const fetchLocations = async () => {
             try {
@@ -121,7 +121,7 @@ const CustomerPortal = () => {
                 setAvailableLocations(['Bath', 'Devon', 'Somerset']);
             }
         };
-        
+
         fetchLocations();
 
         // Refresh booking data when page becomes visible (user switches back to tab)
@@ -167,7 +167,7 @@ const CustomerPortal = () => {
         setSavingPassengerEdit(true);
         try {
             const updates = [];
-            
+
             if (editPassengerFirstName !== (passenger.first_name || '')) {
                 updates.push({ field: 'first_name', value: editPassengerFirstName });
             }
@@ -238,16 +238,16 @@ const CustomerPortal = () => {
             <Container maxWidth="lg" sx={{ py: 4 }}>
                 <Box id="portal-main" sx={{ mb: 4, scrollMarginTop: '100px' }}>
                     <Box sx={{ mb: 3, borderRadius: 3, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
-                        <img 
-                            src="/uploads/email/emailImage.jpg" 
-                            alt="Fly Away Ballooning" 
-                            style={{ 
-                                width: '100%', 
-                                height: 'auto', 
-                                maxHeight: '300px', 
+                        <img
+                            src="/uploads/email/emailImage.jpg"
+                            alt="Fly Away Ballooning"
+                            style={{
+                                width: '100%',
+                                height: 'auto',
+                                maxHeight: '300px',
                                 objectFit: 'cover',
                                 display: 'block'
-                            }} 
+                            }}
                         />
                     </Box>
                     <Box sx={{ textAlign: 'left' }}>
@@ -260,390 +260,390 @@ const CustomerPortal = () => {
                     </Box>
                 </Box>
 
-            <Paper id="scroll-target-booking" elevation={2} sx={{ p: 3, mb: 3, scrollMarginTop: '100px' }}>
-                <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
-                    Your Booking
-                </Typography>
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-                    <Box>
-                        <Typography variant="body2" color="text.secondary">Booking ID or Voucher Reference</Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                            {bookingData.booking_reference || bookingData.id || 'N/A'}
-                        </Typography>
-                    </Box>
-                    <Box>
-                        <Typography variant="body2" color="text.secondary">Status</Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                            {bookingData.status || 'Open'}
-                        </Typography>
-                    </Box>
-                    <Box>
-                        <Typography variant="body2" color="text.secondary">Flight Date</Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                            {bookingData.flight_date 
-                                ? dayjs(bookingData.flight_date).format('DD/MM/YYYY HH:mm')
-                                : 'Not Scheduled'}
-                        </Typography>
-                    </Box>
-                    <Box>
-                        <Typography variant="body2" color="text.secondary">Location</Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                            {bookingData.location || 'TBD'}
-                        </Typography>
-                    </Box>
-                    <Box>
-                        <Typography variant="body2" color="text.secondary">Booking Created Date</Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                            {bookingData.created_at 
-                                ? dayjs(bookingData.created_at).format('DD/MM/YYYY HH:mm')
-                                : 'N/A'}
-                        </Typography>
-                    </Box>
-                    <Box>
-                        <Typography variant="body2" color="text.secondary">Number of Flight Attempts Made</Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                            {bookingData.flight_attempts !== undefined && bookingData.flight_attempts !== null 
-                                ? bookingData.flight_attempts 
-                                : 0}
-                        </Typography>
-                    </Box>
-                    <Box>
-                        <Typography variant="body2" color="text.secondary">Voucher Type Purchased</Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                            {(() => {
-                                const flightType = bookingData.flight_type || bookingData.experience || '';
-                                const voucherType = bookingData.voucher_type || '';
-                                
-                                // Normalize flight type (remove "Flight" or "Charter" if present)
-                                let normalizedFlightType = flightType;
-                                if (normalizedFlightType) {
-                                    normalizedFlightType = normalizedFlightType
-                                        .replace(/\s*Flight\s*/gi, '')
-                                        .replace(/\s*Charter\s*/gi, '')
-                                        .trim();
-                                }
-                                
-                                // Combine flight type and voucher type
-                                if (normalizedFlightType && voucherType) {
-                                    return `${normalizedFlightType} - ${voucherType}`;
-                                } else if (normalizedFlightType) {
-                                    return normalizedFlightType;
-                                } else if (voucherType) {
-                                    return voucherType;
-                                } else {
-                                    return 'Standard';
-                                }
-                            })()}
-                        </Typography>
-                    </Box>
-                    <Box>
-                        <Typography variant="body2" color="text.secondary">Voucher / Booking Expiry Date</Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                            {bookingData.expires 
-                                ? dayjs(bookingData.expires).format('DD/MM/YYYY')
-                                : 'No expiry date'}
-                        </Typography>
-                    </Box>
-                </Box>
-                
-                {/* Action Buttons - Reschedule, Change Location, Cancel */}
-                {(() => {
-                    if (!bookingData.flight_date) return null;
-                    
-                    const flightDate = dayjs(bookingData.flight_date);
-                    const now = dayjs();
-                    const hoursUntilFlight = flightDate.diff(now, 'hour');
-                    const isCancelled = bookingData.status && bookingData.status.toLowerCase() === 'cancelled';
-                    
-                    // Check if expiry date has passed
-                    const expiryDate = bookingData.expires ? dayjs(bookingData.expires) : null;
-                    const isExpired = expiryDate ? expiryDate.isBefore(now, 'day') : false;
-                    
-                    // Reschedule disabled if expired, cancelled or within 120 hours
-                    const canReschedule = !isExpired && !isCancelled && hoursUntilFlight > 120;
-                    
-                    // Change Location and Cancel buttons: Disabled if cancelled or less than 120 hours
-                    const canChangeLocation = !isCancelled && hoursUntilFlight > 120;
-                    const canCancel = !isCancelled && hoursUntilFlight > 120;
-                    
-                    return (
-                        <Box sx={{ mt: 3, pt: 3, borderTop: '1px solid #d1d5db' }}>
-                            {/* Reschedule Flight Button - Disabled if expired, cancelled, or within 120 hours */}
-                            <Tooltip 
-                                title={
-                                    isExpired 
-                                        ? "Voucher / Booking has expired"
-                                        : isCancelled
-                                            ? "Flight is cancelled"
-                                            : (!canReschedule ? "Less than 120 hours remaining until your flight" : "")
-                                }
-                                arrow
-                            >
-                                <span style={{ display: 'block', width: '100%' }}>
-                                    <Button
-                                        variant="contained"
-                                        color="primary"
-                                        fullWidth
-                                        disabled={!canReschedule}
-                                        onClick={() => canReschedule && setRescheduleModalOpen(true)}
-                                        sx={{
-                                            py: 1.5,
-                                            fontSize: '1rem',
-                                            fontWeight: 600,
-                                            textTransform: 'none',
-                                            borderRadius: 2,
-                                            boxShadow: canReschedule ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
-                                            backgroundColor: canReschedule ? undefined : '#f3f4f6',
-                                            color: canReschedule ? undefined : '#9ca3af',
-                                            '&:hover': canReschedule ? {
-                                                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                                            } : {
-                                                boxShadow: 'none',
-                                                backgroundColor: '#f3f4f6',
-                                            },
-                                            '&.Mui-disabled': {
-                                                backgroundColor: '#f3f4f6 !important',
-                                                color: '#9ca3af !important',
-                                                opacity: 0.6,
-                                                cursor: 'not-allowed',
-                                            }
-                                        }}
-                                    >
-                                        Reschedule Your Flight
-                                    </Button>
-                                </span>
-                            </Tooltip>
-                            
-                            {/* Change Flight Location Button - Disabled if cancelled or less than 120 hours */}
-                            <Tooltip 
-                                title={isCancelled ? "Flight is cancelled" : (!canChangeLocation ? "Less than 120 hours remaining until your flight" : "")}
-                                arrow
-                            >
-                                <span style={{ display: 'block', width: '100%' }}>
-                                    <Button
-                                        variant="outlined"
-                                        color="primary"
-                                        fullWidth
-                                        disabled={!canChangeLocation}
-                                        onClick={() => canChangeLocation && (() => {
-                                            setSelectedNewLocation(bookingData.location || '');
-                                            setChangeLocationModalOpen(true);
-                                        })()}
-                                        sx={{
-                                            mt: 1.5,
-                                            py: 1.5,
-                                            fontSize: '1rem',
-                                            fontWeight: 600,
-                                            textTransform: 'none',
-                                            borderRadius: 2,
-                                            borderWidth: 2,
-                                            borderColor: canChangeLocation ? undefined : '#d1d5db',
-                                            color: canChangeLocation ? undefined : '#9ca3af',
-                                            backgroundColor: canChangeLocation ? 'transparent' : '#f3f4f6',
-                                            cursor: canChangeLocation ? 'pointer' : 'not-allowed',
-                                            '&:hover': canChangeLocation ? {
-                                                borderWidth: 2,
-                                            } : {
-                                                borderWidth: 2,
-                                                borderColor: '#d1d5db',
-                                                backgroundColor: '#f3f4f6',
-                                            },
-                                            '&.Mui-disabled': {
-                                                borderColor: '#d1d5db',
-                                                color: '#9ca3af',
-                                                backgroundColor: '#f3f4f6',
-                                            }
-                                        }}
-                                    >
-                                        Change Flight Location
-                                    </Button>
-                                </span>
-                            </Tooltip>
-                            
-                            {/* Cancel Flight Button - Always visible, but disabled if cancelled or less than 120 hours */}
-                            <Tooltip 
-                                title={isCancelled ? "Flight is cancelled" : (!canCancel ? "Less than 120 hours remaining until your flight" : "")}
-                                arrow
-                            >
-                                <span style={{ display: 'block', width: '100%' }}>
-                                    <Button
-                                        variant="outlined"
-                                        color="error"
-                                        fullWidth
-                                        disabled={!canCancel}
-                                        onClick={() => canCancel && setCancelFlightDialogOpen(true)}
-                                        sx={{
-                                            mt: 1.5,
-                                            py: 1.5,
-                                            fontSize: '1rem',
-                                            fontWeight: 600,
-                                            textTransform: 'none',
-                                            borderRadius: 2,
-                                            borderWidth: 2,
-                                            borderColor: canCancel ? '#ef4444' : '#d1d5db',
-                                            color: canCancel ? '#ef4444' : '#9ca3af',
-                                            backgroundColor: canCancel ? 'transparent' : '#f3f4f6',
-                                            cursor: canCancel ? 'pointer' : 'not-allowed',
-                                            '&:hover': canCancel ? {
-                                                borderWidth: 2,
-                                                borderColor: '#dc2626',
-                                                backgroundColor: '#fef2f2',
-                                            } : {
-                                                borderWidth: 2,
-                                                borderColor: '#d1d5db',
-                                                backgroundColor: '#f3f4f6',
-                                            },
-                                            '&.Mui-disabled': {
-                                                borderColor: '#d1d5db',
-                                                color: '#9ca3af',
-                                                backgroundColor: '#f3f4f6',
-                                            }
-                                        }}
-                                    >
-                                        Cancel Flight
-                                    </Button>
-                                </span>
-                            </Tooltip>
-                        </Box>
-                    );
-                })()}
-            </Paper>
-
-            {bookingData.passengers && bookingData.passengers.length > 0 && (
-                <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
+                <Paper id="scroll-target-booking" elevation={2} sx={{ p: 3, mb: 3, scrollMarginTop: '100px' }}>
                     <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
-                        Passengers
+                        Your Booking
                     </Typography>
-                    {bookingData.passengers.map((passenger, index) => {
-                        const isEditing = editingPassenger === passenger.id;
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
+                        <Box>
+                            <Typography variant="body2" color="text.secondary">Booking ID or Voucher Reference</Typography>
+                            <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                                {bookingData.booking_reference || bookingData.id || 'N/A'}
+                            </Typography>
+                        </Box>
+                        <Box>
+                            <Typography variant="body2" color="text.secondary">Status</Typography>
+                            <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                                {bookingData.status || 'Open'}
+                            </Typography>
+                        </Box>
+                        <Box>
+                            <Typography variant="body2" color="text.secondary">Flight Date</Typography>
+                            <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                                {bookingData.status && bookingData.status.toLowerCase() === 'cancelled'
+                                    ? 'Not Scheduled'
+                                    : bookingData.flight_date
+                                        ? dayjs(bookingData.flight_date).format('DD/MM/YYYY HH:mm')
+                                        : 'Not Scheduled'}
+                            </Typography>
+                        </Box>
+                        <Box>
+                            <Typography variant="body2" color="text.secondary">Location</Typography>
+                            <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                                {bookingData.location || 'TBD'}
+                            </Typography>
+                        </Box>
+                        <Box>
+                            <Typography variant="body2" color="text.secondary">Booking Created Date</Typography>
+                            <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                                {bookingData.created_at
+                                    ? dayjs(bookingData.created_at).format('DD/MM/YYYY HH:mm')
+                                    : 'N/A'}
+                            </Typography>
+                        </Box>
+                        <Box>
+                            <Typography variant="body2" color="text.secondary">Number of Flight Attempts Made</Typography>
+                            <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                                {bookingData.flight_attempts !== undefined && bookingData.flight_attempts !== null
+                                    ? bookingData.flight_attempts
+                                    : 0}
+                            </Typography>
+                        </Box>
+                        <Box>
+                            <Typography variant="body2" color="text.secondary">Voucher Type Purchased</Typography>
+                            <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                                {(() => {
+                                    const flightType = bookingData.flight_type || bookingData.experience || '';
+                                    const voucherType = bookingData.voucher_type || '';
+
+                                    // Normalize flight type (remove "Flight" or "Charter" if present)
+                                    let normalizedFlightType = flightType;
+                                    if (normalizedFlightType) {
+                                        normalizedFlightType = normalizedFlightType
+                                            .replace(/\s*Flight\s*/gi, '')
+                                            .replace(/\s*Charter\s*/gi, '')
+                                            .trim();
+                                    }
+
+                                    // Combine flight type and voucher type
+                                    if (normalizedFlightType && voucherType) {
+                                        return `${normalizedFlightType} - ${voucherType}`;
+                                    } else if (normalizedFlightType) {
+                                        return normalizedFlightType;
+                                    } else if (voucherType) {
+                                        return voucherType;
+                                    } else {
+                                        return 'Standard';
+                                    }
+                                })()}
+                            </Typography>
+                        </Box>
+                        <Box>
+                            <Typography variant="body2" color="text.secondary">Voucher / Booking Expiry Date</Typography>
+                            <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                                {bookingData.expires
+                                    ? dayjs(bookingData.expires).format('DD/MM/YYYY')
+                                    : 'No expiry date'}
+                            </Typography>
+                        </Box>
+                    </Box>
+
+                    {/* Action Buttons - Reschedule, Change Location, Cancel */}
+                    {(() => {
+                        if (!bookingData.flight_date) return null;
+
+                        const flightDate = dayjs(bookingData.flight_date);
+                        const now = dayjs();
+                        const hoursUntilFlight = flightDate.diff(now, 'hour');
+                        const isCancelled = bookingData.status && bookingData.status.toLowerCase() === 'cancelled';
+
+                        // Check if expiry date has passed
+                        const expiryDate = bookingData.expires ? dayjs(bookingData.expires) : null;
+                        const isExpired = expiryDate ? expiryDate.isBefore(now, 'day') : false;
+
+                        // Reschedule disabled if expired or within 120 hours
+                        const canReschedule = !isExpired && hoursUntilFlight > 120;
+
+                        // Change Location disabled only if less than 120 hours (even if cancelled)
+                        const canChangeLocation = hoursUntilFlight > 120;
+                        const canCancel = !isCancelled && hoursUntilFlight > 120;
+
                         return (
-                            <Box key={passenger.id || index} sx={{ mb: 2, p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
-                                {/* Name Section */}
-                                <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    {isEditing ? (
-                                        <Box sx={{ display: 'flex', gap: 1, flex: 1, flexWrap: 'wrap' }}>
-                                            <TextField
-                                                size="small"
-                                                label="First Name"
-                                                value={editPassengerFirstName}
-                                                onChange={(e) => setEditPassengerFirstName(e.target.value)}
-                                                sx={{ flex: 1, minWidth: '120px' }}
-                                            />
-                                            <TextField
-                                                size="small"
-                                                label="Last Name"
-                                                value={editPassengerLastName}
-                                                onChange={(e) => setEditPassengerLastName(e.target.value)}
-                                                sx={{ flex: 1, minWidth: '120px' }}
-                                            />
-                                        </Box>
-                                    ) : (
-                                        <>
-                                            <Typography variant="body1" sx={{ fontWeight: 500, flex: 1 }}>
-                                                {passenger.first_name} {passenger.last_name}
-                                            </Typography>
-                                            <IconButton
-                                                size="small"
-                                                onClick={() => handleEditPassengerClick(passenger)}
-                                                sx={{ color: '#3274b4' }}
-                                            >
-                                                <EditIcon fontSize="small" />
-                                            </IconButton>
-                                        </>
-                                    )}
-                                </Box>
-
-                                {/* Phone (only for first passenger) */}
-                                {index === 0 && (bookingData.phone || passenger.phone) && (
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                                        Phone: {bookingData.phone || passenger.phone}
-                                    </Typography>
-                                )}
-
-                                {/* Weight Section */}
-                                <Box sx={{ mb: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    {isEditing ? (
-                                        <TextField
-                                            size="small"
-                                            label="Weight (kg)"
-                                            value={editPassengerWeight}
-                                            onChange={(e) => setEditPassengerWeight(e.target.value.replace(/[^0-9.]/g, ''))}
-                                            sx={{ width: '150px' }}
-                                            inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
-                                        />
-                                    ) : (
-                                        <>
-                                            {passenger.weight && (
-                                                <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
-                                                    Weight: {passenger.weight} kg
-                                                </Typography>
-                                            )}
-                                        </>
-                                    )}
-                                </Box>
-
-                                {/* Email (only for first passenger) */}
-                                {index === 0 && passenger.email && (
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                                        Email: {passenger.email}
-                                    </Typography>
-                                )}
-
-                                {/* Edit Action Buttons */}
-                                {isEditing && (
-                                    <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+                            <Box sx={{ mt: 3, pt: 3, borderTop: '1px solid #d1d5db' }}>
+                                {/* Reschedule Flight Button - Disabled if expired, cancelled, or within 120 hours */}
+                                <Tooltip 
+                                    title={
+                                        isExpired 
+                                            ? "Voucher / Booking has expired"
+                                            : (!canReschedule ? "Less than 120 hours remaining until your flight" : "")
+                                    }
+                                    arrow
+                                >
+                                    <span style={{ display: 'block', width: '100%' }}>
                                         <Button
-                                            size="small"
                                             variant="contained"
                                             color="primary"
-                                            startIcon={<SaveIcon />}
-                                            onClick={() => handleSavePassengerEdit(passenger)}
-                                            disabled={savingPassengerEdit}
+                                            fullWidth
+                                            disabled={!canReschedule}
+                                            onClick={() => canReschedule && setRescheduleModalOpen(true)}
+                                            sx={{
+                                                py: 1.5,
+                                                fontSize: '1rem',
+                                                fontWeight: 600,
+                                                textTransform: 'none',
+                                                borderRadius: 2,
+                                                boxShadow: canReschedule ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+                                                backgroundColor: canReschedule ? undefined : '#f3f4f6',
+                                                color: canReschedule ? undefined : '#9ca3af',
+                                                '&:hover': canReschedule ? {
+                                                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                                                } : {
+                                                    boxShadow: 'none',
+                                                    backgroundColor: '#f3f4f6',
+                                                },
+                                                '&.Mui-disabled': {
+                                                    backgroundColor: '#f3f4f6 !important',
+                                                    color: '#9ca3af !important',
+                                                    opacity: 0.6,
+                                                    cursor: 'not-allowed',
+                                                }
+                                            }}
                                         >
-                                            Save
+                                            Reschedule Your Flight
                                         </Button>
+                                    </span>
+                                </Tooltip>
+
+                                {/* Change Flight Location Button - Disabled if cancelled or less than 120 hours */}
+                                <Tooltip 
+                                    title={!canChangeLocation ? "Less than 120 hours remaining until your flight" : ""}
+                                    arrow
+                                >
+                                    <span style={{ display: 'block', width: '100%' }}>
                                         <Button
-                                            size="small"
                                             variant="outlined"
-                                            startIcon={<CancelIcon />}
-                                            onClick={handleCancelPassengerEdit}
-                                            disabled={savingPassengerEdit}
+                                            color="primary"
+                                            fullWidth
+                                            disabled={!canChangeLocation}
+                                            onClick={() => canChangeLocation && (() => {
+                                                setSelectedNewLocation(bookingData.location || '');
+                                                setChangeLocationModalOpen(true);
+                                            })()}
+                                            sx={{
+                                                mt: 1.5,
+                                                py: 1.5,
+                                                fontSize: '1rem',
+                                                fontWeight: 600,
+                                                textTransform: 'none',
+                                                borderRadius: 2,
+                                                borderWidth: 2,
+                                                borderColor: canChangeLocation ? undefined : '#d1d5db',
+                                                color: canChangeLocation ? undefined : '#9ca3af',
+                                                backgroundColor: canChangeLocation ? 'transparent' : '#f3f4f6',
+                                                cursor: canChangeLocation ? 'pointer' : 'not-allowed',
+                                                '&:hover': canChangeLocation ? {
+                                                    borderWidth: 2,
+                                                } : {
+                                                    borderWidth: 2,
+                                                    borderColor: '#d1d5db',
+                                                    backgroundColor: '#f3f4f6',
+                                                },
+                                                '&.Mui-disabled': {
+                                                    borderColor: '#d1d5db',
+                                                    color: '#9ca3af',
+                                                    backgroundColor: '#f3f4f6',
+                                                }
+                                            }}
                                         >
-                                            Cancel
+                                            Change Flight Location
                                         </Button>
-                                    </Box>
-                                )}
+                                    </span>
+                                </Tooltip>
+
+                                {/* Cancel Flight Button - Always visible, but disabled if cancelled or less than 120 hours */}
+                                <Tooltip
+                                    title={isCancelled ? "Flight is cancelled" : (!canCancel ? "Less than 120 hours remaining until your flight" : "")}
+                                    arrow
+                                >
+                                    <span style={{ display: 'block', width: '100%' }}>
+                                        <Button
+                                            variant="outlined"
+                                            color="error"
+                                            fullWidth
+                                            disabled={!canCancel}
+                                            onClick={() => canCancel && setCancelFlightDialogOpen(true)}
+                                            sx={{
+                                                mt: 1.5,
+                                                py: 1.5,
+                                                fontSize: '1rem',
+                                                fontWeight: 600,
+                                                textTransform: 'none',
+                                                borderRadius: 2,
+                                                borderWidth: 2,
+                                                borderColor: canCancel ? '#ef4444' : '#d1d5db',
+                                                color: canCancel ? '#ef4444' : '#9ca3af',
+                                                backgroundColor: canCancel ? 'transparent' : '#f3f4f6',
+                                                cursor: canCancel ? 'pointer' : 'not-allowed',
+                                                '&:hover': canCancel ? {
+                                                    borderWidth: 2,
+                                                    borderColor: '#dc2626',
+                                                    backgroundColor: '#fef2f2',
+                                                } : {
+                                                    borderWidth: 2,
+                                                    borderColor: '#d1d5db',
+                                                    backgroundColor: '#f3f4f6',
+                                                },
+                                                '&.Mui-disabled': {
+                                                    borderColor: '#d1d5db',
+                                                    color: '#9ca3af',
+                                                    backgroundColor: '#f3f4f6',
+                                                }
+                                            }}
+                                        >
+                                            Cancel Flight
+                                        </Button>
+                                    </span>
+                                </Tooltip>
                             </Box>
                         );
-                    })}
+                    })()}
                 </Paper>
-            )}
 
-            {/* Customer Portal Content Sections */}
-            {portalContents.length > 0 && portalContents.map((content, index) => (
-                <Paper 
-                    key={content.id} 
-                    elevation={2} 
-                    sx={{ p: 3, mb: 3, scrollMarginTop: '100px' }}
-                >
-                    {content.header && (
-                        <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
-                            {content.header}
+                {bookingData.passengers && bookingData.passengers.length > 0 && (
+                    <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
+                        <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
+                            Passengers
                         </Typography>
-                    )}
-                    {content.body && (
-                        <Box 
-                            sx={{ 
-                                color: 'text.secondary',
-                                '& p': { mb: 1.5 },
-                                '& ul, & ol': { pl: 2, mb: 1.5 },
-                                '& li': { mb: 0.5 }
-                            }}
-                            dangerouslySetInnerHTML={{ __html: content.body }}
-                        />
-                    )}
-                </Paper>
-            ))}
+                        {bookingData.passengers.map((passenger, index) => {
+                            const isEditing = editingPassenger === passenger.id;
+                            return (
+                                <Box key={passenger.id || index} sx={{ mb: 2, p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+                                    {/* Name Section */}
+                                    <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        {isEditing ? (
+                                            <Box sx={{ display: 'flex', gap: 1, flex: 1, flexWrap: 'wrap' }}>
+                                                <TextField
+                                                    size="small"
+                                                    label="First Name"
+                                                    value={editPassengerFirstName}
+                                                    onChange={(e) => setEditPassengerFirstName(e.target.value)}
+                                                    sx={{ flex: 1, minWidth: '120px' }}
+                                                />
+                                                <TextField
+                                                    size="small"
+                                                    label="Last Name"
+                                                    value={editPassengerLastName}
+                                                    onChange={(e) => setEditPassengerLastName(e.target.value)}
+                                                    sx={{ flex: 1, minWidth: '120px' }}
+                                                />
+                                            </Box>
+                                        ) : (
+                                            <>
+                                                <Typography variant="body1" sx={{ fontWeight: 500, flex: 1 }}>
+                                                    {passenger.first_name} {passenger.last_name}
+                                                </Typography>
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() => handleEditPassengerClick(passenger)}
+                                                    sx={{ color: '#3274b4' }}
+                                                >
+                                                    <EditIcon fontSize="small" />
+                                                </IconButton>
+                                            </>
+                                        )}
+                                    </Box>
+
+                                    {/* Phone (only for first passenger) */}
+                                    {index === 0 && (bookingData.phone || passenger.phone) && (
+                                        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                                            Phone: {bookingData.phone || passenger.phone}
+                                        </Typography>
+                                    )}
+
+                                    {/* Weight Section */}
+                                    <Box sx={{ mb: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        {isEditing ? (
+                                            <TextField
+                                                size="small"
+                                                label="Weight (kg)"
+                                                value={editPassengerWeight}
+                                                onChange={(e) => setEditPassengerWeight(e.target.value.replace(/[^0-9.]/g, ''))}
+                                                sx={{ width: '150px' }}
+                                                inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
+                                            />
+                                        ) : (
+                                            <>
+                                                {passenger.weight && (
+                                                    <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
+                                                        Weight: {passenger.weight} kg
+                                                    </Typography>
+                                                )}
+                                            </>
+                                        )}
+                                    </Box>
+
+                                    {/* Email (only for first passenger) */}
+                                    {index === 0 && passenger.email && (
+                                        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                                            Email: {passenger.email}
+                                        </Typography>
+                                    )}
+
+                                    {/* Edit Action Buttons */}
+                                    {isEditing && (
+                                        <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+                                            <Button
+                                                size="small"
+                                                variant="contained"
+                                                color="primary"
+                                                startIcon={<SaveIcon />}
+                                                onClick={() => handleSavePassengerEdit(passenger)}
+                                                disabled={savingPassengerEdit}
+                                            >
+                                                Save
+                                            </Button>
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                startIcon={<CancelIcon />}
+                                                onClick={handleCancelPassengerEdit}
+                                                disabled={savingPassengerEdit}
+                                            >
+                                                Cancel
+                                            </Button>
+                                        </Box>
+                                    )}
+                                </Box>
+                            );
+                        })}
+                    </Paper>
+                )}
+
+                {/* Customer Portal Content Sections */}
+                {portalContents.length > 0 && portalContents.map((content, index) => (
+                    <Paper
+                        key={content.id}
+                        elevation={2}
+                        sx={{ p: 3, mb: 3, scrollMarginTop: '100px' }}
+                    >
+                        {content.header && (
+                            <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
+                                {content.header}
+                            </Typography>
+                        )}
+                        {content.body && (
+                            <Box
+                                sx={{
+                                    color: 'text.secondary',
+                                    '& p': { mb: 1.5 },
+                                    '& ul, & ol': { pl: 2, mb: 1.5 },
+                                    '& li': { mb: 0.5 }
+                                }}
+                                dangerouslySetInnerHTML={{ __html: content.body }}
+                            />
+                        )}
+                    </Paper>
+                ))}
             </Container>
 
             {/* Reschedule Flight Modal */}
@@ -693,7 +693,7 @@ const CustomerPortal = () => {
                             <Typography variant="body1" sx={{ mb: 3, color: 'text.secondary' }}>
                                 Select a new location for your flight. After selecting a location, you'll be able to choose an available date and time.
                             </Typography>
-                            
+
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                                 {availableLocations.filter(location => location !== 'Bristol Fiesta').map((location) => (
                                     <Button
@@ -704,50 +704,50 @@ const CustomerPortal = () => {
                                             setSelectedDate(null);
                                             setSelectedTime(null);
                                             setLoadingAvailabilities(true);
-                                            
+
                                             try {
                                                 // Find activity for the selected location
                                                 const activitiesResponse = await axios.get('/api/activities');
                                                 if (activitiesResponse.data?.success) {
                                                     const activities = Array.isArray(activitiesResponse.data.data) ? activitiesResponse.data.data : [];
                                                     const activityForLocation = activities.find(a => a.location === location && a.status === 'Live');
-                                                    
+
                                                     if (activityForLocation) {
                                                         setSelectedActivityId(activityForLocation.id);
-                                                        
+
                                                         // Fetch availabilities for this location
                                                         const availResponse = await axios.get(`/api/activity/${activityForLocation.id}/availabilities`);
                                                         if (availResponse.data?.success) {
                                                             const data = Array.isArray(availResponse.data.data) ? availResponse.data.data : [];
-                                                            
+
                                                             // Filter based on voucher type and flight type
                                                             const bookingFlightType = bookingData?.flight_type || bookingData?.experience || 'Shared Flight';
                                                             const bookingVoucherType = bookingData?.voucher_type || 'Any Day Flight';
-                                                            
+
                                                             // Normalize flight type
                                                             const normalizedFlightType = bookingFlightType.toLowerCase().includes('private') ? 'private' : 'shared';
-                                                            
+
                                                             // Filter availabilities
                                                             const filtered = data.filter(slot => {
                                                                 const status = slot.status || slot.calculated_status || '';
                                                                 const available = Number(slot.available) || Number(slot.calculated_available) || 0;
                                                                 const slotDateTime = dayjs(`${slot.date} ${slot.time}`);
-                                                                
+
                                                                 // Check if slot is in the future
                                                                 if (!slotDateTime.isAfter(dayjs())) return false;
-                                                                
+
                                                                 // Check status and availability
                                                                 if (status.toLowerCase() !== 'open' && available <= 0) return false;
-                                                                
+
                                                                 // Filter by flight type if specified
                                                                 if (slot.flight_types && slot.flight_types.toLowerCase() !== 'all') {
                                                                     const slotTypes = slot.flight_types.split(',').map(t => t.trim().toLowerCase());
                                                                     if (!slotTypes.includes(normalizedFlightType)) return false;
                                                                 }
-                                                                
+
                                                                 return true;
                                                             });
-                                                            
+
                                                             setLocationAvailabilities(filtered);
                                                         }
                                                     }
@@ -815,8 +815,8 @@ const CustomerPortal = () => {
                                     {/* Calendar */}
                                     <Box sx={{ mb: 3, maxWidth: '500px', mx: 'auto' }}>
                                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-                                            <IconButton 
-                                                onClick={() => setCurrentMonth(prev => prev.subtract(1, 'month'))} 
+                                            <IconButton
+                                                onClick={() => setCurrentMonth(prev => prev.subtract(1, 'month'))}
                                                 size="small"
                                             >
                                                 <ChevronLeftIcon />
@@ -824,52 +824,52 @@ const CustomerPortal = () => {
                                             <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 16 }}>
                                                 {currentMonth.format('MMMM YYYY')}
                                             </Typography>
-                                            <IconButton 
-                                                onClick={() => setCurrentMonth(prev => prev.add(1, 'month'))} 
+                                            <IconButton
+                                                onClick={() => setCurrentMonth(prev => prev.add(1, 'month'))}
                                                 size="small"
                                             >
                                                 <ChevronRightIcon />
                                             </IconButton>
                                         </Box>
-                                        
+
                                         {/* Calendar Grid */}
                                         <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', mb: 1 }}>
                                             {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-                                                <div 
-                                                    key={day} 
-                                                    style={{ 
-                                                        textAlign: 'center', 
-                                                        fontWeight: 700, 
-                                                        color: '#64748b', 
-                                                        fontSize: 11 
+                                                <div
+                                                    key={day}
+                                                    style={{
+                                                        textAlign: 'center',
+                                                        fontWeight: 700,
+                                                        color: '#64748b',
+                                                        fontSize: 11
                                                     }}
                                                 >
                                                     {day}
                                                 </div>
                                             ))}
                                         </Box>
-                                        
+
                                         <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
                                             {(() => {
                                                 const cells = [];
                                                 const startOfMonth = currentMonth.startOf('month');
                                                 const firstDayOfMonth = startOfMonth.day();
-                                                
+
                                                 let daysBack;
                                                 if (firstDayOfMonth === 0) {
                                                     daysBack = 6;
                                                 } else {
                                                     daysBack = firstDayOfMonth - 1;
                                                 }
-                                                
+
                                                 const firstCellDate = startOfMonth.subtract(daysBack, 'day');
-                                                
+
                                                 for (let i = 0; i < 42; i++) {
                                                     const d = firstCellDate.add(i, 'day');
                                                     const inCurrentMonth = d.isSame(currentMonth, 'month');
                                                     const isPast = d.isBefore(dayjs(), 'day');
                                                     const isSelected = selectedDate && dayjs(selectedDate).isSame(d, 'day');
-                                                    
+
                                                     const dateStr = d.format('YYYY-MM-DD');
                                                     const slots = locationAvailabilities.filter(a => {
                                                         if (!a.date) return false;
@@ -879,7 +879,7 @@ const CustomerPortal = () => {
                                                     const totalAvailable = slots.reduce((acc, s) => acc + (Number(s.available) || Number(s.calculated_available) || 0), 0);
                                                     const soldOut = slots.length > 0 && totalAvailable <= 0;
                                                     const isSelectable = inCurrentMonth && !isPast && slots.length > 0 && !soldOut;
-                                                    
+
                                                     cells.push(
                                                         <div
                                                             key={d.format('YYYY-MM-DD')}
@@ -904,19 +904,19 @@ const CustomerPortal = () => {
                                                             style={{
                                                                 aspectRatio: '1 / 1',
                                                                 borderRadius: 10,
-                                                                background: isSelected 
-                                                                    ? '#56C1FF' 
-                                                                    : isPast 
-                                                                        ? '#f0f0f0' 
-                                                                        : soldOut 
-                                                                            ? '#888' 
+                                                                background: isSelected
+                                                                    ? '#56C1FF'
+                                                                    : isPast
+                                                                        ? '#f0f0f0'
+                                                                        : soldOut
+                                                                            ? '#888'
                                                                             : '#22c55e',
-                                                                color: isSelected 
-                                                                    ? '#fff' 
-                                                                    : isPast 
-                                                                        ? '#999' 
-                                                                        : soldOut 
-                                                                            ? '#fff' 
+                                                                color: isSelected
+                                                                    ? '#fff'
+                                                                    : isPast
+                                                                        ? '#999'
+                                                                        : soldOut
+                                                                            ? '#fff'
                                                                             : '#fff',
                                                                 display: 'flex',
                                                                 opacity: !inCurrentMonth ? 0 : (isSelectable ? 1 : 0.6),
@@ -949,8 +949,8 @@ const CustomerPortal = () => {
 
                                     {/* Time Selection */}
                                     {selectedDate && (
-                                        <Box sx={{ mt: 3 }}>
-                                            <Typography variant="h6" sx={{ mb: 2, fontSize: 18, fontWeight: 600 }}>
+                                        <Box sx={{ mt: 1.5 }}>
+                                            <Typography variant="h6" sx={{ mb: 1.5, fontSize: 18, fontWeight: 600 }}>
                                                 Select Time for {dayjs(selectedDate).format('DD MMMM YYYY')}
                                             </Typography>
                                             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
@@ -961,7 +961,7 @@ const CustomerPortal = () => {
                                                         const slotDate = a.date.includes('T') ? a.date.split('T')[0] : a.date;
                                                         return slotDate === dateStr;
                                                     }).sort((a, b) => a.time.localeCompare(b.time));
-                                                    
+
                                                     if (times.length === 0) {
                                                         return (
                                                             <Box sx={{ p: 2, textAlign: 'center', width: '100%' }}>
@@ -971,7 +971,7 @@ const CustomerPortal = () => {
                                                             </Box>
                                                         );
                                                     }
-                                                    
+
                                                     return times.map(slot => {
                                                         const isAvailable = (Number(slot.available) || Number(slot.calculated_available) || 0) > 0;
                                                         const isSelected = selectedTime === slot.time;
@@ -987,20 +987,20 @@ const CustomerPortal = () => {
                                                                 onClick={() => !isDisabled && setSelectedTime(slot.time)}
                                                                 sx={{
                                                                     opacity: isDisabled ? 0.5 : 1,
-                                                                    backgroundColor: isDisabled 
-                                                                        ? '#f5f5f5' 
-                                                                        : isSelected 
-                                                                            ? '#56C1FF' 
+                                                                    backgroundColor: isDisabled
+                                                                        ? '#f5f5f5'
+                                                                        : isSelected
+                                                                            ? '#56C1FF'
                                                                             : '#22c55e',
-                                                                    color: isDisabled 
-                                                                        ? '#999' 
-                                                                        : isSelected 
-                                                                            ? '#fff' 
+                                                                    color: isDisabled
+                                                                        ? '#999'
+                                                                        : isSelected
+                                                                            ? '#fff'
                                                                             : '#fff',
-                                                                    borderColor: isDisabled 
-                                                                        ? '#ddd' 
-                                                                        : isSelected 
-                                                                            ? '#56C1FF' 
+                                                                    borderColor: isDisabled
+                                                                        ? '#ddd'
+                                                                        : isSelected
+                                                                            ? '#56C1FF'
                                                                             : '#22c55e',
                                                                     cursor: isDisabled ? 'not-allowed' : 'pointer',
                                                                     fontSize: 16,
@@ -1009,15 +1009,15 @@ const CustomerPortal = () => {
                                                                     minWidth: '140px',
                                                                     height: '50px',
                                                                     '&:hover': {
-                                                                        backgroundColor: isDisabled 
-                                                                            ? '#f5f5f5' 
-                                                                            : isSelected 
-                                                                                ? '#4AB5FF' 
+                                                                        backgroundColor: isDisabled
+                                                                            ? '#f5f5f5'
+                                                                            : isSelected
+                                                                                ? '#4AB5FF'
                                                                                 : '#16a34a',
-                                                                        borderColor: isDisabled 
-                                                                            ? '#ddd' 
-                                                                            : isSelected 
-                                                                                ? '#4AB5FF' 
+                                                                        borderColor: isDisabled
+                                                                            ? '#ddd'
+                                                                            : isSelected
+                                                                                ? '#4AB5FF'
                                                                                 : '#16a34a'
                                                                     }
                                                                 }}
@@ -1041,7 +1041,7 @@ const CustomerPortal = () => {
                     )}
                 </DialogContent>
                 <DialogActions sx={{ p: 3, pt: 2, justifyContent: 'flex-end' }}>
-                    <Button 
+                    <Button
                         onClick={() => {
                             setChangeLocationModalOpen(false);
                             setSelectedNewLocation('');
@@ -1124,7 +1124,7 @@ const CustomerPortal = () => {
                 </DialogTitle>
                 <DialogContent />
                 <DialogActions sx={{ p: 3, pt: 2, justifyContent: 'flex-end' }}>
-                    <Button 
+                    <Button
                         onClick={() => setCancelFlightDialogOpen(false)}
                         disabled={cancellingFlight}
                     >
@@ -1161,7 +1161,7 @@ const CustomerPortal = () => {
                                 // Refresh booking data
                                 const token = encodeURIComponent(tokenParam);
                                 const response = await axios.get(`/api/customer-portal-booking/${token}`);
-                                
+
                                 if (response.data.success) {
                                     setBookingData(response.data.data);
                                     setCancelFlightDialogOpen(false);
