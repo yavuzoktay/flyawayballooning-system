@@ -949,7 +949,7 @@ const CustomerPortal = () => {
 
                                     {/* Time Selection */}
                                     {selectedDate && (
-                                        <Box sx={{ mt: 1.5 }}>
+                                        <Box sx={{ mt: 0 }}>
                                             <Typography variant="h6" sx={{ mb: 1.5, fontSize: 18, fontWeight: 600 }}>
                                                 Select Time for {dayjs(selectedDate).format('DD MMMM YYYY')}
                                             </Typography>

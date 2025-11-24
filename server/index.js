@@ -119,6 +119,8 @@ app.use(cors({
     origin: [
         'https://flyawayballooning-book.com',
         'http://flyawayballooning-book.com',
+        'https://www.flyawayballooning-book.com',
+        'http://www.flyawayballooning-book.com',
         'https://flyawayballooning-system.com',
         'http://flyawayballooning-system.com',
         'http://localhost:3000',
@@ -4993,10 +4995,15 @@ app.get('/api/getAllBookingData', (req, res) => {
 
             // For bookings created from redeem voucher, flight_attempts should start from 0, not 1
             // Check if this is a redeem voucher booking (has voucher_code that exists in all_vouchers)
-            let finalFlightAttempts = rest.flight_attempts;
+            // Initialize with fallback to voucher_flight_attempts if flight_attempts is null/undefined
+            let finalFlightAttempts = rest.flight_attempts !== null && rest.flight_attempts !== undefined
+                ? rest.flight_attempts
+                : (rest.voucher_flight_attempts || 0);
+
             if (isRedeemVoucher && rest.voucher_code) {
                 // If this booking was created from redeem voucher, flight_attempts should be 0
                 // Override if it's 1 (the default value for new bookings) or null/undefined
+                // Note: If it fell back to voucher_flight_attempts (e.g. 2), it won't be 1, so it stays 2.
                 if (finalFlightAttempts === 1 || finalFlightAttempts === null || finalFlightAttempts === undefined) {
                     finalFlightAttempts = 0;
                 }
@@ -5037,7 +5044,7 @@ app.get('/api/getAllBookingData', (req, res) => {
                 voucher_type: finalVoucherType,
                 expires: expiresValue,
                 expires_display: expiresDisplay,
-                flight_attempts: finalFlightAttempts !== null && finalFlightAttempts !== undefined ? finalFlightAttempts : (isRedeemVoucher ? 0 : (rest.flight_attempts || rest.voucher_flight_attempts || 0)),
+                flight_attempts: finalFlightAttempts,
                 flight_type_source: flight_type_source,
                 is_redeem_voucher: isRedeemVoucher
             };
@@ -10362,7 +10369,9 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
 
         // Get flight_attempts from all_booking table (same logic as getAllBookingData)
         // Check if this is a redeem voucher booking
+        // Check if this is a redeem voucher booking and get voucher flight attempts
         let isRedeemVoucher = false;
+        let voucherFlightAttempts = 0;
         if (booking.voucher_code) {
             try {
                 const [voucherCheckRows] = await new Promise((resolve, reject) => {
@@ -10373,6 +10382,7 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 });
                 if (voucherCheckRows && voucherCheckRows.length > 0) {
                     isRedeemVoucher = voucherCheckRows[0].book_flight === 'Gift Voucher' || !!voucherCheckRows[0].id;
+                    voucherFlightAttempts = voucherCheckRows[0].flight_attempts || 0;
                 }
             } catch (voucherCheckErr) {
                 console.warn('⚠️ Customer Portal - Could not check if redeem voucher:', voucherCheckErr.message);
@@ -10380,9 +10390,10 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         }
 
         // Use flight_attempts from all_booking table (same as getAllBookingData)
+        // Fallback to voucher_flight_attempts if booking.flight_attempts is null/undefined
         let finalFlightAttempts = booking.flight_attempts !== null && booking.flight_attempts !== undefined
             ? booking.flight_attempts
-            : 0;
+            : voucherFlightAttempts;
 
         // For bookings created from redeem voucher, flight_attempts should start from 0, not 1
         // This matches getAllBookingData logic
