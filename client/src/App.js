@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import Index from './backend/pages/Index';
 import MainLayout from './backend/layout/MainLayout';
@@ -23,12 +23,26 @@ function RequireAuth({ children }) {
   return children;
 }
 
+const BookingDomainLoginRedirect = () => {
+  useEffect(() => {
+    window.location.replace('https://flyawayballooning-system.com/login');
+  }, []);
+  return null;
+};
+
 function App() {
+  const isBrowser = typeof window !== 'undefined';
+  const hostname = isBrowser ? window.location.hostname.toLowerCase() : '';
+  const isBookingDomain = hostname.includes('flyawayballooning-book.com');
+
   return (
     <div className="App">
       <BrowserRouter>
           <Routes>
-            <Route path="/login" element={<Login />} />
+            <Route
+              path="/login"
+              element={isBookingDomain ? <BookingDomainLoginRedirect /> : <Login />}
+            />
             <Route path="/customerPortal/:token" element={<CustomerPortal />} />
             <Route path="/customerPortal/:token/*" element={<CustomerPortal />} />
             <Route path='/' element={<RequireAuth><MainLayout /></RequireAuth>}>
