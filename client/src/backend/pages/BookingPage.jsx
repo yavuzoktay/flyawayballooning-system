@@ -4626,17 +4626,6 @@ setBookingDetail(finalVoucherDetail);
                                                             <Typography variant="body2" color="text.secondary">
                                                                 {assignedResource.assignmentType}
                                                             </Typography>
-                                                            <Typography variant="body2" sx={{ mt: 0.5 }}>
-                                                                Passengers booked: <strong>{assignedResource.passengerCount}</strong> / {assignedResource.capacity}
-                                                                {assignedResource.exclusiveUse
-                                                                    ? ' · Exclusive use'
-                                                                    : ` · ${assignedResource.remainingSeats} seats remaining`}
-                                                            </Typography>
-                                                            {assignedResource.description && (
-                                                                <Typography variant="caption" color="text.secondary">
-                                                                    {assignedResource.description}
-                                                                </Typography>
-                                                            )}
                                                         </Box>
                                                     )}
                                                         </>

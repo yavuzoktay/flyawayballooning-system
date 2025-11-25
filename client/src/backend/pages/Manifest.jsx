@@ -3904,17 +3904,6 @@ const Manifest = () => {
                                                         <Typography variant="body2" color="text.secondary">
                                                             {manifestAssignedResource.assignmentType}
                                                         </Typography>
-                                                        <Typography variant="body2" sx={{ mt: 0.5 }}>
-                                                            Passengers booked: <strong>{manifestAssignedResource.passengerCount}</strong> / {manifestAssignedResource.capacity}
-                                                            {manifestAssignedResource.exclusiveUse
-                                                                ? ' · Exclusive use'
-                                                                : ` · ${manifestAssignedResource.remainingSeats} seats remaining`}
-                                                        </Typography>
-                                                        {manifestAssignedResource.description && (
-                                                            <Typography variant="caption" color="text.secondary">
-                                                                {manifestAssignedResource.description}
-                                                            </Typography>
-                                                        )}
                                                     </Box>
                                                 )}
                                             </Box>
