@@ -4746,6 +4746,30 @@ app.get("/api/getfilteredBookings", (req, res) => {
     });
 });
 
+// Helper function to determine assigned resource (balloon type) based on flight type and passenger count
+const getAssignedResource = (flightType, passengerCount) => {
+    if (!flightType) return null;
+    
+    const flightTypeLower = (flightType || '').toString().toLowerCase();
+    const pax = parseInt(passengerCount, 10) || 0;
+    
+    // Shared Flight always uses Balloon 210
+    if (flightTypeLower.includes('shared')) {
+        return 'Balloon 210';
+    }
+    
+    // Private Charter logic
+    if (flightTypeLower.includes('private')) {
+        if (pax >= 5) {
+            return 'Balloon 210'; // 5-8 passengers use Balloon 210
+        } else if (pax > 0 && pax <= 4) {
+            return 'Balloon 105'; // 1-4 passengers use Balloon 105
+        }
+    }
+    
+    return null;
+};
+
 // In-memory cache for getAllBookingData to prevent duplicate rapid calls
 const __getAllBookingDataCache = {
     lastKey: null,
@@ -5039,6 +5063,9 @@ app.get('/api/getAllBookingData', (req, res) => {
                 }
             }
 
+            // Determine assigned resource based on flight type and passenger count
+            const assignedResource = getAssignedResource(rest.flight_type || rest.experience, rest.pax);
+
             return {
                 ...rest,
                 status: finalStatus,
@@ -5047,7 +5074,8 @@ app.get('/api/getAllBookingData', (req, res) => {
                 expires_display: expiresDisplay,
                 flight_attempts: finalFlightAttempts,
                 flight_type_source: flight_type_source,
-                is_redeem_voucher: isRedeemVoucher
+                is_redeem_voucher: isRedeemVoucher,
+                resources: assignedResource
             };
         }));
 
@@ -6630,6 +6658,14 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     normalizedBookFlight = 'Flight Voucher';
                 }
 
+                // Determine assigned resource for Buy Flight Voucher or Buy Gift Voucher
+                let assignedResource = null;
+                if (normalizedBookFlight === 'Flight Voucher' || normalizedBookFlight === 'Gift Voucher' || 
+                    normalizedBookFlight === 'Buy Flight Voucher' || normalizedBookFlight === 'Buy Gift Voucher') {
+                    const flightTypeForResource = row.experience_type || row.flight_type || '';
+                    assignedResource = getAssignedResource(flightTypeForResource, normalizedPassengerCount);
+                }
+
                 return {
                     ...row,
                     voucher_ref,
@@ -6714,7 +6750,8 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     additional_information_json: row.additional_information_json || null,
                     add_to_booking_items: parsedAddToBookingItems,
                     choose_add_on: parsedAddToBookingItems, // Same as add_to_booking_items for compatibility with getAllBookingData
-                    booking_additional_information_json: row.booking_additional_information_json || null
+                    booking_additional_information_json: row.booking_additional_information_json || null,
+                    resources: assignedResource
                 };
             }));
 
