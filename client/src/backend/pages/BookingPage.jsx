@@ -15,6 +15,7 @@ import {
     extractMessageFromTemplateBody,
     buildEmailHtml
 } from '../utils/emailTemplateUtils';
+import { getAssignedResourceInfo } from '../utils/resourceAssignment';
 
 const BookingPage = () => {
     const [activeTab, setActiveTab] = useState("bookings");
@@ -39,6 +40,15 @@ const BookingPage = () => {
         redeemedStatus: "",
     });
 
+    const experienceMatchesFilter = (flightTypeValue = '', filterValue = '') => {
+        if (!filterValue) return true;
+        const flightType = flightTypeValue.toString().toLowerCase();
+        const filter = filterValue.toString().toLowerCase();
+        if (filter.includes('shared')) return flightType.includes('shared');
+        if (filter.includes('private')) return flightType.includes('private');
+        return flightType.includes(filter);
+    };
+
     const [voucherDialogOpen, setVoucherDialogOpen] = useState(false);
     const [voucherForm, setVoucherForm] = useState({
         name: '',
@@ -57,6 +67,10 @@ const BookingPage = () => {
     const [detailDialogOpen, setDetailDialogOpen] = useState(false);
     const [selectedBookingId, setSelectedBookingId] = useState(null);
     const [bookingDetail, setBookingDetail] = useState(null);
+    const assignedResource = useMemo(() => {
+        if (!bookingDetail?.booking) return null;
+        return getAssignedResourceInfo(bookingDetail);
+    }, [bookingDetail]);
     const [loadingDetail, setLoadingDetail] = useState(false);
     const [detailError, setDetailError] = useState(null);
     const [bookingHistory, setBookingHistory] = useState([]);
@@ -3734,8 +3748,8 @@ setBookingDetail(finalVoucherDetail);
                                                     <MenuItem value="">
                                                         <em>Select</em>
                                                     </MenuItem>
-                                                    <MenuItem value="Private">Private</MenuItem>
-                                                    <MenuItem value="Shared">Shared</MenuItem>
+                                                    <MenuItem value="Private Charter">Private Charter</MenuItem>
+                                                    <MenuItem value="Shared Flight">Shared Flight</MenuItem>
                                                 </Select>
                                             </FormControl>
                                         </div>
@@ -3830,8 +3844,8 @@ setBookingDetail(finalVoucherDetail);
                                         data={filteredData.filter(item => {
                                             // Experience filter
                                             if (filters.experience && filters.experience !== 'Select') {
-                                                if (filters.experience === 'Private' && !item.flight_type?.toLowerCase().includes('private')) return false;
-                                                if (filters.experience === 'Shared' && !item.flight_type?.toLowerCase().includes('shared')) return false;
+                                                const bookingFlightType = item.flight_type || item.experience || '';
+                                                if (!experienceMatchesFilter(bookingFlightType, filters.experience)) return false;
                                             }
                                             // Status filter
                                             if (filters.status && item.status !== filters.status) return false;
@@ -3937,8 +3951,8 @@ setBookingDetail(finalVoucherDetail);
                                                     <MenuItem value="">
                                                         <em>Select</em>
                                                     </MenuItem>
-                                                    <MenuItem value="Private">Private</MenuItem>
-                                                    <MenuItem value="Shared">Shared</MenuItem>
+                                                    <MenuItem value="Private Charter">Private Charter</MenuItem>
+                                                    <MenuItem value="Shared Flight">Shared Flight</MenuItem>
                                                 </Select>
                                             </FormControl>
                                         </div>
@@ -4008,8 +4022,8 @@ setBookingDetail(finalVoucherDetail);
                                         if (filters.actualVoucherType && item.actual_voucher_type !== filters.actualVoucherType) return false;
                                         // Experience filter
                                         if (filters.experience && filters.experience !== 'Select') {
-                                            if (filters.experience === 'Private' && !item.flight_type?.toLowerCase().includes('private')) return false;
-                                            if (filters.experience === 'Shared' && !item.flight_type?.toLowerCase().includes('shared')) return false;
+                                            const bookingFlightType = item.flight_type || item.experience || '';
+                                            if (!experienceMatchesFilter(bookingFlightType, filters.experience)) return false;
                                         }
                                         // Redeemed Status filter
                                         if (filters.redeemedStatus && item.redeemed !== filters.redeemedStatus) return false;
@@ -4601,6 +4615,30 @@ setBookingDetail(finalVoucherDetail);
                                                             </Typography>
                                                         );
                                                     })()}
+                                                    {assignedResource && (
+                                                        <Box sx={{ mt: 2, p: 1.5, borderRadius: 2, border: '1px solid #e0e7ff', background: '#f7f9ff' }}>
+                                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1d4ed8', mb: 0.5 }}>
+                                                                Assigned Resources
+                                                            </Typography>
+                                                            <Typography sx={{ fontWeight: 600 }}>
+                                                                {assignedResource.resourceName}
+                                                            </Typography>
+                                                            <Typography variant="body2" color="text.secondary">
+                                                                {assignedResource.assignmentType}
+                                                            </Typography>
+                                                            <Typography variant="body2" sx={{ mt: 0.5 }}>
+                                                                Passengers booked: <strong>{assignedResource.passengerCount}</strong> / {assignedResource.capacity}
+                                                                {assignedResource.exclusiveUse
+                                                                    ? ' · Exclusive use'
+                                                                    : ` · ${assignedResource.remainingSeats} seats remaining`}
+                                                            </Typography>
+                                                            {assignedResource.description && (
+                                                                <Typography variant="caption" color="text.secondary">
+                                                                    {assignedResource.description}
+                                                                </Typography>
+                                                            )}
+                                                        </Box>
+                                                    )}
                                                         </>
                                                     )}
                                                 </Box>
