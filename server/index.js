@@ -11,6 +11,7 @@ const path = require("path");
 const fs = require("fs");
 const dayjs = require("dayjs");
 const moment = require('moment');
+const { BALLOON_210_CAPACITY, BALLOON_105_CAPACITY, getAssignedResourceInfo } = require('./utils/resourceAssignment');
 const multer = require('multer');
 const dotenv = require('dotenv');
 const axios = require('axios');
@@ -1628,12 +1629,12 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     });
                 }
 
-                res.json({
-                    success: true,
-                    message: 'Booking created successfully',
-                    bookingId: bookingId
-                });
-            });
+        res.json({
+            success: true,
+            message: 'Booking created successfully',
+            bookingId: bookingId
+        });
+    });
         } // end of createBookingWithPrice
     } // end of createRedeemBookingLogic
 });
@@ -11955,11 +11956,15 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
             a.location,
             a.flight_type,
             COALESCE(booking_counts.total_booked, 0) as total_booked,
+            COALESCE(booking_counts.shared_consumed_pax, 0) as shared_consumed_pax,
+            COALESCE(booking_counts.private_small_bookings, 0) as private_charter_small_bookings,
+            COALESCE(booking_counts.private_small_passengers, 0) as private_charter_small_passengers,
+            LEAST(aa.capacity, 8) as shared_capacity,
             CASE 
-                WHEN COALESCE(booking_counts.total_booked, 0) >= aa.capacity THEN 'Closed'
+                WHEN COALESCE(booking_counts.shared_consumed_pax, 0) >= LEAST(aa.capacity, 8) THEN 'Closed'
                 ELSE aa.status
             END as calculated_status,
-            GREATEST(0, aa.capacity - COALESCE(booking_counts.total_booked, 0)) as calculated_available
+            GREATEST(0, LEAST(aa.capacity, 8) - COALESCE(booking_counts.shared_consumed_pax, 0)) as calculated_available
         FROM activity_availability aa 
         JOIN activity a ON aa.activity_id = a.id 
         LEFT JOIN (
@@ -11967,7 +11972,28 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
                 DATE(ab.flight_date) as flight_date,
                 TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i') as flight_time_min,
                 ab.location as location,
-                COALESCE(SUM(ab.pax), 0) as total_booked
+                COALESCE(SUM(ab.pax), 0) as total_booked,
+                COALESCE(SUM(
+                    CASE 
+                        WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%') 
+                             AND COALESCE(ab.pax, 0) <= 4 THEN 0
+                        ELSE COALESCE(ab.pax, 0)
+                    END
+                ), 0) as shared_consumed_pax,
+                COALESCE(SUM(
+                    CASE 
+                        WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%')
+                             AND COALESCE(ab.pax, 0) <= 4 THEN 1
+                        ELSE 0
+                    END
+                ), 0) as private_small_bookings,
+                COALESCE(SUM(
+                    CASE 
+                        WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%')
+                             AND COALESCE(ab.pax, 0) <= 4 THEN COALESCE(ab.pax, 0)
+                        ELSE 0
+                    END
+                ), 0) as private_small_passengers
             FROM all_booking ab 
             WHERE DATE(ab.flight_date) >= CURDATE() - INTERVAL 30 DAY
             AND (ab.status IS NULL OR TRIM(LOWER(ab.status)) NOT IN ('cancelled'))
@@ -11999,19 +12025,24 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
 
         // Process results and update database if needed
         const processedResult = result.map(row => {
-            // IMPORTANT: Only calculate availability for this specific time slot, not for the entire date
-            // The booking count should be specific to this date+time combination, not just the date
-            const needsUpdate = row.calculated_status !== row.status || row.calculated_available !== row.available;
+            const sharedCapacity = row.shared_capacity
+                ? Number(row.shared_capacity)
+                : Math.min(Number(row.capacity) || BALLOON_210_CAPACITY, BALLOON_210_CAPACITY);
+            const sharedBooked = Number(row.shared_consumed_pax || 0);
+            const sharedAvailable = Math.max(0, sharedCapacity - sharedBooked);
+            const privateSmallBookings = Number(row.private_charter_small_bookings || 0);
+            const privateSmallRemaining = privateSmallBookings > 0 ? 0 : BALLOON_105_CAPACITY;
+            const calculatedStatus = sharedAvailable <= 0 ? 'Closed' : row.calculated_status;
+            const needsUpdate = calculatedStatus !== row.status || sharedAvailable !== row.available;
 
-            // Update database if needed (non-blocking) - but only for this specific record
             if (needsUpdate) {
-                console.log(`Updating availability ${row.id}: date=${row.date}, time=${row.time}, status=${row.calculated_status}, available=${row.calculated_available}`);
+                console.log(`Updating availability ${row.id}: date=${row.date}, time=${row.time}, status=${calculatedStatus}, available=${sharedAvailable}`);
                 const updateSql = 'UPDATE activity_availability SET status = ?, available = ? WHERE id = ?';
-                con.query(updateSql, [row.calculated_status, row.calculated_available, row.id], (updateErr) => {
+                con.query(updateSql, [calculatedStatus, sharedAvailable, row.id], (updateErr) => {
                     if (updateErr) {
                         console.error('Error updating availability:', updateErr);
                     } else {
-                        console.log(`Updated availability ${row.id}: status=${row.calculated_status}, available=${row.calculated_available}`);
+                        console.log(`Updated availability ${row.id}: status=${calculatedStatus}, available=${sharedAvailable}`);
                     }
                 });
             }
@@ -12020,8 +12051,13 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
                 ...row,
                 date: row.date ? dayjs(row.date).format('YYYY-MM-DD') : row.date,
                 total_booked: row.total_booked || 0,
-                available: row.calculated_available,
-                status: row.calculated_status
+                available: sharedAvailable,
+                status: calculatedStatus,
+                shared_capacity: sharedCapacity,
+                shared_booked: sharedBooked,
+                private_charter_small_bookings: privateSmallBookings,
+                private_charter_small_remaining: privateSmallRemaining,
+                private_charter_small_passengers: Number(row.private_charter_small_passengers || 0)
             };
         });
 
@@ -12086,11 +12122,15 @@ app.get('/api/availabilities/filter', (req, res) => {
             a.flight_type,
             a.voucher_type as activity_voucher_types,
             COALESCE(booking_counts.total_booked, 0) as total_booked,
+            COALESCE(booking_counts.shared_consumed_pax, 0) as shared_consumed_pax,
+            COALESCE(booking_counts.private_small_bookings, 0) as private_charter_small_bookings,
+            COALESCE(booking_counts.private_small_passengers, 0) as private_charter_small_passengers,
+            LEAST(aa.capacity, 8) as shared_capacity,
             CASE 
-                WHEN COALESCE(booking_counts.total_booked, 0) >= aa.capacity THEN 'Closed'
+                WHEN COALESCE(booking_counts.shared_consumed_pax, 0) >= LEAST(aa.capacity, 8) THEN 'Closed'
                 ELSE aa.status
             END as calculated_status,
-            GREATEST(0, aa.capacity - COALESCE(booking_counts.total_booked, 0)) as calculated_available
+            GREATEST(0, LEAST(aa.capacity, 8) - COALESCE(booking_counts.shared_consumed_pax, 0)) as calculated_available
         FROM activity_availability aa 
         JOIN activity a ON aa.activity_id = a.id 
         LEFT JOIN (
@@ -12098,7 +12138,28 @@ app.get('/api/availabilities/filter', (req, res) => {
                 DATE(ab.flight_date) as flight_date,
                 TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i') as flight_time_min,
                 ab.location as location,
-                COALESCE(SUM(ab.pax), 0) as total_booked
+                COALESCE(SUM(ab.pax), 0) as total_booked,
+                COALESCE(SUM(
+                    CASE 
+                        WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%') 
+                             AND COALESCE(ab.pax, 0) <= 4 THEN 0
+                        ELSE COALESCE(ab.pax, 0)
+                    END
+                ), 0) as shared_consumed_pax,
+                COALESCE(SUM(
+                    CASE 
+                        WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%')
+                             AND COALESCE(ab.pax, 0) <= 4 THEN 1
+                        ELSE 0
+                    END
+                ), 0) as private_small_bookings,
+                COALESCE(SUM(
+                    CASE 
+                        WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%')
+                             AND COALESCE(ab.pax, 0) <= 4 THEN COALESCE(ab.pax, 0)
+                        ELSE 0
+                    END
+                ), 0) as private_small_passengers
             FROM all_booking ab 
             WHERE DATE(ab.flight_date) >= CURDATE() - INTERVAL 30 DAY
             AND (ab.status IS NULL OR TRIM(LOWER(ab.status)) NOT IN ('cancelled'))
@@ -12172,23 +12233,34 @@ app.get('/api/availabilities/filter', (req, res) => {
             const voucherTypesArray = parseList(row.voucher_types);
             const flightTypesArray = parseList(row.flight_types);
 
-            // Use calculated values from booking counts (same logic as /api/activity/:id/availabilities)
+            const sharedCapacity = row.shared_capacity
+                ? Number(row.shared_capacity)
+                : Math.min(Number(row.capacity) || BALLOON_210_CAPACITY, BALLOON_210_CAPACITY);
+            const sharedBooked = Number(row.shared_consumed_pax || 0);
+            const sharedAvailable = Math.max(0, sharedCapacity - sharedBooked);
+            const privateSmallBookings = Number(row.private_charter_small_bookings || 0);
+            const privateSmallRemaining = privateSmallBookings > 0 ? 0 : BALLOON_105_CAPACITY;
             const totalBooked = Number(row.total_booked) || 0;
-            const calculatedAvailable = Number(row.calculated_available) || 0;
-            const calculatedStatus = row.calculated_status || row.status;
+            const baseStatus = sharedAvailable <= 0 ? 'Closed' : (row.calculated_status || row.status);
 
             // Final available = calculated_available - heldSeats
-            const finalAvailable = Math.max(0, calculatedAvailable - heldSeats);
+            const finalAvailable = Math.max(0, sharedAvailable - heldSeats);
+            const finalStatus = finalAvailable <= 0 ? 'Closed' : baseStatus;
 
             return {
                 ...row,
                 date: localDateString,
                 available: finalAvailable,
                 booked: totalBooked,
-                actualAvailable: calculatedAvailable,
+                actualAvailable: sharedAvailable,
                 heldSeats: heldSeats,
-                status: calculatedStatus,
+                status: finalStatus,
                 total_booked: totalBooked,
+                shared_capacity: sharedCapacity,
+                shared_booked: sharedBooked,
+                private_charter_small_bookings: privateSmallBookings,
+                private_charter_small_remaining: privateSmallRemaining,
+                private_charter_small_passengers: Number(row.private_charter_small_passengers || 0),
                 voucher_types_array: voucherTypesArray,
                 flight_types_array: flightTypesArray
             };
@@ -15647,7 +15719,22 @@ function updateSpecificAvailability(bookingDate, bookingTime, activityId, passen
             // Sum pax for this date/time and location; include bookings that may not have activity_id
             // IMPORTANT: Exclude cancelled bookings from availability calculations
             const sumPaxSql = `
-                SELECT COALESCE(SUM(ab.pax), 0) as total_booked
+                SELECT 
+                    COALESCE(SUM(ab.pax), 0) as total_booked,
+                    COALESCE(SUM(
+                        CASE 
+                            WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%')
+                                 AND COALESCE(ab.pax, 0) <= 4 THEN 0
+                            ELSE COALESCE(ab.pax, 0)
+                        END
+                    ), 0) as shared_consumed_pax,
+                    COALESCE(SUM(
+                        CASE 
+                            WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%')
+                                 AND COALESCE(ab.pax, 0) <= 4 THEN 1
+                            ELSE 0
+                        END
+                    ), 0) as private_small_bookings
                 FROM all_booking ab
                 WHERE DATE(ab.flight_date) = DATE(?)
                 AND TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i') = TIME_FORMAT(TIME(?), '%H:%i')
@@ -15660,9 +15747,12 @@ function updateSpecificAvailability(bookingDate, bookingTime, activityId, passen
                     console.error('updateSpecificAvailability: error summing pax', sumErr);
                     return;
                 }
-                const totalBooked = (sumRows && sumRows[0] && sumRows[0].total_booked) ? Number(sumRows[0].total_booked) : 0;
-                const newAvailable = Math.max(0, Number(slot.capacity) - totalBooked);
-                const newStatus = totalBooked >= Number(slot.capacity) ? 'Closed' : 'Open';
+                const totalBooked = Number(sumRows?.[0]?.total_booked || 0);
+                const sharedBooked = Number(sumRows?.[0]?.shared_consumed_pax || 0);
+                const privateSmallBookings = Number(sumRows?.[0]?.private_small_bookings || 0);
+                const sharedCapacity = Math.min(Number(slot.capacity) || BALLOON_210_CAPACITY, BALLOON_210_CAPACITY);
+                const newAvailable = Math.max(0, sharedCapacity - sharedBooked);
+                const newStatus = newAvailable <= 0 ? 'Closed' : 'Open';
                 const updateSql = 'UPDATE activity_availability SET available = ?, booked = ?, status = ? WHERE id = ?';
                 con.query(updateSql, [newAvailable, totalBooked, newStatus, slot.id], (updErr) => {
                     if (updErr) {

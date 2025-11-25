@@ -50,6 +50,7 @@ import {
     extractMessageFromTemplateBody,
     buildEmailHtml
 } from '../utils/emailTemplateUtils';
+import { getAssignedResourceInfo } from '../utils/resourceAssignment';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -149,6 +150,10 @@ const Manifest = () => {
     const [detailDialogOpen, setDetailDialogOpen] = useState(false);
     const [selectedBookingId, setSelectedBookingId] = useState(null);
     const [bookingDetail, setBookingDetail] = useState(null);
+    const manifestAssignedResource = useMemo(() => {
+        if (!bookingDetail?.booking) return null;
+        return getAssignedResourceInfo(bookingDetail);
+    }, [bookingDetail]);
     const [loadingDetail, setLoadingDetail] = useState(false);
     const [detailError, setDetailError] = useState(null);
     const [addGuestDialogOpen, setAddGuestDialogOpen] = useState(false);
@@ -3888,6 +3893,30 @@ const Manifest = () => {
                                                         </Typography>
                                                     );
                                                 })()}
+                                                {manifestAssignedResource && (
+                                                    <Box sx={{ mt: 2, p: 1.5, borderRadius: 2, border: '1px solid #e0e7ff', background: '#f7f9ff' }}>
+                                                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1d4ed8', mb: 0.5 }}>
+                                                            Assigned Resources
+                                                        </Typography>
+                                                        <Typography sx={{ fontWeight: 600 }}>
+                                                            {manifestAssignedResource.resourceName}
+                                                        </Typography>
+                                                        <Typography variant="body2" color="text.secondary">
+                                                            {manifestAssignedResource.assignmentType}
+                                                        </Typography>
+                                                        <Typography variant="body2" sx={{ mt: 0.5 }}>
+                                                            Passengers booked: <strong>{manifestAssignedResource.passengerCount}</strong> / {manifestAssignedResource.capacity}
+                                                            {manifestAssignedResource.exclusiveUse
+                                                                ? ' · Exclusive use'
+                                                                : ` · ${manifestAssignedResource.remainingSeats} seats remaining`}
+                                                        </Typography>
+                                                        {manifestAssignedResource.description && (
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                {manifestAssignedResource.description}
+                                                            </Typography>
+                                                        )}
+                                                    </Box>
+                                                )}
                                             </Box>
                                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 140 }}>
                                                 <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleRebook}>Rebook</Button>
