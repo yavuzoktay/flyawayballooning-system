@@ -7142,8 +7142,9 @@ app.post('/api/createBooking', (req, res) => {
                 original_amount,
                 add_to_booking_items_total_price,
                 weather_refund_total_price,
-                flight_type_source
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                flight_type_source,
+                resources
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         // Debug log for choose_add_on and bookingValues
@@ -7230,7 +7231,8 @@ app.post('/api/createBooking', (req, res) => {
             base_original_amount, // original_amount (base price excluding add-ons and weather refund)
             add_on_total_price, // add_to_booking_items_total_price
             weather_refund_total_price, // weather_refund_total_price
-            flight_type_source // flight_type_source ('Redeem Voucher' if activitySelect is 'Redeem Voucher', otherwise flight_type/experience)
+            flight_type_source, // flight_type_source ('Redeem Voucher' if activitySelect is 'Redeem Voucher', otherwise flight_type/experience)
+            getAssignedResource(chooseFlightType.type || experience, actualPaxCount) // resources (calculated based on flight type and passenger count)
         ];
         console.log('bookingValues:', bookingValues);
 
@@ -8012,8 +8014,8 @@ app.post('/api/createVoucher', (req, res) => {
         }
 
         const insertSql = `INSERT INTO all_vouchers 
-            (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, purchaser_name, purchaser_email, purchaser_phone, purchaser_mobile, numberOfPassengers, additional_information_json, add_to_booking_items)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+            (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, purchaser_name, purchaser_email, purchaser_phone, purchaser_mobile, numberOfPassengers, additional_information_json, add_to_booking_items, resources)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
         const values = [
             emptyToNull(name),
@@ -8048,7 +8050,8 @@ app.post('/api/createVoucher', (req, res) => {
             resolvedPassengerCount, // Number of passengers
             // Persist additional information answers regardless of which key frontend used
             (additional_information_json || additionalInfo || additional_information) ? JSON.stringify(additional_information_json || additionalInfo || additional_information) : null, // additional_information_json
-            add_to_booking_items ? JSON.stringify(add_to_booking_items) : null // add_to_booking_items
+            add_to_booking_items ? JSON.stringify(add_to_booking_items) : null, // add_to_booking_items
+            getAssignedResource(flight_type, resolvedPassengerCount) // resources (calculated based on experience_type and passenger count)
         ];
 
         // Values being inserted for voucher creation
@@ -10009,7 +10012,7 @@ app.patch('/api/updateBookingField', (req, res) => {
     // Debug: API çağrısını logla
     console.log('updateBookingField API çağrısı:', { booking_id, field, value });
 
-    const allowedFields = ['name', 'phone', 'email', 'expires', 'weight', 'status', 'flight_attempts', 'choose_add_on', 'additional_notes', 'preferred_day', 'preferred_location', 'preferred_time', 'paid', 'activity_id', 'location', 'flight_type', 'flight_date', 'experience_types']; // Add new fields
+    const allowedFields = ['name', 'phone', 'email', 'expires', 'weight', 'status', 'flight_attempts', 'choose_add_on', 'additional_notes', 'preferred_day', 'preferred_location', 'preferred_time', 'paid', 'activity_id', 'location', 'flight_type', 'flight_date', 'experience_types', 'pax', 'experience']; // Add new fields
     if (!booking_id || !field || !allowedFields.includes(field)) {
         console.log('updateBookingField - Geçersiz istek:', { booking_id, field, value });
         return res.status(400).json({ success: false, message: 'Invalid request' });
@@ -10059,6 +10062,27 @@ app.patch('/api/updateBookingField', (req, res) => {
             }
 
             console.log('updateBookingField - Database güncelleme başarılı:', { field, value, affectedRows: result.affectedRows });
+
+            // If flight_type, experience, or pax is updated, also update resources field
+            if (field === 'flight_type' || field === 'experience' || field === 'pax') {
+                // Get current booking data to calculate resources
+                con.query('SELECT flight_type, experience, pax FROM all_booking WHERE id = ?', [booking_id], (err2, bookingRows) => {
+                    if (!err2 && bookingRows && bookingRows.length > 0) {
+                        const booking = bookingRows[0];
+                        const flightType = field === 'flight_type' ? normalizedValue : (booking.flight_type || booking.experience || '');
+                        const passengerCount = field === 'pax' ? (parseInt(normalizedValue, 10) || 0) : (parseInt(booking.pax, 10) || 0);
+                        const assignedResource = getAssignedResource(flightType, passengerCount);
+                        
+                        con.query('UPDATE all_booking SET resources = ? WHERE id = ?', [assignedResource, booking_id], (err3) => {
+                            if (err3) {
+                                console.error('Error updating resources field:', err3);
+                            } else {
+                                console.log('✅ Updated resources field to:', assignedResource, 'for booking:', booking_id);
+                            }
+                        });
+                    }
+                });
+            }
 
             const refreshNewSlot = (field === 'status') || slotFields.has(field);
             const refreshOldSlot = previousSlot && slotFields.has(field);
