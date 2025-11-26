@@ -92,10 +92,6 @@ const AnalyticsDashboard = ({ dateRange }) => {
                             )) || <Typography>No data available</Typography>}
                             <Typography variant="h6" sx={{ mt: 2 }}>Refundable Liability</Typography>
                             <Typography><span style={{color:'#16a085'}}>£{analytics?.refundableLiability || 0}</span></Typography>
-                            <Typography variant="h6" sx={{ mt: 2 }}>Flown Flights by Location</Typography>
-                            {analytics?.flownFlightsByLocation?.map((f, i) => (
-                                <Typography key={i}>{f.location}: <span style={{color:'#2980b9'}}>{f.count}</span></Typography>
-                            )) || <Typography>No data available</Typography>}
                         </CardContent>
                     </Card>
                 </Grid>
