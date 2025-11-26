@@ -10007,7 +10007,8 @@ const refreshAvailabilitySlot = (slotInfo = {}) => {
 };
 
 app.patch('/api/updateBookingField', (req, res) => {
-    const { booking_id, field, value } = req.body;
+    const { booking_id, field, value, skip_flight_attempt_increment } = req.body;
+    const skipFlightAttemptIncrement = Boolean(skip_flight_attempt_increment);
 
     // Debug: API çağrısını logla
     console.log('updateBookingField API çağrısı:', { booking_id, field, value });
@@ -10119,6 +10120,15 @@ app.patch('/api/updateBookingField', (req, res) => {
                     finalizeResponse();
                 };
 
+                // Helper to optionally increment flight attempts (can be skipped for certain requests)
+                const maybeIncrementFlightAttempts = () => {
+                    if (skipFlightAttemptIncrement) {
+                        console.log('⏭️ Skipping flight_attempts increment for booking:', booking_id);
+                        return;
+                    }
+                    handleFlightAttemptsIncrement(booking_id);
+                };
+
                 // If status is Cancelled, update the last entry (any status) instead of creating a new one
                 if (normalizedValue === 'Cancelled') {
                     // Find the last entry for this booking (any status except Cancelled)
@@ -10136,7 +10146,7 @@ app.patch('/api/updateBookingField', (req, res) => {
                             con.query(historySql, [booking_id, normalizedValue], (err2) => {
                                 if (err2) console.error('History insert error:', err2);
                                 else console.log('updateBookingField - Status history başarıyla eklendi');
-                                handleFlightAttemptsIncrement(booking_id);
+                                maybeIncrementFlightAttempts();
                                 proceedWithAvailabilityRefresh();
                             });
                         } else if (lastRows && lastRows.length > 0) {
@@ -10150,12 +10160,12 @@ app.patch('/api/updateBookingField', (req, res) => {
                                     con.query(historySql, [booking_id, normalizedValue], (err2) => {
                                         if (err2) console.error('History insert error:', err2);
                                         else console.log('updateBookingField - Status history başarıyla eklendi');
-                                        handleFlightAttemptsIncrement(booking_id);
+                                        maybeIncrementFlightAttempts();
                                         proceedWithAvailabilityRefresh();
                                     });
                                 } else {
                                     console.log('updateBookingField - Updated last entry (', lastRows[0].status, ') to Cancelled:', lastRows[0].id);
-                                    handleFlightAttemptsIncrement(booking_id);
+                                    maybeIncrementFlightAttempts();
                                     proceedWithAvailabilityRefresh();
                                 }
                             });
@@ -10165,7 +10175,7 @@ app.patch('/api/updateBookingField', (req, res) => {
                             con.query(historySql, [booking_id, normalizedValue], (err2) => {
                                 if (err2) console.error('History insert error:', err2);
                                 else console.log('updateBookingField - Status history başarıyla eklendi');
-                                handleFlightAttemptsIncrement(booking_id);
+                                maybeIncrementFlightAttempts();
                                 proceedWithAvailabilityRefresh();
                             });
                         }
