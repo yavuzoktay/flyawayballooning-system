@@ -853,18 +853,17 @@ const CustomerPortal = () => {
                                             {(() => {
                                                 const cells = [];
                                                 const startOfMonth = currentMonth.startOf('month');
-                                                const firstDayOfMonth = startOfMonth.day();
+                                                const endOfMonth = currentMonth.endOf('month');
 
-                                                let daysBack;
-                                                if (firstDayOfMonth === 0) {
-                                                    daysBack = 6;
-                                                } else {
-                                                    daysBack = firstDayOfMonth - 1;
-                                                }
+                                                const firstDayIndex = (startOfMonth.day() + 6) % 7; // Monday = 0
+                                                const lastDayIndex = (endOfMonth.day() + 6) % 7;
+                                                const daysBack = firstDayIndex;
+                                                const daysForward = 6 - lastDayIndex;
 
                                                 const firstCellDate = startOfMonth.subtract(daysBack, 'day');
+                                                const totalCells = startOfMonth.daysInMonth() + daysBack + daysForward;
 
-                                                for (let i = 0; i < 42; i++) {
+                                                for (let i = 0; i < totalCells; i++) {
                                                     const d = firstCellDate.add(i, 'day');
                                                     const inCurrentMonth = d.isSame(currentMonth, 'month');
                                                     const isPast = d.isBefore(dayjs(), 'day');
