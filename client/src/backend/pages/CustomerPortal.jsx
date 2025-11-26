@@ -1139,22 +1139,12 @@ const CustomerPortal = () => {
                             setCancellingFlight(true);
                             setError(null);
                             try {
-                                // Get current flight attempts
-                                const currentAttempts = parseInt(bookingData.flight_attempts || 0, 10);
-                                const newAttempts = (currentAttempts + 1).toString();
-
-                                // Update status to Cancelled
+                                // Update status to Cancelled (skip incrementing flight attempts)
                                 await axios.patch('/api/updateBookingField', {
                                     booking_id: bookingData.id,
                                     field: 'status',
-                                    value: 'Cancelled'
-                                });
-
-                                // Update flight_attempts
-                                await axios.patch('/api/updateBookingField', {
-                                    booking_id: bookingData.id,
-                                    field: 'flight_attempts',
-                                    value: newAttempts
+                                    value: 'Cancelled',
+                                    skip_flight_attempt_increment: true
                                 });
 
                                 // Refresh booking data
