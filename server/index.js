@@ -11612,19 +11612,28 @@ app.get('/api/analytics', async (req, res) => {
                                                             location: r.location || 'Other',
                                                             value: Math.round(r.value || 0)
                                                         }));
-                                                        // 8. Liability by Flight Type
+                                                        // 8. Liability by Flight Type (voucher type driven)
                                                         const liabilityTypeSql = `
-                                    SELECT flight_type, SUM(paid) as value
-                                    FROM all_booking
-                                    WHERE paid IS NOT NULL AND paid > 0 ${dateFilter()}
-                                    GROUP BY flight_type
+                                    SELECT 
+                                        COALESCE(v.voucher_type, ab.voucher_type, ab.flight_type) as voucher_type,
+                                        SUM(ab.paid) as value
+                                    FROM all_booking ab
+                                    LEFT JOIN all_vouchers v ON v.voucher_ref = ab.voucher_code
+                                    WHERE ab.paid IS NOT NULL AND ab.paid > 0 ${dateFilter('ab.flight_date')}
+                                    GROUP BY voucher_type
                                 `;
                                                         con.query(liabilityTypeSql, [], (err8, liabTypeRows) => {
                                                             if (err8) return res.status(500).json({ error: 'Failed to fetch liability by flight type' });
-                                                            const liabilityByFlightType = liabTypeRows.map(r => ({
-                                                                type: r.flight_type || 'Other',
-                                                                value: Math.round(r.value || 0)
-                                                            }));
+                                                            const liabilityTypeMap = {};
+                                                            liabTypeRows.forEach(r => {
+                                                                const label = normalizeVoucherLabel(r.voucher_type);
+                                                                const value = Math.round(r.value || 0);
+                                                                liabilityTypeMap[label] = (liabilityTypeMap[label] || 0) + value;
+                                                            });
+                                                            const liabilityByFlightType = Object.entries(liabilityTypeMap).map(([label, value]) => ({
+                                                                type: label || 'Other',
+                                                                value
+                                                            })).sort((a, b) => b.value - a.value);
                                                             // 9. Refundable Liability (paid for WX Refundable, not expired)
                                                             const refundableSql = `
                                         SELECT choose_add_on, paid, status
