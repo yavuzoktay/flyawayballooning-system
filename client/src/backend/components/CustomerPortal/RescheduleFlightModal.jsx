@@ -80,26 +80,17 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
     const buildDayCells = () => {
         const cells = [];
         const startOfMonth = currentMonth.startOf('month');
-        const firstDayOfMonth = startOfMonth.day();
-        
-        // Calculate offset to previous Monday
-        // Monday (1): 0 days back
-        // Tuesday (2): 1 day back  
-        // Wednesday (3): 2 days back
-        // Thursday (4): 3 days back
-        // Friday (5): 4 days back
-        // Saturday (6): 5 days back
-        // Sunday (0): 6 days back
-        let daysBack;
-        if (firstDayOfMonth === 0) {
-            daysBack = 6; // Sunday -> go back to Monday
-        } else {
-            daysBack = firstDayOfMonth - 1; // Other days -> go back to Monday
-        }
-        
+        const endOfMonth = currentMonth.endOf('month');
+
+        const firstDayIndex = (startOfMonth.day() + 6) % 7; // Monday = 0
+        const lastDayIndex = (endOfMonth.day() + 6) % 7;
+        const daysBack = firstDayIndex;
+        const daysForward = 6 - lastDayIndex;
+
         const firstCellDate = startOfMonth.subtract(daysBack, 'day');
-        
-        for (let i = 0; i < 42; i++) {
+        const totalCells = startOfMonth.daysInMonth() + daysBack + daysForward;
+
+        for (let i = 0; i < totalCells; i++) {
             const d = firstCellDate.add(i, 'day');
             const inCurrentMonth = d.isSame(currentMonth, 'month');
             const isPast = d.isBefore(dayjs(), 'day');
@@ -143,7 +134,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                         }
                     }}
                     style={{
-                        aspectRatio: '0.85 / 1',
+                        aspectRatio: '1 / 1',
                         borderRadius: 10,
                         background: isSelected 
                             ? '#56C1FF' 
@@ -168,16 +159,16 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                         fontWeight: 700,
                         cursor: isSelectable ? 'pointer' : 'default',
                         userSelect: 'none',
-                        fontSize: 11,
+                        fontSize: 12,
                         zIndex: 1,
                         position: 'relative',
                         transition: 'all 0.2s ease',
-                        minHeight: '34px',
-                        padding: '2px'
+                        minHeight: '40px',
+                        padding: '4px'
                     }}
                 >
-                    <div style={{ fontSize: 12, lineHeight: 1.1 }}>{d.date()}</div>
-                    <div style={{ fontSize: 8, fontWeight: 600, lineHeight: 1 }}>
+                    <div style={{ fontSize: 13, lineHeight: 1.2 }}>{d.date()}</div>
+                    <div style={{ fontSize: 9, fontWeight: 600, lineHeight: 1.2 }}>
                         {slots.length === 0 ? '' : (soldOut ? 'Sold Out' : `${totalAvailable} Spaces`)}
                     </div>
                 </div>
@@ -236,15 +227,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             <DialogTitle sx={{ fontWeight: 700, fontSize: 20, pb: 1.5 }}>
                 Reschedule Your Flight
             </DialogTitle>
-            <DialogContent
-                sx={{
-                    pt: 0.5,
-                    maxHeight: '70vh',
-                    overflowY: 'auto',
-                    pr: 1,
-                    pl: 1
-                }}
-            >
+            <DialogContent>
                 {error && (
                     <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
                         {error}
@@ -258,7 +241,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 ) : (
                     <>
                         {/* Calendar */}
-                        <Box sx={{ mb: 2, maxWidth: 420, mx: 'auto' }}>
+                        <Box sx={{ mb: 3, maxWidth: '500px', mx: 'auto' }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
                                 <IconButton 
                                     onClick={() => setCurrentMonth(prev => prev.subtract(1, 'month'))} 
@@ -278,7 +261,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                             </Box>
                             
                             {/* Calendar Grid */}
-                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '1px', mb: 0.5 }}>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', mb: 1 }}>
                                 {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
                                     <div 
                                         key={day} 
@@ -294,14 +277,14 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                 ))}
                             </Box>
                             
-                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '1px' }}>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
                                 {buildDayCells()}
                             </Box>
                         </Box>
 
                         {/* Time Selection */}
                         {selectedDate && (
-                            <Box sx={{ mt: 2 }}>
+                            <Box sx={{ mt: 3 }}>
                                 <Typography variant="h6" sx={{ mb: 2, fontSize: 18, fontWeight: 600 }}>
                                     Select Time for {dayjs(selectedDate).format('DD MMMM YYYY')}
                                 </Typography>
@@ -344,11 +327,11 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                                                 ? '#56C1FF' 
                                                                 : '#22c55e',
                                                         cursor: isDisabled ? 'not-allowed' : 'pointer',
-                                                        fontSize: 15,
+                                                        fontSize: 16,
                                                         fontWeight: 600,
-                                                        padding: '10px 16px',
-                                                        minWidth: '120px',
-                                                        height: '46px',
+                                                        padding: '12px 20px',
+                                                        minWidth: '140px',
+                                                        height: '50px',
                                                         '&:hover': {
                                                             backgroundColor: isDisabled 
                                                                 ? '#f5f5f5' 
