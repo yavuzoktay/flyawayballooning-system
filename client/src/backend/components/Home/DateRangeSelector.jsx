@@ -174,7 +174,6 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                                 <table border="1" style={{ width: "100%", background: "#FFF", marginTop: "10px", borderCollapse: "collapse" }}>
                                     <thead style={{ background: "#3274b4", color: "#FFF" }}>
                                         <tr>
-                                            <th>Flown Flights</th>
                                             <th>Pax Flown</th>
                                             <th>Flights Completed</th>
                                             <th>Sales</th>
@@ -184,7 +183,6 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                                     </thead>
                                     <tbody>
                                         <tr>
-                                            <td style={{ textAlign: "center", padding: "8px" }}>{summary.totalFlights}</td>
                                             <td style={{ textAlign: "center", padding: "8px" }}>{summary.totalPax}</td>
                                             <td style={{ textAlign: "center", padding: "8px" }}>£{summary.completedFlights}</td>
                                             <td style={{ textAlign: "center", padding: "8px" }}>£{summary.totalSales.toFixed(2)}</td>
