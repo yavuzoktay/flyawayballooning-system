@@ -11546,21 +11546,60 @@ app.get('/api/analytics', async (req, res) => {
 
                                                 console.log('Sales by Location calculated:', salesByLocation);
 
-                                                // 6. Sales by Booking Type
-                                                const typeSql = `
-                            SELECT flight_type, COUNT(*) as count
-                            FROM all_booking
-                            WHERE flight_date IS NOT NULL AND status IN ('Flown', 'Confirmed', 'Scheduled') ${dateFilter()}
-                            GROUP BY flight_type
+                                                // 6. Sales by Booking Type (voucher type driven)
+                                                const normalizeVoucherLabel = (type) => {
+                                                    if (!type) return 'Other';
+                                                    const value = type.toString().trim();
+                                                    const lower = value.toLowerCase();
+                                                    if (lower.includes('proposal')) return 'Proposal';
+                                                    if (lower.includes('private')) return 'Private';
+                                                    if (lower.includes('any')) return 'Any Day Flight';
+                                                    if (lower.includes('flex')) return 'Flex Weekday';
+                                                    if (lower.includes('weekday')) return 'Weekday Morning';
+                                                    if (lower.includes('weekend')) return 'Weekend';
+                                                    if (lower.includes('gift')) return 'Gift Voucher';
+                                                    return value.replace(/\s+/g, ' ');
+                                                };
+
+                                                const addTypeCount = (map, type, count) => {
+                                                    const label = normalizeVoucherLabel(type);
+                                                    map[label] = (map[label] || 0) + (count || 0);
+                                                };
+
+                                                const bookingTypeSql = `
+                            SELECT COALESCE(v.voucher_type, ab.voucher_type, ab.flight_type) as voucher_type, COUNT(*) as count
+                            FROM all_booking ab
+                            LEFT JOIN all_vouchers v ON v.voucher_ref = ab.voucher_code
+                            WHERE ab.flight_date IS NOT NULL AND ab.status IN ('Flown', 'Confirmed', 'Scheduled') ${dateFilter('ab.flight_date')}
+                            GROUP BY voucher_type
                         `;
-                                                con.query(typeSql, [], (err6, typeRows) => {
+                                                con.query(bookingTypeSql, [], (err6, bookingTypeRows) => {
                                                     if (err6) return res.status(500).json({ error: 'Failed to fetch sales by booking type' });
-                                                    const totalType = typeRows.reduce((sum, r) => sum + r.count, 0);
-                                                    const salesByBookingType = typeRows.map(r => ({
-                                                        type: r.flight_type || 'Other',
-                                                        percent: totalType ? Math.round((r.count / totalType) * 100) : 0
-                                                    }));
-                                                    // 7. Liability by Location
+
+                                                    const typeCounts = {};
+                                                    bookingTypeRows.forEach(row => addTypeCount(typeCounts, row.voucher_type, row.count));
+
+                                                    const voucherTypeSql = `
+                            SELECT voucher_type, COUNT(*) as count
+                            FROM all_vouchers
+                            WHERE created_at IS NOT NULL ${dateFilter('created_at')}
+                            GROUP BY voucher_type
+                        `;
+                                                    con.query(voucherTypeSql, [], (errVoucherType, voucherTypeRows) => {
+                                                        if (errVoucherType) {
+                                                            console.warn('Error fetching voucher types for analytics:', errVoucherType);
+                                                        } else {
+                                                            voucherTypeRows.forEach(row => addTypeCount(typeCounts, row.voucher_type, row.count));
+                                                        }
+
+                                                        const totalType = Object.values(typeCounts).reduce((sum, c) => sum + c, 0);
+                                                        const salesByBookingType = Object.entries(typeCounts).map(([label, count]) => ({
+                                                            type: label || 'Other',
+                                                            percent: totalType ? Math.round((count / totalType) * 100) : 0,
+                                                            count
+                                                        })).sort((a, b) => b.count - a.count);
+
+                                                        // 7. Liability by Location
                                                     const liabilityLocSql = `
                                 SELECT location, SUM(paid) as value
                                 FROM all_booking
@@ -11649,6 +11688,7 @@ app.get('/api/analytics', async (req, res) => {
                                                             });
                                                         });
                                                     });
+                                                });
                                                 });
                                             });
                                         });
