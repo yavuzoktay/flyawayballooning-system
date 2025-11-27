@@ -12326,10 +12326,11 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
                 ? Number(row.shared_capacity)
                 : Math.min(Number(row.capacity) || BALLOON_210_CAPACITY, BALLOON_210_CAPACITY);
             const sharedBooked = Number(row.shared_consumed_pax || 0);
-            const sharedAvailable = Math.max(0, sharedCapacity - sharedBooked);
             const privateSmallBookings = Number(row.private_charter_small_bookings || 0);
-            const privateSmallRemaining = privateSmallBookings > 0 ? 0 : BALLOON_105_CAPACITY;
-            const calculatedStatus = sharedAvailable <= 0 ? 'Closed' : row.calculated_status;
+            const isBalloon105Locked = privateSmallBookings > 0;
+            const sharedAvailable = isBalloon105Locked ? 0 : Math.max(0, sharedCapacity - sharedBooked);
+            const privateSmallRemaining = isBalloon105Locked ? 0 : BALLOON_105_CAPACITY;
+            const calculatedStatus = (sharedAvailable <= 0 || isBalloon105Locked) ? 'Closed' : row.calculated_status;
             const needsUpdate = calculatedStatus !== row.status || sharedAvailable !== row.available;
 
             if (needsUpdate) {
@@ -12352,6 +12353,7 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
                 status: calculatedStatus,
                 shared_capacity: sharedCapacity,
                 shared_booked: sharedBooked,
+                balloon105_locked: isBalloon105Locked ? 1 : 0,
                 private_charter_small_bookings: privateSmallBookings,
                 private_charter_small_remaining: privateSmallRemaining,
                 private_charter_small_passengers: Number(row.private_charter_small_passengers || 0)
@@ -12534,15 +12536,16 @@ app.get('/api/availabilities/filter', (req, res) => {
                 ? Number(row.shared_capacity)
                 : Math.min(Number(row.capacity) || BALLOON_210_CAPACITY, BALLOON_210_CAPACITY);
             const sharedBooked = Number(row.shared_consumed_pax || 0);
-            const sharedAvailable = Math.max(0, sharedCapacity - sharedBooked);
             const privateSmallBookings = Number(row.private_charter_small_bookings || 0);
-            const privateSmallRemaining = privateSmallBookings > 0 ? 0 : BALLOON_105_CAPACITY;
+            const isBalloon105Locked = privateSmallBookings > 0;
+            const sharedAvailable = isBalloon105Locked ? 0 : Math.max(0, sharedCapacity - sharedBooked);
+            const privateSmallRemaining = isBalloon105Locked ? 0 : BALLOON_105_CAPACITY;
             const totalBooked = Number(row.total_booked) || 0;
-            const baseStatus = sharedAvailable <= 0 ? 'Closed' : (row.calculated_status || row.status);
+            const baseStatus = (sharedAvailable <= 0 || isBalloon105Locked) ? 'Closed' : (row.calculated_status || row.status);
 
             // Final available = calculated_available - heldSeats
             const finalAvailable = Math.max(0, sharedAvailable - heldSeats);
-            const finalStatus = finalAvailable <= 0 ? 'Closed' : baseStatus;
+            const finalStatus = (finalAvailable <= 0 || isBalloon105Locked) ? 'Closed' : baseStatus;
 
             return {
                 ...row,
@@ -12555,6 +12558,7 @@ app.get('/api/availabilities/filter', (req, res) => {
                 total_booked: totalBooked,
                 shared_capacity: sharedCapacity,
                 shared_booked: sharedBooked,
+                balloon105_locked: isBalloon105Locked ? 1 : 0,
                 private_charter_small_bookings: privateSmallBookings,
                 private_charter_small_remaining: privateSmallRemaining,
                 private_charter_small_passengers: Number(row.private_charter_small_passengers || 0),
@@ -12726,7 +12730,14 @@ app.post('/api/activity/:id/updateAvailabilityStatus', (req, res) => {
                              AND COALESCE(ab.pax, 0) <= 4 THEN 0
                         ELSE COALESCE(ab.pax, 0)
                     END
-                ), 0) as shared_consumed_pax
+                ), 0) as shared_consumed_pax,
+                COALESCE(SUM(
+                    CASE 
+                        WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%')
+                             AND COALESCE(ab.pax, 0) <= 4 THEN 1
+                        ELSE 0
+                    END
+                ), 0) as private_small_bookings
             FROM all_booking ab
             WHERE DATE(ab.flight_date) >= CURDATE() - INTERVAL 30 DAY
             AND (ab.status IS NULL OR TRIM(LOWER(ab.status)) NOT IN ('cancelled'))
@@ -12737,10 +12748,14 @@ app.post('/api/activity/:id/updateAvailabilityStatus', (req, res) => {
             TIME_FORMAT(TIME(aa.time), '%H:%i') = booking_counts.flight_time_min
         SET 
             aa.status = CASE 
+                WHEN booking_counts.private_small_bookings > 0 THEN 'Closed'
                 WHEN booking_counts.shared_consumed_pax >= LEAST(aa.capacity, ${BALLOON_210_CAPACITY}) THEN 'Closed'
                 ELSE 'Open'
             END,
-            aa.available = GREATEST(0, LEAST(aa.capacity, ${BALLOON_210_CAPACITY}) - booking_counts.shared_consumed_pax),
+            aa.available = CASE 
+                WHEN booking_counts.private_small_bookings > 0 THEN 0
+                ELSE GREATEST(0, LEAST(aa.capacity, ${BALLOON_210_CAPACITY}) - booking_counts.shared_consumed_pax)
+            END,
             aa.booked = booking_counts.total_booked
         WHERE aa.activity_id = ?
     `;
@@ -16053,9 +16068,10 @@ function updateSpecificAvailability(bookingDate, bookingTime, activityId, passen
                 const totalBooked = Number(sumRows?.[0]?.total_booked || 0);
                 const sharedBooked = Number(sumRows?.[0]?.shared_consumed_pax || 0);
                 const privateSmallBookings = Number(sumRows?.[0]?.private_small_bookings || 0);
+                const isBalloon105Locked = privateSmallBookings > 0;
                 const sharedCapacity = Math.min(Number(slot.capacity) || BALLOON_210_CAPACITY, BALLOON_210_CAPACITY);
-                const newAvailable = Math.max(0, sharedCapacity - sharedBooked);
-                const newStatus = newAvailable <= 0 ? 'Closed' : 'Open';
+                const newAvailable = isBalloon105Locked ? 0 : Math.max(0, sharedCapacity - sharedBooked);
+                const newStatus = (isBalloon105Locked || newAvailable <= 0) ? 'Closed' : 'Open';
                 const updateSql = 'UPDATE activity_availability SET available = ?, booked = ?, status = ? WHERE id = ?';
                 con.query(updateSql, [newAvailable, totalBooked, newStatus, slot.id], (updErr) => {
                     if (updErr) {
