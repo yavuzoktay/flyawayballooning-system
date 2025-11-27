@@ -13,6 +13,27 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import '../components/CustomerPortal/CustomerPortalHeader.css';
 
+const getApiBaseUrl = () => {
+    if (process.env.REACT_APP_API_URL && process.env.REACT_APP_API_URL.trim()) {
+        return process.env.REACT_APP_API_URL.trim();
+    }
+    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+        return 'http://localhost:3002';
+    }
+    return '';
+};
+
+const buildApiUrl = (path) => {
+    const base = getApiBaseUrl();
+    if (!base) {
+        return path;
+    }
+    if (path.startsWith('/')) {
+        return `${base}${path}`;
+    }
+    return `${base}/${path}`;
+};
+
 const CustomerPortal = () => {
     const { token: tokenParam } = useParams();
     const [bookingData, setBookingData] = useState(null);
@@ -32,6 +53,7 @@ const CustomerPortal = () => {
     const [selectedActivityId, setSelectedActivityId] = useState(null);
     const [cancelFlightDialogOpen, setCancelFlightDialogOpen] = useState(false);
     const [cancellingFlight, setCancellingFlight] = useState(false);
+    const [resendingConfirmation, setResendingConfirmation] = useState(false);
 
     // Passenger edit states
     const [editingPassenger, setEditingPassenger] = useState(null);
@@ -147,6 +169,31 @@ const CustomerPortal = () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, [token]);
+
+    const handleResendConfirmation = async () => {
+        if (!bookingData?.id) {
+            alert('Booking information missing. Please refresh the page and try again.');
+            return;
+        }
+
+        setResendingConfirmation(true);
+        try {
+            const response = await axios.post(buildApiUrl('/api/customer-portal-resend-confirmation'), {
+                bookingId: bookingData.id
+            });
+
+            if (response.data?.success) {
+                alert(response.data.message || 'Your confirmation email is on its way!');
+            } else {
+                alert(response.data?.message || 'Failed to resend confirmation email. Please try again.');
+            }
+        } catch (error) {
+            console.error('Customer Portal - Error resending confirmation:', error);
+            alert(error.response?.data?.message || 'Failed to resend confirmation email. Please try again later.');
+        } finally {
+            setResendingConfirmation(false);
+        }
+    };
 
     // Passenger edit handlers
     const handleEditPassengerClick = (passenger) => {
@@ -504,6 +551,29 @@ const CustomerPortal = () => {
                                         </Button>
                                     </span>
                                 </Tooltip>
+
+                                {/* Resend Confirmation Button */}
+                                <Button
+                                    variant="text"
+                                    color="primary"
+                                    fullWidth
+                                    onClick={handleResendConfirmation}
+                                    disabled={resendingConfirmation}
+                                    sx={{
+                                        mt: 1.5,
+                                        py: 1.25,
+                                        fontSize: '1rem',
+                                        fontWeight: 600,
+                                        textTransform: 'none',
+                                        borderRadius: 2,
+                                        color: '#1d4ed8',
+                                        '&:hover': {
+                                            backgroundColor: '#eff6ff'
+                                        }
+                                    }}
+                                >
+                                    {resendingConfirmation ? <CircularProgress size={20} /> : 'Resend Confirmation'}
+                                </Button>
                             </Box>
                         );
                     })()}

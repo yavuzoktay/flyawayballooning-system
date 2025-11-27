@@ -97,6 +97,8 @@ const getFallbackFrom = () => {
     return `${name} <${email}>`;
 };
 
+const isEmailServiceAvailable = () => sendgridReady || !!smtpTransporter;
+
 const shouldFallbackToSmtp = (error) => {
     if (!error) return false;
     const code = Number(error.code || error.statusCode || error?.response?.statusCode || error?.response?.status);
@@ -11097,6 +11099,80 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
     }
 });
 
+// Customer Portal - Resend Confirmation Email
+const customerPortalResendPaths = [
+    '/api/customer-portal-resend-confirmation',
+    '/api/customer-portal/resend-confirmation'
+];
+
+const handleCustomerPortalResendConfirmation = async (req, res) => {
+    const { bookingId, booking_id, reference } = req.body || {};
+    const finalBookingId = bookingId || booking_id || reference;
+
+    if (!finalBookingId) {
+        return res.status(400).json({
+            success: false,
+            message: 'Booking ID is required'
+        });
+    }
+
+    if (!isEmailServiceAvailable()) {
+        return res.status(503).json({
+            success: false,
+            message: 'Email service is not configured. Please contact support.'
+        });
+    }
+
+    try {
+        console.log('📧 Customer Portal - Resend request received for booking:', finalBookingId);
+
+        const bookingEmail = await new Promise((resolve, reject) => {
+            con.query('SELECT email FROM all_booking WHERE id = ? LIMIT 1', [finalBookingId], (err, rows) => {
+                if (err) {
+                    reject(err);
+                } else if (!rows || rows.length === 0) {
+                    resolve(null);
+                } else {
+                    resolve(rows[0].email || null);
+                }
+            });
+        });
+
+        if (!bookingEmail) {
+            return res.status(404).json({
+                success: false,
+                message: 'Booking not found or no email address available'
+            });
+        }
+
+        await sendAutomaticBookingConfirmationEmail(finalBookingId, {
+            templateName: 'Booking Confirmation',
+            templateType: 'booking_confirmation_customer_portal',
+            ownerTemplateType: 'booking_confirmation_customer_portal_owner',
+            ownerSubjectPrefix: '📧 Customer Portal Resend - ',
+            ownerBannerTitle: 'Customer Portal Confirmation Resend',
+            ownerTextIntro: 'Customer requested a new confirmation email for:',
+            ownerMessageLead: 'Customer triggered confirmation resend via portal.',
+            throwOnMissingTransport: true
+        });
+
+        res.json({
+            success: true,
+            message: 'Your confirmation email is on its way!'
+        });
+    } catch (error) {
+        console.error('❌ Customer Portal Resend Confirmation - Error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to resend confirmation email'
+        });
+    }
+};
+
+customerPortalResendPaths.forEach((path) => {
+    app.post(path, handleCustomerPortalResendConfirmation);
+});
+
 // Passenger tablosunda herhangi bir yolcunun weight bilgisini güncellemek için
 app.patch('/api/updatePassengerField', (req, res) => {
     const { passenger_id, field, value } = req.body;
@@ -12192,11 +12268,12 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
             SELECT 
                 DATE(ab.flight_date) as flight_date,
                 TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i') as flight_time_min,
-                ab.location as location,
                 COALESCE(SUM(ab.pax), 0) as total_booked,
                 COALESCE(SUM(
                     CASE 
-                        WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%') 
+                        WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%')
+                             AND COALESCE(ab.pax, 0) > 4 THEN ${BALLOON_210_CAPACITY}
+                        WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%')
                              AND COALESCE(ab.pax, 0) <= 4 THEN 0
                         ELSE COALESCE(ab.pax, 0)
                     END
@@ -12219,11 +12296,10 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
             WHERE DATE(ab.flight_date) >= CURDATE() - INTERVAL 30 DAY
             AND (ab.status IS NULL OR TRIM(LOWER(ab.status)) NOT IN ('cancelled'))
             AND (ab.manual_status_override IS NULL OR TRIM(LOWER(ab.manual_status_override)) NOT IN ('cancelled'))
-            GROUP BY DATE(ab.flight_date), TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i'), ab.location
+            GROUP BY DATE(ab.flight_date), TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i')
         ) as booking_counts 
             ON DATE(aa.date) = booking_counts.flight_date 
             AND TIME_FORMAT(TIME(aa.time), '%H:%i') = booking_counts.flight_time_min
-            AND a.location = booking_counts.location
         WHERE aa.activity_id = ? 
         ORDER BY aa.date, aa.time
 `;
@@ -12358,11 +12434,12 @@ app.get('/api/availabilities/filter', (req, res) => {
             SELECT 
                 DATE(ab.flight_date) as flight_date,
                 TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i') as flight_time_min,
-                ab.location as location,
                 COALESCE(SUM(ab.pax), 0) as total_booked,
                 COALESCE(SUM(
                     CASE 
-                        WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%') 
+                        WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%')
+                             AND COALESCE(ab.pax, 0) > 4 THEN ${BALLOON_210_CAPACITY}
+                        WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%')
                              AND COALESCE(ab.pax, 0) <= 4 THEN 0
                         ELSE COALESCE(ab.pax, 0)
                     END
@@ -12385,11 +12462,10 @@ app.get('/api/availabilities/filter', (req, res) => {
             WHERE DATE(ab.flight_date) >= CURDATE() - INTERVAL 30 DAY
             AND (ab.status IS NULL OR TRIM(LOWER(ab.status)) NOT IN ('cancelled'))
             AND (ab.manual_status_override IS NULL OR TRIM(LOWER(ab.manual_status_override)) NOT IN ('cancelled'))
-            GROUP BY DATE(ab.flight_date), TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i'), ab.location
+            GROUP BY DATE(ab.flight_date), TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i')
         ) as booking_counts 
             ON DATE(aa.date) = booking_counts.flight_date 
             AND TIME_FORMAT(TIME(aa.time), '%H:%i') = booking_counts.flight_time_min
-            AND a.location = booking_counts.location
         WHERE ${activityId ? 'aa.activity_id = ?' : 'a.location = ?'} AND a.status = 'Live'
     `;
 
@@ -12640,33 +12716,38 @@ app.post('/api/activity/:id/updateAvailabilityStatus', (req, res) => {
         JOIN (
             SELECT 
                 DATE(ab.flight_date) as flight_date,
-                ab.location,
-                TIME(ab.time_slot) as time_slot,
-                COUNT(ab.id) as total_booked
+                TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i') as flight_time_min,
+                COALESCE(SUM(ab.pax), 0) as total_booked,
+                COALESCE(SUM(
+                    CASE 
+                        WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%')
+                             AND COALESCE(ab.pax, 0) > 4 THEN ${BALLOON_210_CAPACITY}
+                        WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%')
+                             AND COALESCE(ab.pax, 0) <= 4 THEN 0
+                        ELSE COALESCE(ab.pax, 0)
+                    END
+                ), 0) as shared_consumed_pax
             FROM all_booking ab
-            WHERE ab.activity_id = ?
+            WHERE DATE(ab.flight_date) >= CURDATE() - INTERVAL 30 DAY
             AND (ab.status IS NULL OR TRIM(LOWER(ab.status)) NOT IN ('cancelled'))
-            GROUP BY DATE(ab.flight_date), ab.location, TIME(ab.time_slot)
+            AND (ab.manual_status_override IS NULL OR TRIM(LOWER(ab.manual_status_override)) NOT IN ('cancelled'))
+            GROUP BY DATE(ab.flight_date), TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i')
         ) as booking_counts ON 
             DATE(aa.date) = booking_counts.flight_date AND
-            TIME(aa.time) = booking_counts.time_slot AND
-            EXISTS (
-                SELECT 1 FROM activity a 
-                WHERE a.id = aa.activity_id 
-                AND a.location = booking_counts.location
-            )
+            TIME_FORMAT(TIME(aa.time), '%H:%i') = booking_counts.flight_time_min
         SET 
             aa.status = CASE 
-                WHEN booking_counts.total_booked >= aa.capacity THEN 'Closed'
+                WHEN booking_counts.shared_consumed_pax >= LEAST(aa.capacity, ${BALLOON_210_CAPACITY}) THEN 'Closed'
                 ELSE 'Open'
             END,
-            aa.available = GREATEST(0, aa.capacity - booking_counts.total_booked)
+            aa.available = GREATEST(0, LEAST(aa.capacity, ${BALLOON_210_CAPACITY}) - booking_counts.shared_consumed_pax),
+            aa.booked = booking_counts.total_booked
         WHERE aa.activity_id = ?
     `;
 
     console.log(`Updating availability status for activity ${id}`);
 
-    con.query(sql, [id, id], (err, result) => {
+    con.query(sql, [id], (err, result) => {
         if (err) {
             console.error('Error updating availability status for activity:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err });
@@ -15945,6 +16026,8 @@ function updateSpecificAvailability(bookingDate, bookingTime, activityId, passen
                     COALESCE(SUM(
                         CASE 
                             WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%')
+                                 AND COALESCE(ab.pax, 0) > 4 THEN ${BALLOON_210_CAPACITY}
+                            WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%')
                                  AND COALESCE(ab.pax, 0) <= 4 THEN 0
                             ELSE COALESCE(ab.pax, 0)
                         END
@@ -15959,11 +16042,10 @@ function updateSpecificAvailability(bookingDate, bookingTime, activityId, passen
                 FROM all_booking ab
                 WHERE DATE(ab.flight_date) = DATE(?)
                 AND TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i') = TIME_FORMAT(TIME(?), '%H:%i')
-                AND (ab.activity_id = ? OR (ab.activity_id IS NULL AND ab.location = ?))
                 AND (ab.status IS NULL OR TRIM(LOWER(ab.status)) NOT IN ('cancelled'))
                 AND (ab.manual_status_override IS NULL OR TRIM(LOWER(ab.manual_status_override)) NOT IN ('cancelled'))
             `;
-            con.query(sumPaxSql, [bookingDate, bookingTime, activityId, slot.location], (sumErr, sumRows) => {
+            con.query(sumPaxSql, [bookingDate, bookingTime], (sumErr, sumRows) => {
                 if (sumErr) {
                     console.error('updateSpecificAvailability: error summing pax', sumErr);
                     return;
@@ -18968,14 +19050,17 @@ async function sendAutomaticBookingConfirmationEmail(bookingId, options = {}) {
     try {
         console.log('📧 [sendAutomaticBookingConfirmationEmail] Starting email send for booking ID:', bookingId);
 
-        // Check if SendGrid is configured
-        if (!process.env.SENDGRID_API_KEY) {
-            console.warn('⚠️ [sendAutomaticBookingConfirmationEmail] SendGrid API key not configured, skipping automatic email');
-            console.warn('⚠️ [sendAutomaticBookingConfirmationEmail] SENDGRID_API_KEY exists:', !!process.env.SENDGRID_API_KEY);
+        // Ensure email service is available
+        if (!isEmailServiceAvailable()) {
+            const message = 'Email service not configured. Cannot send confirmation email.';
+            console.warn(`⚠️ [sendAutomaticBookingConfirmationEmail] ${message}`);
+            if (options?.throwOnMissingTransport) {
+                throw new Error(message);
+            }
             return;
         }
 
-        console.log('✅ [sendAutomaticBookingConfirmationEmail] SendGrid API key is configured');
+        console.log('✅ [sendAutomaticBookingConfirmationEmail] Email service available via', sendgridReady ? 'SendGrid' : 'SMTP fallback');
 
         // Fetch booking details
         const bookingQuery = `SELECT * FROM all_booking WHERE id = ?`;
@@ -19053,9 +19138,9 @@ async function sendAutomaticBookingConfirmationEmail(bookingId, options = {}) {
 // Helper function to send automatic flight voucher confirmation email
 async function sendAutomaticFlightVoucherConfirmationEmail(voucherId) {
     try {
-        // Check if SendGrid is configured
-        if (!process.env.SENDGRID_API_KEY) {
-            console.warn('SendGrid API key not configured, skipping automatic email');
+        // Ensure email service is available
+        if (!isEmailServiceAvailable()) {
+            console.warn('Email service not configured, skipping automatic flight voucher confirmation email');
             return;
         }
 
@@ -19093,9 +19178,9 @@ async function sendAutomaticFlightVoucherConfirmationEmail(voucherId) {
 // Helper function to send automatic gift voucher confirmation email
 async function sendAutomaticGiftVoucherConfirmationEmail(voucherId, purchasingContactOverride = {}) {
     try {
-        // Check if SendGrid is configured
-        if (!process.env.SENDGRID_API_KEY) {
-            console.warn('SendGrid API key not configured, skipping automatic email');
+        // Ensure email service is available
+        if (!isEmailServiceAvailable()) {
+            console.warn('Email service not configured, skipping automatic gift voucher confirmation email');
             return;
         }
 
