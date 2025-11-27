@@ -95,7 +95,10 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
             // Filter flown flights: only count flights that are not cancelled, have flight_date, and flight_date is in the past
             const flownFlights = data?.filter(item => {
                 // Must not be cancelled
-                if (item.status === 'Cancelled') return false;
+                if (!item || typeof item !== 'object') return false;
+                const status = (item.status || '').toLowerCase();
+                if (status === 'cancelled') return false;
+                if (status === 'scheduled' || status === 'open') return false;
                 
                 // Must have flight_date
                 if (!item.flight_date) return false;
