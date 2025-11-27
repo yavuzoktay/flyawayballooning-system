@@ -1,7 +1,7 @@
 import axios from "axios";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import PaginatedTable from "../components/BookingPage/PaginatedTable";
-import { Container, FormControl, InputLabel, MenuItem, OutlinedInput, Select, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Grid, Typography, Box, Divider, IconButton, Table, TableHead, TableRow, TableCell, TableBody, FormControlLabel, Switch } from "@mui/material";
+import { Container, FormControl, InputLabel, MenuItem, OutlinedInput, Select, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Grid, Typography, Box, Divider, IconButton, Table, TableHead, TableRow, TableCell, TableBody, FormControlLabel, Switch, FormGroup, Checkbox, Chip } from "@mui/material";
 import dayjs from 'dayjs';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -38,6 +38,10 @@ const BookingPage = () => {
         voucherType: "",
         actualVoucherType: "",
         redeemedStatus: "",
+        // Advanced multi-select filters for All Bookings (Filter popup)
+        statusMulti: [],
+        voucherTypeMulti: [],
+        locationMulti: [],
     });
 
     const experienceMatchesFilter = (flightTypeValue = '', filterValue = '') => {
@@ -47,6 +51,62 @@ const BookingPage = () => {
         if (filter.includes('shared')) return flightType.includes('shared');
         if (filter.includes('private')) return flightType.includes('private');
         return flightType.includes(filter);
+    };
+
+    // Advanced filter dialog state
+    const [filterDialogOpen, setFilterDialogOpen] = useState(false);
+
+    // Dynamic filter option lists for All Bookings tab
+    const bookingStatusOptions = useMemo(() => {
+        const set = new Set();
+        booking.forEach(b => {
+            const raw = (b.status || '').toString().trim();
+            if (!raw) return;
+            const normalized = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+            set.add(normalized);
+        });
+        return Array.from(set).sort();
+    }, [booking]);
+
+    const bookingVoucherTypeOptions = useMemo(() => {
+        const set = new Set();
+        booking.forEach(b => {
+            const raw = (b.voucher_type || '').toString().trim();
+            if (!raw) return;
+            set.add(raw);
+        });
+        return Array.from(set).sort();
+    }, [booking]);
+
+    const bookingLocationOptions = useMemo(() => {
+        const set = new Set();
+        booking.forEach(b => {
+            const raw = (b.location || '').toString().trim();
+            if (!raw) return;
+            set.add(raw);
+        });
+        return Array.from(set).sort();
+    }, [booking]);
+
+    const handleCheckboxFilterChange = (field, value) => {
+        setFilters(prev => {
+            const current = Array.isArray(prev[field]) ? prev[field] : [];
+            const exists = current.includes(value);
+            const next = exists ? current.filter(v => v !== value) : [...current, value];
+            return {
+                ...prev,
+                [field]: next,
+            };
+        });
+    };
+
+    const handleClearAdvancedFilters = () => {
+        setFilters(prev => ({
+            ...prev,
+            statusMulti: [],
+            voucherTypeMulti: [],
+            locationMulti: [],
+        }));
     };
 
     const [voucherDialogOpen, setVoucherDialogOpen] = useState(false);
@@ -240,6 +300,12 @@ const BookingPage = () => {
     const [smsLogs, setSmsLogs] = useState([]);
     const [smsLogsLoading, setSmsLogsLoading] = useState(false);
     const [smsPollId, setSmsPollId] = useState(null);
+
+    // Bulk selection for bookings
+    const [selectedBookingIds, setSelectedBookingIds] = useState([]);
+    const handleBookingSelectionChange = useCallback((selectedIds) => {
+        setSelectedBookingIds(selectedIds);
+    }, []);
 
     // Normalize UK phone numbers to +44 format for SMS
     const normalizeUkPhone = (raw) => {
@@ -526,7 +592,9 @@ const BookingPage = () => {
         console.log('🔍 Current emailForm state:', emailForm);
         console.log('🔍 Personal note:', personalNote);
         
-        if (!emailForm.to) {
+        const isBulk = selectedBookingIds && selectedBookingIds.length > 1;
+
+        if (!isBulk && !emailForm.to) {
             alert('Recipient email is required');
             return;
         }
@@ -552,33 +620,68 @@ const BookingPage = () => {
             to: emailForm.to,
             subject: emailForm.subject,
             messageLength: finalHtml?.length || 0,
-            template: emailForm.template
+            template: emailForm.template,
+            mode: isBulk ? 'bulk' : 'single',
+            selectedBookingIdsCount: selectedBookingIds?.length || 0
         });
 
         console.log('📄 Final HTML contains receipt:', /Receipt/i.test(finalHtml));
 
         setSendingEmail(true);
         try {
-            const response = await axios.post('/api/sendBookingEmail', {
-                bookingId: selectedBookingForEmail.id,
-                to: emailForm.to,
-                subject: emailForm.subject,
-                message: finalHtml,
-                messageText: finalText,
-                template: emailForm.template,
-                bookingData: selectedBookingForEmail
-            });
 
-            if (response.data.success) {
-                alert('Email sent successfully!');
-                setEmailModalOpen(false);
-                setEmailForm({ to: '', subject: '', message: '', template: 'custom' });
-                setPersonalNote('');
-                if (emailLogsContext) {
-                    fetchEmailLogsForParams(emailLogsContext);
+            if (isBulk) {
+                // Bulk email to selected bookings
+                const recipients = booking
+                    .filter(b => selectedBookingIds.includes(b.id))
+                    .map(b => (b.email || '').trim())
+                    .filter(e => !!e);
+
+                if (recipients.length === 0) {
+                    alert('No valid email addresses found for selected bookings.');
+                    return;
+                }
+
+                const response = await axios.post('/api/sendBulkBookingEmail', {
+                    bookingIds: selectedBookingIds,
+                    to: recipients,
+                    subject: emailForm.subject,
+                    message: finalHtml,
+                    messageText: finalText,
+                    template: emailForm.template,
+                });
+
+                if (response.data.success) {
+                    alert(`Email sent to ${recipients.length} bookings successfully!`);
+                    setEmailModalOpen(false);
+                    setEmailForm({ to: '', subject: '', message: '', template: 'custom' });
+                    setPersonalNote('');
+                } else {
+                    alert('Failed to send email: ' + response.data.message);
                 }
             } else {
-                alert('Failed to send email: ' + response.data.message);
+                // Single booking email (existing behaviour)
+                const response = await axios.post('/api/sendBookingEmail', {
+                    bookingId: selectedBookingForEmail.id,
+                    to: emailForm.to,
+                    subject: emailForm.subject,
+                    message: finalHtml,
+                    messageText: finalText,
+                    template: emailForm.template,
+                    bookingData: selectedBookingForEmail
+                });
+
+                if (response.data.success) {
+                    alert('Email sent successfully!');
+                    setEmailModalOpen(false);
+                    setEmailForm({ to: '', subject: '', message: '', template: 'custom' });
+                    setPersonalNote('');
+                    if (emailLogsContext) {
+                        fetchEmailLogsForParams(emailLogsContext);
+                    }
+                } else {
+                    alert('Failed to send email: ' + response.data.message);
+                }
             }
         } catch (error) {
             console.error('Error sending email:', error);
@@ -2170,23 +2273,6 @@ setBookingDetail(finalVoucherDetail);
         }
     };
 
-    console.log("PaginatedTable data:", filteredData);
-    console.log("PaginatedTable columns:", [
-        "created_at",
-        "name",
-        "flight_type",
-        "voucher_type",
-        "location",
-        "flight_date",
-        "pax",
-        "status",
-        "paid",
-        "due",
-        "voucher_code",
-        "flight_attempts",
-        "expires"
-    ]);
-
     // CSV export fonksiyonu
     function handleExportCSV() {
         if (!filteredData.length) {
@@ -3732,9 +3818,80 @@ setBookingDetail(finalVoucherDetail);
                                         <Button variant="outlined" color="primary" onClick={handleExportCSV} style={{ height: 40 }}>
                                             Export
                                         </Button>
-                                        <OutlinedInput placeholder="Search by name, email, phone, location..." value={filters.search}
-                                            onChange={(e) => handleFilterChange("search", e.target.value)} sx={{ fontSize: 14, '& input::placeholder': { fontSize: 14 } }} />
+                                        <Button
+                                            variant="outlined"
+                                            color="secondary"
+                                            onClick={() => setFilterDialogOpen(true)}
+                                            style={{ height: 40 }}
+                                        >
+                                            Filter
+                                        </Button>
+                                        <Button
+                                            variant="contained"
+                                            color="primary"
+                                            disabled={selectedBookingIds.length === 0}
+                                            onClick={() => {
+                                                if (selectedBookingIds.length === 0) return;
+                                                // Çoklu alıcılar için varsayılan booking'i kullan (ilk seçilen)
+                                                const primaryBooking = booking.find(b => b.id === selectedBookingIds[0]);
+                                                if (primaryBooking) {
+                                                    openEmailModalForBooking(primaryBooking, { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
+                                                } else if (filteredData.length > 0) {
+                                                    openEmailModalForBooking(filteredData[0], { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
+                                                }
+                                            }}
+                                            style={{ height: 40 }}
+                                        >
+                                            Bulk Email
+                                        </Button>
+                                        <OutlinedInput
+                                            placeholder="Search by name, email, phone, location..."
+                                            value={filters.search}
+                                            onChange={(e) => handleFilterChange("search", e.target.value)}
+                                            sx={{ fontSize: 14, '& input::placeholder': { fontSize: 14 } }}
+                                        />
                                     </div>
+                                    {/* Show active advanced filters as chips */}
+                                    {(filters.statusMulti.length > 0 || filters.voucherTypeMulti.length > 0 || filters.locationMulti.length > 0) && (
+                                        <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                            {filters.statusMulti.map(value => (
+                                                <Chip
+                                                    key={`status-${value}`}
+                                                    size="small"
+                                                    label={`Status: ${value}`}
+                                                    onDelete={() => handleCheckboxFilterChange('statusMulti', value)}
+                                                    color="primary"
+                                                    variant="outlined"
+                                                />
+                                            ))}
+                                            {filters.voucherTypeMulti.map(value => (
+                                                <Chip
+                                                    key={`voucher-${value}`}
+                                                    size="small"
+                                                    label={`Voucher: ${value}`}
+                                                    onDelete={() => handleCheckboxFilterChange('voucherTypeMulti', value)}
+                                                    color="primary"
+                                                    variant="outlined"
+                                                />
+                                            ))}
+                                            {filters.locationMulti.map(value => (
+                                                <Chip
+                                                    key={`location-${value}`}
+                                                    size="small"
+                                                    label={`Location: ${value}`}
+                                                    onDelete={() => handleCheckboxFilterChange('locationMulti', value)}
+                                                    color="primary"
+                                                    variant="outlined"
+                                                />
+                                            ))}
+                                            <Chip
+                                                size="small"
+                                                label="Clear filters"
+                                                onClick={handleClearAdvancedFilters}
+                                                variant="text"
+                                            />
+                                        </Box>
+                                    )}
                                     <div className="booking-filter-wrap">
                                         <div className="booking-filter-field">
                                             <FormControl sx={{ m: 1, minWidth: 160 }} size="small" className="booking-filter-field">
@@ -3847,11 +4004,27 @@ setBookingDetail(finalVoucherDetail);
                                                 const bookingFlightType = item.flight_type || item.experience || '';
                                                 if (!experienceMatchesFilter(bookingFlightType, filters.experience)) return false;
                                             }
-                                            // Status filter
+                                            // Advanced multi Status filter (checkboxes)
+                                            if (filters.statusMulti && filters.statusMulti.length > 0) {
+                                                const itemStatus = (item.status || '').toString().trim().toLowerCase();
+                                                const matchesAny = filters.statusMulti.some(s => s.toString().trim().toLowerCase() === itemStatus);
+                                                if (!matchesAny) return false;
+                                            }
+                                            // Status dropdown filter
                                             if (filters.status && item.status !== filters.status) return false;
-                                            // Location filter
+                                            // Advanced multi Location filter (checkboxes)
+                                            if (filters.locationMulti && filters.locationMulti.length > 0) {
+                                                const itemLocation = (item.location || '').toString().trim();
+                                                if (!filters.locationMulti.includes(itemLocation)) return false;
+                                            }
+                                            // Location dropdown filter
                                             if (filters.location && item.location !== filters.location) return false;
-                                            // Voucher Type filter
+                                            // Advanced multi Voucher Type filter (checkboxes)
+                                            if (filters.voucherTypeMulti && filters.voucherTypeMulti.length > 0) {
+                                                const itemVoucherType = (item.voucher_type || '').toString().trim();
+                                                if (!filters.voucherTypeMulti.includes(itemVoucherType)) return false;
+                                            }
+                                            // Voucher Type dropdown filter
                                             if (filters.voucherType && item.voucher_type !== filters.voucherType) return false;
                                             // Search filter (case-insensitive, partial match)
                                             if (filters.search && filters.search.trim() !== "") {
@@ -3887,6 +4060,8 @@ setBookingDetail(finalVoucherDetail);
                                             flight_attempts: item.flight_attempts ?? 0,
                                             expires: item.expires || ''
                                         }))}
+                                        selectable={true}
+                                        onSelectionChange={handleBookingSelectionChange}
                                         columns={[
                                             "created_at",
                                             "name",
@@ -5497,6 +5672,78 @@ setBookingDetail(finalVoucherDetail);
                         <Button onClick={() => { setDetailDialogOpen(false); setSelectedBookingId(null); }} color="primary" variant="contained">Close</Button>
                     </DialogActions>
                 </Dialog>
+                {/* Advanced Filter Dialog for All Bookings */}
+                <Dialog
+                    open={filterDialogOpen}
+                    onClose={() => setFilterDialogOpen(false)}
+                    maxWidth="sm"
+                    fullWidth
+                >
+                    <DialogTitle sx={{ fontWeight: 700, fontSize: 22 }}>
+                        Filter Bookings
+                    </DialogTitle>
+                    <DialogContent dividers>
+                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                            Booking status
+                        </Typography>
+                        <FormGroup sx={{ mb: 2 }}>
+                            {bookingStatusOptions.map(status => (
+                                <FormControlLabel
+                                    key={status}
+                                    control={
+                                        <Checkbox
+                                            checked={filters.statusMulti.includes(status)}
+                                            onChange={() => handleCheckboxFilterChange('statusMulti', status)}
+                                        />
+                                    }
+                                    label={status}
+                                />
+                            ))}
+                        </FormGroup>
+
+                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                            Voucher type
+                        </Typography>
+                        <FormGroup sx={{ mb: 2 }}>
+                            {bookingVoucherTypeOptions.map(type => (
+                                <FormControlLabel
+                                    key={type}
+                                    control={
+                                        <Checkbox
+                                            checked={filters.voucherTypeMulti.includes(type)}
+                                            onChange={() => handleCheckboxFilterChange('voucherTypeMulti', type)}
+                                        />
+                                    }
+                                    label={type}
+                                />
+                            ))}
+                        </FormGroup>
+
+                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                            Location
+                        </Typography>
+                        <FormGroup>
+                            {bookingLocationOptions.map(loc => (
+                                <FormControlLabel
+                                    key={loc}
+                                    control={
+                                        <Checkbox
+                                            checked={filters.locationMulti.includes(loc)}
+                                            onChange={() => handleCheckboxFilterChange('locationMulti', loc)}
+                                        />
+                                    }
+                                    label={loc}
+                                />
+                            ))}
+                        </FormGroup>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={handleClearAdvancedFilters}>Clear</Button>
+                        <Button onClick={() => setFilterDialogOpen(false)} variant="contained" color="primary">
+                            Apply
+                        </Button>
+                    </DialogActions>
+                </Dialog>
                 <Dialog open={addGuestDialogOpen} onClose={() => setAddGuestDialogOpen(false)} maxWidth="sm" fullWidth>
                     <DialogTitle>Add Guest</DialogTitle>
                     <DialogContent>
@@ -6240,7 +6487,15 @@ setBookingDetail(finalVoucherDetail);
                         Send a Message
                         {selectedBookingForEmail && (
                             <Typography variant="subtitle2" color="textSecondary" sx={{ mt: 0.5 }}>
-                                Booking: {selectedBookingForEmail.name} ({selectedBookingForEmail.id})
+                                {selectedBookingIds && selectedBookingIds.length > 1 ? (
+                                    <>
+                                        Bulk to {selectedBookingIds.length} bookings
+                                    </>
+                                ) : (
+                                    <>
+                                        Booking: {selectedBookingForEmail.name} ({selectedBookingForEmail.id})
+                                    </>
+                                )}
                             </Typography>
                         )}
                     </DialogTitle>
@@ -6339,6 +6594,16 @@ setBookingDetail(finalVoucherDetail);
                                     <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 0.5 }}>
                                         From "Fly Away Ballooning" &lt;info@flyawayballooning.com&gt;
                                     </Typography>
+                                    {selectedBookingIds && selectedBookingIds.length > 1 && (
+                                        <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 0.5 }}>
+                                            To:&nbsp;
+                                            {booking
+                                                .filter(b => selectedBookingIds.includes(b.id))
+                                                .map(b => (b.email || '').trim())
+                                                .filter(e => !!e)
+                                                .join(', ')}
+                                        </Typography>
+                                    )}
                                     <Typography variant="caption" sx={{ color: '#999', display: 'block', mb: 2 }}>
                                         {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
                                     </Typography>
@@ -6407,7 +6672,7 @@ setBookingDetail(finalVoucherDetail);
                                         </Box>
                                 </Box>
                             </Grid>
-                            {/* Hidden fields for backend */}
+                            {/* Hidden fields for backend / debugging */}
                             <input type="hidden" value={emailForm.to} />
                             <input type="hidden" value={emailForm.subject} />
                             {/* Email Logs */}
@@ -6474,7 +6739,7 @@ setBookingDetail(finalVoucherDetail);
                                     backgroundColor: '#1565c0'
                                 }
                             }}
-                            disabled={sendingEmail || !emailForm.to || !emailForm.subject}
+                            disabled={sendingEmail || !emailForm.subject || (!emailForm.to && (!selectedBookingIds || selectedBookingIds.length === 0))}
                         >
                             {sendingEmail ? 'Sending...' : 'Send'}
                         </Button>

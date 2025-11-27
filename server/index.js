@@ -19709,6 +19709,127 @@ app.post('/api/sendBookingEmail', async (req, res) => {
     }
 });
 
+// Send bulk booking email via SendGrid
+app.post('/api/sendBulkBookingEmail', async (req, res) => {
+    console.log('POST /api/sendBulkBookingEmail called');
+    const { bookingIds, to, subject, message, template } = req.body;
+
+    try {
+        if (!Array.isArray(to) || to.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Recipient list is empty'
+            });
+        }
+
+        if (!subject || !message) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields: subject and message are required'
+            });
+        }
+
+        if (!process.env.SENDGRID_API_KEY) {
+            console.error('SendGrid API key not configured');
+            return res.status(500).json({
+                success: false,
+                message: 'Email service not configured'
+            });
+        }
+
+        const containsHtml = typeof message === 'string' && /<\/?[a-z][\s\S]*>/i.test(message);
+        const sanitizeComments = (input) =>
+            input ? input.replace(/<!--[\s\S]*?-->/g, '') : input;
+        const normalizeHtml = (html) => sanitizeComments(html || '');
+
+        const htmlBody = containsHtml ? normalizeHtml(message) : (message || '').replace(/\n/g, '<br>');
+        const textBody = containsHtml ? convertHtmlToText(message) : message;
+
+        const uniqueRecipients = Array.from(new Set(to.map(e => String(e || '').trim()).filter(Boolean)));
+        if (uniqueRecipients.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No valid recipient emails'
+            });
+        }
+
+        const emailContent = {
+            to: uniqueRecipients,
+            from: {
+                email: 'info@flyawayballooning.com',
+                name: 'Fly Away Ballooning'
+            },
+            subject: subject,
+            text: textBody,
+            html: htmlBody,
+            custom_args: {
+                booking_ids: Array.isArray(bookingIds) ? bookingIds.join(',') : '',
+                template_type: template || 'custom',
+                context_type: 'bulk'
+            }
+        };
+
+        console.log('Sending BULK email via SendGrid to:', uniqueRecipients);
+        const response = await sgMail.sendMultiple(emailContent);
+        console.log('SendGrid bulk response:', response[0]?.statusCode);
+
+        // Optionally log one row per recipient
+        if (typeof ensureEmailLogsSchema === 'function') {
+            const logSql = `
+                INSERT INTO email_logs (
+                    booking_id,
+                    recipient_email,
+                    subject,
+                    template_type,
+                    message_html,
+                    message_text,
+                    sent_at,
+                    status,
+                    message_id,
+                    opens,
+                    clicks,
+                    last_event,
+                    last_event_at,
+                    context_type,
+                    context_id
+                )
+                VALUES (?, ?, ?, ?, ?, ?, NOW(), 'sent', ?, 0, 0, 'sent', NOW(), ?, ?)
+            `;
+            ensureEmailLogsSchema(() => {
+                uniqueRecipients.forEach((recipient) => {
+                    const messageId = response[0]?.headers?.['x-message-id'] || null;
+                    con.query(logSql, [
+                        null,
+                        recipient,
+                        subject,
+                        template || 'custom',
+                        htmlBody,
+                        textBody,
+                        messageId,
+                        'bulk',
+                        recipient
+                    ], (err) => {
+                        if (err) {
+                            console.error('Error logging bulk email activity:', err);
+                        }
+                    });
+                });
+            });
+        }
+
+        return res.json({
+            success: true,
+            message: `Bulk email sent to ${uniqueRecipients.length} recipients`
+        });
+    } catch (error) {
+        console.error('Error sending bulk booking email:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to send bulk email'
+        });
+    }
+});
+
 // Get email logs for a booking
 app.get('/api/bookingEmails/:bookingId', (req, res) => {
     const { bookingId } = req.params;
