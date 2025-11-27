@@ -3066,6 +3066,20 @@ const Manifest = () => {
                             }
                             
                             console.log('Final Pax Booked values:', { paxBooked, paxTotal });
+                            const parseNumeric = (value) => {
+                                const parsed = Number(value);
+                                return Number.isFinite(parsed) ? parsed : null;
+                            };
+                            const getInitialAvailableTotal = (slot) => {
+                                if (!slot) return null;
+                                const availableNum = parseNumeric(slot.available);
+                                const bookedNum = parseNumeric(slot.booked);
+                                if (availableNum !== null && bookedNum !== null) {
+                                    return availableNum + bookedNum;
+                                }
+                                const capacityNum = parseNumeric(slot.capacity);
+                                return capacityNum !== null ? capacityNum : null;
+                            };
                             // DISPLAY LOGIC UPDATE: Compare availability count vs actual passenger count and use the larger to include newly added guests immediately
                             const passengerCountDisplay = groupFlights.reduce((sum, f) => sum + (f.passengers ? f.passengers.length : 0), 0);
                             const availabilityCountDisplay = (found && typeof found.capacity === 'number' && typeof found.available === 'number')
@@ -3074,8 +3088,11 @@ const Manifest = () => {
                             const paxBookedDisplay = passengerCountDisplay;
                             // Prefer capacity directly from matched availability; otherwise try to re-match using map
                             let paxTotalDisplay = '-';
-                            if (found && typeof found.capacity === 'number') {
-                                paxTotalDisplay = found.capacity;
+                            if (found) {
+                                const initialAvailableTotal = getInitialAvailableTotal(found);
+                                if (initialAvailableTotal !== null) {
+                                    paxTotalDisplay = initialAvailableTotal;
+                                }
                             } else {
                                 const dateStr = first.flight_date ? first.flight_date.substring(0,10) : null;
                                 let timeStr = null;
@@ -3090,8 +3107,11 @@ const Manifest = () => {
                                     const idMatch = aid ? (a.activity_id == aid) : false;
                                     return (a.location === first.location || idMatch) && aDate === dateStr && aTime === timeStr;
                                 });
-                                if (reFound && typeof reFound.capacity === 'number') {
-                                    paxTotalDisplay = reFound.capacity;
+                                if (reFound) {
+                                    const reFoundInitial = getInitialAvailableTotal(reFound);
+                                    if (reFoundInitial !== null) {
+                                        paxTotalDisplay = reFoundInitial;
+                                    }
                                 }
                             }
                             
