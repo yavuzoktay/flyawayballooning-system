@@ -16,6 +16,7 @@ const multer = require('multer');
 const dotenv = require('dotenv');
 const axios = require('axios');
 const sgMail = require('@sendgrid/mail');
+const nodemailer = require('nodemailer');
 const { EventWebhook, EventWebhookHeader } = require('@sendgrid/eventwebhook');
 const Twilio = require('twilio');
 const { parsePassengerList, derivePaidAmount } = require('./lib/voucherMetrics');
@@ -39,15 +40,115 @@ const resolveSendGridApiKey = () => {
 };
 
 const resolvedSendGridApiKey = resolveSendGridApiKey();
+let sendgridReady = false;
 if (resolvedSendGridApiKey) {
-    if (!process.env.SENDGRID_API_KEY || process.env.SENDGRID_API_KEY.trim() !== resolvedSendGridApiKey) {
-        process.env.SENDGRID_API_KEY = resolvedSendGridApiKey;
+    try {
+        if (!process.env.SENDGRID_API_KEY || process.env.SENDGRID_API_KEY.trim() !== resolvedSendGridApiKey) {
+            process.env.SENDGRID_API_KEY = resolvedSendGridApiKey;
+        }
+        sgMail.setApiKey(resolvedSendGridApiKey);
+        sendgridReady = true;
+        console.log('SendGrid API key configured (masked):', `${resolvedSendGridApiKey.slice(0, 8)}***`);
+    } catch (err) {
+        console.error('Failed to configure SendGrid API key:', err.message);
     }
-    sgMail.setApiKey(resolvedSendGridApiKey);
-    console.log('SendGrid API key configured (masked):', `${resolvedSendGridApiKey.slice(0, 8)}***`);
 } else {
     console.warn('SENDGRID_API_KEY not found in environment variables');
 }
+
+// Configure optional SMTP fallback (useful for local/dev or when SendGrid auth fails)
+const smtpConfig = {
+    host: process.env.SMTP_HOST || process.env.EMAIL_SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || process.env.EMAIL_SMTP_PORT) || 587,
+    secure: (process.env.SMTP_SECURE || process.env.EMAIL_SMTP_SECURE || '').toLowerCase() === 'true' || Number(process.env.SMTP_PORT) === 465,
+    user: process.env.SMTP_USER || process.env.EMAIL_SMTP_USER,
+    pass: process.env.SMTP_PASS || process.env.EMAIL_SMTP_PASS,
+    fromEmail: process.env.SMTP_FROM_EMAIL || process.env.EMAIL_FROM || 'info@flyawayballooning.com',
+    fromName: process.env.SMTP_FROM_NAME || process.env.EMAIL_FROM_NAME || 'Fly Away Ballooning'
+};
+
+let smtpTransporter = null;
+if (smtpConfig.host && smtpConfig.user && smtpConfig.pass) {
+    smtpTransporter = nodemailer.createTransport({
+        host: smtpConfig.host,
+        port: smtpConfig.port,
+        secure: smtpConfig.secure,
+        auth: {
+            user: smtpConfig.user,
+            pass: smtpConfig.pass
+        }
+    });
+
+    smtpTransporter.verify((err) => {
+        if (err) {
+            console.error('SMTP transporter verification failed:', err.message);
+            smtpTransporter = null;
+        } else {
+            console.log(`SMTP transporter ready via ${smtpConfig.host}:${smtpConfig.port}`);
+        }
+    });
+} else {
+    console.warn('SMTP fallback not configured (missing SMTP_HOST/SMTP_USER/SMTP_PASS).');
+}
+
+const getFallbackFrom = () => {
+    const email = smtpConfig.fromEmail || 'info@flyawayballooning.com';
+    const name = smtpConfig.fromName || 'Fly Away Ballooning';
+    return `${name} <${email}>`;
+};
+
+const shouldFallbackToSmtp = (error) => {
+    if (!error) return false;
+    const code = Number(error.code || error.statusCode || error?.response?.statusCode || error?.response?.status);
+    return code === 401 || code === 403;
+};
+
+const sendEmailWithFallback = async (payload, { isBulk = false, context = 'generic-email' } = {}) => {
+    const sendgridAvailable = sendgridReady;
+
+    if (sendgridAvailable) {
+        try {
+            const response = isBulk ? await sgMail.sendMultiple(payload) : await sgMail.send(payload);
+            const messageId = response?.[0]?.headers?.['x-message-id'] || response?.[0]?.body?.messageId || null;
+            return { provider: 'sendgrid', messageId, response };
+        } catch (error) {
+            console.error(`[${context}] SendGrid send failed:`, error.response?.body || error.message);
+            if (!smtpTransporter || !shouldFallbackToSmtp(error)) {
+                throw error;
+            }
+            console.warn(`[${context}] Falling back to SMTP transporter...`);
+        }
+    }
+
+    if (!smtpTransporter) {
+        throw new Error('Email service not configured: SendGrid unavailable and SMTP fallback missing.');
+    }
+
+    const recipients = Array.isArray(payload.to) ? payload.to : [payload.to];
+    if (payload.sendAt && payload.sendAt > Math.floor(Date.now() / 1000)) {
+        console.warn(`[${context}] SMTP fallback does not support delayed sendAt (${payload.sendAt}). Sending immediately.`);
+    }
+    const smtpResults = [];
+
+    for (const recipient of recipients) {
+        const info = await smtpTransporter.sendMail({
+            from: payload.from?.email ? `${payload.from.name || smtpConfig.fromName} <${payload.from.email}>` : getFallbackFrom(),
+            to: recipient,
+            subject: payload.subject,
+            html: payload.html,
+            text: payload.text,
+            headers: payload.custom_args ? Object.fromEntries(
+                Object.entries(payload.custom_args)
+                    .filter(([_, value]) => value !== undefined && value !== null)
+                    .map(([key, value]) => [`X-${key.replace(/_/g, '-')}`, value])
+            ) : undefined
+        });
+        smtpResults.push(info);
+    }
+
+    const messageId = smtpResults.map(result => result?.messageId).filter(Boolean).join(', ') || null;
+    return { provider: 'smtp', messageId, response: smtpResults };
+};
 
 
 
@@ -18808,8 +18909,10 @@ async function scheduleReceivedGiftVoucherEmail(voucherId, recipientEmail, delay
         };
 
         console.log('📧 [scheduleReceivedGiftVoucherEmail] Scheduling Received GV email for voucher:', voucherId, 'sendAt (unix):', sendAtUnix);
-        const response = await sgMail.send(emailPayload);
-        const messageId = response[0]?.headers?.['x-message-id'] || null;
+        const { provider: receivedProvider, messageId } = await sendEmailWithFallback(emailPayload, {
+            context: 'schedule_received_gv'
+        });
+        console.log(`📧 [scheduleReceivedGiftVoucherEmail] Email scheduled via ${receivedProvider}`);
 
         ensureEmailLogsSchema(() => {
             const logSql = `
@@ -19169,16 +19272,17 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
                         htmlLength: customerEmailContent.html ? customerEmailContent.html.length : 0
                     });
 
-                    const customerResponse = await sgMail.send(customerEmailContent);
-                    console.log('✅ [sendEmailToCustomerAndOwner] Automatic booking confirmation email sent to customer successfully');
-                    console.log('✅ [sendEmailToCustomerAndOwner] Response status:', customerResponse[0].statusCode);
-                    console.log('✅ [sendEmailToCustomerAndOwner] Response headers:', customerResponse[0].headers);
+                    const { provider: customerProvider, messageId: customerMessageId } = await sendEmailWithFallback(customerEmailContent, {
+                        context: 'auto_booking_confirmation_customer'
+                    });
+                    console.log(`✅ [sendEmailToCustomerAndOwner] Automatic booking confirmation email sent to customer via ${customerProvider}`);
 
                     // Send email to business owner
                     console.log('📧 [sendEmailToCustomerAndOwner] Sending automatic booking confirmation email to business owner: info@flyawayballooning.com');
-                    const ownerResponse = await sgMail.send(ownerEmailContent);
-                    console.log('✅ [sendEmailToCustomerAndOwner] Automatic booking confirmation email sent to business owner successfully');
-                    console.log('✅ [sendEmailToCustomerAndOwner] Owner response status:', ownerResponse[0].statusCode);
+                    const { provider: ownerProvider, messageId: ownerMessageId } = await sendEmailWithFallback(ownerEmailContent, {
+                        context: 'auto_booking_confirmation_owner'
+                    });
+                    console.log(`✅ [sendEmailToCustomerAndOwner] Automatic booking confirmation email sent to business owner via ${ownerProvider}`);
 
                     // Log email activity for customer
                     const logSql = `
@@ -19201,7 +19305,6 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
                         )
                         VALUES (?, ?, ?, ?, ?, ?, NOW(), 'sent', ?, 0, 0, 'sent', NOW(), ?, ?)
                     `;
-                    const customerMessageId = customerResponse[0]?.headers?.['x-message-id'];
                     const contextType = 'booking';
                     const contextId = bookingId ? String(bookingId) : null;
                     con.query(logSql, [
@@ -19221,7 +19324,6 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
                     });
 
                     // Log email activity for business owner
-                    const ownerMessageId = ownerResponse[0]?.headers?.['x-message-id'];
                     con.query(logSql, [
                         bookingId,
                         'info@flyawayballooning.com',
@@ -19338,13 +19440,17 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                 try {
                     // Send email to customer
                     console.log('📧 Sending automatic flight voucher confirmation email to customer:', voucher.email);
-                    const customerResponse = await sgMail.send(customerEmailContent);
-                    console.log('✅ Automatic flight voucher confirmation email sent to customer successfully:', customerResponse[0].statusCode);
+                    const { provider: customerProvider, messageId: customerMessageId } = await sendEmailWithFallback(customerEmailContent, {
+                        context: 'flight_voucher_confirmation_customer'
+                    });
+                    console.log(`✅ Automatic flight voucher confirmation email sent to customer via ${customerProvider}`);
 
                     // Send email to business owner
                     console.log('📧 Sending automatic flight voucher confirmation email to business owner: info@flyawayballooning.com');
-                    const ownerResponse = await sgMail.send(ownerEmailContent);
-                    console.log('✅ Automatic flight voucher confirmation email sent to business owner successfully:', ownerResponse[0].statusCode);
+                    const { provider: ownerProvider, messageId: ownerMessageId } = await sendEmailWithFallback(ownerEmailContent, {
+                        context: 'flight_voucher_confirmation_owner'
+                    });
+                    console.log(`✅ Automatic flight voucher confirmation email sent to business owner via ${ownerProvider}`);
 
                     // Log email activity for customer
                     const logSql = `
@@ -19367,7 +19473,6 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                         )
                         VALUES (?, ?, ?, ?, ?, ?, NOW(), 'sent', ?, 0, 0, 'sent', NOW(), ?, ?)
                     `;
-                    const customerMessageId = customerResponse[0]?.headers?.['x-message-id'];
                     const contextType = 'voucher';
                     const contextId = voucherId ? String(voucherId) : null;
                     con.query(logSql, [
@@ -19387,7 +19492,6 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                     });
 
                     // Log email activity for business owner
-                    const ownerMessageId = ownerResponse[0]?.headers?.['x-message-id'];
                     con.query(logSql, [
                         null, // booking_id is null for vouchers
                         'info@flyawayballooning.com',
@@ -19494,13 +19598,17 @@ async function sendGiftVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                 try {
                     // Send email to customer
                     console.log('📧 Sending automatic gift voucher confirmation email to customer:', voucher.email);
-                    const customerResponse = await sgMail.send(customerEmailContent);
-                    console.log('✅ Automatic gift voucher confirmation email sent to customer successfully:', customerResponse[0].statusCode);
+                    const { provider: customerProvider, messageId: customerMessageId } = await sendEmailWithFallback(customerEmailContent, {
+                        context: 'gift_voucher_confirmation_customer'
+                    });
+                    console.log(`✅ Automatic gift voucher confirmation email sent to customer via ${customerProvider}`);
 
                     // Send email to business owner
                     console.log('📧 Sending automatic gift voucher confirmation email to business owner: info@flyawayballooning.com');
-                    const ownerResponse = await sgMail.send(ownerEmailContent);
-                    console.log('✅ Automatic gift voucher confirmation email sent to business owner successfully:', ownerResponse[0].statusCode);
+                    const { provider: ownerProvider, messageId: ownerMessageId } = await sendEmailWithFallback(ownerEmailContent, {
+                        context: 'gift_voucher_confirmation_owner'
+                    });
+                    console.log(`✅ Automatic gift voucher confirmation email sent to business owner via ${ownerProvider}`);
 
                     // Log email activity for customer
                     const logSql = `
@@ -19523,7 +19631,6 @@ async function sendGiftVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                         )
                         VALUES (?, ?, ?, ?, ?, ?, NOW(), 'sent', ?, 0, 0, 'sent', NOW(), ?, ?)
                     `;
-                    const customerMessageId = customerResponse[0]?.headers?.['x-message-id'];
                     const contextType = 'voucher';
                     const contextId = voucherId ? String(voucherId) : null;
                     con.query(logSql, [
@@ -19543,7 +19650,6 @@ async function sendGiftVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                     });
 
                     // Log email activity for business owner
-                    const ownerMessageId = ownerResponse[0]?.headers?.['x-message-id'];
                     con.query(logSql, [
                         null, // booking_id is null for vouchers
                         'info@flyawayballooning.com',
@@ -19628,11 +19734,12 @@ app.post('/api/sendBookingEmail', async (req, res) => {
             }
         };
 
-        // Send email via SendGrid
-        console.log('Sending email via SendGrid to:', to);
-        const response = await sgMail.send(emailContent);
-
-        console.log('SendGrid response:', response[0].statusCode);
+        // Send email via SendGrid (with SMTP fallback)
+        console.log(`Sending booking email to ${to}`);
+        const { provider: emailProvider, messageId } = await sendEmailWithFallback(emailContent, {
+            context: 'send_booking_email'
+        });
+        console.log(`Email sent to ${to} via ${emailProvider}`);
 
         // Log email activity (bookingId may be null)
         {
@@ -19661,7 +19768,6 @@ app.post('/api/sendBookingEmail', async (req, res) => {
                 const contextType = isNumericBooking ? 'booking' : 'voucher';
                 const contextId = bookingId ? String(bookingId) : (to || '');
                 const bookingIdValue = isNumericBooking ? Number(bookingId) : null;
-                const messageId = response[0]?.headers?.['x-message-id'] || null;
                 con.query(logSql, [
                     bookingIdValue,
                     to,
@@ -19685,26 +19791,18 @@ app.post('/api/sendBookingEmail', async (req, res) => {
         res.json({
             success: true,
             message: 'Email sent successfully',
-            messageId: response[0].headers['x-message-id']
+            provider: emailProvider,
+            messageId
         });
 
     } catch (error) {
         console.error('Error sending email:', error);
 
-        // Handle SendGrid specific errors
-        if (error.response) {
-            console.error('SendGrid error response:', error.response.body);
-            return res.status(error.code || 500).json({
-                success: false,
-                message: 'Failed to send email',
-                error: error.response.body?.errors?.[0]?.message || error.message
-            });
-        }
-
-        res.status(500).json({
+        const statusCode = error.code && Number(error.code) ? Number(error.code) : 500;
+        res.status(statusCode).json({
             success: false,
             message: 'Failed to send email',
-            error: error.message
+            error: error.response?.body?.errors?.[0]?.message || error.message
         });
     }
 });
@@ -19769,9 +19867,12 @@ app.post('/api/sendBulkBookingEmail', async (req, res) => {
             }
         };
 
-        console.log('Sending BULK email via SendGrid to:', uniqueRecipients);
-        const response = await sgMail.sendMultiple(emailContent);
-        console.log('SendGrid bulk response:', response[0]?.statusCode);
+        console.log('Sending BULK email to:', uniqueRecipients);
+        const { provider: bulkProvider, messageId: bulkMessageId } = await sendEmailWithFallback(emailContent, {
+            isBulk: true,
+            context: 'send_bulk_booking_email'
+        });
+        console.log(`Bulk email sent to ${uniqueRecipients.length} recipients via ${bulkProvider}`);
 
         // Optionally log one row per recipient
         if (typeof ensureEmailLogsSchema === 'function') {
@@ -19797,7 +19898,6 @@ app.post('/api/sendBulkBookingEmail', async (req, res) => {
             `;
             ensureEmailLogsSchema(() => {
                 uniqueRecipients.forEach((recipient) => {
-                    const messageId = response[0]?.headers?.['x-message-id'] || null;
                     con.query(logSql, [
                         null,
                         recipient,
@@ -19805,7 +19905,7 @@ app.post('/api/sendBulkBookingEmail', async (req, res) => {
                         template || 'custom',
                         htmlBody,
                         textBody,
-                        messageId,
+                        bulkMessageId,
                         'bulk',
                         recipient
                     ], (err) => {
@@ -19819,7 +19919,8 @@ app.post('/api/sendBulkBookingEmail', async (req, res) => {
 
         return res.json({
             success: true,
-            message: `Bulk email sent to ${uniqueRecipients.length} recipients`
+            message: `Bulk email sent to ${uniqueRecipients.length} recipients`,
+            provider: bulkProvider
         });
     } catch (error) {
         console.error('Error sending bulk booking email:', error);
