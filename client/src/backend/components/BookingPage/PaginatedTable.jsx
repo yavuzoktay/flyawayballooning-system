@@ -17,6 +17,7 @@ const PaginatedTable = ({
     const [showVoucherModal, setShowVoucherModal] = useState(false);
     const [selectedVoucherData, setSelectedVoucherData] = useState(null);
     const loadingRef = useRef(false);
+    const prevSelectedIdsRef = useRef([]); // Track previous selected IDs to avoid infinite loops
 
     // Helper to get column id/label
     const getColId = (col) => (typeof col === 'string' ? col : (col?.id || ''));
@@ -46,11 +47,19 @@ const PaginatedTable = ({
         return label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
     };
 
-    // Reset visible count when data changes (filters, tab switch, etc.)
+    // Reset visible count when data length changes (filters, tab switch, etc.)
+    // Use ref to track previous length to avoid unnecessary resets
+    const prevDataLengthRef = useRef(data?.length || 0);
+    
     useEffect(() => {
-        setVisibleCount(10);
-        loadingRef.current = false;
-    }, [data]);
+        const currentLength = data?.length || 0;
+        // Only reset if length actually changed (not just data reference)
+        if (currentLength !== prevDataLengthRef.current) {
+            setVisibleCount(10);
+            loadingRef.current = false;
+            prevDataLengthRef.current = currentLength;
+        }
+    }, [data?.length]); // Only depend on length, not the entire data array
 
     // Infinite scroll logic
     useEffect(() => {
@@ -130,12 +139,20 @@ const PaginatedTable = ({
     };
 
     // Update parent on selection change
+    // Use useRef to track previous selectedIds to avoid infinite loops
     useEffect(() => {
         if (selectable && typeof onSelectionChange === 'function') {
             const selectedIds = selectedRows.map(idx => data[idx]?.id).filter(Boolean);
-            onSelectionChange(selectedIds);
+            // Only call onSelectionChange if the IDs actually changed
+            const idsChanged = selectedIds.length !== prevSelectedIdsRef.current.length ||
+                selectedIds.some((id, idx) => id !== prevSelectedIdsRef.current[idx]);
+            
+            if (idsChanged) {
+                prevSelectedIdsRef.current = selectedIds;
+                onSelectionChange(selectedIds);
+            }
         }
-    }, [selectedRows, data, selectable, onSelectionChange]);
+    }, [selectedRows, selectable, onSelectionChange]); // Removed 'data' from dependencies
 
     return (
         <>
@@ -451,15 +468,15 @@ const PaginatedTable = ({
                                                             fontSize: "16px"
                                                         }}>
                                                             {id === 'name' ? (
-                                                                selectable ? (
-                                                                    <span>{item[id]}</span>
-                                                                ) : (
+                                                                onNameClick ? (
                                                                     <span
                                                                         style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontSize: '16px' }}
                                                                         onClick={() => onNameClick && onNameClick(item)}
                                                                     >
                                                                         {item[id]}
                                                                     </span>
+                                                                ) : (
+                                                                    <span>{item[id]}</span>
                                                                 )
                                                             ) : id === 'created_at' ? (
                                                                 (() => {
