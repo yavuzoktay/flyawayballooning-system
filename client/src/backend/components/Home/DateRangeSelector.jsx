@@ -92,23 +92,18 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
     const calculateSummary = (data) => {
         const safeValue = (value) => isNaN(value) ? 0 : value;
         if(data){
-            // Filter flown flights: only count flights that are not cancelled, have flight_date, and flight_date is in the past
+            // Filter flown flights: only count flights where status is exactly "Flown"
             const flownFlights = data?.filter(item => {
-                // Must not be cancelled
                 if (!item || typeof item !== 'object') return false;
-                const status = (item.status || '').toLowerCase();
-                if (status === 'cancelled') return false;
-                if (status === 'scheduled' || status === 'open') return false;
                 
-                // Must have flight_date
-                if (!item.flight_date) return false;
+                // Status must be exactly "Flown" (case-insensitive check)
+                const status = (item.status || '').trim();
+                if (status.toLowerCase() !== 'flown') return false;
                 
-                // Flight date must be in the past (flown)
-                const flightDate = new Date(item.flight_date);
-                const today = new Date();
-                today.setHours(0, 0, 0, 0); // Reset time to start of day
+                // Must have pax count to calculate total passengers
+                // (flight_date check removed as status "Flown" is sufficient)
                 
-                return flightDate < today;
+                return true;
             });
             
             const summary = {
