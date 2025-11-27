@@ -12278,6 +12278,13 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
                         ELSE COALESCE(ab.pax, 0)
                     END
                 ), 0) as shared_consumed_pax,
+                CEIL(COALESCE(SUM(
+                    CASE 
+                        WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%')
+                             AND COALESCE(ab.pax, 0) > 4 THEN ${BALLOON_210_CAPACITY}
+                        ELSE COALESCE(ab.pax, 0)
+                    END
+                ), 0) / ${BALLOON_210_CAPACITY}) as shared_slots_used,
                 COALESCE(SUM(
                     CASE 
                         WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%')
@@ -12446,6 +12453,13 @@ app.get('/api/availabilities/filter', (req, res) => {
                         ELSE COALESCE(ab.pax, 0)
                     END
                 ), 0) as shared_consumed_pax,
+                CEIL(COALESCE(SUM(
+                    CASE 
+                        WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%')
+                             AND COALESCE(ab.pax, 0) > 4 THEN ${BALLOON_210_CAPACITY}
+                        ELSE COALESCE(ab.pax, 0)
+                    END
+                ), 0) / ${BALLOON_210_CAPACITY}) as shared_slots_used,
                 COALESCE(SUM(
                     CASE 
                         WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%')
@@ -12537,15 +12551,19 @@ app.get('/api/availabilities/filter', (req, res) => {
                 : Math.min(Number(row.capacity) || BALLOON_210_CAPACITY, BALLOON_210_CAPACITY);
             const sharedBooked = Number(row.shared_consumed_pax || 0);
             const privateSmallBookings = Number(row.private_charter_small_bookings || 0);
+            const sharedSlotsBooked = row.shared_slots_used ? Number(row.shared_slots_used) : Math.ceil(sharedBooked / BALLOON_210_CAPACITY);
             const isBalloon105Locked = privateSmallBookings > 0;
-            const sharedAvailable = isBalloon105Locked ? 0 : Math.max(0, sharedCapacity - sharedBooked);
+            const isBalloon210Locked = sharedSlotsBooked > 0;
+            const sharedAvailable = (isBalloon105Locked || isBalloon210Locked)
+                ? 0
+                : Math.max(0, sharedCapacity - sharedBooked);
             const privateSmallRemaining = isBalloon105Locked ? 0 : BALLOON_105_CAPACITY;
             const totalBooked = Number(row.total_booked) || 0;
-            const baseStatus = (sharedAvailable <= 0 || isBalloon105Locked) ? 'Closed' : (row.calculated_status || row.status);
+            const baseStatus = (sharedAvailable <= 0 || isBalloon105Locked || isBalloon210Locked) ? 'Closed' : (row.calculated_status || row.status);
 
             // Final available = calculated_available - heldSeats
             const finalAvailable = Math.max(0, sharedAvailable - heldSeats);
-            const finalStatus = (finalAvailable <= 0 || isBalloon105Locked) ? 'Closed' : baseStatus;
+            const finalStatus = (finalAvailable <= 0 || isBalloon105Locked || isBalloon210Locked) ? 'Closed' : baseStatus;
 
             return {
                 ...row,
@@ -12559,6 +12577,7 @@ app.get('/api/availabilities/filter', (req, res) => {
                 shared_capacity: sharedCapacity,
                 shared_booked: sharedBooked,
                 balloon105_locked: isBalloon105Locked ? 1 : 0,
+                balloon210_locked: isBalloon210Locked ? 1 : 0,
                 private_charter_small_bookings: privateSmallBookings,
                 private_charter_small_remaining: privateSmallRemaining,
                 private_charter_small_passengers: Number(row.private_charter_small_passengers || 0),
