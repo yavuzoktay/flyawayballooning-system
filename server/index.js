@@ -991,7 +991,7 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                         return res.json({ success: false, message: 'Voucher code has expired' });
                     }
                 }
-                // Also validate when the code originates from booking table → already used, block
+                // Also validate when the code originates from booking table
                 else if (row.code_source === 'booking_voucher_code') {
                     const now = new Date();
                     // Prefer explicit expires; otherwise compute 24 months from created_at if available
@@ -1003,11 +1003,14 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                         exp = new Date(created.getTime());
                         exp.setMonth(exp.getMonth() + 24);
                     }
+                    
+                    // First check if voucher has expired
+                    if (exp && now > exp) {
+                        return res.json({ success: false, message: 'Voucher code has expired. The expiration date has passed.' });
+                    }
+                    
                     // If code already exists on a booking, treat as redeemed/used
                     return res.json({ success: false, message: 'Voucher already redeemed' });
-                    if (exp && now > exp) {
-                        return res.json({ success: false, message: 'Voucher code has expired' });
-                    }
                 }
                 // Treat as valid for redeem flow
                 return res.json({
