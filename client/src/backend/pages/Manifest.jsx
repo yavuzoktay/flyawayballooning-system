@@ -3071,7 +3071,7 @@ const Manifest = () => {
                             const availabilityCountDisplay = (found && typeof found.capacity === 'number' && typeof found.available === 'number')
                                 ? (found.capacity - found.available)
                                 : passengerCountDisplay;
-                            const paxBookedDisplay = Math.max(availabilityCountDisplay, passengerCountDisplay);
+                            const paxBookedDisplay = passengerCountDisplay;
                             // Prefer capacity directly from matched availability; otherwise try to re-match using map
                             let paxTotalDisplay = '-';
                             if (found && typeof found.capacity === 'number') {
