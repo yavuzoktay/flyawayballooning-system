@@ -12264,7 +12264,9 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
                 WHEN COALESCE(booking_counts.shared_consumed_pax, 0) >= LEAST(aa.capacity, 8) THEN 'Closed'
                 ELSE aa.status
             END as calculated_status,
-            GREATEST(0, LEAST(aa.capacity, 8) - COALESCE(booking_counts.shared_consumed_pax, 0)) as calculated_available
+            GREATEST(0, LEAST(aa.capacity, 8) - COALESCE(booking_counts.shared_consumed_pax, 0)) as calculated_available,
+            resource_assignments.assigned_balloon210_location,
+            resource_assignments.assigned_balloon105_location
         FROM activity_availability aa 
         JOIN activity a ON aa.activity_id = a.id 
         LEFT JOIN (
@@ -12310,6 +12312,53 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
         ) as booking_counts 
             ON DATE(aa.date) = booking_counts.flight_date 
             AND TIME_FORMAT(TIME(aa.time), '%H:%i') = booking_counts.flight_time_min
+        LEFT JOIN (
+            SELECT 
+                flight_date,
+                flight_time_min,
+                SUBSTRING_INDEX(
+                    GROUP_CONCAT(
+                        CASE WHEN resource_key = 'BALLOON_210' THEN location ELSE NULL END
+                        ORDER BY created_at ASC
+                        SEPARATOR ','
+                    ),
+                    ',',
+                    1
+                ) as assigned_balloon210_location,
+                SUBSTRING_INDEX(
+                    GROUP_CONCAT(
+                        CASE WHEN resource_key = 'BALLOON_105' THEN location ELSE NULL END
+                        ORDER BY created_at ASC
+                        SEPARATOR ','
+                    ),
+                    ',',
+                    1
+                ) as assigned_balloon105_location
+            FROM (
+                SELECT 
+                    DATE(ab.flight_date) as flight_date,
+                    TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i') as flight_time_min,
+                    CASE 
+                        WHEN (LOWER(COALESCE(ab.resources, '')) LIKE '%105%')
+                             OR (
+                                (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%')
+                                AND COALESCE(ab.pax, 0) > 0
+                                AND COALESCE(ab.pax, 0) <= ${BALLOON_105_CAPACITY}
+                             )
+                        THEN 'BALLOON_105'
+                        ELSE 'BALLOON_210'
+                    END as resource_key,
+                    NULLIF(TRIM(ab.location), '') as location,
+                    ab.created_at
+                FROM all_booking ab 
+                WHERE DATE(ab.flight_date) >= CURDATE() - INTERVAL 30 DAY
+                AND (ab.status IS NULL OR TRIM(LOWER(ab.status)) NOT IN ('cancelled'))
+                AND (ab.manual_status_override IS NULL OR TRIM(LOWER(ab.manual_status_override)) NOT IN ('cancelled'))
+            ) as resource_usage
+            GROUP BY flight_date, flight_time_min
+        ) as resource_assignments
+            ON DATE(aa.date) = resource_assignments.flight_date
+            AND TIME_FORMAT(TIME(aa.time), '%H:%i') = resource_assignments.flight_time_min
         WHERE aa.activity_id = ? 
         ORDER BY aa.date, aa.time
 `;
@@ -12331,26 +12380,37 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
         }
 
         // Process results and update database if needed
+        const normalizeLocationValue = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
+
         const processedResult = result.map(row => {
             const sharedCapacity = row.shared_capacity
                 ? Number(row.shared_capacity)
                 : Math.min(Number(row.capacity) || BALLOON_210_CAPACITY, BALLOON_210_CAPACITY);
             const sharedBooked = Number(row.shared_consumed_pax || 0);
             const privateSmallBookings = Number(row.private_charter_small_bookings || 0);
-            const isBalloon105Locked = privateSmallBookings > 0;
-            const sharedAvailable = isBalloon105Locked ? 0 : Math.max(0, sharedCapacity - sharedBooked);
-            const privateSmallRemaining = isBalloon105Locked ? 0 : BALLOON_105_CAPACITY;
-            const calculatedStatus = (sharedAvailable <= 0 || isBalloon105Locked) ? 'Closed' : row.calculated_status;
-            const needsUpdate = calculatedStatus !== row.status || sharedAvailable !== row.available;
+            const locationName = normalizeLocationValue(row.location);
+            const assignedBalloon210Location = normalizeLocationValue(row.assigned_balloon210_location);
+            const assignedBalloon105Location = normalizeLocationValue(row.assigned_balloon105_location);
+            const ownsBalloon210 = !assignedBalloon210Location || assignedBalloon210Location === locationName;
+            const ownsBalloon105 = !assignedBalloon105Location || assignedBalloon105Location === locationName;
+            const sharedAvailable = ownsBalloon210 ? Math.max(0, sharedCapacity - sharedBooked) : 0;
+            const privateSmallRemaining = ownsBalloon105
+                ? (privateSmallBookings > 0 ? 0 : BALLOON_105_CAPACITY)
+                : 0;
+            const balloon210Locked = ownsBalloon210 ? 0 : 1;
+            const balloon105Locked = ownsBalloon105 ? 0 : 1;
+            const baseStatus = row.calculated_status || row.status;
+            const calculatedStatus = (sharedAvailable <= 0 || balloon210Locked) ? 'Closed' : baseStatus;
+            const needsUpdate = calculatedStatus !== row.status || sharedAvailable !== row.available || balloon210Locked !== Number(row.balloon210_locked || 0);
 
             if (needsUpdate) {
-                console.log(`Updating availability ${row.id}: date=${row.date}, time=${row.time}, status=${calculatedStatus}, available=${sharedAvailable}`);
-                const updateSql = 'UPDATE activity_availability SET status = ?, available = ? WHERE id = ?';
-                con.query(updateSql, [calculatedStatus, sharedAvailable, row.id], (updateErr) => {
+                console.log(`Updating availability ${row.id}: date=${row.date}, time=${row.time}, status=${calculatedStatus}, available=${sharedAvailable}, balloon210_locked=${balloon210Locked}`);
+                const updateSql = 'UPDATE activity_availability SET status = ?, available = ?, balloon210_locked = ?, balloon105_locked = ? WHERE id = ?';
+                con.query(updateSql, [calculatedStatus, sharedAvailable, balloon210Locked, balloon105Locked, row.id], (updateErr) => {
                     if (updateErr) {
                         console.error('Error updating availability:', updateErr);
                     } else {
-                        console.log(`Updated availability ${row.id}: status=${calculatedStatus}, available=${sharedAvailable}`);
+                        console.log(`Updated availability ${row.id}: status=${calculatedStatus}, available=${sharedAvailable}, balloon210_locked=${balloon210Locked}, balloon105_locked=${balloon105Locked}`);
                     }
                 });
             }
@@ -12363,7 +12423,8 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
                 status: calculatedStatus,
                 shared_capacity: sharedCapacity,
                 shared_booked: sharedBooked,
-                balloon105_locked: isBalloon105Locked ? 1 : 0,
+                balloon105_locked: balloon105Locked,
+                balloon210_locked: balloon210Locked,
                 private_charter_small_bookings: privateSmallBookings,
                 private_charter_small_remaining: privateSmallRemaining,
                 private_charter_small_passengers: Number(row.private_charter_small_passengers || 0)
@@ -12439,7 +12500,9 @@ app.get('/api/availabilities/filter', (req, res) => {
                 WHEN COALESCE(booking_counts.shared_consumed_pax, 0) >= LEAST(aa.capacity, 8) THEN 'Closed'
                 ELSE aa.status
             END as calculated_status,
-            GREATEST(0, LEAST(aa.capacity, 8) - COALESCE(booking_counts.shared_consumed_pax, 0)) as calculated_available
+            GREATEST(0, LEAST(aa.capacity, 8) - COALESCE(booking_counts.shared_consumed_pax, 0)) as calculated_available,
+            resource_assignments.assigned_balloon210_location,
+            resource_assignments.assigned_balloon105_location
         FROM activity_availability aa 
         JOIN activity a ON aa.activity_id = a.id 
         LEFT JOIN (
@@ -12485,6 +12548,53 @@ app.get('/api/availabilities/filter', (req, res) => {
         ) as booking_counts 
             ON DATE(aa.date) = booking_counts.flight_date 
             AND TIME_FORMAT(TIME(aa.time), '%H:%i') = booking_counts.flight_time_min
+        LEFT JOIN (
+            SELECT 
+                flight_date,
+                flight_time_min,
+                SUBSTRING_INDEX(
+                    GROUP_CONCAT(
+                        CASE WHEN resource_key = 'BALLOON_210' THEN location ELSE NULL END
+                        ORDER BY created_at ASC
+                        SEPARATOR ','
+                    ),
+                    ',',
+                    1
+                ) as assigned_balloon210_location,
+                SUBSTRING_INDEX(
+                    GROUP_CONCAT(
+                        CASE WHEN resource_key = 'BALLOON_105' THEN location ELSE NULL END
+                        ORDER BY created_at ASC
+                        SEPARATOR ','
+                    ),
+                    ',',
+                    1
+                ) as assigned_balloon105_location
+            FROM (
+                SELECT 
+                    DATE(ab.flight_date) as flight_date,
+                    TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i') as flight_time_min,
+                    CASE 
+                        WHEN (LOWER(COALESCE(ab.resources, '')) LIKE '%105%')
+                             OR (
+                                (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%')
+                                AND COALESCE(ab.pax, 0) > 0
+                                AND COALESCE(ab.pax, 0) <= ${BALLOON_105_CAPACITY}
+                             )
+                        THEN 'BALLOON_105'
+                        ELSE 'BALLOON_210'
+                    END as resource_key,
+                    NULLIF(TRIM(ab.location), '') as location,
+                    ab.created_at
+                FROM all_booking ab 
+                WHERE DATE(ab.flight_date) >= CURDATE() - INTERVAL 30 DAY
+                AND (ab.status IS NULL OR TRIM(LOWER(ab.status)) NOT IN ('cancelled'))
+                AND (ab.manual_status_override IS NULL OR TRIM(LOWER(ab.manual_status_override)) NOT IN ('cancelled'))
+            ) as resource_usage
+            GROUP BY flight_date, flight_time_min
+        ) as resource_assignments
+            ON DATE(aa.date) = resource_assignments.flight_date
+            AND TIME_FORMAT(TIME(aa.time), '%H:%i') = resource_assignments.flight_time_min
         WHERE ${activityId ? 'aa.activity_id = ?' : 'a.location = ?'} AND a.status = 'Live'
     `;
 
@@ -12525,6 +12635,8 @@ app.get('/api/availabilities/filter', (req, res) => {
         }
 
         // Normalize date format to YYYY-MM-DD using local timezone to prevent 1-day offset
+        const normalizeLocationValue = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
+
         const normalizedResult = result.map(row => {
             if (!row.date) return row;
 
@@ -12552,35 +12664,46 @@ app.get('/api/availabilities/filter', (req, res) => {
             const sharedCapacity = row.shared_capacity
                 ? Number(row.shared_capacity)
                 : Math.min(Number(row.capacity) || BALLOON_210_CAPACITY, BALLOON_210_CAPACITY);
-            const sharedBooked = Number(row.shared_consumed_pax || 0);
+            const sharedBooked = Number(row.shared_consumed_pax || row.shared_booked || 0);
             const privateSmallBookings = Number(row.private_charter_small_bookings || 0);
-            const sharedSlotsBooked = row.shared_slots_used ? Number(row.shared_slots_used) : Math.ceil(sharedBooked / BALLOON_210_CAPACITY);
-            const isBalloon105Locked = privateSmallBookings > 0;
-            const isBalloon210Locked = sharedSlotsBooked > 0;
-            const sharedAvailable = (isBalloon105Locked || isBalloon210Locked)
-                ? 0
-                : Math.max(0, sharedCapacity - sharedBooked);
-            const privateSmallRemaining = isBalloon105Locked ? 0 : BALLOON_105_CAPACITY;
+            const locationName = normalizeLocationValue(row.location);
+            const assignedBalloon210Location = normalizeLocationValue(row.assigned_balloon210_location);
+            const assignedBalloon105Location = normalizeLocationValue(row.assigned_balloon105_location);
+            const ownsBalloon210 = !assignedBalloon210Location || assignedBalloon210Location === locationName;
+            const ownsBalloon105 = !assignedBalloon105Location || assignedBalloon105Location === locationName;
+            const balloon210Locked = ownsBalloon210 ? 0 : 1;
+            const balloon105Locked = ownsBalloon105 ? 0 : 1;
+            const sharedAvailable = ownsBalloon210 ? Math.max(0, sharedCapacity - sharedBooked) : 0;
+            const privateSmallRemaining = ownsBalloon105
+                ? (privateSmallBookings > 0 ? 0 : BALLOON_105_CAPACITY)
+                : 0;
             const totalBooked = Number(row.total_booked) || 0;
-            const baseStatus = (sharedAvailable <= 0 || isBalloon105Locked || isBalloon210Locked) ? 'Closed' : (row.calculated_status || row.status);
+
+            const rawCalculatedAvailable = Number(row.calculated_available);
+            const calculatedAvailable = ownsBalloon210
+                ? (Number.isFinite(rawCalculatedAvailable)
+                    ? rawCalculatedAvailable
+                    : Math.max(0, sharedCapacity - sharedBooked))
+                : 0;
+            const baseStatus = (row.calculated_status || row.status || '').trim() || 'Open';
 
             // Final available = calculated_available - heldSeats
-            const finalAvailable = Math.max(0, sharedAvailable - heldSeats);
-            const finalStatus = (finalAvailable <= 0 || isBalloon105Locked || isBalloon210Locked) ? 'Closed' : baseStatus;
+            const finalAvailable = Math.max(0, calculatedAvailable - heldSeats);
+            const finalStatus = (finalAvailable <= 0 || !ownsBalloon210) ? 'Closed' : baseStatus;
 
             return {
                 ...row,
                 date: localDateString,
                 available: finalAvailable,
                 booked: totalBooked,
-                actualAvailable: sharedAvailable,
+                actualAvailable: calculatedAvailable,
                 heldSeats: heldSeats,
                 status: finalStatus,
                 total_booked: totalBooked,
                 shared_capacity: sharedCapacity,
                 shared_booked: sharedBooked,
-                balloon105_locked: isBalloon105Locked ? 1 : 0,
-                balloon210_locked: isBalloon210Locked ? 1 : 0,
+                balloon105_locked: balloon105Locked ? 1 : 0,
+                balloon210_locked: balloon210Locked ? 1 : 0,
                 private_charter_small_bookings: privateSmallBookings,
                 private_charter_small_remaining: privateSmallRemaining,
                 private_charter_small_passengers: Number(row.private_charter_small_passengers || 0),
