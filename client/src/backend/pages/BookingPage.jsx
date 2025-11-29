@@ -134,6 +134,44 @@ const BookingPage = () => {
     const [loadingDetail, setLoadingDetail] = useState(false);
     const [detailError, setDetailError] = useState(null);
     const [bookingHistory, setBookingHistory] = useState([]);
+    // Helper function to calculate expires date based on flight_attempts
+    // If flight_attempts is a multiple of 3, add 6 months to expires date
+    const calculateExpiresDate = (expiresDate, flightAttempts) => {
+        if (!expiresDate || !flightAttempts) return expiresDate;
+        
+        const attempts = parseInt(flightAttempts, 10) || 0;
+        
+        // Check if flight_attempts is a multiple of 3 (3, 6, 9, 12, etc.)
+        if (attempts > 0 && attempts % 3 === 0) {
+            // Parse the expires date
+            let parsedDate;
+            if (typeof expiresDate === 'string' && expiresDate.includes('/')) {
+                // DD/MM/YYYY format
+                const parts = expiresDate.split('/');
+                if (parts.length === 3) {
+                    parsedDate = dayjs(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
+                } else {
+                    parsedDate = dayjs(expiresDate);
+                }
+            } else {
+                parsedDate = dayjs(expiresDate);
+            }
+            
+            if (parsedDate.isValid()) {
+                // Add 6 months to the expires date
+                const newExpiresDate = parsedDate.add(6, 'month');
+                return newExpiresDate.format('DD/MM/YYYY');
+            }
+        }
+        
+        // Return original date if not a multiple of 3 or parsing failed
+        if (typeof expiresDate === 'string' && expiresDate.includes('/')) {
+            return expiresDate; // Already in DD/MM/YYYY format
+        }
+        const parsedDate = dayjs(expiresDate);
+        return parsedDate.isValid() ? parsedDate.format('DD/MM/YYYY') : expiresDate;
+    };
+
     const buildDisplayedHistoryRows = () => {
         // Build history from booking_status_history and current booking
         const historyEntries = Array.isArray(bookingHistory) ? [...bookingHistory] : [];
@@ -160,8 +198,8 @@ const BookingPage = () => {
             // Only process entries with valid flight dates and status
             if (entryFlightDate && status) {
                 const isCancelled = status.toLowerCase() === 'cancelled';
-                
-                if (isCancelled) {
+            
+            if (isCancelled) {
                     // Cancelled: Find the last Scheduled entry with the same flight_date and update it
                     // Use the Cancelled entry's own flight_date to find matching Scheduled entry
                     const cancelledDateKey = dayjs(entryFlightDate).format('YYYY-MM-DD HH:mm');
@@ -262,8 +300,8 @@ const BookingPage = () => {
                             status: 'Cancelled',
                             changed_at: currentFlightDate
                         });
-                    }
-                } else {
+                }
+            } else {
                     // If Scheduled, add as new row only if it doesn't already exist
                     processedRows.push({
                         flight_date: currentFlightDate,
@@ -4654,14 +4692,9 @@ setBookingDetail(finalVoucherDetail);
                                                             <>
                                                                 {bookingDetail.voucher.expires ? (
                                                                     (() => {
-                                                                        // Backend returns DD/MM/YYYY format
-                                                                        // If it's already in DD/MM/YYYY format, use it directly
-                                                                        if (typeof bookingDetail.voucher.expires === 'string' && bookingDetail.voucher.expires.includes('/')) {
-                                                                            return bookingDetail.voucher.expires; // Already in DD/MM/YYYY format from backend
-                                                                        }
-                                                                        // Try dayjs parsing for Date objects or other formats
-                                                                        const expiresMoment = dayjs(bookingDetail.voucher.expires);
-                                                                        return expiresMoment.isValid() ? expiresMoment.format('DD/MM/YYYY') : bookingDetail.voucher.expires;
+                                                                        // Calculate expires date based on flight_attempts (add 6 months if multiple of 3)
+                                                                        const flightAttempts = v.flight_attempts ?? 0;
+                                                                        return calculateExpiresDate(bookingDetail.voucher.expires, flightAttempts);
                                                                     })()
                                                                 ) : '-'}
                                                                 <IconButton size="small" onClick={() => handleEditClick('expires', bookingDetail.voucher.expires)}><EditIcon fontSize="small" /></IconButton>
@@ -4811,7 +4844,13 @@ setBookingDetail(finalVoucherDetail);
                                                         </>
                                                     ) : (
                                                         <>
-                                                            {bookingDetail.booking.expires ? dayjs(bookingDetail.booking.expires).format('DD/MM/YYYY') : '-'}
+                                                            {bookingDetail.booking.expires ? (
+                                                                (() => {
+                                                                    // Calculate expires date based on flight_attempts (add 6 months if multiple of 3)
+                                                                    const flightAttempts = bookingDetail.booking.flight_attempts ?? 0;
+                                                                    return calculateExpiresDate(bookingDetail.booking.expires, flightAttempts);
+                                                                })()
+                                                            ) : '-'}
                                                             <IconButton size="small" onClick={() => handleEditClick('expires', bookingDetail.booking.expires)}><EditIcon fontSize="small" /></IconButton>
                                                         </>
                                                     )}</Typography>
@@ -4949,14 +4988,9 @@ setBookingDetail(finalVoucherDetail);
                                                                 ) : '-'}</Typography>
                                                                 <Typography><b>Expires:</b> {v.expires ? (
                                                                     (() => {
-                                                                        // Backend returns DD/MM/YYYY format
-                                                                        // If it's already in DD/MM/YYYY format, use it directly
-                                                                        if (typeof v.expires === 'string' && v.expires.includes('/')) {
-                                                                            return v.expires; // Already in DD/MM/YYYY format from backend
-                                                                        }
-                                                                        // Try dayjs parsing for Date objects or other formats
-                                                                        const expiresMoment = dayjs(v.expires);
-                                                                        return expiresMoment.isValid() ? expiresMoment.format('DD/MM/YYYY') : v.expires;
+                                                                        // Calculate expires date based on flight_attempts (add 6 months if multiple of 3)
+                                                                        const flightAttempts = v.flight_attempts ?? 0;
+                                                                        return calculateExpiresDate(v.expires, flightAttempts);
                                                                     })()
                                                                 ) : '-'}</Typography>
                                                             </>;
@@ -6267,20 +6301,20 @@ setBookingDetail(finalVoucherDetail);
                                                         </Typography>
                                                     ) : (
                                                         <>
-                                                            <Typography variant="body2" sx={{ 
-                                                                fontWeight: 600,
-                                                                textTransform: 'uppercase',
-                                                                fontSize: '0.75rem',
-                                                                px: 1,
-                                                                py: 0.5,
-                                                                borderRadius: 1,
-                                                                background: '#f0f0f0'
-                                                            }}>
-                                                                {getCardBrandLogo(payment.card_brand)}
-                                                            </Typography>
-                                                            <Typography variant="body2">
-                                                                **** {payment.card_last4 || 'N/A'}
-                                                            </Typography>
+                                                    <Typography variant="body2" sx={{ 
+                                                        fontWeight: 600,
+                                                        textTransform: 'uppercase',
+                                                        fontSize: '0.75rem',
+                                                        px: 1,
+                                                        py: 0.5,
+                                                        borderRadius: 1,
+                                                        background: '#f0f0f0'
+                                                    }}>
+                                                        {getCardBrandLogo(payment.card_brand)}
+                                                    </Typography>
+                                                    <Typography variant="body2">
+                                                        **** {payment.card_last4 || 'N/A'}
+                                                    </Typography>
                                                         </>
                                                     )}
                                                 </Box>

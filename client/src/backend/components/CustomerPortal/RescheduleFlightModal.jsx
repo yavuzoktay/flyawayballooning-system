@@ -25,56 +25,196 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
     const [currentMonth, setCurrentMonth] = useState(dayjs().startOf('month'));
     const [submitting, setSubmitting] = useState(false);
 
-    // Get activity ID from booking data
+    // Get activity ID, location, and voucher type from booking data
     const activityId = bookingData?.activity_id || bookingData?.activityId;
+    const location = bookingData?.location;
+    const voucherType = bookingData?.voucher_type || bookingData?.voucher_type_detail;
+    const experience = bookingData?.experience || bookingData?.flight_type || bookingData?.flight_type_source;
+    
+    // Debug logging
+    console.log('RescheduleFlightModal - Booking Data:', {
+        activityId,
+        location,
+        voucherType,
+        experience,
+        bookingData
+    });
+
+    // Helper function to check if a date is a weekday (Monday-Friday)
+    const isWeekday = (date) => {
+        const day = date.getDay();
+        return day >= 1 && day <= 5; // Monday = 1, Friday = 5
+    };
+
+    // Helper function to check if a time is morning (typically before 12:00 PM)
+    const isMorning = (time) => {
+        if (!time) return false;
+        // Parse time string (format: "HH:mm" or "HH:mm:ss")
+        const timeParts = time.split(':');
+        const hour = parseInt(timeParts[0], 10);
+        return hour < 12; // Morning is before 12:00 PM
+    };
+
+    // Filter availabilities based on voucher type
+    const filterByVoucherType = (availability) => {
+        if (!voucherType) return true; // No filtering if no voucher type
+
+        const voucherTypeLower = voucherType.toLowerCase();
+        
+        // Parse availability date safely
+        let availabilityDate = null;
+        if (availability.date) {
+            try {
+                // Handle different date formats
+                if (typeof availability.date === 'string') {
+                    // If date includes time, extract just the date part
+                    const datePart = availability.date.split(' ')[0];
+                    availabilityDate = new Date(datePart + 'T00:00:00'); // Add time to avoid timezone issues
+                } else {
+                    availabilityDate = new Date(availability.date);
+                }
+                
+                // Check if date is valid
+                if (isNaN(availabilityDate.getTime())) {
+                    return true; // Invalid date, don't filter
+                }
+            } catch (e) {
+                console.warn('Error parsing availability date:', availability.date, e);
+                return true; // Error parsing, don't filter
+            }
+        }
+        
+        if (!availabilityDate) return true; // If no date, don't filter
+
+        // Weekday Morning voucher → Show weekday mornings only
+        if (voucherTypeLower.includes('weekday morning')) {
+            return isWeekday(availabilityDate) && isMorning(availability.time);
+        }
+        
+        // Flexible Weekday voucher → Show all weekdays (any time)
+        if (voucherTypeLower.includes('flexible weekday')) {
+            return isWeekday(availabilityDate);
+        }
+        
+        // Anytime voucher (Any Day Flight) → Show all available schedules
+        if (voucherTypeLower.includes('any day') || voucherTypeLower.includes('anytime')) {
+            return true; // Show all dates
+        }
+
+        // Default: show all if voucher type doesn't match known types
+        return true;
+    };
 
     // Fetch availabilities when modal opens
     useEffect(() => {
-        if (open && activityId) {
+        if (open && location) {
             setLoading(true);
             setError(null);
             setSelectedDate(null);
             setSelectedTime(null);
             setCurrentMonth(dayjs().startOf('month'));
 
-            axios.get(`/api/activity/${activityId}/availabilities`)
-                .then(res => {
-                    if (res.data.success) {
-                        const data = Array.isArray(res.data.data) ? res.data.data : [];
-                        // Filter only open/available slots
+            // First, get activity ID from location if not available in bookingData
+            const fetchAvailabilities = async () => {
+                try {
+                    let finalActivityId = activityId;
+                    
+                    // If activityId is not available, fetch it from location
+                    if (!finalActivityId && location) {
+                        const activitiesResponse = await axios.get('/api/activities');
+                        if (activitiesResponse.data?.success) {
+                            const activities = Array.isArray(activitiesResponse.data.data) ? activitiesResponse.data.data : [];
+                            const activityForLocation = activities.find(a => a.location === location && a.status === 'Live');
+                            if (activityForLocation) {
+                                finalActivityId = activityForLocation.id;
+                                console.log('RescheduleFlightModal - Found activity ID from location:', finalActivityId);
+                            }
+                        }
+                    }
+
+                    if (!finalActivityId) {
+                        console.error('RescheduleFlightModal - No activity ID found for location:', location);
+                        setError('Could not find activity for this location. Please try again later.');
+                        setAvailabilities([]);
+                        setLoading(false);
+                        return;
+                    }
+
+                    // Use the same endpoint as Change Flight Location modal for consistency
+                    const availResponse = await axios.get(`/api/activity/${finalActivityId}/availabilities`);
+                    if (availResponse.data?.success) {
+                        const data = Array.isArray(availResponse.data.data) ? availResponse.data.data : [];
+                        
+                        // Filter based on voucher type and flight type (same logic as Change Flight Location)
+                        const bookingFlightType = experience || bookingData?.flight_type || bookingData?.experience || 'Shared Flight';
+                        const bookingVoucherType = voucherType || bookingData?.voucher_type || bookingData?.voucher_type_detail || 'Any Day Flight';
+
+                        // Normalize flight type
+                        const normalizedFlightType = bookingFlightType.toLowerCase().includes('private') ? 'private' : 'shared';
+
+                        // Filter availabilities
                         const filtered = data.filter(slot => {
                             const status = slot.status || slot.calculated_status || '';
                             const available = Number(slot.available) || Number(slot.calculated_available) || 0;
                             const slotDateTime = dayjs(`${slot.date} ${slot.time}`);
-                            return (status.toLowerCase() === 'open' || available > 0) && slotDateTime.isAfter(dayjs());
+
+                            // Check if slot is in the future
+                            if (!slotDateTime.isAfter(dayjs())) return false;
+
+                            // Check status and availability
+                            if (status.toLowerCase() !== 'open' && available <= 0) return false;
+
+                            // Filter by flight type if specified
+                            if (slot.flight_types && slot.flight_types.toLowerCase() !== 'all') {
+                                const slotTypes = slot.flight_types.split(',').map(t => t.trim().toLowerCase());
+                                if (!slotTypes.includes(normalizedFlightType)) return false;
+                            }
+
+                            return true;
                         });
+
+                        console.log('RescheduleFlightModal - Loaded availabilities:', filtered.length, 'for location:', location, 'voucher type:', bookingVoucherType, 'activityId:', finalActivityId);
                         setAvailabilities(filtered);
                     } else {
                         setAvailabilities([]);
                     }
-                })
-                .catch(err => {
+                } catch (err) {
                     console.error('Error loading availabilities:', err);
                     setError('Could not fetch availabilities. Please try again later.');
                     setAvailabilities([]);
-                })
-                .finally(() => setLoading(false));
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            fetchAvailabilities();
         } else if (!open) {
             setAvailabilities([]);
             setSelectedDate(null);
             setSelectedTime(null);
             setError(null);
         }
-    }, [open, activityId]);
+    }, [open, activityId, location, voucherType, experience, bookingData]);
 
     const getTimesForDate = (date) => {
         if (!date) return [];
         const dateStr = dayjs(date).format('YYYY-MM-DD');
-        return availabilities.filter(a => {
+        let matchingSlots = availabilities.filter(a => {
             if (!a.date) return false;
             const slotDate = a.date.includes('T') ? a.date.split('T')[0] : a.date;
             return slotDate === dateStr;
-        }).sort((a, b) => a.time.localeCompare(b.time));
+        });
+        
+        // Apply additional voucher type filtering for Weekday Morning (must be morning times)
+        if (voucherType) {
+            const voucherTypeLower = voucherType.toLowerCase();
+            if (voucherTypeLower.includes('weekday morning')) {
+                // Filter to only show morning times (before 12:00 PM)
+                matchingSlots = matchingSlots.filter(a => isMorning(a.time));
+            }
+        }
+        
+        return matchingSlots.sort((a, b) => a.time.localeCompare(b.time));
     };
 
     const buildDayCells = () => {
@@ -107,10 +247,40 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             const totalAvailable = slots.reduce((acc, s) => acc + (Number(s.available) || Number(s.calculated_available) || 0), 0);
             const soldOut = slots.length > 0 && totalAvailable <= 0;
             
-            // Tarih seçilebilir olmalı eğer:
-            // 1. Mevcut ay içinde
-            // 2. Geçmiş değil
-            const isSelectable = inCurrentMonth && !isPast;
+            // Apply voucher type filtering for calendar display
+            let shouldShowDate = true;
+            const voucherTypeLower = (voucherType || '').toLowerCase();
+            
+            // If no voucher type or "Any Day Flight", show all dates
+            if (!voucherType || voucherTypeLower.includes('any day') || voucherTypeLower.includes('anytime')) {
+                shouldShowDate = true;
+            } else if (slots.length > 0) {
+                const dateObj = d.toDate();
+                
+                // Weekday Morning voucher → Show weekday mornings only
+                if (voucherTypeLower.includes('weekday morning')) {
+                    // Must be weekday AND have morning slots available
+                    const isWeekdayDate = isWeekday(dateObj);
+                    if (isWeekdayDate) {
+                        // Check if there are any morning slots for this date
+                        const hasMorningSlots = slots.some(slot => isMorning(slot.time));
+                        shouldShowDate = hasMorningSlots;
+                    } else {
+                        shouldShowDate = false;
+                    }
+                }
+                // Flexible Weekday voucher → Show all weekdays (any time)
+                else if (voucherTypeLower.includes('flexible weekday')) {
+                    shouldShowDate = isWeekday(dateObj);
+                }
+            }
+            
+            // Only show date if it has available slots and matches voucher type filter
+            // Use same logic as Change Flight Location modal - check if slots exist and not sold out
+            const hasAvailableSlots = slots.length > 0 && !soldOut;
+            // If voucher type filtering says we shouldn't show this date, mark it as not selectable
+            // But still show it if it has slots (just make it non-selectable)
+            const isSelectable = inCurrentMonth && !isPast && shouldShowDate && hasAvailableSlots;
             
             cells.push(
                 <div
@@ -136,23 +306,27 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                     style={{
                         aspectRatio: '1 / 1',
                         borderRadius: 10,
-                        background: isSelected 
-                            ? '#56C1FF' 
-                            : isPast 
-                                ? '#f0f0f0' 
-                                : soldOut 
-                                    ? '#888' 
-                                    : '#22c55e',
-                        color: isSelected 
-                            ? '#fff' 
-                            : isPast 
-                                ? '#999' 
-                                : soldOut 
-                                    ? '#fff' 
-                                    : '#fff',
-                        display: 'flex',  // Always flex for Grid - use opacity for visibility
-                        opacity: !inCurrentMonth ? 0 : (isSelectable ? 1 : 0.6),  // Hide other months, dim unselectable dates
-                        pointerEvents: inCurrentMonth && isSelectable ? 'auto' : 'none',  // Disable interaction for hidden/unselectable dates
+                        background: isSelected
+                            ? '#56C1FF'
+                            : isPast
+                                ? '#f0f0f0'
+                                : soldOut
+                                    ? '#888'
+                                    : hasAvailableSlots
+                                        ? '#22c55e'  // Green for available dates
+                                        : '#f0f0f0',  // Light grey for dates with no slots
+                        color: isSelected
+                            ? '#fff'
+                            : isPast
+                                ? '#999'
+                                : soldOut
+                                    ? '#fff'
+                                    : hasAvailableSlots
+                                        ? '#fff'
+                                        : '#999',
+                        display: 'flex',
+                        opacity: !inCurrentMonth ? 0 : (isSelectable ? 1 : 0.6),
+                        pointerEvents: inCurrentMonth && isSelectable ? 'auto' : 'none',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',

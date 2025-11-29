@@ -792,10 +792,25 @@ const CustomerPortal = () => {
 
                                                             // Filter based on voucher type and flight type
                                                             const bookingFlightType = bookingData?.flight_type || bookingData?.experience || 'Shared Flight';
-                                                            const bookingVoucherType = bookingData?.voucher_type || 'Any Day Flight';
+                                                            const bookingVoucherType = bookingData?.voucher_type || bookingData?.voucher_type_detail || 'Any Day Flight';
 
                                                             // Normalize flight type
                                                             const normalizedFlightType = bookingFlightType.toLowerCase().includes('private') ? 'private' : 'shared';
+
+                                                            // Helper function to check if a date is a weekday (Monday-Friday)
+                                                            const isWeekday = (date) => {
+                                                                const day = date.getDay();
+                                                                return day >= 1 && day <= 5; // Monday = 1, Friday = 5
+                                                            };
+
+                                                            // Helper function to check if a time is morning (typically before 12:00 PM)
+                                                            const isMorning = (time) => {
+                                                                if (!time) return false;
+                                                                // Parse time string (format: "HH:mm" or "HH:mm:ss")
+                                                                const timeParts = time.split(':');
+                                                                const hour = parseInt(timeParts[0], 10);
+                                                                return hour < 12; // Morning is before 12:00 PM
+                                                            };
 
                                                             // Filter availabilities
                                                             const filtered = data.filter(slot => {
@@ -813,6 +828,38 @@ const CustomerPortal = () => {
                                                                 if (slot.flight_types && slot.flight_types.toLowerCase() !== 'all') {
                                                                     const slotTypes = slot.flight_types.split(',').map(t => t.trim().toLowerCase());
                                                                     if (!slotTypes.includes(normalizedFlightType)) return false;
+                                                                }
+
+                                                                // Apply voucher type filtering
+                                                                const voucherTypeLower = (bookingVoucherType || '').toLowerCase();
+                                                                if (voucherTypeLower && !voucherTypeLower.includes('any day') && !voucherTypeLower.includes('anytime')) {
+                                                                    // Parse slot date
+                                                                    let slotDate = null;
+                                                                    if (slot.date) {
+                                                                        try {
+                                                                            if (typeof slot.date === 'string') {
+                                                                                const datePart = slot.date.split(' ')[0];
+                                                                                slotDate = new Date(datePart + 'T00:00:00');
+                                                                            } else {
+                                                                                slotDate = new Date(slot.date);
+                                                                            }
+                                                                            if (isNaN(slotDate.getTime())) return true; // Invalid date, don't filter
+                                                                        } catch (e) {
+                                                                            return true; // Error parsing, don't filter
+                                                                        }
+                                                                    }
+                                                                    
+                                                                    if (slotDate) {
+                                                                        // Weekday Morning voucher → Show weekday mornings only
+                                                                        if (voucherTypeLower.includes('weekday morning')) {
+                                                                            if (!isWeekday(slotDate) || !isMorning(slot.time)) return false;
+                                                                        }
+                                                                        // Flexible Weekday voucher → Show all weekdays (any time)
+                                                                        else if (voucherTypeLower.includes('flexible weekday')) {
+                                                                            if (!isWeekday(slotDate)) return false;
+                                                                        }
+                                                                        // Anytime voucher → Show all available schedules (no additional filtering)
+                                                                    }
                                                                 }
 
                                                                 return true;
@@ -947,7 +994,47 @@ const CustomerPortal = () => {
                                                     });
                                                     const totalAvailable = slots.reduce((acc, s) => acc + (Number(s.available) || Number(s.calculated_available) || 0), 0);
                                                     const soldOut = slots.length > 0 && totalAvailable <= 0;
-                                                    const isSelectable = inCurrentMonth && !isPast && slots.length > 0 && !soldOut;
+                                                    
+                                                    // Apply voucher type filtering for calendar display
+                                                    const bookingVoucherType = bookingData?.voucher_type || bookingData?.voucher_type_detail || 'Any Day Flight';
+                                                    const voucherTypeLower = (bookingVoucherType || '').toLowerCase();
+                                                    
+                                                    // Helper function to check if a date is a weekday (Monday-Friday)
+                                                    const isWeekday = (date) => {
+                                                        const day = date.getDay();
+                                                        return day >= 1 && day <= 5; // Monday = 1, Friday = 5
+                                                    };
+                                                    
+                                                    // Helper function to check if a time is morning (typically before 12:00 PM)
+                                                    const isMorning = (time) => {
+                                                        if (!time) return false;
+                                                        const timeParts = time.split(':');
+                                                        const hour = parseInt(timeParts[0], 10);
+                                                        return hour < 12; // Morning is before 12:00 PM
+                                                    };
+                                                    
+                                                    let shouldShowDate = true;
+                                                    if (voucherTypeLower && !voucherTypeLower.includes('any day') && !voucherTypeLower.includes('anytime') && slots.length > 0) {
+                                                        const dateObj = d.toDate();
+                                                        
+                                                        // Weekday Morning voucher → Show weekday mornings only
+                                                        if (voucherTypeLower.includes('weekday morning')) {
+                                                            const isWeekdayDate = isWeekday(dateObj);
+                                                            if (isWeekdayDate) {
+                                                                const hasMorningSlots = slots.some(slot => isMorning(slot.time));
+                                                                shouldShowDate = hasMorningSlots;
+                                                            } else {
+                                                                shouldShowDate = false;
+                                                            }
+                                                        }
+                                                        // Flexible Weekday voucher → Show all weekdays (any time)
+                                                        else if (voucherTypeLower.includes('flexible weekday')) {
+                                                            shouldShowDate = isWeekday(dateObj);
+                                                        }
+                                                        // Anytime voucher → Show all available schedules (no filtering)
+                                                    }
+                                                    
+                                                    const isSelectable = inCurrentMonth && !isPast && shouldShowDate && slots.length > 0 && !soldOut;
 
                                                     cells.push(
                                                         <div
@@ -1025,11 +1112,31 @@ const CustomerPortal = () => {
                                             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
                                                 {(() => {
                                                     const dateStr = dayjs(selectedDate).format('YYYY-MM-DD');
-                                                    const times = locationAvailabilities.filter(a => {
+                                                    let times = locationAvailabilities.filter(a => {
                                                         if (!a.date) return false;
                                                         const slotDate = a.date.includes('T') ? a.date.split('T')[0] : a.date;
                                                         return slotDate === dateStr;
-                                                    }).sort((a, b) => a.time.localeCompare(b.time));
+                                                    });
+                                                    
+                                                    // Apply voucher type filtering for time selection
+                                                    const bookingVoucherType = bookingData?.voucher_type || bookingData?.voucher_type_detail || 'Any Day Flight';
+                                                    const voucherTypeLower = (bookingVoucherType || '').toLowerCase();
+                                                    
+                                                    // Helper function to check if a time is morning (typically before 12:00 PM)
+                                                    const isMorning = (time) => {
+                                                        if (!time) return false;
+                                                        const timeParts = time.split(':');
+                                                        const hour = parseInt(timeParts[0], 10);
+                                                        return hour < 12; // Morning is before 12:00 PM
+                                                    };
+                                                    
+                                                    // Weekday Morning voucher → Show only morning times
+                                                    if (voucherTypeLower.includes('weekday morning')) {
+                                                        times = times.filter(slot => isMorning(slot.time));
+                                                    }
+                                                    // Flexible Weekday and Anytime → Show all times (no additional filtering)
+                                                    
+                                                    times = times.sort((a, b) => a.time.localeCompare(b.time));
 
                                                     if (times.length === 0) {
                                                         return (

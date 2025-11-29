@@ -1081,6 +1081,7 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                 v.experience_type,
                 v.book_flight,
                 v.voucher_type AS actual_voucher_type,
+                v.voucher_type_detail,
                 v.paid,
                 v.redeemed,
                 v.offer_code,
@@ -1100,6 +1101,46 @@ app.post('/api/voucher-codes/validate', (req, res) => {
             let enriched = null;
             if (dRows && dRows.length > 0) {
                 const v = dRows[0];
+                
+                // Extract voucher_type_detail from various sources
+                let voucherTypeDetail = v.voucher_type_detail || null;
+                
+                // If voucher_type_detail is null, try to extract from title
+                if (!voucherTypeDetail && voucher.title) {
+                    const title = voucher.title.toLowerCase();
+                    if (title.includes('weekday morning')) {
+                        voucherTypeDetail = 'Weekday Morning';
+                    } else if (title.includes('flexible weekday')) {
+                        voucherTypeDetail = 'Flexible Weekday';
+                    } else if (title.includes('any day') || title.includes('anytime')) {
+                        voucherTypeDetail = 'Any Day Flight';
+                    }
+                }
+                
+                // If still null, try to extract from voucher_type field
+                if (!voucherTypeDetail && v.actual_voucher_type) {
+                    const voucherType = v.actual_voucher_type.toLowerCase();
+                    if (voucherType.includes('weekday morning')) {
+                        voucherTypeDetail = 'Weekday Morning';
+                    } else if (voucherType.includes('flexible weekday')) {
+                        voucherTypeDetail = 'Flexible Weekday';
+                    } else if (voucherType.includes('any day') || voucherType.includes('anytime')) {
+                        voucherTypeDetail = 'Any Day Flight';
+                    }
+                }
+                
+                // If still null, try to extract from book_flight
+                if (!voucherTypeDetail && v.book_flight) {
+                    const bookFlight = v.book_flight.toLowerCase();
+                    if (bookFlight.includes('weekday morning')) {
+                        voucherTypeDetail = 'Weekday Morning';
+                    } else if (bookFlight.includes('flexible weekday')) {
+                        voucherTypeDetail = 'Flexible Weekday';
+                    } else if (bookFlight.includes('any day') || bookFlight.includes('anytime')) {
+                        voucherTypeDetail = 'Any Day Flight';
+                    }
+                }
+                
                 enriched = {
                     experience: v.experience_type || null,
                     book_flight: v.book_flight || null,
@@ -1109,8 +1150,28 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                     voucher_ref: v.voucher_ref || voucher.code,
                     numberOfVouchers: v.numberOfPassengers || null,
                     created: v.created_at || null,
-                    expires: v.expires || null
+                    expires: v.expires || null,
+                    voucher_type_detail: voucherTypeDetail // Use extracted voucher type detail
                 };
+            } else {
+                // If no voucher found in all_vouchers, try to extract from voucher.title
+                let voucherTypeDetail = null;
+                if (voucher.title) {
+                    const title = voucher.title.toLowerCase();
+                    if (title.includes('weekday morning')) {
+                        voucherTypeDetail = 'Weekday Morning';
+                    } else if (title.includes('flexible weekday')) {
+                        voucherTypeDetail = 'Flexible Weekday';
+                    } else if (title.includes('any day') || title.includes('anytime')) {
+                        voucherTypeDetail = 'Any Day Flight';
+                    }
+                }
+                
+                if (voucherTypeDetail) {
+                    enriched = {
+                        voucher_type_detail: voucherTypeDetail
+                    };
+                }
             }
 
             // Voucher code is valid (no discount calculation needed)
@@ -1122,6 +1183,7 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                     // Keep response shape consistent with getAllVoucherData fields when possible
                     experience_type: voucher.applicable_experiences || enriched?.experience || null,
                     voucher_type: voucher.applicable_voucher_types || enriched?.actual_voucher_type || null,
+                    voucher_type_detail: enriched?.voucher_type_detail || null, // Add voucher type detail to main response
                     final_amount: booking_amount, // No discount applied
                     numberOfPassengers: enriched?.numberOfVouchers || null,
                     // Extra detail block for Redeem Voucher UI
@@ -5020,8 +5082,10 @@ app.get('/api/getAllBookingData', (req, res) => {
         SELECT 
             ab.*, 
             ab.name as passenger_name,
-            -- Prioritize voucher_type from all_vouchers (for redeem voucher bookings)
-            COALESCE(v.voucher_type, ab.voucher_type) as voucher_type,
+            -- Prioritize voucher_type_detail from all_vouchers, then booking's voucher_type_detail, then voucher_type, then booking's voucher_type
+            -- This ensures we show the actual voucher type (Weekday Morning, Flexible Weekday, Any Day Flight, etc.)
+            -- instead of experience type (Shared Flight, Private Charter, etc.)
+            COALESCE(v.voucher_type_detail, ab.voucher_type_detail, v.voucher_type, ab.voucher_type) as voucher_type,
             COALESCE(ab.voucher_code, vc.code, vcu_map.code, v.voucher_ref) as voucher_code,
             DATE_FORMAT(ab.created_at, '%Y-%m-%d') as created_at_display,
             DATE_FORMAT(ab.expires, '%d/%m/%Y') as expires_display,
@@ -5029,6 +5093,7 @@ app.get('/api/getAllBookingData', (req, res) => {
             DATE_FORMAT(v.expires, '%d/%m/%Y') as voucher_expires_display,
             v.created_at as voucher_created_at,
             v.voucher_type as original_voucher_type,
+            v.voucher_type_detail as voucher_type_detail,
             v.experience_type as voucher_experience_type,
             v.book_flight as voucher_book_flight,
             v.flight_attempts as voucher_flight_attempts,
@@ -9101,20 +9166,48 @@ app.get('/api/getBookingDetail', async (req, res) => {
 
                     // Safely parse options
                     if (question.options) {
-                        try {
-                            parsedOptions = JSON.parse(question.options);
-                        } catch (e) {
-                            console.warn('Failed to parse options for question', question.id, e);
+                        // Check if it's already an array
+                        if (Array.isArray(question.options)) {
+                            parsedOptions = question.options;
+                        } else if (typeof question.options === 'string') {
+                            // Check if it looks like JSON (starts with [ or {)
+                            const trimmed = question.options.trim();
+                            if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+                                try {
+                                    parsedOptions = JSON.parse(question.options);
+                                } catch (e) {
+                                    // If it's not valid JSON, treat as a single string value
+                                    parsedOptions = [question.options];
+                                }
+                            } else {
+                                // If it's a plain string (not JSON), treat as a single value in array
+                                parsedOptions = [question.options];
+                            }
+                        } else {
                             parsedOptions = [];
                         }
                     }
 
                     // Safely parse journey_types
                     if (question.journey_types) {
-                        try {
-                            parsedJourneyTypes = JSON.parse(question.journey_types);
-                        } catch (e) {
-                            console.warn('Failed to parse journey_types for question', question.id, e);
+                        // Check if it's already an array
+                        if (Array.isArray(question.journey_types)) {
+                            parsedJourneyTypes = question.journey_types;
+                        } else if (typeof question.journey_types === 'string') {
+                            // Check if it looks like JSON (starts with [ or {)
+                            const trimmed = question.journey_types.trim();
+                            if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+                                try {
+                                    parsedJourneyTypes = JSON.parse(question.journey_types);
+                                } catch (e) {
+                                    // If it's not valid JSON, treat as a single string value
+                                    parsedJourneyTypes = [question.journey_types];
+                                }
+                            } else {
+                                // If it's a plain string (not JSON), treat as a single value in array
+                                parsedJourneyTypes = [question.journey_types];
+                            }
+                        } else {
                             parsedJourneyTypes = [];
                         }
                     }
@@ -10376,6 +10469,32 @@ app.patch('/api/updateBookingField', (req, res) => {
             params = [normalizedValue, booking_id];
         }
 
+        // If flight_attempts is being updated and it's a multiple of 3, extend expires date by 6 months
+        if (field === 'flight_attempts') {
+            const attempts = parseInt(normalizedValue, 10) || 0;
+            if (attempts > 0 && attempts % 3 === 0) {
+                // Get current expires date
+                con.query('SELECT expires FROM all_booking WHERE id = ?', [booking_id], (expiresErr, expiresRows) => {
+                    if (!expiresErr && expiresRows && expiresRows.length > 0 && expiresRows[0].expires) {
+                        const currentExpires = expiresRows[0].expires;
+                        // Parse the expires date and add 6 months
+                        let parsedDate = moment(currentExpires);
+                        if (parsedDate.isValid()) {
+                            const newExpiresDate = parsedDate.add(6, 'months').format('YYYY-MM-DD');
+                            // Update expires date
+                            con.query('UPDATE all_booking SET expires = ? WHERE id = ?', [newExpiresDate, booking_id], (updateExpiresErr) => {
+                                if (updateExpiresErr) {
+                                    console.error('Error updating expires date:', updateExpiresErr);
+                                } else {
+                                    console.log(`Extended expires date by 6 months for booking ${booking_id} (flight_attempts: ${attempts})`);
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+        }
+
         if (typeof normalizedValue === 'undefined') {
             normalizedValue = value;
         }
@@ -10797,25 +10916,38 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
 
         console.log('✅ Customer Portal - Booking found:', booking.id);
 
-        // Get voucher_type from all_vouchers if booking was created from redeem voucher
+        // Get voucher_type and voucher_type_detail from all_vouchers if booking was created from redeem voucher
         // This matches the logic in getAllBookingData endpoint
         let finalVoucherType = booking.voucher_type;
+        let finalVoucherTypeDetail = booking.voucher_type_detail || null;
         if (booking.voucher_code) {
             try {
                 const [voucherRows] = await new Promise((resolve, reject) => {
-                    con.query('SELECT voucher_type FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [booking.voucher_code], (err, rows) => {
+                    con.query('SELECT voucher_type, voucher_type_detail FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [booking.voucher_code], (err, rows) => {
                         if (err) reject(err);
                         else resolve([rows]);
                     });
                 });
-                if (voucherRows && voucherRows.length > 0 && voucherRows[0].voucher_type) {
-                    finalVoucherType = voucherRows[0].voucher_type;
-                    console.log('✅ Customer Portal - Voucher type from all_vouchers:', finalVoucherType);
+                if (voucherRows && voucherRows.length > 0) {
+                    // Prioritize voucher_type_detail, then voucher_type
+                    if (voucherRows[0].voucher_type_detail) {
+                        finalVoucherTypeDetail = voucherRows[0].voucher_type_detail;
+                        finalVoucherType = voucherRows[0].voucher_type_detail;
+                        console.log('✅ Customer Portal - Voucher type detail from all_vouchers:', finalVoucherTypeDetail);
+                    } else if (voucherRows[0].voucher_type) {
+                        finalVoucherType = voucherRows[0].voucher_type;
+                        console.log('✅ Customer Portal - Voucher type from all_vouchers:', finalVoucherType);
+                    }
                 }
             } catch (voucherErr) {
                 console.warn('⚠️ Customer Portal - Could not fetch voucher_type from all_vouchers:', voucherErr.message);
                 // Continue with booking.voucher_type as fallback
             }
+        }
+        
+        // If voucher_type_detail is still null, try to extract from booking.voucher_type
+        if (!finalVoucherTypeDetail && finalVoucherType) {
+            finalVoucherTypeDetail = finalVoucherType;
         }
 
         // Get passengers for this booking
@@ -10889,6 +11021,7 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 voucher_code: booking.voucher_code,
                 voucher_ref: booking.voucher_code || null,
                 voucher_type: finalVoucherType || booking.voucher_type,
+                voucher_type_detail: finalVoucherTypeDetail || booking.voucher_type_detail || finalVoucherType || booking.voucher_type,
                 paid: booking.paid,
                 due: booking.due,
                 expires: booking.expires,
@@ -12682,16 +12815,16 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
             const balloon105Locked = ownsBalloon105 ? 0 : 1;
             const baseStatus = row.calculated_status || row.status;
             const calculatedStatus = (sharedAvailable <= 0 || balloon210Locked) ? 'Closed' : baseStatus;
-            const needsUpdate = calculatedStatus !== row.status || sharedAvailable !== row.available || balloon210Locked !== Number(row.balloon210_locked || 0);
+            const needsUpdate = calculatedStatus !== row.status || sharedAvailable !== row.available;
 
             if (needsUpdate) {
-                console.log(`Updating availability ${row.id}: date=${row.date}, time=${row.time}, status=${calculatedStatus}, available=${sharedAvailable}, balloon210_locked=${balloon210Locked}`);
-                const updateSql = 'UPDATE activity_availability SET status = ?, available = ?, balloon210_locked = ?, balloon105_locked = ? WHERE id = ?';
-                con.query(updateSql, [calculatedStatus, sharedAvailable, balloon210Locked, balloon105Locked, row.id], (updateErr) => {
+                console.log(`Updating availability ${row.id}: date=${row.date}, time=${row.time}, status=${calculatedStatus}, available=${sharedAvailable}`);
+                const updateSql = 'UPDATE activity_availability SET status = ?, available = ? WHERE id = ?';
+                con.query(updateSql, [calculatedStatus, sharedAvailable, row.id], (updateErr) => {
                     if (updateErr) {
                         console.error('Error updating availability:', updateErr);
                     } else {
-                        console.log(`Updated availability ${row.id}: status=${calculatedStatus}, available=${sharedAvailable}, balloon210_locked=${balloon210Locked}, balloon105_locked=${balloon105Locked}`);
+                        console.log(`Updated availability ${row.id}: status=${calculatedStatus}, available=${sharedAvailable}`);
                     }
                 });
             }
