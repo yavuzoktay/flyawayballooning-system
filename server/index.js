@@ -3366,17 +3366,19 @@ app.delete('/api/additional-information-questions/:id', (req, res) => {
 
 // Create new crew member
 app.post('/api/crew', (req, res) => {
-    const { first_name, last_name, is_active } = req.body;
+    const { first_name, last_name, email, phone, is_active } = req.body;
 
     // Validation
     if (!first_name || !last_name) {
         return res.status(400).json({ success: false, message: 'Missing required fields: first_name and last_name' });
     }
 
-    const sql = 'INSERT INTO crew (first_name, last_name, is_active) VALUES (?, ?, ?)';
+    const sql = 'INSERT INTO crew (first_name, last_name, email, phone, is_active) VALUES (?, ?, ?, ?, ?)';
     const values = [
         first_name.trim(),
         last_name.trim(),
+        email ? email.trim() : null,
+        phone ? phone.trim() : null,
         is_active !== undefined ? is_active : true
     ];
 
@@ -3400,17 +3402,19 @@ app.post('/api/crew', (req, res) => {
 // Update crew member
 app.put('/api/crew/:id', (req, res) => {
     const { id } = req.params;
-    const { first_name, last_name, is_active } = req.body;
+    const { first_name, last_name, email, phone, is_active } = req.body;
 
     // Validation
     if (!first_name || !last_name) {
         return res.status(400).json({ success: false, message: 'Missing required fields: first_name and last_name' });
     }
 
-    const sql = 'UPDATE crew SET first_name = ?, last_name = ?, is_active = ? WHERE id = ?';
+    const sql = 'UPDATE crew SET first_name = ?, last_name = ?, email = ?, phone = ?, is_active = ? WHERE id = ?';
     const values = [
         first_name.trim(),
         last_name.trim(),
+        email ? email.trim() : null,
+        phone ? phone.trim() : null,
         is_active !== undefined ? is_active : true,
         id
     ];
@@ -3490,17 +3494,19 @@ app.get('/api/pilots/:id', (req, res) => {
 
 // Create new pilot
 app.post('/api/pilots', (req, res) => {
-    const { first_name, last_name, is_active } = req.body;
+    const { first_name, last_name, email, phone, is_active } = req.body;
 
     // Validation
     if (!first_name || !last_name) {
         return res.status(400).json({ success: false, message: 'Missing required fields: first_name and last_name' });
     }
 
-    const sql = 'INSERT INTO pilots (first_name, last_name, is_active) VALUES (?, ?, ?)';
+    const sql = 'INSERT INTO pilots (first_name, last_name, email, phone, is_active) VALUES (?, ?, ?, ?, ?)';
     const values = [
         first_name.trim(),
         last_name.trim(),
+        email ? email.trim() : null,
+        phone ? phone.trim() : null,
         is_active !== undefined ? is_active : true
     ];
 
@@ -3524,17 +3530,19 @@ app.post('/api/pilots', (req, res) => {
 // Update pilot
 app.put('/api/pilots/:id', (req, res) => {
     const { id } = req.params;
-    const { first_name, last_name, is_active } = req.body;
+    const { first_name, last_name, email, phone, is_active } = req.body;
 
     // Validation
     if (!first_name || !last_name) {
         return res.status(400).json({ success: false, message: 'Missing required fields: first_name and last_name' });
     }
 
-    const sql = 'UPDATE pilots SET first_name = ?, last_name = ?, is_active = ? WHERE id = ?';
+    const sql = 'UPDATE pilots SET first_name = ?, last_name = ?, email = ?, phone = ?, is_active = ? WHERE id = ?';
     const values = [
         first_name.trim(),
         last_name.trim(),
+        email ? email.trim() : null,
+        phone ? phone.trim() : null,
         is_active !== undefined ? is_active : true,
         id
     ];

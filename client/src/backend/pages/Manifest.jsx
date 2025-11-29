@@ -2896,11 +2896,121 @@ const Manifest = () => {
             // Show success message
             console.log('Crew assignment saved successfully!');
             
+            // Get crew member details and send email
+            let emailSent = false;
+            let emailErrorMsg = '';
+            try {
+                console.log('📧 Starting email send process for crew ID:', crewId);
+                console.log('📧 Available email templates:', emailTemplates.map(t => t.name));
+                
+                // Fetch crew member details
+                const crewResponse = await axios.get(`/api/crew/${crewId}`);
+                const crewMember = crewResponse.data?.data;
+                console.log('📧 Crew member data:', { 
+                    id: crewMember?.id, 
+                    name: crewMember ? `${crewMember.first_name} ${crewMember.last_name}` : 'N/A',
+                    email: crewMember?.email || 'N/A' 
+                });
+                
+                if (crewMember && crewMember.email) {
+                    // Find "Crew Management" email template - try multiple variations
+                    const crewManagementTemplate = emailTemplates.find(
+                        (t) => {
+                            if (!t.name) return false;
+                            const nameLower = t.name.toLowerCase();
+                            return nameLower.includes('crew management') || 
+                                   nameLower.includes('crewmanagement') ||
+                                   (nameLower.includes('crew') && nameLower.includes('management'));
+                        }
+                    );
+                    
+                    console.log('📧 Template search result:', crewManagementTemplate ? {
+                        id: crewManagementTemplate.id,
+                        name: crewManagementTemplate.name,
+                        subject: crewManagementTemplate.subject
+                    } : 'Template not found');
+                    
+                    if (crewManagementTemplate) {
+                        // Get template content
+                        const templateName = crewManagementTemplate.name;
+                        const subject = crewManagementTemplate.subject || 'Crew Management';
+                        let message = extractMessageFromTemplateBody(crewManagementTemplate.body) || '';
+                        
+                        // If no message in template, use default
+                        if (!message) {
+                            message = getDefaultTemplateMessageHtml(templateName, null) || '';
+                        }
+                        
+                        console.log('📧 Email content prepared:', { 
+                            subject, 
+                            messageLength: message.length,
+                            to: crewMember.email 
+                        });
+                        
+                        // Build email HTML
+                        const finalHtml = buildEmailHtml({
+                            templateName,
+                            messageHtml: message,
+                            booking: null,
+                            personalNote: ''
+                        });
+                        const finalText = stripHtml(finalHtml);
+                        
+                        // Send email to crew member
+                        console.log('📧 Sending email to:', crewMember.email);
+                        const emailResponse = await axios.post('/api/sendBookingEmail', {
+                            bookingId: null,
+                            to: crewMember.email,
+                            subject: subject,
+                            message: finalHtml,
+                            messageText: finalText,
+                            template: crewManagementTemplate.id,
+                            bookingData: null
+                        });
+                        
+                        console.log('📧 Email response:', emailResponse.data);
+                        
+                        if (emailResponse.data?.success) {
+                            emailSent = true;
+                            console.log('✅ Crew Management email sent successfully to:', crewMember.email);
+                        } else {
+                            emailErrorMsg = emailResponse.data?.message || 'Unknown error';
+                            console.error('❌ Failed to send email:', emailErrorMsg);
+                        }
+                    } else {
+                        emailErrorMsg = 'Crew Management email template not found';
+                        console.warn('⚠️', emailErrorMsg);
+                        console.warn('Available templates:', emailTemplates.map(t => t.name));
+                    }
+                } else {
+                    emailErrorMsg = crewMember ? 'Crew member email not found' : 'Crew member not found';
+                    console.warn('⚠️', emailErrorMsg);
+                }
+            } catch (emailError) {
+                emailErrorMsg = emailError.response?.data?.message || emailError.message || 'Unknown error';
+                console.error('❌ Error sending crew management email:', emailError);
+                console.error('Error details:', {
+                    message: emailError.message,
+                    response: emailError.response?.data,
+                    status: emailError.response?.status
+                });
+                // Don't fail the crew assignment if email fails
+            }
+            
             // Show success notification
             const crewName = getCrewMemberName(crewId);
+            let notificationMessage = '';
+            if (emailSent) {
+                notificationMessage = `Crew member ${crewName} assigned successfully! Email sent.`;
+            } else if (emailErrorMsg) {
+                notificationMessage = `Crew member ${crewName} assigned successfully! (Email: ${emailErrorMsg})`;
+            } else {
+                notificationMessage = `Crew member ${crewName} assigned successfully!`;
+            }
+            
             setCrewNotification({
                 show: true,
-                message: `Crew member ${crewName} assigned successfully!`,
+                message: notificationMessage,
                 type: 'success'
             });
             
