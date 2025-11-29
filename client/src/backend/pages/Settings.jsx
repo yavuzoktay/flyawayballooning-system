@@ -138,6 +138,8 @@ const Settings = () => {
     const [crewFormData, setCrewFormData] = useState({
         first_name: '',
         last_name: '',
+        email: '',
+        phone: '',
         is_active: true
     });
     
@@ -149,6 +151,8 @@ const Settings = () => {
     const [pilotFormData, setPilotFormData] = useState({
         first_name: '',
         last_name: '',
+        email: '',
+        phone: '',
         is_active: true
     });
     
@@ -1418,6 +1422,8 @@ const Settings = () => {
         setCrewFormData({
             first_name: crewMember.first_name,
             last_name: crewMember.last_name,
+            email: crewMember.email || '',
+            phone: crewMember.phone || '',
             is_active: crewMember.is_active
         });
         setShowEditCrewForm(true);
@@ -1439,6 +1445,8 @@ const Settings = () => {
         setCrewFormData({
             first_name: '',
             last_name: '',
+            email: '',
+            phone: '',
             is_active: true
         });
         setSelectedCrewMember(null);
@@ -1476,6 +1484,8 @@ const Settings = () => {
         setPilotFormData({
             first_name: pilot.first_name,
             last_name: pilot.last_name,
+            email: pilot.email || '',
+            phone: pilot.phone || '',
             is_active: pilot.is_active
         });
         setShowEditPilotForm(true);
@@ -1497,6 +1507,8 @@ const Settings = () => {
         setPilotFormData({
             first_name: '',
             last_name: '',
+            email: '',
+            phone: '',
             is_active: true
         });
         setSelectedPilot(null);
@@ -4604,7 +4616,7 @@ const Settings = () => {
                                                         <span style={{ fontWeight: 500, color: '#1f2937' }}>{g.name}</span>
                                                     </div>
                                                 </td>
-                                                <td><span style={{ color: '#475569' }}>{g.used_by || '—'}</span></td>
+                                                <td><span style={{ color: '#475569' }}>{g.used_by || '-'}</span></td>
                                                 <td>{items}</td>
                                                 <td>{totalPax}</td>
                                                 <td>
@@ -4615,8 +4627,8 @@ const Settings = () => {
                                                             onClick={() => {
                                                                 setSelectedResourceGroup(g);
                                                                 const selectedIds = resources
-                                                                    .filter(r => (r.group && r.group === g.name) || String(r.resource_group_id) === String(g.id))
-                                                                    .map(r => r.id);
+                                                                    .filter((r) => (r.group && r.group === g.name) || String(r.resource_group_id) === String(g.id))
+                                                                    .map((r) => r.id);
                                                                 setResourceGroupEditFormData({ name: g.name, resource_ids: selectedIds });
                                                                 setShowEditResourceGroupForm(true);
                                                             }}
@@ -6815,6 +6827,28 @@ const Settings = () => {
                                 </div>
                             </div>
                             
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Email</label>
+                                    <input
+                                        type="email"
+                                        value={crewFormData.email}
+                                        onChange={(e) => setCrewFormData({...crewFormData, email: e.target.value})}
+                                        placeholder="e.g., john.smith@example.com"
+                                    />
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label>Phone Number</label>
+                                    <input
+                                        type="tel"
+                                        value={crewFormData.phone}
+                                        onChange={(e) => setCrewFormData({...crewFormData, phone: e.target.value})}
+                                        placeholder="e.g., +44 123 456 7890"
+                                    />
+                                </div>
+                            </div>
+                            
                             <div className="form-group">
                                 <label>Status</label>
                                 <select
@@ -6882,6 +6916,28 @@ const Settings = () => {
                                         onChange={(e) => setPilotFormData({...pilotFormData, last_name: e.target.value})}
                                         placeholder="e.g., Smith"
                                         required
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Email</label>
+                                    <input
+                                        type="email"
+                                        value={pilotFormData.email}
+                                        onChange={(e) => setPilotFormData({...pilotFormData, email: e.target.value})}
+                                        placeholder="e.g., john.smith@example.com"
+                                    />
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label>Phone Number</label>
+                                    <input
+                                        type="tel"
+                                        value={pilotFormData.phone}
+                                        onChange={(e) => setPilotFormData({...pilotFormData, phone: e.target.value})}
+                                        placeholder="e.g., +44 123 456 7890"
                                     />
                                 </div>
                             </div>
