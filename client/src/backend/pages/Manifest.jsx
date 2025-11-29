@@ -24,6 +24,11 @@ import {
     InputLabel,
     FormControlLabel,
     Switch,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    InputAdornment,
 } from "@mui/material";
 import { MoreVert as MoreVertIcon, Edit as EditIcon } from "@mui/icons-material";
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -31,10 +36,6 @@ import useBooking from "../api/useBooking";
 import usePessanger from "../api/usePessanger";
 import useActivity from "../api/useActivity";
 import axios from "axios";
-import Dialog from "@mui/material/Dialog";
-import DialogTitle from "@mui/material/DialogTitle";
-import DialogContent from "@mui/material/DialogContent";
-import DialogActions from "@mui/material/DialogActions";
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
@@ -204,6 +205,13 @@ const Manifest = () => {
     const [paymentHistory, setPaymentHistory] = useState([]);
     const [paymentHistoryLoading, setPaymentHistoryLoading] = useState(false);
     const [expandedPaymentIds, setExpandedPaymentIds] = useState({});
+    
+    // Refund modal state
+    const [refundModalOpen, setRefundModalOpen] = useState(false);
+    const [selectedPaymentForRefund, setSelectedPaymentForRefund] = useState(null);
+    const [refundAmount, setRefundAmount] = useState('');
+    const [refundComment, setRefundComment] = useState('');
+    const [processingRefund, setProcessingRefund] = useState(false);
     
     // User Session modal state
     const [userSessionModalOpen, setUserSessionModalOpen] = useState(false);
@@ -770,6 +778,62 @@ const Manifest = () => {
             setPaymentHistory([]);
         } finally {
             setPaymentHistoryLoading(false);
+        }
+    };
+
+    const handleRefundClick = (payment) => {
+        setSelectedPaymentForRefund(payment);
+        setRefundAmount(parseFloat(payment.amount || 0).toFixed(2));
+        setRefundComment('');
+        setRefundModalOpen(true);
+    };
+
+    const handleRefundSubmit = async () => {
+        if (!selectedPaymentForRefund) return;
+        
+        const amount = parseFloat(refundAmount);
+        const maxAmount = parseFloat(selectedPaymentForRefund.amount || 0);
+        
+        if (isNaN(amount) || amount <= 0) {
+            alert('Please enter a valid refund amount');
+            return;
+        }
+        
+        if (amount > maxAmount) {
+            alert(`Refund amount cannot exceed £${maxAmount.toFixed(2)}`);
+            return;
+        }
+        
+        setProcessingRefund(true);
+        try {
+            const response = await axios.post('/api/refund-payment', {
+                paymentId: selectedPaymentForRefund.id,
+                bookingId: selectedPaymentForRefund.booking_id,
+                amount: amount,
+                comment: refundComment,
+                stripeChargeId: selectedPaymentForRefund.stripe_charge_id || selectedPaymentForRefund.stripe_payment_intent_id
+            });
+            
+            if (response.data.success) {
+                alert('Refund processed successfully');
+                setRefundModalOpen(false);
+                setSelectedPaymentForRefund(null);
+                setRefundAmount('');
+                setRefundComment('');
+                // Refresh payment history
+                if (bookingDetail?.booking?.id) {
+                    fetchPaymentHistory(bookingDetail.booking.id);
+                    // Refresh booking detail to update paid amount
+                    fetchBookingDetail(bookingDetail.booking.id);
+                }
+            } else {
+                alert(response.data.message || 'Failed to process refund');
+            }
+        } catch (error) {
+            console.error('Error processing refund:', error);
+            alert(error.response?.data?.message || 'Error processing refund. Please try again.');
+        } finally {
+            setProcessingRefund(false);
         }
     };
 
@@ -4734,24 +4798,44 @@ const Manifest = () => {
                                                 )}
                                             </Box>
                                             <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'center' }}>
-                                                <Typography variant="body2" sx={{ 
-                                                    fontWeight: 600,
-                                                    textTransform: 'uppercase',
-                                                    fontSize: '0.75rem',
-                                                    px: 1,
-                                                    py: 0.5,
-                                                    borderRadius: 1,
-                                                    background: '#f0f0f0'
-                                                }}>
-                                                    {getCardBrandLogo(payment.card_brand)}
-                                                </Typography>
-                                                <Typography variant="body2">
-                                                    **** {payment.card_last4 || 'N/A'}
-                                                </Typography>
+                                                {payment.payment_status === 'refunded' || payment.origin === 'refund' ? (
+                                                    <Typography variant="body2" sx={{ 
+                                                        fontWeight: 600,
+                                                        textTransform: 'uppercase',
+                                                        fontSize: '0.75rem',
+                                                        px: 1,
+                                                        py: 0.5,
+                                                        borderRadius: 1,
+                                                        background: '#fee',
+                                                        color: '#c33'
+                                                    }}>
+                                                        REFUND
+                                                    </Typography>
+                                                ) : (
+                                                    <>
+                                                        <Typography variant="body2" sx={{ 
+                                                            fontWeight: 600,
+                                                            textTransform: 'uppercase',
+                                                            fontSize: '0.75rem',
+                                                            px: 1,
+                                                            py: 0.5,
+                                                            borderRadius: 1,
+                                                            background: '#f0f0f0'
+                                                        }}>
+                                                            {getCardBrandLogo(payment.card_brand)}
+                                                        </Typography>
+                                                        <Typography variant="body2">
+                                                            **** {payment.card_last4 || 'N/A'}
+                                                        </Typography>
+                                                    </>
+                                                )}
                                             </Box>
                                             <Box sx={{ flex: '0 0 150px', textAlign: 'right' }}>
-                                                <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                                                    £{parseFloat(payment.amount || 0).toFixed(2)}
+                                                <Typography variant="body1" sx={{ 
+                                                    fontWeight: 600,
+                                                    color: (payment.payment_status === 'refunded' || payment.origin === 'refund') ? '#c33' : 'inherit'
+                                                }}>
+                                                    £{Math.abs(parseFloat(payment.amount || 0)).toFixed(2)}
                                                 </Typography>
                                             </Box>
                                             <Box sx={{ flex: '0 0 100px', textAlign: 'right' }}>
@@ -4771,7 +4855,7 @@ const Manifest = () => {
                                                         sx={{ ml: 1, textTransform: 'none' }}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            // TODO: Implement refund
+                                                            handleRefundClick(payment);
                                                         }}
                                                     >
                                                         Refund...
@@ -4799,10 +4883,13 @@ const Manifest = () => {
                                                     </Grid>
                                                     <Grid item xs={6}>
                                                         <Typography variant="caption" color="text.secondary">
-                                                            Guest Charge
+                                                            {payment.payment_status === 'refunded' || payment.origin === 'refund' ? 'Refund Amount' : 'Guest Charge'}
                                                         </Typography>
-                                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                                            £{parseFloat(payment.amount || 0).toFixed(2)}
+                                                        <Typography variant="body2" sx={{ 
+                                                            fontWeight: 600,
+                                                            color: (payment.payment_status === 'refunded' || payment.origin === 'refund') ? '#c33' : 'inherit'
+                                                        }}>
+                                                            £{Math.abs(parseFloat(payment.amount || 0)).toFixed(2)}
                                                         </Typography>
                                                     </Grid>
                                                     <Grid item xs={6}>
@@ -4854,6 +4941,16 @@ const Manifest = () => {
                                                             {payment.card_present ? 'Yes' : 'No'}
                                                         </Typography>
                                                     </Grid>
+                                                    {(payment.payment_status === 'refunded' || payment.origin === 'refund') && payment.refund_comment && (
+                                                        <Grid item xs={12}>
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                Refund Comment
+                                                            </Typography>
+                                                            <Typography variant="body2">
+                                                                {payment.refund_comment}
+                                                            </Typography>
+                                                        </Grid>
+                                                    )}
                                                     <Grid item xs={6}>
                                                         <Typography variant="caption" color="text.secondary">
                                                             Status
@@ -4905,6 +5002,138 @@ const Manifest = () => {
                         setPaymentHistoryModalOpen(false);
                         setExpandedPaymentIds({});
                     }}>Close</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Refund Credit Card Charge Modal */}
+            <Dialog
+                open={refundModalOpen}
+                onClose={() => {
+                    if (!processingRefund) {
+                        setRefundModalOpen(false);
+                        setSelectedPaymentForRefund(null);
+                        setRefundAmount('');
+                        setRefundComment('');
+                    }
+                }}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    fontWeight: 700,
+                    fontSize: 20
+                }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                        Refund Credit Card Charge
+                    </Typography>
+                    <IconButton
+                        onClick={() => {
+                            if (!processingRefund) {
+                                setRefundModalOpen(false);
+                                setSelectedPaymentForRefund(null);
+                                setRefundAmount('');
+                                setRefundComment('');
+                            }
+                        }}
+                        disabled={processingRefund}
+                        sx={{ p: 0 }}
+                    >
+                        ✕
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers sx={{ pt: 3 }}>
+                    <Typography variant="body2" sx={{ mb: 3, color: '#666', lineHeight: 1.6 }}>
+                        We submit refund requests to your customer's bank or card issuer immediately. Your customer sees the refund as a credit approximately 5-10 business days later, depending upon the bank. Once issued, a refund cannot be canceled. Disputes and chargebacks aren't possible on credit card charges that are fully refunded.
+                    </Typography>
+                    
+                    <Box sx={{ mb: 3 }}>
+                        <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                            Refund Amount (up to £{selectedPaymentForRefund ? parseFloat(selectedPaymentForRefund.amount || 0).toFixed(2) : '0.00'}):
+                        </Typography>
+                        <TextField
+                            fullWidth
+                            value={refundAmount}
+                            onChange={(e) => {
+                                const value = e.target.value.replace(/[^0-9.]/g, '');
+                                setRefundAmount(value);
+                            }}
+                            placeholder="0.00"
+                            InputProps={{
+                                startAdornment: <InputAdornment position="start">£</InputAdornment>,
+                            }}
+                            disabled={processingRefund}
+                            sx={{
+                                '& .MuiOutlinedInput-root': {
+                                    borderRadius: 1,
+                                }
+                            }}
+                        />
+                    </Box>
+                    
+                    <Box>
+                        <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                            Comment/Notes
+                        </Typography>
+                        <TextField
+                            fullWidth
+                            multiline
+                            rows={4}
+                            value={refundComment}
+                            onChange={(e) => setRefundComment(e.target.value)}
+                            placeholder="Explain why this refund is being issued"
+                            disabled={processingRefund}
+                            sx={{
+                                '& .MuiOutlinedInput-root': {
+                                    borderRadius: 1,
+                                }
+                            }}
+                        />
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ p: 2, justifyContent: 'flex-end' }}>
+                    <Button
+                        onClick={() => {
+                            if (!processingRefund) {
+                                setRefundModalOpen(false);
+                                setSelectedPaymentForRefund(null);
+                                setRefundAmount('');
+                                setRefundComment('');
+                            }
+                        }}
+                        disabled={processingRefund}
+                        sx={{ textTransform: 'none', mr: 1 }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleRefundSubmit}
+                        disabled={(() => {
+                            if (processingRefund) return true;
+                            if (!refundAmount) return true;
+                            const amount = parseFloat(refundAmount);
+                            if (isNaN(amount) || amount <= 0) return true;
+                            const maxAmount = selectedPaymentForRefund ? parseFloat(selectedPaymentForRefund.amount || 0) : 0;
+                            if (amount > maxAmount) return true;
+                            return false;
+                        })()}
+                        sx={{ 
+                            textTransform: 'none',
+                            backgroundColor: '#1976d2',
+                            '&:hover': {
+                                backgroundColor: '#1565c0',
+                            },
+                            '&:disabled': {
+                                backgroundColor: '#e0e0e0',
+                                color: '#9e9e9e',
+                            }
+                        }}
+                    >
+                        {processingRefund ? 'Processing...' : `Refund £${refundAmount || '0.00'}`}
+                    </Button>
                 </DialogActions>
             </Dialog>
 

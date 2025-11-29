@@ -5777,7 +5777,9 @@ app.get('/api/booking-payment-history/:bookingId', (req, res) => {
             origin,
             card_present,
             created_at,
-            arriving_on
+            arriving_on,
+            refund_comment,
+            refunded_payment_id
         FROM payment_history
         WHERE booking_id = ?
         ORDER BY created_at DESC
@@ -5898,6 +5900,163 @@ app.post('/api/sync-payment-history/:bookingId', async (req, res) => {
         );
     } catch (error) {
         console.error('Error in sync-payment-history:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
+// Refund payment endpoint
+app.post('/api/refund-payment', async (req, res) => {
+    try {
+        const { paymentId, bookingId, amount, comment, stripeChargeId } = req.body;
+
+        if (!paymentId || !bookingId || !amount) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields: paymentId, bookingId, and amount are required'
+            });
+        }
+
+        if (!stripeChargeId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Stripe charge ID is required for refund'
+            });
+        }
+
+        const refundAmount = Math.round(parseFloat(amount) * 100); // Convert to cents
+        if (!Number.isFinite(refundAmount) || refundAmount <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid refund amount'
+            });
+        }
+
+        // Get payment details from database
+        con.query(
+            'SELECT * FROM payment_history WHERE id = ? AND booking_id = ?',
+            [paymentId, bookingId],
+            async (err, results) => {
+                if (err) {
+                    console.error('Error fetching payment:', err);
+                    return res.status(500).json({
+                        success: false,
+                        message: 'Error fetching payment details',
+                        error: err.message
+                    });
+                }
+
+                if (results.length === 0) {
+                    return res.status(404).json({
+                        success: false,
+                        message: 'Payment not found'
+                    });
+                }
+
+                const payment = results[0];
+                const maxRefundAmount = Math.round(parseFloat(payment.amount) * 100);
+
+                if (refundAmount > maxRefundAmount) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Refund amount cannot exceed £${(maxRefundAmount / 100).toFixed(2)}`
+                    });
+                }
+
+                // Process refund through Stripe
+                try {
+                    const refund = await stripe.refunds.create({
+                        charge: stripeChargeId,
+                        amount: refundAmount,
+                        metadata: {
+                            payment_id: paymentId.toString(),
+                            booking_id: bookingId.toString(),
+                            comment: comment || '',
+                            refunded_by: 'admin'
+                        }
+                    });
+
+                    // Save refund record to database
+                    const refundSql = `
+                        INSERT INTO payment_history (
+                            booking_id,
+                            stripe_session_id,
+                            stripe_charge_id,
+                            stripe_payment_intent_id,
+                            amount,
+                            currency,
+                            payment_status,
+                            origin,
+                            refund_comment,
+                            refunded_payment_id,
+                            created_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, 'refunded', 'refund', ?, ?, NOW())
+                    `;
+
+                    const refundAmountDecimal = (refundAmount / 100).toFixed(2);
+                    con.query(
+                        refundSql,
+                        [
+                            bookingId,
+                            payment.stripe_session_id,
+                            refund.id,
+                            refund.payment_intent,
+                            -Math.abs(parseFloat(refundAmountDecimal)), // Negative amount for refund
+                            payment.currency || 'GBP',
+                            comment || null, // Refund comment/notes
+                            paymentId // Reference to the original payment that was refunded
+                        ],
+                        (insertErr) => {
+                            if (insertErr) {
+                                console.error('Error saving refund to database:', insertErr);
+                                // Refund was successful in Stripe, but failed to save to DB
+                                // Still return success but log the error
+                            } else {
+                                // Update booking's paid amount by subtracting the refund amount
+                                const updateBookingSql = `
+                                    UPDATE all_booking 
+                                    SET paid = GREATEST(0, paid - ?)
+                                    WHERE id = ?
+                                `;
+                                con.query(
+                                    updateBookingSql,
+                                    [parseFloat(refundAmountDecimal), bookingId],
+                                    (updateErr) => {
+                                        if (updateErr) {
+                                            console.error('Error updating booking paid amount:', updateErr);
+                                        } else {
+                                            console.log(`✅ Booking ${bookingId} paid amount decreased by £${refundAmountDecimal}`);
+                                        }
+                                    }
+                                );
+                            }
+                        }
+                    );
+
+                    res.json({
+                        success: true,
+                        message: 'Refund processed successfully',
+                        data: {
+                            refundId: refund.id,
+                            amount: refundAmountDecimal,
+                            status: refund.status
+                        }
+                    });
+                } catch (stripeError) {
+                    console.error('Stripe refund error:', stripeError);
+                    return res.status(500).json({
+                        success: false,
+                        message: 'Error processing refund with Stripe',
+                        error: stripeError.message
+                    });
+                }
+            }
+        );
+    } catch (error) {
+        console.error('Error in refund-payment:', error);
         res.status(500).json({
             success: false,
             message: 'Internal server error',
