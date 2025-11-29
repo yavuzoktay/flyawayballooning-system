@@ -3878,7 +3878,51 @@ const Manifest = () => {
   </LocalizationProvider>
 ) : (
   <>
-    {bookingDetail.booking.expires ? dayjs(bookingDetail.booking.expires).format('DD/MM/YYYY') : '-'}
+    {bookingDetail.booking.expires ? (
+      (() => {
+        // Helper function to calculate expires date based on flight_attempts
+        // If flight_attempts is a multiple of 3, add 6 months to expires date
+        const calculateExpiresDate = (expiresDate, flightAttempts) => {
+          if (!expiresDate || !flightAttempts) return expiresDate;
+          
+          const attempts = parseInt(flightAttempts, 10) || 0;
+          
+          // Check if flight_attempts is a multiple of 3 (3, 6, 9, 12, etc.)
+          if (attempts > 0 && attempts % 3 === 0) {
+            // Parse the expires date
+            let parsedDate;
+            if (typeof expiresDate === 'string' && expiresDate.includes('/')) {
+              // DD/MM/YYYY format
+              const parts = expiresDate.split('/');
+              if (parts.length === 3) {
+                parsedDate = dayjs(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
+              } else {
+                parsedDate = dayjs(expiresDate);
+              }
+            } else {
+              parsedDate = dayjs(expiresDate);
+            }
+            
+            if (parsedDate.isValid()) {
+              // Add 6 months to the expires date
+              const newExpiresDate = parsedDate.add(6, 'month');
+              return newExpiresDate.format('DD/MM/YYYY');
+            }
+          }
+          
+          // Return original date if not a multiple of 3 or parsing failed
+          if (typeof expiresDate === 'string' && expiresDate.includes('/')) {
+            return expiresDate; // Already in DD/MM/YYYY format
+          }
+          const parsedDate = dayjs(expiresDate);
+          return parsedDate.isValid() ? parsedDate.format('DD/MM/YYYY') : expiresDate;
+        };
+        
+        // Calculate expires date based on flight_attempts (add 6 months if multiple of 3)
+        const flightAttempts = bookingDetail.booking.flight_attempts ?? 0;
+        return calculateExpiresDate(bookingDetail.booking.expires, flightAttempts);
+      })()
+    ) : '-'}
     <IconButton size="small" onClick={() => handleEditClick('expires', bookingDetail.booking.expires)}><EditIcon fontSize="small" /></IconButton>
   </>
 )}</Typography>
