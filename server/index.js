@@ -7530,46 +7530,108 @@ app.post('/api/createBooking', (req, res) => {
                     entries: incomingHistoryEntriesRaw.length
                 });
             }
+            
+            // Get flight_date for new booking (will be used as fallback if history entry doesn't have flight_date)
+            // flight_date is at index 2 in bookingValues array
+            const flightDate = bookingValues[2] || selectedDate || null;
+            
             incomingHistoryEntriesRaw
                 .filter(entry => entry && typeof entry.status === 'string' && entry.status.trim() !== '')
                 .forEach((entry, idx) => {
                     const statusValue = entry.status.trim();
                     let normalizedChangedAt = null;
+                    let normalizedFlightDate = null;
+                    
                     if (entry.changed_at) {
                         const parsed = moment(entry.changed_at);
                         if (parsed.isValid()) {
                             normalizedChangedAt = parsed.format('YYYY-MM-DD HH:mm:ss');
                         }
                     }
-                    const historySql = normalizedChangedAt
-                        ? 'INSERT INTO booking_status_history (booking_id, status, changed_at) VALUES (?, ?, ?)'
-                        : 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
-                    const params = normalizedChangedAt
-                        ? [bookingId, statusValue, normalizedChangedAt]
-                        : [bookingId, statusValue];
+                    
+                    // Preserve flight_date from the original entry if available
+                    if (entry.flight_date) {
+                        const parsedFlightDate = moment(entry.flight_date);
+                        if (parsedFlightDate.isValid()) {
+                            normalizedFlightDate = parsedFlightDate.format('YYYY-MM-DD HH:mm:ss');
+                        }
+                    }
+                    
+                    // Use flight_date from entry if available, otherwise use the new booking's flight_date
+                    const finalFlightDate = normalizedFlightDate || flightDate;
+                    
+                    let historySql, params;
+                    if (normalizedChangedAt && finalFlightDate) {
+                        historySql = 'INSERT INTO booking_status_history (booking_id, status, changed_at, flight_date) VALUES (?, ?, ?, ?)';
+                        params = [bookingId, statusValue, normalizedChangedAt, finalFlightDate];
+                    } else if (normalizedChangedAt) {
+                        historySql = 'INSERT INTO booking_status_history (booking_id, status, changed_at) VALUES (?, ?, ?)';
+                        params = [bookingId, statusValue, normalizedChangedAt];
+                    } else if (finalFlightDate) {
+                        historySql = 'INSERT INTO booking_status_history (booking_id, status, flight_date) VALUES (?, ?, ?)';
+                        params = [bookingId, statusValue, finalFlightDate];
+                    } else {
+                        historySql = 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
+                        params = [bookingId, statusValue];
+                    }
+                    
                     con.query(historySql, params, (copyErr) => {
                         if (copyErr) {
                             console.error('Error copying booking history entry', { booking_id: bookingId, entryIndex: idx, error: copyErr });
                         } else {
-                            console.log('📜 Copied previous history entry for booking', bookingId, statusValue, normalizedChangedAt);
+                            console.log('📜 Copied previous history entry for booking', bookingId, statusValue, normalizedChangedAt, normalizedFlightDate);
                         }
                     });
                 });
 
-            // Add initial status to booking history
+            // Add initial status to booking history with flight_date
             // Status is at index 5 in bookingValues array (after name, flight_type, flight_date, pax, location)
-            const initialStatus = bookingStatus || bookingValues[5] || 'Open';
+            const initialStatus = bookingStatus || bookingValues[5] || 'Scheduled';
+            // flightDate is already defined above for history entries copying
 
-            // Insert initial status into history for new bookings
-            // This ensures every new booking (including rebooks) gets a history entry
-            const initialHistorySql = 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
-            con.query(initialHistorySql, [bookingId, initialStatus], (historyErr) => {
-                if (historyErr) {
-                    console.error('Error inserting initial booking history:', historyErr);
-                } else {
-                    console.log('✅ Initial booking history added:', { booking_id: bookingId, status: initialStatus });
+            // Check if initial status already exists in copied history entries to avoid duplicates
+            // This is especially important for rebook operations where history_entries already contains the current status
+            const initialStatusAlreadyExists = incomingHistoryEntriesRaw.some(entry => {
+                if (!entry || !entry.status) return false;
+                const entryStatus = entry.status.trim();
+                const entryFlightDate = entry.flight_date || null;
+                
+                // Check if status matches
+                if (entryStatus.toLowerCase() !== initialStatus.toLowerCase()) return false;
+                
+                // If both have flight_date, they must match
+                if (flightDate && entryFlightDate) {
+                    const entryDateKey = moment(entryFlightDate).format('YYYY-MM-DD HH:mm');
+                    const initialDateKey = moment(flightDate).format('YYYY-MM-DD HH:mm');
+                    return entryDateKey === initialDateKey;
                 }
+                
+                // If only one has flight_date, consider it a match if status matches
+                // (for cases where old entries don't have flight_date)
+                return true;
             });
+
+            // Only insert initial status if it doesn't already exist in copied history
+            if (!initialStatusAlreadyExists) {
+                // Insert initial status into history for new bookings with flight_date
+                // This ensures every new booking (including rebooks) gets a history entry with the actual flight date
+                const initialHistorySql = flightDate 
+                    ? 'INSERT INTO booking_status_history (booking_id, status, changed_at, flight_date) VALUES (?, ?, NOW(), ?)'
+                    : 'INSERT INTO booking_status_history (booking_id, status, changed_at) VALUES (?, ?, NOW())';
+                const initialHistoryParams = flightDate 
+                    ? [bookingId, initialStatus, flightDate]
+                    : [bookingId, initialStatus];
+                
+                con.query(initialHistorySql, initialHistoryParams, (historyErr) => {
+                    if (historyErr) {
+                        console.error('Error inserting initial booking history:', historyErr);
+                    } else {
+                        console.log('✅ Initial booking history added:', { booking_id: bookingId, status: initialStatus, flight_date: flightDate });
+                    }
+                });
+            } else {
+                console.log('⏭️ Skipping initial status - already exists in copied history:', { booking_id: bookingId, status: initialStatus, flight_date: flightDate });
+            }
 
             // --- Availability güncelleme ---
             // selectedDate ve selectedTime ile availability güncellenir
@@ -10435,24 +10497,65 @@ app.patch('/api/updateBookingField', (req, res) => {
                                 }
                             });
                         } else {
-                            // No previous entry found, insert new Cancelled entry
-                            const historySql = 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
-                            con.query(historySql, [booking_id, normalizedValue], (err2) => {
-                                if (err2) console.error('History insert error:', err2);
-                                else console.log('updateBookingField - Status history başarıyla eklendi');
-                                maybeIncrementFlightAttempts();
-                                proceedWithAvailabilityRefresh();
+                            // No previous entry found, insert new Cancelled entry with flight_date if available
+                            con.query('SELECT flight_date FROM all_booking WHERE id = ?', [booking_id], (fetchErr, bookingRows) => {
+                                if (fetchErr) {
+                                    console.error('Error fetching booking flight_date:', fetchErr);
+                                    // Fallback: insert without flight_date
+                                    const historySql = 'INSERT INTO booking_status_history (booking_id, status, changed_at) VALUES (?, ?, NOW())';
+                                    con.query(historySql, [booking_id, normalizedValue], (err2) => {
+                                        if (err2) console.error('History insert error:', err2);
+                                        else console.log('updateBookingField - Status history başarıyla eklendi');
+                                        maybeIncrementFlightAttempts();
+                                        proceedWithAvailabilityRefresh();
+                                    });
+                                } else {
+                                    const flightDate = bookingRows[0]?.flight_date || null;
+                                    const historySql = flightDate
+                                        ? 'INSERT INTO booking_status_history (booking_id, status, changed_at, flight_date) VALUES (?, ?, NOW(), ?)'
+                                        : 'INSERT INTO booking_status_history (booking_id, status, changed_at) VALUES (?, ?, NOW())';
+                                    const historyParams = flightDate
+                                        ? [booking_id, normalizedValue, flightDate]
+                                        : [booking_id, normalizedValue];
+                                    
+                                    con.query(historySql, historyParams, (err2) => {
+                                        if (err2) console.error('History insert error:', err2);
+                                        else console.log('updateBookingField - Status history başarıyla eklendi');
+                                        maybeIncrementFlightAttempts();
+                                        proceedWithAvailabilityRefresh();
+                                    });
+                                }
                             });
                         }
                     });
                 } else {
-                    // For non-Cancelled statuses, insert new entry as before
-                    const historySql = 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
-                    console.log('updateBookingField - Status history ekleniyor:', { booking_id, status: normalizedValue });
-                    con.query(historySql, [booking_id, normalizedValue], (err2) => {
-                        if (err2) console.error('History insert error:', err2);
-                        else console.log('updateBookingField - Status history başarıyla eklendi');
-                        proceedWithAvailabilityRefresh();
+                    // For non-Cancelled statuses, insert new entry with flight_date if available
+                    con.query('SELECT flight_date FROM all_booking WHERE id = ?', [booking_id], (fetchErr, bookingRows) => {
+                        if (fetchErr) {
+                            console.error('Error fetching booking flight_date:', fetchErr);
+                            // Fallback: insert without flight_date
+                            const historySql = 'INSERT INTO booking_status_history (booking_id, status, changed_at) VALUES (?, ?, NOW())';
+                            con.query(historySql, [booking_id, normalizedValue], (err2) => {
+                                if (err2) console.error('History insert error:', err2);
+                                else console.log('updateBookingField - Status history başarıyla eklendi');
+                                proceedWithAvailabilityRefresh();
+                            });
+                        } else {
+                            const flightDate = bookingRows[0]?.flight_date || null;
+                            const historySql = flightDate
+                                ? 'INSERT INTO booking_status_history (booking_id, status, changed_at, flight_date) VALUES (?, ?, NOW(), ?)'
+                                : 'INSERT INTO booking_status_history (booking_id, status, changed_at) VALUES (?, ?, NOW())';
+                            const historyParams = flightDate
+                                ? [booking_id, normalizedValue, flightDate]
+                                : [booking_id, normalizedValue];
+                            
+                            console.log('updateBookingField - Status history ekleniyor:', { booking_id, status: normalizedValue, flight_date: flightDate });
+                            con.query(historySql, historyParams, (err2) => {
+                                if (err2) console.error('History insert error:', err2);
+                                else console.log('updateBookingField - Status history başarıyla eklendi');
+                                proceedWithAvailabilityRefresh();
+                            });
+                        }
                     });
                 }
             } else {
@@ -10490,10 +10593,29 @@ app.patch('/api/updateBookingField', (req, res) => {
 app.get('/api/getBookingHistory', (req, res) => {
     const booking_id = req.query.booking_id;
     if (!booking_id) return res.status(400).json({ success: false, message: 'booking_id is required' });
+    // Join with all_booking to get flight_date for each history entry
     // Order by changed_at DESC to show most recent first, but we'll reverse in frontend for chronological display
-    con.query('SELECT * FROM booking_status_history WHERE booking_id = ? ORDER BY changed_at DESC', [booking_id], (err, rows) => {
+    const sql = `
+        SELECT 
+            h.*,
+            b.flight_date as booking_flight_date,
+            b.status as booking_status
+        FROM booking_status_history h
+        LEFT JOIN all_booking b ON h.booking_id = b.id
+        WHERE h.booking_id = ?
+        ORDER BY h.changed_at DESC
+    `;
+    con.query(sql, [booking_id], (err, rows) => {
         if (err) return res.status(500).json({ success: false, message: 'DB error' });
-        res.json({ success: true, history: rows });
+        // Map results: Use flight_date from history entry if available, otherwise use changed_at
+        // DO NOT use current booking's flight_date as it may have changed
+        const mappedRows = rows.map(row => ({
+            ...row,
+            // Use flight_date from history entry itself, or changed_at as fallback
+            // Do not use booking_flight_date as it represents current state, not historical state
+            flight_date: row.flight_date || row.changed_at
+        }));
+        res.json({ success: true, history: mappedRows });
     });
 });
 
