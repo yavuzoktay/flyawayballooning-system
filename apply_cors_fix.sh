@@ -31,29 +31,33 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# 4. Reload Nginx
-echo "4. Reloading Nginx..."
-sudo systemctl reload nginx
+# 4. Restart Nginx (Restart is safer than reload for config changes)
+echo "4. Restarting Nginx..."
+sudo systemctl restart nginx
 
 if [ $? -ne 0 ]; then
-    echo "❌ Failed to reload Nginx!"
+    echo "❌ Failed to restart Nginx!"
     exit 1
 fi
 
-echo "✅ Nginx reloaded successfully."
+echo "✅ Nginx restarted successfully."
 
 # 5. Verify locally
-echo "5. Verifying CORS headers locally..."
+echo "5. Verifying CORS headers locally (curl test)..."
+# Test with the local origin that was failing
 RESPONSE=$(curl -I -s -H "Origin: http://127.0.0.1:9292" http://127.0.0.1/api/voucher-types)
 
+echo "--- Response Headers ---"
+echo "$RESPONSE"
+echo "------------------------"
+
 if echo "$RESPONSE" | grep -q "Access-Control-Allow-Origin"; then
-    echo "✅ SUCCESS: Access-Control-Allow-Origin header found!"
-    echo "Debug Headers:"
+    echo "✅ SUCCESS: Access-Control-Allow-Origin header is present!"
+    echo "Debug Info:"
     echo "$RESPONSE" | grep "X-Debug"
 else
-    echo "⚠️ WARNING: Access-Control-Allow-Origin header NOT found in local test."
-    echo "Full Response Headers:"
-    echo "$RESPONSE"
+    echo "⚠️ WARNING: Access-Control-Allow-Origin header is MISSING."
+    echo "This suggests the configuration might not be applying correctly or the map is not matching."
 fi
 
 echo "=== Fix Application Completed ==="
