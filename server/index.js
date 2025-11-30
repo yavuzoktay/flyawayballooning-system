@@ -163,6 +163,117 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true }));
 
+// CORS middleware - MUST be before cache control and other middleware
+// Enable CORS with dynamic origin checking and manual header setting
+const allowedOrigins = [
+    'https://flyawayballooning-book.com',
+    'http://flyawayballooning-book.com',
+    'https://www.flyawayballooning-book.com',
+    'http://www.flyawayballooning-book.com',
+    'https://flyawayballooning-system.com',
+    'http://flyawayballooning-system.com',
+    'https://flyawayballooning.com',
+    'http://flyawayballooning.com',
+    'https://www.flyawayballooning.com',
+    'http://www.flyawayballooning.com',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:3002',
+    'http://localhost:3004',
+    'http://localhost:3006',
+    'http://localhost:9292',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
+    'http://127.0.0.1:3002',
+    'http://127.0.0.1:3004',
+    'http://127.0.0.1:3006',
+    'http://127.0.0.1:9292',
+    'http://34.205.25.8:3002'
+];
+
+function isOriginAllowed(origin) {
+    if (!origin) return true; // Allow requests with no origin
+    
+    // Check exact match
+    if (allowedOrigins.indexOf(origin) !== -1) {
+        return true;
+    }
+    
+    // Allow localhost variations
+    if (origin.startsWith('http://localhost:') || origin.startsWith('https://localhost:')) {
+        return true;
+    }
+    
+    // Allow 127.0.0.1 variations
+    if (origin.startsWith('http://127.0.0.1:') || origin.startsWith('https://127.0.0.1:')) {
+        return true;
+    }
+    
+    // Allow all myshopify.com subdomains
+    if (origin.endsWith('.myshopify.com')) {
+        return true;
+    }
+    
+    // Allow preview URLs
+    if (origin.includes('myshopify.com')) {
+        return true;
+    }
+    
+    return false;
+}
+
+// Helper function to ensure CORS headers are always set
+function setCorsHeaders(req, res) {
+    const origin = req.headers.origin;
+    
+    if (origin && isOriginAllowed(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+    } else if (!origin) {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+    } else {
+        // Even for blocked origins, set it (browser will still reject, but helps with debugging)
+        res.setHeader('Access-Control-Allow-Origin', origin);
+    }
+    
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,PATCH,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Cache-Control,Pragma,Origin,Accept');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Type,Content-Length,ETag');
+    res.setHeader('Vary', 'Origin');
+    
+    // Ensure Content-Type is set for JSON responses
+    if (!res.getHeader('Content-Type')) {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    }
+}
+
+// CORS middleware - handle preflight and set headers
+// CRITICAL: This MUST run before any other middleware that might send responses
+app.use(function(req, res, next) {
+    const origin = req.headers.origin;
+    
+    // Always log the origin for debugging
+    console.log('🔵 CORS Request - Origin:', origin || 'No origin header', 'Method:', req.method, 'Path:', req.path);
+    
+    // Check if origin is allowed
+    const originAllowed = isOriginAllowed(origin);
+    console.log('🔵 CORS: Origin allowed?', originAllowed, 'for origin:', origin);
+    
+    // Use helper function to set all CORS headers
+    setCorsHeaders(req, res);
+    
+    // Log all headers being set
+    console.log('🔵 CORS: All headers set for', req.method, req.path);
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+        console.log('🔵 CORS: Handling OPTIONS preflight request - sending 200');
+        return res.status(200).end();
+    }
+    
+    next();
+});
+
 // Cache control middleware for all routes
 app.use((req, res, next) => {
     res.set({
@@ -218,32 +329,6 @@ function logToFile(message, data = null) {
     }
 }
 
-// Enable CORS
-app.use(cors({
-    origin: [
-        'https://flyawayballooning-book.com',
-        'http://flyawayballooning-book.com',
-        'https://www.flyawayballooning-book.com',
-        'http://www.flyawayballooning-book.com',
-        'https://flyawayballooning-system.com',
-        'http://flyawayballooning-system.com',
-        'http://localhost:3000',
-        'http://localhost:3001',
-        'http://localhost:3002',
-        'http://localhost:3004',
-        'http://localhost:3006',
-        'http://34.205.25.8:3002'
-    ],
-    methods: "GET,POST,PUT,DELETE,PATCH,OPTIONS",
-    allowedHeaders: [
-        'Content-Type',
-        'Authorization',
-        'X-Requested-With',
-        'Cache-Control',
-        'Pragma'
-    ],
-    credentials: true
-}));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -2150,6 +2235,7 @@ app.delete('/api/experiences/:id', (req, res) => {
 // Get all voucher types with updated pricing from activity table
 app.get('/api/voucher-types', (req, res) => {
     console.log('GET /api/voucher-types called');
+    console.log('CORS: Request origin:', req.headers.origin);
 
     // Get location from query parameter if provided
     const { location } = req.query;
@@ -2193,6 +2279,9 @@ app.get('/api/voucher-types', (req, res) => {
     console.log('SQL params:', params);
 
     con.query(sql, params, (err, result) => {
+        // Ensure CORS headers are always set, even on error
+        setCorsHeaders(req, res);
+        
         if (err) {
             console.error('Error fetching voucher types:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
@@ -2228,6 +2317,7 @@ app.get('/api/voucher-types', (req, res) => {
 
         console.log('Processed voucher types with updated pricing:', processedVoucherTypes);
         console.log('Result length:', processedVoucherTypes ? processedVoucherTypes.length : 'undefined');
+        console.log('✅ CORS: Headers set in /api/voucher-types response');
 
         res.json({ success: true, data: processedVoucherTypes });
     });
@@ -2401,6 +2491,7 @@ app.delete('/api/voucher-types/:id', (req, res) => {
 // Get all private charter voucher types
 app.get('/api/private-charter-voucher-types', (req, res) => {
     console.log('GET /api/private-charter-voucher-types called');
+    console.log('CORS: Request origin:', req.headers.origin);
 
     // Check if we want only active voucher types (default) or all
     const showOnlyActive = req.query.active !== 'false';
@@ -2417,6 +2508,9 @@ app.get('/api/private-charter-voucher-types', (req, res) => {
     }
 
     con.query(sql, params, (err, result) => {
+        // Ensure CORS headers are always set, even on error
+        setCorsHeaders(req, res);
+        
         if (err) {
             console.error('Error fetching private charter voucher types:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
@@ -2492,6 +2586,11 @@ app.get('/api/private-charter-voucher-types', (req, res) => {
                 console.log('Show only active:', showOnlyActive);
                 console.log('Result length:', result ? result.length : 'undefined');
                 console.log('Final result length:', finalResult ? finalResult.length : 'undefined');
+                
+                // Ensure CORS headers are set before sending response in nested callback
+                setCorsHeaders(req, res);
+                console.log('✅ CORS: Headers set in /api/private-charter-voucher-types (location branch) response');
+                
                 return res.json({ success: true, data: finalResult });
             });
             return; // prevent double send
@@ -2501,6 +2600,7 @@ app.get('/api/private-charter-voucher-types', (req, res) => {
         console.log('Show only active:', showOnlyActive);
         console.log('Result length:', result ? result.length : 'undefined');
         console.log('Final result length:', finalResult ? finalResult.length : 'undefined');
+        console.log('✅ CORS: Headers set in /api/private-charter-voucher-types response');
 
         res.json({ success: true, data: finalResult });
     });
@@ -14366,6 +14466,28 @@ app.use(express.static(path.join(__dirname, '../client/build')));
 // Serve index.html for non-API routes (supports client-side routing)
 app.get(/^\/(?!api\/).*/, (req, res) => {
     res.sendFile(path.join(__dirname, '../client/build/index.html'));
+});
+
+// Global error handler to ensure CORS headers are always set
+app.use((err, req, res, next) => {
+    console.error('Global error handler:', err);
+    setCorsHeaders(req, res);
+    
+    if (res.headersSent) {
+        return next(err);
+    }
+    
+    res.status(err.status || 500).json({
+        success: false,
+        message: err.message || 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+});
+
+// 404 handler - ensure CORS headers are set
+app.use((req, res) => {
+    setCorsHeaders(req, res);
+    res.status(404).json({ success: false, message: 'Route not found' });
 });
 
 // Start the server
