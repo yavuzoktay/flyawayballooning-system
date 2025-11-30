@@ -262,12 +262,21 @@ app.use(function(req, res, next) {
     // Use helper function to set all CORS headers
     setCorsHeaders(req, res);
     
+    // Log the actual header value that was set
+    const setHeader = res.getHeader('Access-Control-Allow-Origin');
+    console.log('🔵 CORS: Access-Control-Allow-Origin header set to:', setHeader);
+    
     // Log all headers being set
     console.log('🔵 CORS: All headers set for', req.method, req.path);
     
     // Handle preflight requests
     if (req.method === 'OPTIONS') {
         console.log('🔵 CORS: Handling OPTIONS preflight request - sending 200');
+        console.log('🔵 CORS: OPTIONS response headers:', {
+            'Access-Control-Allow-Origin': res.getHeader('Access-Control-Allow-Origin'),
+            'Access-Control-Allow-Methods': res.getHeader('Access-Control-Allow-Methods'),
+            'Access-Control-Allow-Headers': res.getHeader('Access-Control-Allow-Headers')
+        });
         return res.status(200).end();
     }
     
