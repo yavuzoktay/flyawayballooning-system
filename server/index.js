@@ -14477,6 +14477,81 @@ app.get(/^\/(?!api\/).*/, (req, res) => {
     res.sendFile(path.join(__dirname, '../client/build/index.html'));
 });
 
+// Get activities with flight types for ballooning-book
+app.get('/api/activities/flight-types', (req, res) => {
+    const { location } = req.query;
+
+    console.log('=== /api/activities/flight-types called ===');
+    console.log('Location filter:', location);
+
+    let sql = 'SELECT id, activity_name, location, flight_type, status, private_charter_pricing, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price FROM activity WHERE status = "Live"';
+    const params = [];
+
+    if (location) {
+        sql += ' AND location = ?';
+        params.push(location);
+    }
+
+    sql += ' ORDER BY location, activity_name';
+
+    console.log('SQL query:', sql);
+    console.log('SQL params:', params);
+
+    con.query(sql, params, (err, result) => {
+        if (err) {
+            console.error('Error fetching activities with flight types:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+
+        console.log('Raw database result:', result);
+        console.log('Raw database result - private_charter_pricing fields:', result.map(r => ({ id: r.id, name: r.activity_name, pricing: r.private_charter_pricing })));
+        console.log('Raw database result - shared flight pricing fields:', result.map(r => ({
+            id: r.id,
+            name: r.activity_name,
+            weekday_morning_price: r.weekday_morning_price,
+            flexible_weekday_price: r.flexible_weekday_price,
+            any_day_flight_price: r.any_day_flight_price,
+            shared_flight_from_price: r.shared_flight_from_price
+        })));
+
+        // Process flight types to map them to experience names
+        const processedActivities = result.map(activity => {
+            let flightTypes = [];
+            if (activity.flight_type) {
+                // Parse flight_type which can be comma-separated string or array
+                if (typeof activity.flight_type === 'string') {
+                    flightTypes = activity.flight_type.split(',').map(type => type.trim());
+                } else if (Array.isArray(activity.flight_type)) {
+                    flightTypes = activity.flight_type;
+                }
+            }
+
+            // Map flight types to experience names
+            const experiences = flightTypes.map(type => {
+                if (type === 'Private') return 'Private Charter';
+                if (type === 'Shared') return 'Shared Flight';
+                return type; // Keep original if not mapped
+            });
+
+            console.log(`Activity ${activity.activity_name}: flight_type="${activity.flight_type}" -> flightTypes=${JSON.stringify(flightTypes)} -> experiences=${JSON.stringify(experiences)}`);
+
+            return {
+                ...activity,
+                flight_type: flightTypes,
+                experiences: experiences
+            };
+        });
+
+        console.log('Processed activities:', processedActivities);
+        console.log('=== /api/activities/flight-types response ===');
+
+        res.json({
+            success: true,
+            data: processedActivities
+        });
+    });
+});
+
 // Global error handler to ensure CORS headers are always set
 app.use((err, req, res, next) => {
     console.error('Global error handler:', err);
@@ -18194,81 +18269,6 @@ app.post('/api/debug/crew-assignments/test', (req, res) => {
 
         console.log('Test crew assignment inserted:', result);
         res.json({ success: true, message: 'Test crew assignment inserted', result });
-    });
-});
-
-// Get activities with flight types for ballooning-book
-app.get('/api/activities/flight-types', (req, res) => {
-    const { location } = req.query;
-
-    console.log('=== /api/activities/flight-types called ===');
-    console.log('Location filter:', location);
-
-    let sql = 'SELECT id, activity_name, location, flight_type, status, private_charter_pricing, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price FROM activity WHERE status = "Live"';
-    const params = [];
-
-    if (location) {
-        sql += ' AND location = ?';
-        params.push(location);
-    }
-
-    sql += ' ORDER BY location, activity_name';
-
-    console.log('SQL query:', sql);
-    console.log('SQL params:', params);
-
-    con.query(sql, params, (err, result) => {
-        if (err) {
-            console.error('Error fetching activities with flight types:', err);
-            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
-        }
-
-        console.log('Raw database result:', result);
-        console.log('Raw database result - private_charter_pricing fields:', result.map(r => ({ id: r.id, name: r.activity_name, pricing: r.private_charter_pricing })));
-        console.log('Raw database result - shared flight pricing fields:', result.map(r => ({
-            id: r.id,
-            name: r.activity_name,
-            weekday_morning_price: r.weekday_morning_price,
-            flexible_weekday_price: r.flexible_weekday_price,
-            any_day_flight_price: r.any_day_flight_price,
-            shared_flight_from_price: r.shared_flight_from_price
-        })));
-
-        // Process flight types to map them to experience names
-        const processedActivities = result.map(activity => {
-            let flightTypes = [];
-            if (activity.flight_type) {
-                // Parse flight_type which can be comma-separated string or array
-                if (typeof activity.flight_type === 'string') {
-                    flightTypes = activity.flight_type.split(',').map(type => type.trim());
-                } else if (Array.isArray(activity.flight_type)) {
-                    flightTypes = activity.flight_type;
-                }
-            }
-
-            // Map flight types to experience names
-            const experiences = flightTypes.map(type => {
-                if (type === 'Private') return 'Private Charter';
-                if (type === 'Shared') return 'Shared Flight';
-                return type; // Keep original if not mapped
-            });
-
-            console.log(`Activity ${activity.activity_name}: flight_type="${activity.flight_type}" -> flightTypes=${JSON.stringify(flightTypes)} -> experiences=${JSON.stringify(experiences)}`);
-
-            return {
-                ...activity,
-                flight_type: flightTypes,
-                experiences: experiences
-            };
-        });
-
-        console.log('Processed activities:', processedActivities);
-        console.log('=== /api/activities/flight-types response ===');
-
-        res.json({
-            success: true,
-            data: processedActivities
-        });
     });
 });
 
