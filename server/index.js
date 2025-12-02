@@ -240,9 +240,9 @@ function setCorsHeaders(req, res) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Expose-Headers', 'Content-Type,Content-Length,ETag');
     res.setHeader('Vary', 'Origin');
-    
-    // Ensure Content-Type is set for JSON responses
-    if (!res.getHeader('Content-Type')) {
+
+    const isApiRequest = typeof req.path === 'string' && req.path.startsWith('/api');
+    if (isApiRequest && !res.getHeader('Content-Type')) {
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
     }
 }
