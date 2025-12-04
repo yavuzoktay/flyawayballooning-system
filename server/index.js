@@ -14568,12 +14568,6 @@ app.use((err, req, res, next) => {
     });
 });
 
-// 404 handler - ensure CORS headers are set
-app.use((req, res) => {
-    setCorsHeaders(req, res);
-    res.status(404).json({ success: false, message: 'Route not found' });
-});
-
 // Start the server
 const PORT = process.env.PORT || 3002;
 app.listen(PORT, '0.0.0.0', () => {
@@ -14591,6 +14585,7 @@ app.listen(PORT, '0.0.0.0', () => {
     // Set up periodic updates every 5 minutes (maintenance only)
     setInterval(updateAvailabilityStatus, 5 * 60 * 1000);
 });
+
 // Delete a booking by ID (with cascade delete for passengers)
 app.delete('/api/deleteBooking/:id', (req, res) => {
     const { id } = req.params;
@@ -21246,3 +21241,9 @@ app.post('/api/fix-flight-dates', (req, res) => {
     });
 });
 
+// 404 handler - ensure CORS headers are set
+// This MUST be registered after all other routes so it doesn't override them.
+app.use((req, res) => {
+    setCorsHeaders(req, res);
+    res.status(404).json({ success: false, message: 'Route not found' });
+});
