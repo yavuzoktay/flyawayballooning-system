@@ -1015,7 +1015,6 @@ const ActivityList = ({ activity }) => {
                                                     min="0"
                                                     step="0.01"
                                                     style={{ width: '120px' }}
-                                                    disabled={!Array.isArray(editForm.private_charter_voucher_types) ? (typeof editForm.private_charter_voucher_types === 'string' ? editForm.private_charter_voucher_types.split(',').includes(voucherType.id.toString()) : false) : editForm.private_charter_voucher_types.includes(voucherType.id.toString())}
                                                 />
                                                 <span style={{ color: '#856404', fontSize: '14px' }}>£</span>
                                             </div>
