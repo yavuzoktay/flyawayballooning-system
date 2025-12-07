@@ -13140,8 +13140,35 @@ app.get('/api/availabilities/filter', (req, res) => {
     }
 
     if (voucherTypes && voucherTypes !== 'All') {
-        sql += ` AND (aa.voucher_types = 'All' OR aa.voucher_types = ? OR FIND_IN_SET(?, aa.voucher_types) > 0)`;
-        params.push(voucherTypes, voucherTypes);
+        // Parse voucherTypes to handle comma-separated values and trim whitespace
+        const requestedVoucherTypes = parseList(voucherTypes).map(vt => vt.trim());
+        
+        if (requestedVoucherTypes.length > 0) {
+            // Build conditions for each requested voucher type
+            // Use both FIND_IN_SET (for exact match in comma-separated list) and LIKE (for substring match)
+            // This handles cases like:
+            // - "Private Charter,Proposal Flight" (FIND_IN_SET will match)
+            // - "Proposal Flight ,Private Charter" (LIKE will match due to trailing space)
+            // - "Proposal Flight" (both will match)
+            const voucherConditions = requestedVoucherTypes.map(() => {
+                // Use FIND_IN_SET for exact match and LIKE for substring match (handles trailing spaces and order)
+                return `(FIND_IN_SET(?, aa.voucher_types) > 0 OR aa.voucher_types LIKE ?)`;
+            }).join(' OR ');
+            
+            sql += ` AND (aa.voucher_types = 'All' OR ${voucherConditions})`;
+            
+            // Add parameters for each voucher type (both for FIND_IN_SET and LIKE)
+            requestedVoucherTypes.forEach(vt => {
+                const trimmedVt = vt.trim();
+                params.push(trimmedVt); // For FIND_IN_SET (exact match in comma-separated list)
+                params.push(`%${trimmedVt}%`); // For LIKE (substring match, handles trailing spaces and order)
+            });
+        } else {
+            // Fallback: if parseList returns empty, use original logic with LIKE for substring match
+            const trimmedVoucherTypes = voucherTypes.trim();
+            sql += ` AND (aa.voucher_types = 'All' OR aa.voucher_types = ? OR FIND_IN_SET(?, aa.voucher_types) > 0 OR aa.voucher_types LIKE ?)`;
+            params.push(trimmedVoucherTypes, trimmedVoucherTypes, `%${trimmedVoucherTypes}%`);
+        }
     } else {
         // If no voucher type specified, show all voucher types
         sql += ` AND (aa.voucher_types = 'All' OR aa.voucher_types IS NOT NULL)`;
