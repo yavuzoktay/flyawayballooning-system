@@ -236,25 +236,81 @@ const ActivityAvailabilitiesPage = () => {
                             <TableCell>{row.available}</TableCell>
                             <TableCell>{row.total_booked}</TableCell>
                             <TableCell>
-                                {row.flight_types && row.flight_types !== 'All' ? 
-                                    row.flight_types.split(',').map((type, index) => (
-                                        <Chip 
-                                            key={index} 
-                                            label={type.trim()} 
-                                            size="small" 
-                                            color="primary" 
-                                            variant="outlined"
-                                            sx={{ mr: 0.5, mb: 0.5 }}
-                                        />
-                                    ))
-                                    : 
-                                    <Chip 
-                                        label="All" 
-                                        size="small" 
-                                        color="default" 
-                                        variant="outlined"
-                                    />
-                                }
+                                {(() => {
+                                    // Check voucher_types to determine which chips to show
+                                    const voucherTypes = row.voucher_types ? (typeof row.voucher_types === 'string' ? row.voucher_types.split(',').map(t => t.trim()) : row.voucher_types) : [];
+                                    const hasProposalFlight = voucherTypes.some(vt => vt.toLowerCase().includes('proposal flight'));
+                                    const hasPrivateCharter = voucherTypes.some(vt => vt.toLowerCase().includes('private charter'));
+                                    
+                                    // If both Private Charter and Proposal Flight exist, show both
+                                    if (hasPrivateCharter && hasProposalFlight) {
+                                        return (
+                                            <div style={{ display: 'flex', flexWrap: 'nowrap', gap: '4px' }}>
+                                                <Chip 
+                                                    key="private-charter"
+                                                    label="Private Charter" 
+                                                    size="small" 
+                                                    color="primary" 
+                                                    variant="outlined"
+                                                />
+                                                <Chip 
+                                                    key="proposal"
+                                                    label="Proposal" 
+                                                    size="small" 
+                                                    color="primary" 
+                                                    variant="outlined"
+                                                />
+                                            </div>
+                                        );
+                                    }
+                                    
+                                    // If only Proposal Flight exists, show only "Proposal"
+                                    if (hasProposalFlight) {
+                                        return (
+                                            <Chip 
+                                                label="Proposal" 
+                                                size="small" 
+                                                color="primary" 
+                                                variant="outlined"
+                                            />
+                                        );
+                                    }
+                                    
+                                    // If only Private Charter exists, show only "Private Charter"
+                                    if (hasPrivateCharter) {
+                                        return (
+                                            <Chip 
+                                                label="Private Charter" 
+                                                size="small" 
+                                                color="primary" 
+                                                variant="outlined"
+                                            />
+                                        );
+                                    }
+                                    
+                                    // Otherwise, show flight_types as before
+                                    if (row.flight_types && row.flight_types !== 'All') {
+                                        return row.flight_types.split(',').map((type, index) => (
+                                            <Chip 
+                                                key={index} 
+                                                label={type.trim()} 
+                                                size="small" 
+                                                color="primary" 
+                                                variant="outlined"
+                                                sx={{ mr: 0.5, mb: 0.5 }}
+                                            />
+                                        ));
+                                    } else {
+                                        return (
+                                            <Chip 
+                                                label="All" 
+                                                size="small" 
+                                                color="default" 
+                                                variant="outlined"
+                                            />
+                                        );
+                                    }
+                                })()}
                             </TableCell>
                             <TableCell>
                                 <Chip 
