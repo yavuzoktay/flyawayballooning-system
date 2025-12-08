@@ -15432,29 +15432,11 @@ async function createVoucherFromWebhook(voucherData) {
                     }
                     console.log(`Webhook voucher created successfully, ID: ${result.insertId}, Code: ${uniqueVoucherCode}`);
 
-                    // Store additional information answers if available
-                    if (additionalInfo && typeof additionalInfo === 'object') {
-                        const additionalInfoAnswers = [];
-
-                        // Process additionalInfo object to extract question answers
-                        Object.keys(additionalInfo).forEach(key => {
-                            if (key.startsWith('question_') && additionalInfo[key]) {
-                                const questionId = key.replace('question_', '');
-                                additionalInfoAnswers.push([result.insertId, questionId, additionalInfo[key]]);
-                            }
-                        });
-
-                        if (additionalInfoAnswers.length > 0) {
-                            const additionalInfoSql = 'INSERT INTO additional_information_answers (booking_id, question_id, answer) VALUES ?';
-                            con.query(additionalInfoSql, [additionalInfoAnswers], (additionalInfoErr) => {
-                                if (additionalInfoErr) {
-                                    console.error('Error storing additional information answers for webhook voucher:', additionalInfoErr);
-                                } else {
-                                    console.log('Additional information answers stored successfully for webhook voucher');
-                                }
-                            });
-                        }
-                    }
+                    // NOTE: Vouchers do NOT store additional information in additional_information_answers table
+                    // The additional_information_answers table has a foreign key constraint to all_booking table,
+                    // but vouchers are stored in all_vouchers table, not all_booking table.
+                    // Additional information for vouchers is already stored in additional_information_json column.
+                    // Only bookings (not vouchers) should store data in additional_information_answers table.
 
                     // Send automatic flight voucher confirmation email for Flight Voucher type
                     if (normalizedBookFlight === 'Flight Voucher') {
@@ -19058,15 +19040,139 @@ function getGiftVoucherMessageHtml(voucher = {}) {
 
 // Helper function to generate booking confirmation receipt HTML (matches frontend getBookingConfirmationReceiptHtml)
 function getBookingConfirmationReceiptHtml(booking = {}) {
+    // Debug logging for receipt generation
+    console.log('📧 [getBookingConfirmationReceiptHtml] Generating receipt with booking data:', {
+        id: booking.id,
+        paid: booking.paid,
+        paid_amount: booking.paid_amount,
+        paidAmount: booking.paidAmount,
+        due: booking.due,
+        due_amount: booking.due_amount,
+        subtotal: booking.subtotal,
+        total: booking.total,
+        original_amount: booking.original_amount,
+        originalAmount: booking.originalAmount,
+        price: booking.price,
+        amount: booking.amount,
+        location: booking.location,
+        preferred_location: booking.preferred_location,
+        flight_type: booking.flight_type,
+        experience_type: booking.experience_type,
+        passengersCount: Array.isArray(booking.passengers) ? booking.passengers.length : 0,
+        pax: booking.pax,
+        numberOfPassengers: booking.numberOfPassengers
+    });
+    
     const receiptItems = Array.isArray(booking.passengers) ? booking.passengers : [];
-    const paidAmount = booking.paid != null ? Number(booking.paid) : null;
-    const dueAmount = booking.due != null ? Number(booking.due) : null;
-    const subtotal = paidAmount != null && dueAmount != null ? paidAmount + dueAmount : null;
+    
+    // Helper function to safely convert to number
+    const safeNumber = (value) => {
+        if (value == null || value === '') return null;
+        const num = typeof value === 'string' ? parseFloat(value) : Number(value);
+        return isNaN(num) ? null : num;
+    };
+    
+    // Get paid, due, and subtotal from booking object
+    // Check multiple possible field names for paid amount
+    const paidAmount = 
+        safeNumber(booking.paid) ||
+        safeNumber(booking.paid_amount) ||
+        safeNumber(booking.paidAmount) ||
+        null;
+    
+    // Check multiple possible field names for due amount
+    const dueAmount = 
+        safeNumber(booking.due) ||
+        safeNumber(booking.due_amount) ||
+        safeNumber(booking.dueAmount) ||
+        null;
+    
+    // Check multiple possible field names for total amount
+    const totalAmount = 
+        safeNumber(booking.total) ||
+        safeNumber(booking.total_amount) ||
+        safeNumber(booking.totalAmount) ||
+        safeNumber(booking.price) ||
+        safeNumber(booking.amount) ||
+        null;
+    
+    // Check for original_amount (used in getAllBookingData and vouchers)
+    const originalAmount = 
+        safeNumber(booking.original_amount) ||
+        safeNumber(booking.originalAmount) ||
+        null;
+    
+    // Use provided subtotal if available, otherwise calculate
+    let subtotal = 
+        safeNumber(booking.subtotal) ||
+        safeNumber(booking.subtotal_amount) ||
+        safeNumber(booking.subtotalAmount) ||
+        null;
+    
+    if (subtotal == null) {
+        // Calculate subtotal from paid + due
+        if (paidAmount != null && dueAmount != null) {
+            // Both are available, sum them
+            subtotal = paidAmount + dueAmount;
+        } else if (dueAmount != null && dueAmount > 0) {
+            subtotal = dueAmount;
+        } else if (paidAmount != null && paidAmount > 0) {
+            // Only use paid if it's greater than 0
+            subtotal = paidAmount;
+        }
+    }
+    
+    // Priority: Use original_amount if available (it represents the actual booking total)
+    // This is especially important for vouchers where paid might be 0
+    if (subtotal == null && originalAmount != null && originalAmount > 0) {
+        subtotal = originalAmount;
+    }
+    
+    // Fallback to total if subtotal is still null
+    if (subtotal == null && totalAmount != null && totalAmount > 0) {
+        subtotal = totalAmount;
+    }
+    
+    // If still no subtotal, try to calculate from passengers and price
+    if (subtotal == null && receiptItems.length > 0) {
+        // Try to get price from voucher data or booking
+        const voucherPrice = booking.voucherData?.price || 
+                            booking.voucherData?.basePrice || 
+                            booking.voucherData?.totalPrice ||
+                            booking.voucher_price ||
+                            null;
+        if (voucherPrice != null && Number(voucherPrice) > 0) {
+            subtotal = Number(voucherPrice) * receiptItems.length;
+        }
+    }
+    
+    // If still no subtotal and we have paid amount > 0, use paid as subtotal
+    // This handles cases where only paid is available (e.g., fully paid vouchers)
+    if (subtotal == null && paidAmount != null && paidAmount > 0) {
+        subtotal = paidAmount;
+    }
+    
+    // Final fallback: if paid is 0 and we have original_amount, use it
+    // This handles voucher cases where paid is 0 but original_amount has the actual price
+    if (subtotal == null && (paidAmount === 0 || paidAmount == null) && originalAmount != null && originalAmount > 0) {
+        subtotal = originalAmount;
+    }
+    
+    // Debug logging for calculated values
+    console.log('📧 [getBookingConfirmationReceiptHtml] Calculated receipt values:', {
+        paidAmount: paidAmount,
+        dueAmount: dueAmount,
+        originalAmount: originalAmount,
+        totalAmount: totalAmount,
+        subtotal: subtotal,
+        receiptItemsCount: receiptItems.length
+    });
+    
     const receiptId = booking.receipt_number || booking.booking_reference || booking.id || '';
     const receiptSoldDate = booking.created_at ? formatDate(booking.created_at) : null;
-    const location = escapeHtml(booking.location || 'Bath');
-    const experience = escapeHtml(booking.flight_type || booking.experience || 'Flight Experience');
-    const guestCount = receiptItems.length > 0 ? receiptItems.length : (booking.pax || 0);
+    const location = escapeHtml(booking.location || booking.preferred_location || 'Bath');
+    const experience = escapeHtml(booking.flight_type || booking.experience || booking.experience_type || 'Flight Experience');
+    const guestCount = receiptItems.length > 0 ? receiptItems.length : (booking.pax || booking.numberOfPassengers || 0);
 
     // Format flight date and time for receipt (DD/MM/YYYY HH:mm format)
     let flightDateTime = null;
@@ -19142,7 +19248,13 @@ function getBookingConfirmationReceiptHtml(booking = {}) {
         <div class="receipt-summary" style="margin-top:16px; font-size:13px; color:#475569;">
             <div style="text-align:right; margin-bottom:8px;"><strong>Subtotal:</strong> £${subtotal != null ? subtotal.toFixed(2) : '—'}</div>
             <div style="text-align:right; margin-bottom:8px;"><strong>Total:</strong> £${subtotal != null ? subtotal.toFixed(2) : '—'}</div>
-            <div style="text-align:right; margin-bottom:8px;"><strong>Paid:</strong> £${paidAmount != null ? paidAmount.toFixed(2) : '—'}</div>
+            <div style="text-align:right; margin-bottom:8px;"><strong>Paid:</strong> £${(() => {
+                // For vouchers, if paid is 0 or null but original_amount exists, use original_amount as paid
+                if ((paidAmount === 0 || paidAmount == null) && originalAmount != null && originalAmount > 0) {
+                    return originalAmount.toFixed(2);
+                }
+                return paidAmount != null ? paidAmount.toFixed(2) : '—';
+            })()}</div>
             <div style="text-align:right;"><strong>Due:</strong> £${dueAmount != null ? dueAmount.toFixed(2) : '—'}</div>
         </div>
     </div>`;
@@ -19578,8 +19690,98 @@ function generateFlightVoucherConfirmationEmail(voucher, template = null) {
         messageHtml = getFlightVoucherMessageHtml(voucher);
     }
 
-    // Replace prompts in the message
-    const messageWithPrompts = replacePrompts(messageHtml, voucher);
+    // Convert voucher object to booking-like format for receipt generation
+    // This ensures getBookingConfirmationReceiptHtml can properly extract price information
+    const voucherPaid = voucher.paid != null ? Number(voucher.paid) : null;
+    const voucherDue = voucher.due != null ? Number(voucher.due) : null;
+    const voucherOriginalAmount = voucher.original_amount != null ? Number(voucher.original_amount) : null;
+    
+    // For vouchers, paid amount is the total amount paid, which should be used as original_amount
+    // if original_amount is not explicitly set
+    const effectiveOriginalAmount = voucherOriginalAmount != null ? voucherOriginalAmount : voucherPaid;
+
+    // Infer missing monetary fields (Stripe webhook may not persist subtotal/total)
+    const inferredTotal = (voucher.total != null ? Number(voucher.total) : null)
+        ?? (voucher.subtotal != null ? Number(voucher.subtotal) : null)
+        ?? (effectiveOriginalAmount != null ? Number(effectiveOriginalAmount) : null)
+        ?? (voucher.paid != null ? Number(voucher.paid) : null)
+        ?? (voucher.amount != null ? Number(voucher.amount) : null);
+
+    const inferredPaid = voucherPaid != null ? voucherPaid : (effectiveOriginalAmount != null ? effectiveOriginalAmount : inferredTotal);
+    const inferredSubtotal = (voucher.subtotal != null ? Number(voucher.subtotal) : null) ?? inferredTotal;
+    const inferredDue = voucherDue != null ? voucherDue : Math.max((inferredTotal || 0) - (inferredPaid || 0), 0);
+    
+    const bookingLikeObject = {
+        ...voucher,
+        // Map voucher fields to booking fields
+        paid: inferredPaid,
+        due: inferredDue,
+        subtotal: inferredSubtotal,
+        total: inferredTotal,
+        // Set original_amount to paid if not explicitly set (vouchers are typically fully paid)
+        original_amount: effectiveOriginalAmount,
+        originalAmount: effectiveOriginalAmount,
+        // Map location
+        location: voucher.preferred_location || voucher.location || 'Bath',
+        // Map flight type
+        flight_type: voucher.experience_type || voucher.flight_type || 'Shared Flight',
+        experience: voucher.experience_type || voucher.flight_type || 'Shared Flight',
+        // Map voucher code
+        voucher_code: voucher.voucher_ref || voucher.voucher_code || '',
+        // Map receipt number
+        receipt_number: voucher.voucher_ref || voucher.id || '',
+        booking_reference: voucher.voucher_ref || voucher.id || '',
+        // Parse passengers from voucher_passenger_details if available
+        passengers: (() => {
+            if (voucher.voucher_passenger_details) {
+                try {
+                    const parsed = typeof voucher.voucher_passenger_details === 'string' 
+                        ? JSON.parse(voucher.voucher_passenger_details) 
+                        : voucher.voucher_passenger_details;
+                    return Array.isArray(parsed) ? parsed : [];
+                } catch (e) {
+                    return [];
+                }
+            }
+            return [];
+        })(),
+        // Map passenger count
+        pax: voucher.numberOfPassengers || (() => {
+            if (voucher.voucher_passenger_details) {
+                try {
+                    const parsed = typeof voucher.voucher_passenger_details === 'string' 
+                        ? JSON.parse(voucher.voucher_passenger_details) 
+                        : voucher.voucher_passenger_details;
+                    return Array.isArray(parsed) ? parsed.length : 0;
+                } catch (e) {
+                    return 0;
+                }
+            }
+            return 0;
+        })(),
+        numberOfPassengers: voucher.numberOfPassengers || 0,
+        // Map created date
+        created: voucher.created_at || voucher.created,
+        created_at: voucher.created_at || voucher.created
+    };
+    
+    // Debug logging for voucher to booking conversion
+    console.log('📧 [generateFlightVoucherConfirmationEmail] Voucher to booking conversion:', {
+        voucherId: voucher.id,
+        voucherPaid: voucherPaid,
+        voucherDue: voucherDue,
+        voucherOriginalAmount: voucherOriginalAmount,
+        effectiveOriginalAmount: effectiveOriginalAmount,
+        bookingLikeObjectPaid: bookingLikeObject.paid,
+        bookingLikeObjectOriginalAmount: bookingLikeObject.original_amount,
+        bookingLikeObjectSubtotal: bookingLikeObject.subtotal,
+        bookingLikeObjectTotal: bookingLikeObject.total,
+        passengersCount: bookingLikeObject.passengers.length,
+        pax: bookingLikeObject.pax
+    });
+
+    // Replace prompts in the message (use booking-like object for receipt generation)
+    const messageWithPrompts = replacePrompts(messageHtml, bookingLikeObject);
     const bodyHtml = messageWithPrompts;
 
     // Build email layout (matches frontend buildEmailLayout)
@@ -19901,6 +20103,20 @@ async function sendAutomaticFlightVoucherConfirmationEmail(voucherId) {
                 console.log('Skipping automatic email - not a Flight Voucher:', voucher.book_flight);
                 return;
             }
+
+            // Debug logging for voucher data
+            console.log('📧 [sendAutomaticFlightVoucherConfirmationEmail] Voucher data for email:', {
+                voucherId: voucherId,
+                paid: voucher.paid,
+                due: voucher.due,
+                subtotal: voucher.subtotal,
+                total: voucher.total,
+                original_amount: voucher.original_amount,
+                numberOfPassengers: voucher.numberOfPassengers,
+                location: voucher.preferred_location || voucher.location,
+                experience_type: voucher.experience_type,
+                flight_type: voucher.flight_type
+            });
 
             // Continue with email sending
             sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId);
