@@ -15212,6 +15212,9 @@ async function createVoucherFromWebhook(voucherData) {
             expires = '',
             redeemed = 'No',
             paid = 0,
+            subtotal = null,
+            total = null,
+            original_amount = null,
             offer_code = '',
             voucher_ref = '',
             recipient_name = '',
@@ -15400,9 +15403,15 @@ async function createVoucherFromWebhook(voucherData) {
             });
 
             // No duplicates found, proceed with voucher creation
+            // Infer amounts from voucherData if not explicitly provided
+            const resolvedPaid = Number(paid) || 0;
+            const resolvedSubtotal = subtotal != null ? Number(subtotal) : (total != null ? Number(total) : resolvedPaid);
+            const resolvedTotal = total != null ? Number(total) : resolvedPaid;
+            const resolvedOriginalAmount = original_amount != null ? Number(original_amount) : resolvedPaid;
+            
             const insertSql = `INSERT INTO all_vouchers 
-                    (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, numberOfPassengers, additional_information_json, add_to_booking_items, voucher_passenger_details)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                    (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, subtotal, total, original_amount, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, numberOfPassengers, additional_information_json, add_to_booking_items, voucher_passenger_details)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
             const values = [
                 emptyToNull(name),
                 emptyToNull(weight),
@@ -15414,7 +15423,10 @@ async function createVoucherFromWebhook(voucherData) {
                 emptyToNull(mobile),
                 emptyToNull(expiresFinal),
                 emptyToNull(redeemed),
-                paid,
+                resolvedPaid,
+                resolvedSubtotal > 0 ? resolvedSubtotal : null,
+                resolvedTotal > 0 ? resolvedTotal : null,
+                resolvedOriginalAmount > 0 ? resolvedOriginalAmount : null,
                 emptyToNull(offer_code),
                 emptyToNull(voucher_ref),
                 now,
@@ -15455,8 +15467,9 @@ async function createVoucherFromWebhook(voucherData) {
                 console.log(`🎁 Generating single voucher code: ${uniqueVoucherCode}`);
 
                 // Update values array with unique voucher code
+                // Column order: name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, subtotal, total, original_amount, offer_code, voucher_ref (index 15)
                 const updatedValues = [...values];
-                updatedValues[10] = uniqueVoucherCode; // voucher_ref is at index 10
+                updatedValues[15] = uniqueVoucherCode; // voucher_ref is at index 15 (after subtotal, total, original_amount)
 
                 con.query(insertSql, updatedValues, (err, result) => {
                     if (err) {
