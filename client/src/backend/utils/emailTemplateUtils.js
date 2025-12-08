@@ -338,26 +338,89 @@ const getBookingConfirmationReceiptHtml = (booking = {}) => {
     const receiptItems = Array.isArray(booking?.passengers) ? booking.passengers : [];
     
     // Get paid, due, and subtotal from booking object
-    // If subtotal is already provided, use it; otherwise calculate from paid + due
-    const paidAmount = booking?.paid != null ? Number(booking.paid) : null;
-    const dueAmount = booking?.due != null ? Number(booking.due) : null;
+    // Check multiple possible field names for paid amount
+    const paidAmount = 
+        (booking?.paid != null ? Number(booking.paid) : null) ||
+        (booking?.paid_amount != null ? Number(booking.paid_amount) : null) ||
+        (booking?.paidAmount != null ? Number(booking.paidAmount) : null) ||
+        null;
+    
+    // Check multiple possible field names for due amount
+    const dueAmount = 
+        (booking?.due != null ? Number(booking.due) : null) ||
+        (booking?.due_amount != null ? Number(booking.due_amount) : null) ||
+        (booking?.dueAmount != null ? Number(booking.dueAmount) : null) ||
+        null;
+    
+    // Check multiple possible field names for total amount
+    const totalAmount = 
+        (booking?.total != null ? Number(booking.total) : null) ||
+        (booking?.total_amount != null ? Number(booking.total_amount) : null) ||
+        (booking?.totalAmount != null ? Number(booking.totalAmount) : null) ||
+        (booking?.price != null ? Number(booking.price) : null) ||
+        (booking?.amount != null ? Number(booking.amount) : null) ||
+        null;
+    
+    // Check for original_amount (used in getAllBookingData)
+    const originalAmount = 
+        (booking?.original_amount != null ? Number(booking.original_amount) : null) ||
+        (booking?.originalAmount != null ? Number(booking.originalAmount) : null) ||
+        null;
     
     // Use provided subtotal if available, otherwise calculate
-    let subtotal = booking?.subtotal != null ? Number(booking.subtotal) : null;
+    let subtotal = 
+        (booking?.subtotal != null ? Number(booking.subtotal) : null) ||
+        (booking?.subtotal_amount != null ? Number(booking.subtotal_amount) : null) ||
+        (booking?.subtotalAmount != null ? Number(booking.subtotalAmount) : null) ||
+        null;
+    
     if (subtotal == null) {
         // Calculate subtotal from paid + due
         if (paidAmount != null && dueAmount != null) {
+            // Both are available, sum them
             subtotal = paidAmount + dueAmount;
-        } else if (paidAmount != null) {
-            subtotal = paidAmount;
-        } else if (dueAmount != null) {
+        } else if (dueAmount != null && dueAmount > 0) {
             subtotal = dueAmount;
+        } else if (paidAmount != null && paidAmount > 0) {
+            // Only use paid if it's greater than 0
+            subtotal = paidAmount;
         }
     }
     
+    // Priority: Use original_amount if available (it represents the actual booking total)
+    // This is especially important for vouchers where paid might be 0
+    if (subtotal == null && originalAmount != null && originalAmount > 0) {
+        subtotal = originalAmount;
+    }
+    
     // Fallback to total if subtotal is still null
-    if (subtotal == null && booking?.total != null) {
-        subtotal = Number(booking.total);
+    if (subtotal == null && totalAmount != null && totalAmount > 0) {
+        subtotal = totalAmount;
+    }
+    
+    // If still no subtotal, try to calculate from passengers and price
+    if (subtotal == null && receiptItems.length > 0) {
+        // Try to get price from voucher data or booking
+        const voucherPrice = booking?.voucherData?.price || 
+                            booking?.voucherData?.basePrice || 
+                            booking?.voucherData?.totalPrice ||
+                            booking?.voucher_price ||
+                            null;
+        if (voucherPrice != null && Number(voucherPrice) > 0) {
+            subtotal = Number(voucherPrice) * receiptItems.length;
+        }
+    }
+    
+    // If still no subtotal and we have paid amount > 0, use paid as subtotal
+    // This handles cases where only paid is available (e.g., fully paid vouchers)
+    if (subtotal == null && paidAmount != null && paidAmount > 0) {
+        subtotal = paidAmount;
+    }
+    
+    // Final fallback: if paid is 0 and we have original_amount, use it
+    // This handles voucher cases where paid is 0 but original_amount has the actual price
+    if (subtotal == null && (paidAmount === 0 || paidAmount == null) && originalAmount != null && originalAmount > 0) {
+        subtotal = originalAmount;
     }
     const receiptId = booking?.receipt_number || booking?.booking_reference || booking?.id || '';
     
