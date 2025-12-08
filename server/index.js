@@ -16136,6 +16136,29 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                 result = storeData.voucherData.voucher_id;
                 voucherCode = storeData.voucherData.generated_voucher_code;
             } else {
+                // Capture Stripe amounts (authoritative) as a fallback for receipts
+                let sessionAmountTotal = null;
+                let sessionAmountSubtotal = null;
+                try {
+                    const stripeSession = await stripe.checkout.sessions.retrieve(session_id);
+                    sessionAmountTotal = stripeSession?.amount_total ? Number(stripeSession.amount_total) / 100 : null;
+                    sessionAmountSubtotal = stripeSession?.amount_subtotal ? Number(stripeSession.amount_subtotal) / 100 : null;
+                } catch (e) {
+                    console.warn('Could not fetch Stripe session for voucher amount inference:', e?.message);
+                }
+                const fallbackAmount = Number(storeData.totalPrice || storeData.voucherData?.paid || 0);
+                const resolvedPaidAmount = sessionAmountTotal ?? fallbackAmount;
+                const resolvedSubtotalAmount = sessionAmountSubtotal ?? resolvedPaidAmount;
+                // Inject amounts into voucherData before creation
+                storeData.voucherData = {
+                    ...storeData.voucherData,
+                    paid: resolvedPaidAmount,
+                    subtotal: resolvedSubtotalAmount,
+                    total: resolvedPaidAmount,
+                    original_amount: resolvedPaidAmount,
+                    amount: resolvedPaidAmount
+                };
+
                 // Additional check: look for existing voucher in database to prevent duplicates
                 const existingVoucherSql = `SELECT id FROM all_vouchers WHERE name = ? AND email = ? AND paid = ? AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE) LIMIT 1`;
 
@@ -16169,6 +16192,21 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                         // Create voucher only if not already created
                         result = await createVoucherFromWebhook(storeData.voucherData);
                         console.log('Voucher created successfully, ID:', result);
+                    // Persist Stripe amounts into voucher row to power receipt fields
+                    if (result && resolvedPaidAmount != null) {
+                        const updateSql = `
+                            UPDATE all_vouchers 
+                            SET paid = ?, subtotal = IFNULL(subtotal, ?), total = IFNULL(total, ?), original_amount = IFNULL(original_amount, ?)
+                            WHERE id = ?
+                        `;
+                        con.query(updateSql, [resolvedPaidAmount, resolvedSubtotalAmount, resolvedPaidAmount, resolvedPaidAmount, result], (err) => {
+                            if (err) {
+                                console.error('Error updating voucher amounts from Stripe session (fallback):', err);
+                            } else {
+                                console.log('✅ Voucher amounts updated from Stripe session (fallback):', { voucherId: result, resolvedPaidAmount, resolvedSubtotalAmount });
+                            }
+                        });
+                    }
                         // Voucher code generation is now handled by frontend only
                         // Webhook only creates the voucher entry
                         console.log('Voucher code generation skipped - will be handled by frontend');
