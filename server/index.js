@@ -4353,6 +4353,13 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     // Webhook creates the voucher, voucher code generation will be done by createBookingFromSession
                     console.log('Creating voucher via webhook, voucher code generation will be done by createBookingFromSession');
 
+                    // Capture amount information from Stripe session as a reliable paid/total source
+                    const sessionAmountTotal = session?.amount_total ? Number(session.amount_total) / 100 : null;
+                    const sessionAmountSubtotal = session?.amount_subtotal ? Number(session.amount_subtotal) / 100 : null;
+                    const fallbackAmount = Number(storeData.totalPrice || storeData.voucherData?.paid || 0);
+                    const resolvedPaidAmount = sessionAmountTotal ?? fallbackAmount;
+                    const resolvedSubtotalAmount = sessionAmountSubtotal ?? resolvedPaidAmount;
+
                     // Log the voucher data before creation
                     logToFile('Creating voucher from webhook with data:', {
                         additionalInfo: storeData.voucherData.additionalInfo,
@@ -4360,12 +4367,38 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                         add_to_booking_items: storeData.voucherData.add_to_booking_items
                     });
 
+                    // Ensure paid/amount fields are persisted into voucherData before creation
+                    storeData.voucherData = {
+                        ...storeData.voucherData,
+                        paid: resolvedPaidAmount,
+                        subtotal: resolvedSubtotalAmount,
+                        total: resolvedPaidAmount,
+                        original_amount: resolvedPaidAmount,
+                        amount: resolvedPaidAmount
+                    };
+
                     // Direct database insertion instead of HTTP call
                     const voucherId = await createVoucherFromWebhook(storeData.voucherData);
                     console.log('Webhook voucher creation completed, ID:', voucherId);
 
                     // Store voucher ID in session data to prevent duplicate creation
                     storeData.voucherData.voucher_id = voucherId;
+
+                    // Persist Stripe amounts into voucher row to power receipt fields
+                    if (voucherId && resolvedPaidAmount != null) {
+                        const updateSql = `
+                            UPDATE all_vouchers 
+                            SET paid = ?, subtotal = IFNULL(subtotal, ?), total = IFNULL(total, ?), original_amount = IFNULL(original_amount, ?)
+                            WHERE id = ?
+                        `;
+                        con.query(updateSql, [resolvedPaidAmount, resolvedSubtotalAmount, resolvedPaidAmount, resolvedPaidAmount, voucherId], (err) => {
+                            if (err) {
+                                console.error('Error updating voucher amounts from Stripe session:', err);
+                            } else {
+                                console.log('✅ Voucher amounts updated from Stripe session:', { voucherId, resolvedPaidAmount, resolvedSubtotalAmount });
+                            }
+                        });
+                    }
 
                     // Mark session as processed to prevent duplicate calls
                     storeData.processed = true;
