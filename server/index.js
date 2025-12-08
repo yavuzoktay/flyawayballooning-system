@@ -4385,7 +4385,9 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     storeData.voucherData.voucher_id = voucherId;
 
                     // Persist Stripe amounts into voucher row to power receipt fields
+                    // Try to update subtotal, total, original_amount if columns exist, otherwise just update paid
                     if (voucherId && resolvedPaidAmount != null) {
+                        // First try to update all amount fields
                         const updateSql = `
                             UPDATE all_vouchers 
                             SET paid = ?, subtotal = IFNULL(subtotal, ?), total = IFNULL(total, ?), original_amount = IFNULL(original_amount, ?)
@@ -4393,7 +4395,19 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                         `;
                         con.query(updateSql, [resolvedPaidAmount, resolvedSubtotalAmount, resolvedPaidAmount, resolvedPaidAmount, voucherId], (err) => {
                             if (err) {
-                                console.error('Error updating voucher amounts from Stripe session:', err);
+                                // If columns don't exist, just update paid
+                                if (err.code === 'ER_BAD_FIELD_ERROR') {
+                                    console.warn('⚠️ Amount columns (subtotal, total, original_amount) not found in database, updating only paid field');
+                                    con.query('UPDATE all_vouchers SET paid = ? WHERE id = ?', [resolvedPaidAmount, voucherId], (err2) => {
+                                        if (err2) {
+                                            console.error('Error updating voucher paid amount from Stripe session:', err2);
+                                        } else {
+                                            console.log('✅ Voucher paid amount updated from Stripe session:', { voucherId, resolvedPaidAmount });
+                                        }
+                                    });
+                                } else {
+                                    console.error('Error updating voucher amounts from Stripe session:', err);
+                                }
                             } else {
                                 console.log('✅ Voucher amounts updated from Stripe session:', { voucherId, resolvedPaidAmount, resolvedSubtotalAmount });
                             }
@@ -15410,8 +15424,8 @@ async function createVoucherFromWebhook(voucherData) {
             const resolvedOriginalAmount = original_amount != null ? Number(original_amount) : resolvedPaid;
             
             const insertSql = `INSERT INTO all_vouchers 
-                    (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, subtotal, total, original_amount, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, numberOfPassengers, additional_information_json, add_to_booking_items, voucher_passenger_details)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                    (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, numberOfPassengers, additional_information_json, add_to_booking_items, voucher_passenger_details)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
             const values = [
                 emptyToNull(name),
                 emptyToNull(weight),
@@ -15424,9 +15438,6 @@ async function createVoucherFromWebhook(voucherData) {
                 emptyToNull(expiresFinal),
                 emptyToNull(redeemed),
                 resolvedPaid,
-                resolvedSubtotal > 0 ? resolvedSubtotal : null,
-                resolvedTotal > 0 ? resolvedTotal : null,
-                resolvedOriginalAmount > 0 ? resolvedOriginalAmount : null,
                 emptyToNull(offer_code),
                 emptyToNull(voucher_ref),
                 now,
@@ -15467,9 +15478,9 @@ async function createVoucherFromWebhook(voucherData) {
                 console.log(`🎁 Generating single voucher code: ${uniqueVoucherCode}`);
 
                 // Update values array with unique voucher code
-                // Column order: name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, subtotal, total, original_amount, offer_code, voucher_ref (index 15)
+                // Column order: name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref (index 12)
                 const updatedValues = [...values];
-                updatedValues[15] = uniqueVoucherCode; // voucher_ref is at index 15 (after subtotal, total, original_amount)
+                updatedValues[12] = uniqueVoucherCode; // voucher_ref is at index 12
 
                 con.query(insertSql, updatedValues, (err, result) => {
                     if (err) {
@@ -16206,7 +16217,9 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                         result = await createVoucherFromWebhook(storeData.voucherData);
                         console.log('Voucher created successfully, ID:', result);
                     // Persist Stripe amounts into voucher row to power receipt fields
+                    // Try to update subtotal, total, original_amount if columns exist, otherwise just update paid
                     if (result && resolvedPaidAmount != null) {
+                        // First try to update all amount fields
                         const updateSql = `
                             UPDATE all_vouchers 
                             SET paid = ?, subtotal = IFNULL(subtotal, ?), total = IFNULL(total, ?), original_amount = IFNULL(original_amount, ?)
@@ -16214,7 +16227,19 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                         `;
                         con.query(updateSql, [resolvedPaidAmount, resolvedSubtotalAmount, resolvedPaidAmount, resolvedPaidAmount, result], (err) => {
                             if (err) {
-                                console.error('Error updating voucher amounts from Stripe session (fallback):', err);
+                                // If columns don't exist, just update paid
+                                if (err.code === 'ER_BAD_FIELD_ERROR') {
+                                    console.warn('⚠️ Amount columns (subtotal, total, original_amount) not found in database, updating only paid field (fallback)');
+                                    con.query('UPDATE all_vouchers SET paid = ? WHERE id = ?', [resolvedPaidAmount, result], (err2) => {
+                                        if (err2) {
+                                            console.error('Error updating voucher paid amount from Stripe session (fallback):', err2);
+                                        } else {
+                                            console.log('✅ Voucher paid amount updated from Stripe session (fallback):', { voucherId: result, resolvedPaidAmount });
+                                        }
+                                    });
+                                } else {
+                                    console.error('Error updating voucher amounts from Stripe session (fallback):', err);
+                                }
                             } else {
                                 console.log('✅ Voucher amounts updated from Stripe session (fallback):', { voucherId: result, resolvedPaidAmount, resolvedSubtotalAmount });
                             }
