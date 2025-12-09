@@ -16356,7 +16356,13 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                                                     });
                                                 });
                                                 // Ensure PAID is set correctly
-                                                const paidAmount = Number(storeData.voucherData.paid || totalPrice || 0);
+                                                // Use resolved Stripe amount as the most reliable paid value
+                                                const paidAmount = Number(
+                                                    storeData.voucherData.paid ??
+                                                    resolvedPaidAmount ??
+                                                    storeData.totalPrice ??
+                                                    0
+                                                );
                                                 if (paidAmount > 0) {
                                                     await new Promise((resolve) => {
                                                         con.query('UPDATE all_vouchers SET paid = ? WHERE id = ?', [paidAmount, rows[0].id], (err) => {
