@@ -4432,6 +4432,25 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                         });
                     }
 
+                    // Send Gift Voucher Confirmation email in webhook (only once)
+                    const isGiftVoucher = (storeData.voucherData.voucher_type && storeData.voucherData.voucher_type.toLowerCase().includes('gift')) ||
+                        (storeData.voucherData.book_flight && storeData.voucherData.book_flight.toLowerCase().includes('gift'));
+                    if (isGiftVoucher && !storeData.voucherData.gift_email_sent) {
+                        try {
+                            console.log('📧 Sending automatic Gift Voucher Confirmation email from webhook for voucher ID:', voucherId);
+                            sendAutomaticGiftVoucherConfirmationEmail(voucherId, {
+                                purchaser_email: storeData.voucherData.purchaser_email || storeData.voucherData.email,
+                                purchaser_name: storeData.voucherData.purchaser_name || storeData.voucherData.name,
+                                purchaser_phone: storeData.voucherData.phone || storeData.voucherData.mobile,
+                                purchaser_mobile: storeData.voucherData.mobile || storeData.voucherData.phone
+                            });
+                            // Mark that email was sent to prevent duplicate in fallback
+                            storeData.voucherData.gift_email_sent = true;
+                        } catch (emailErr) {
+                            console.error('Error sending Gift Voucher Confirmation email from webhook:', emailErr?.message || emailErr);
+                        }
+                    }
+
                     // Mark session as processed to prevent duplicate calls
                     storeData.processed = true;
 
@@ -15540,11 +15559,10 @@ async function createVoucherFromWebhook(voucherData) {
                         sendAutomaticFlightVoucherConfirmationEmail(result.insertId);
                     }
 
-                    // Send automatic gift voucher confirmation email for Gift Voucher type
+                    // Note: Gift Voucher Confirmation email is sent in webhook handler, not here
+                    // This prevents duplicate emails when createBookingFromSession fallback is called
                     if (normalizedBookFlight === 'Gift Voucher') {
                         const webhookRecipientEmail = (recipient_email || '').trim();
-                        console.log('📧 Sending automatic Gift Voucher Confirmation email for voucher ID:', result.insertId);
-                        sendAutomaticGiftVoucherConfirmationEmail(result.insertId);
                         if (webhookRecipientEmail) {
                             scheduleReceivedGiftVoucherEmail(result.insertId, webhookRecipientEmail).catch((err) => {
                                 console.error('Error scheduling Received GV email:', err);
