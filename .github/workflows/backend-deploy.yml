@@ -76,14 +76,14 @@ jobs:
           echo "SSH_HOSTS: ${SSH_HOSTS:-'NOT_SET'}"
           echo "SSH_HOST_SINGLE: ${SSH_HOST_SINGLE:-'NOT_SET'}"
           
-          # Fallbacks when SSH_HOSTS is not provided: use SSH_HOST (single), otherwise default to previous host
+          # Fallbacks when SSH_HOSTS is not provided: use SSH_HOST (single), otherwise default to current production host
           if [ -z "$SSH_HOSTS" ]; then
             if [ -n "$SSH_HOST_SINGLE" ]; then
               SSH_HOSTS="$SSH_HOST_SINGLE"
               echo "INFO: Using SSH_HOST single target: $SSH_HOSTS"
             else
-              SSH_HOSTS="34.205.25.8"
-              echo "WARNING: SSH_HOSTS and SSH_HOST are empty. Falling back to 34.205.25.8"
+              SSH_HOSTS="44.201.218.229"
+              echo "WARNING: SSH_HOSTS and SSH_HOST are empty. Falling back to 44.201.218.229"
             fi
           fi
           
