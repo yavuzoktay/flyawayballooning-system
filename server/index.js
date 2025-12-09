@@ -20,6 +20,7 @@ const nodemailer = require('nodemailer');
 const { EventWebhook, EventWebhookHeader } = require('@sendgrid/eventwebhook');
 const Twilio = require('twilio');
 const { parsePassengerList, derivePaidAmount } = require('./lib/voucherMetrics');
+const PDFDocument = require('pdfkit');
 dotenv.config();
 
 // Configure SendGrid
@@ -133,7 +134,7 @@ const sendEmailWithFallback = async (payload, { isBulk = false, context = 'gener
     const smtpResults = [];
 
     for (const recipient of recipients) {
-        const info = await smtpTransporter.sendMail({
+        const mailOptions = {
             from: payload.from?.email ? `${payload.from.name || smtpConfig.fromName} <${payload.from.email}>` : getFallbackFrom(),
             to: recipient,
             subject: payload.subject,
@@ -144,7 +145,24 @@ const sendEmailWithFallback = async (payload, { isBulk = false, context = 'gener
                     .filter(([_, value]) => value !== undefined && value !== null)
                     .map(([key, value]) => [`X-${key.replace(/_/g, '-')}`, value])
             ) : undefined
-        });
+        };
+        
+        // Handle attachments for SMTP fallback
+        if (payload.attachments && Array.isArray(payload.attachments)) {
+            mailOptions.attachments = payload.attachments.map(att => {
+                // Convert base64 content to buffer for nodemailer
+                if (att.content) {
+                    return {
+                        filename: att.filename || 'attachment',
+                        content: Buffer.from(att.content, 'base64'),
+                        contentType: att.type || 'application/octet-stream'
+                    };
+                }
+                return att;
+            });
+        }
+        
+        const info = await smtpTransporter.sendMail(mailOptions);
         smtpResults.push(info);
     }
 
@@ -20725,6 +20743,81 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
     }
 }
 
+// Helper function to generate PDF for gift voucher
+async function generateGiftVoucherPDF(voucher) {
+    return new Promise((resolve, reject) => {
+        try {
+            const doc = new PDFDocument({ margin: 50 });
+            const chunks = [];
+            
+            doc.on('data', chunk => chunks.push(chunk));
+            doc.on('end', () => {
+                const pdfBuffer = Buffer.concat(chunks);
+                resolve(pdfBuffer);
+            });
+            doc.on('error', reject);
+            
+            // Header
+            doc.fontSize(24)
+               .fillColor('#1e40af')
+               .text('Gift Voucher', { align: 'center' });
+            
+            doc.moveDown(2);
+            
+            // Recipient Name
+            const recipientName = voucher.recipient_name || voucher.name || 'Recipient';
+            doc.fontSize(16)
+               .fillColor('#000000')
+               .text('Recipient Name:', { continued: true })
+               .fontSize(14)
+               .text(` ${recipientName}`, { align: 'left' });
+            
+            doc.moveDown(1.5);
+            
+            // Voucher Code
+            const voucherCode = voucher.voucher_ref || voucher.voucher_code || 'N/A';
+            doc.fontSize(16)
+               .fillColor('#000000')
+               .text('Voucher Code:', { continued: true })
+               .fontSize(14)
+               .font('Helvetica-Bold')
+               .text(` ${voucherCode}`, { align: 'left' });
+            
+            doc.moveDown(1.5);
+            
+            // Expiry Date
+            let expiryDate = 'N/A';
+            if (voucher.expires) {
+                expiryDate = moment(voucher.expires).format('MMMM D, YYYY');
+            } else if (voucher.created_at) {
+                // Default expiry: 18 months from creation (or 24 months for Any Day Flight)
+                const isAnyDay = (voucher.voucher_type || '').toLowerCase().includes('any day');
+                const monthsToAdd = isAnyDay ? 24 : 18;
+                expiryDate = moment(voucher.created_at).add(monthsToAdd, 'months').format('MMMM D, YYYY');
+            }
+            
+            doc.fontSize(16)
+               .fillColor('#000000')
+               .font('Helvetica')
+               .text('Expiry Date:', { continued: true })
+               .fontSize(14)
+               .text(` ${expiryDate}`, { align: 'left' });
+            
+            doc.moveDown(2);
+            
+            // Footer
+            doc.fontSize(10)
+               .fillColor('#666666')
+               .text('Fly Away Ballooning', { align: 'center' })
+               .text('www.flyawayballooning.com', { align: 'center' });
+            
+            doc.end();
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
 // Helper function to send gift voucher email to both customer and owner
 async function sendGiftVoucherEmailToCustomerAndOwner(voucher, voucherId) {
     try {
@@ -20736,7 +20829,7 @@ async function sendGiftVoucherEmailToCustomerAndOwner(voucher, voucherId) {
 
         // Fetch "Gift Voucher Confirmation" template from database
         const templateQuery = `SELECT * FROM email_templates WHERE name = 'Gift Voucher Confirmation' LIMIT 1`;
-        con.query(templateQuery, (templateErr, templateRows) => {
+        con.query(templateQuery, async (templateErr, templateRows) => {
             if (templateErr) {
                 console.error('❌ Error fetching Gift Voucher Confirmation template:', templateErr);
                 // Continue with default template if fetch fails
@@ -20764,6 +20857,17 @@ async function sendGiftVoucherEmailToCustomerAndOwner(voucher, voucherId) {
 
             const subject = template?.subject || '🎁 Your Gift Voucher is ready';
 
+            // Generate PDF attachment
+            let pdfBuffer = null;
+            try {
+                console.log('📄 Generating gift voucher PDF for voucher ID:', voucherId);
+                pdfBuffer = await generateGiftVoucherPDF(voucher);
+                console.log('✅ Gift voucher PDF generated successfully, size:', pdfBuffer.length, 'bytes');
+            } catch (pdfError) {
+                console.error('❌ Error generating gift voucher PDF:', pdfError);
+                // Continue without PDF attachment if generation fails
+            }
+
             // Prepare email content for customer
             const customerEmailContent = {
                 to: voucher.email,
@@ -20779,6 +20883,16 @@ async function sendGiftVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                     template_type: 'gift_voucher_confirmation_automatic'
                 }
             };
+
+            // Add PDF attachment if generated successfully
+            if (pdfBuffer) {
+                customerEmailContent.attachments = [{
+                    content: pdfBuffer.toString('base64'),
+                    filename: `Gift_Voucher_${voucher.voucher_ref || voucherId}.pdf`,
+                    type: 'application/pdf',
+                    disposition: 'attachment'
+                }];
+            }
 
             // Prepare email content for business owner (same content, different recipient)
             const ownerEmailContent = {
@@ -20799,6 +20913,16 @@ async function sendGiftVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                     template_type: 'gift_voucher_confirmation_automatic_owner'
                 }
             };
+
+            // Add PDF attachment to owner email as well
+            if (pdfBuffer) {
+                ownerEmailContent.attachments = [{
+                    content: pdfBuffer.toString('base64'),
+                    filename: `Gift_Voucher_${voucher.voucher_ref || voucherId}.pdf`,
+                    type: 'application/pdf',
+                    disposition: 'attachment'
+                }];
+            }
 
             // Send emails asynchronously
             (async () => {
