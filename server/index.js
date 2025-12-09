@@ -16220,6 +16220,23 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                         result = existingVoucher[0].id;
                         storeData.voucherData.voucher_id = result;
                         storeData.processed = true;
+                        // Ensure Gift Voucher Confirmation email is sent even when voucher already exists
+                        const isGiftVoucher =
+                            (storeData.voucherData.voucher_type && storeData.voucherData.voucher_type.toLowerCase().includes('gift')) ||
+                            (storeData.voucherData.book_flight && storeData.voucherData.book_flight.toLowerCase().includes('gift'));
+                        if (isGiftVoucher && !storeData.voucherData.gift_email_sent) {
+                            try {
+                                await sendAutomaticGiftVoucherConfirmationEmail(result, {
+                                    purchaser_email: storeData.voucherData.purchaser_email || storeData.voucherData.email,
+                                    purchaser_name: storeData.voucherData.purchaser_name || storeData.voucherData.name,
+                                    purchaser_phone: storeData.voucherData.phone || storeData.voucherData.mobile,
+                                    purchaser_mobile: storeData.voucherData.mobile || storeData.voucherData.phone
+                                });
+                                storeData.voucherData.gift_email_sent = true;
+                            } catch (emailErr) {
+                                console.error('Error sending Gift Voucher Confirmation (existing voucher):', emailErr?.message || emailErr);
+                            }
+                        }
                     } else {
                         // Ensure voucher_type_detail is present for createVoucherFromWebhook
                         try {
@@ -16266,6 +16283,23 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                             }
                         });
                     }
+                        // Send Gift Voucher Confirmation email for newly created gift vouchers
+                        const isGiftVoucher =
+                            (storeData.voucherData.voucher_type && storeData.voucherData.voucher_type.toLowerCase().includes('gift')) ||
+                            (storeData.voucherData.book_flight && storeData.voucherData.book_flight.toLowerCase().includes('gift'));
+                        if (isGiftVoucher && !storeData.voucherData.gift_email_sent) {
+                            try {
+                                await sendAutomaticGiftVoucherConfirmationEmail(result, {
+                                    purchaser_email: storeData.voucherData.purchaser_email || storeData.voucherData.email,
+                                    purchaser_name: storeData.voucherData.purchaser_name || storeData.voucherData.name,
+                                    purchaser_phone: storeData.voucherData.phone || storeData.voucherData.mobile,
+                                    purchaser_mobile: storeData.voucherData.mobile || storeData.voucherData.phone
+                                });
+                                storeData.voucherData.gift_email_sent = true;
+                            } catch (emailErr) {
+                                console.error('Error sending Gift Voucher Confirmation (new voucher):', emailErr?.message || emailErr);
+                            }
+                        }
                         // Voucher code generation is now handled by frontend only
                         // Webhook only creates the voucher entry
                         console.log('Voucher code generation skipped - will be handled by frontend');
