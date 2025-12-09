@@ -12438,6 +12438,18 @@ app.get('/api/analytics', async (req, res) => {
                                                                         location: r.location || 'Other',
                                                                         count: r.count
                                                                     }));
+                                                                    // 11. Voucher Liability (gift + flight vouchers not redeemed)
+                                                                    const voucherLiabilitySql = `
+                                                                        SELECT COUNT(*) AS cnt
+                                                                        FROM all_vouchers
+                                                                        WHERE
+                                                                            (voucher_type LIKE '%Gift%' OR voucher_type LIKE '%Flight%')
+                                                                            AND (redeemed IS NULL OR LOWER(redeemed) = 'no')
+                                                                            ${dateFilter('created_at')}
+                                                                    `;
+                                                                    con.query(voucherLiabilitySql, [], (err11, voucherLiabilityRows) => {
+                                                                        if (err11) return res.status(500).json({ error: 'Failed to fetch voucher liability' });
+                                                                        const voucherLiability = voucherLiabilityRows?.[0]?.cnt || 0;
                                                                     // Return all real analytics
                                                                     res.json({
                                                                         bookingAttempts,
@@ -12449,7 +12461,9 @@ app.get('/api/analytics', async (req, res) => {
                                                                         liabilityByLocation,
                                                                         liabilityByFlightType,
                                                                         refundableLiability: Math.round(refundableLiability),
-                                                                        flownFlightsByLocation
+                                                                        flownFlightsByLocation,
+                                                                        voucherLiability
+                                                                    });
                                                                     });
                                                                 });
                                                             });
