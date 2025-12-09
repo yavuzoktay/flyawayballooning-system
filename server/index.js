@@ -12439,13 +12439,20 @@ app.get('/api/analytics', async (req, res) => {
                                                                         count: r.count
                                                                     }));
                                                                     // 11. Voucher Liability (gift + flight vouchers not redeemed)
+                                                                    // Count outstanding vouchers (Gift/Flight) not redeemed
                                                                     const voucherLiabilitySql = `
                                                                         SELECT COUNT(*) AS cnt
-                                                                        FROM all_vouchers
+                                                                        FROM all_vouchers v
                                                                         WHERE
-                                                                            (voucher_type LIKE '%Gift%' OR voucher_type LIKE '%Flight%')
-                                                                            AND (redeemed IS NULL OR LOWER(redeemed) = 'no')
-                                                                            ${dateFilter('created_at')}
+                                                                            (
+                                                                                COALESCE(v.voucher_type, v.book_flight, '') LIKE '%Gift%'
+                                                                                OR COALESCE(v.voucher_type, v.book_flight, '') LIKE '%Flight%'
+                                                                            )
+                                                                            AND (
+                                                                                v.redeemed IS NULL
+                                                                                OR TRIM(LOWER(v.redeemed)) NOT IN ('yes', 'redeemed', 'true', '1')
+                                                                            )
+                                                                            ${dateFilter('v.created_at')}
                                                                     `;
                                                                     con.query(voucherLiabilitySql, [], (err11, voucherLiabilityRows) => {
                                                                         if (err11) return res.status(500).json({ error: 'Failed to fetch voucher liability' });
