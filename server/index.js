@@ -4433,21 +4433,50 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     }
 
                     // Send Flight Voucher Confirmation email in webhook (only once)
-                    const isFlightVoucher = (storeData.voucherData.voucher_type && !storeData.voucherData.voucher_type.toLowerCase().includes('gift')) &&
-                        (storeData.voucherData.book_flight && (storeData.voucherData.book_flight.toLowerCase().includes('flight voucher') || storeData.voucherData.book_flight.toLowerCase().includes('buy flight voucher')));
+                    console.log('🔍 [WEBHOOK] Checking Flight Voucher email eligibility:', {
+                        voucherId: voucherId,
+                        voucher_type: storeData.voucherData.voucher_type,
+                        book_flight: storeData.voucherData.book_flight,
+                        flight_email_sent: storeData.voucherData.flight_email_sent,
+                        email: storeData.voucherData.email,
+                        purchaser_email: storeData.voucherData.purchaser_email
+                    });
+                    
+                    const voucherTypeCheck = storeData.voucherData.voucher_type && !storeData.voucherData.voucher_type.toLowerCase().includes('gift');
+                    const bookFlightCheck = storeData.voucherData.book_flight && (storeData.voucherData.book_flight.toLowerCase().includes('flight voucher') || storeData.voucherData.book_flight.toLowerCase().includes('buy flight voucher'));
+                    const isFlightVoucher = voucherTypeCheck && bookFlightCheck;
+                    
+                    console.log('🔍 [WEBHOOK] Flight Voucher check results:', {
+                        voucherTypeCheck: voucherTypeCheck,
+                        bookFlightCheck: bookFlightCheck,
+                        isFlightVoucher: isFlightVoucher,
+                        flight_email_sent: storeData.voucherData.flight_email_sent
+                    });
+                    
                     if (isFlightVoucher && !storeData.voucherData.flight_email_sent) {
                         try {
-                            console.log('📧 Sending automatic Flight Voucher Confirmation email from webhook for voucher ID:', voucherId);
-                            sendAutomaticFlightVoucherConfirmationEmail(voucherId, {
+                            console.log('📧 [WEBHOOK] Sending automatic Flight Voucher Confirmation email from webhook for voucher ID:', voucherId);
+                            const contactOverride = {
                                 purchaser_email: storeData.voucherData.purchaser_email || storeData.voucherData.email,
                                 purchaser_name: storeData.voucherData.purchaser_name || storeData.voucherData.name,
                                 purchaser_phone: storeData.voucherData.phone || storeData.voucherData.mobile,
                                 purchaser_mobile: storeData.voucherData.mobile || storeData.voucherData.phone
-                            });
+                            };
+                            console.log('📧 [WEBHOOK] Contact override data:', JSON.stringify(contactOverride));
+                            sendAutomaticFlightVoucherConfirmationEmail(voucherId, contactOverride);
                             // Mark that email was sent to prevent duplicate in fallback
                             storeData.voucherData.flight_email_sent = true;
+                            console.log('✅ [WEBHOOK] Flight Voucher email sent flag set to true');
                         } catch (emailErr) {
-                            console.error('Error sending Flight Voucher Confirmation email from webhook:', emailErr?.message || emailErr);
+                            console.error('❌ [WEBHOOK] Error sending Flight Voucher Confirmation email from webhook:', emailErr?.message || emailErr);
+                            console.error('❌ [WEBHOOK] Error stack:', emailErr?.stack);
+                        }
+                    } else {
+                        if (!isFlightVoucher) {
+                            console.log('⏭️ [WEBHOOK] Skipping Flight Voucher email - not identified as Flight Voucher');
+                        }
+                        if (storeData.voucherData.flight_email_sent) {
+                            console.log('⏭️ [WEBHOOK] Skipping Flight Voucher email - already sent (flight_email_sent=true)');
                         }
                     }
 
@@ -16271,26 +16300,55 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                     });
 
                     if (existingVoucher && existingVoucher.length > 0) {
-                        console.log('Voucher already exists in database, using existing ID:', existingVoucher[0].id);
+                        console.log('✅ [FALLBACK] Voucher already exists in database, using existing ID:', existingVoucher[0].id);
                         result = existingVoucher[0].id;
                         storeData.voucherData.voucher_id = result;
                         storeData.processed = true;
+                        
                         // Ensure Flight Voucher Confirmation email is sent even when voucher already exists
-                        const isFlightVoucher =
-                            (storeData.voucherData.voucher_type && !storeData.voucherData.voucher_type.toLowerCase().includes('gift')) &&
-                            (storeData.voucherData.book_flight && (storeData.voucherData.book_flight.toLowerCase().includes('flight voucher') || storeData.voucherData.book_flight.toLowerCase().includes('buy flight voucher')));
-                        if (isFlightVoucher && !storeData.voucherData.flight_email_sent) {
+                        console.log('🔍 [FALLBACK] Checking Flight Voucher email eligibility (existing voucher):', {
+                            voucherId: result,
+                            voucher_type: storeData.voucherData.voucher_type,
+                            book_flight: storeData.voucherData.book_flight,
+                            flight_email_sent: storeData.voucherData.flight_email_sent,
+                            email: storeData.voucherData.email,
+                            purchaser_email: storeData.voucherData.purchaser_email
+                        });
+                        
+                        const voucherTypeCheckExisting = storeData.voucherData.voucher_type && !storeData.voucherData.voucher_type.toLowerCase().includes('gift');
+                        const bookFlightCheckExisting = storeData.voucherData.book_flight && (storeData.voucherData.book_flight.toLowerCase().includes('flight voucher') || storeData.voucherData.book_flight.toLowerCase().includes('buy flight voucher'));
+                        const isFlightVoucherExisting = voucherTypeCheckExisting && bookFlightCheckExisting;
+                        
+                        console.log('🔍 [FALLBACK] Flight Voucher check results (existing voucher):', {
+                            voucherTypeCheck: voucherTypeCheckExisting,
+                            bookFlightCheck: bookFlightCheckExisting,
+                            isFlightVoucher: isFlightVoucherExisting,
+                            flight_email_sent: storeData.voucherData.flight_email_sent
+                        });
+                        
+                        if (isFlightVoucherExisting && !storeData.voucherData.flight_email_sent) {
                             try {
-                                console.log('📧 Sending automatic Flight Voucher Confirmation email for existing voucher ID:', result);
-                                await sendAutomaticFlightVoucherConfirmationEmail(result, {
+                                console.log('📧 [FALLBACK] Sending automatic Flight Voucher Confirmation email for existing voucher ID:', result);
+                                const contactOverrideExisting = {
                                     purchaser_email: storeData.voucherData.purchaser_email || storeData.voucherData.email,
                                     purchaser_name: storeData.voucherData.purchaser_name || storeData.voucherData.name,
                                     purchaser_phone: storeData.voucherData.phone || storeData.voucherData.mobile,
                                     purchaser_mobile: storeData.voucherData.mobile || storeData.voucherData.phone
-                                });
+                                };
+                                console.log('📧 [FALLBACK] Contact override data (existing voucher):', JSON.stringify(contactOverrideExisting));
+                                await sendAutomaticFlightVoucherConfirmationEmail(result, contactOverrideExisting);
                                 storeData.voucherData.flight_email_sent = true;
+                                console.log('✅ [FALLBACK] Flight Voucher email sent flag set to true (existing voucher)');
                             } catch (emailErr) {
-                                console.error('Error sending Flight Voucher Confirmation (existing voucher):', emailErr?.message || emailErr);
+                                console.error('❌ [FALLBACK] Error sending Flight Voucher Confirmation (existing voucher):', emailErr?.message || emailErr);
+                                console.error('❌ [FALLBACK] Error stack (existing voucher):', emailErr?.stack);
+                            }
+                        } else {
+                            if (!isFlightVoucherExisting) {
+                                console.log('⏭️ [FALLBACK] Skipping Flight Voucher email - not identified as Flight Voucher (existing voucher)');
+                            }
+                            if (storeData.voucherData.flight_email_sent) {
+                                console.log('⏭️ [FALLBACK] Skipping Flight Voucher email - already sent (flight_email_sent=true) (existing voucher)');
                             }
                         }
                         // Ensure Gift Voucher Confirmation email is sent even when voucher already exists
@@ -16357,21 +16415,49 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                         });
                     }
                         // Send Flight Voucher Confirmation email for newly created flight vouchers
-                        const isFlightVoucher =
-                            (storeData.voucherData.voucher_type && !storeData.voucherData.voucher_type.toLowerCase().includes('gift')) &&
-                            (storeData.voucherData.book_flight && (storeData.voucherData.book_flight.toLowerCase().includes('flight voucher') || storeData.voucherData.book_flight.toLowerCase().includes('buy flight voucher')));
-                        if (isFlightVoucher && !storeData.voucherData.flight_email_sent) {
+                        console.log('🔍 [FALLBACK] Checking Flight Voucher email eligibility (new voucher):', {
+                            voucherId: result,
+                            voucher_type: storeData.voucherData.voucher_type,
+                            book_flight: storeData.voucherData.book_flight,
+                            flight_email_sent: storeData.voucherData.flight_email_sent,
+                            email: storeData.voucherData.email,
+                            purchaser_email: storeData.voucherData.purchaser_email
+                        });
+                        
+                        const voucherTypeCheckFallback = storeData.voucherData.voucher_type && !storeData.voucherData.voucher_type.toLowerCase().includes('gift');
+                        const bookFlightCheckFallback = storeData.voucherData.book_flight && (storeData.voucherData.book_flight.toLowerCase().includes('flight voucher') || storeData.voucherData.book_flight.toLowerCase().includes('buy flight voucher'));
+                        const isFlightVoucherFallback = voucherTypeCheckFallback && bookFlightCheckFallback;
+                        
+                        console.log('🔍 [FALLBACK] Flight Voucher check results (new voucher):', {
+                            voucherTypeCheck: voucherTypeCheckFallback,
+                            bookFlightCheck: bookFlightCheckFallback,
+                            isFlightVoucher: isFlightVoucherFallback,
+                            flight_email_sent: storeData.voucherData.flight_email_sent
+                        });
+                        
+                        if (isFlightVoucherFallback && !storeData.voucherData.flight_email_sent) {
                             try {
-                                console.log('📧 Sending automatic Flight Voucher Confirmation email from fallback for voucher ID:', result);
-                                await sendAutomaticFlightVoucherConfirmationEmail(result, {
+                                console.log('📧 [FALLBACK] Sending automatic Flight Voucher Confirmation email from fallback for voucher ID:', result);
+                                const contactOverrideFallback = {
                                     purchaser_email: storeData.voucherData.purchaser_email || storeData.voucherData.email,
                                     purchaser_name: storeData.voucherData.purchaser_name || storeData.voucherData.name,
                                     purchaser_phone: storeData.voucherData.phone || storeData.voucherData.mobile,
                                     purchaser_mobile: storeData.voucherData.mobile || storeData.voucherData.phone
-                                });
+                                };
+                                console.log('📧 [FALLBACK] Contact override data:', JSON.stringify(contactOverrideFallback));
+                                await sendAutomaticFlightVoucherConfirmationEmail(result, contactOverrideFallback);
                                 storeData.voucherData.flight_email_sent = true;
+                                console.log('✅ [FALLBACK] Flight Voucher email sent flag set to true');
                             } catch (emailErr) {
-                                console.error('Error sending Flight Voucher Confirmation (new voucher):', emailErr?.message || emailErr);
+                                console.error('❌ [FALLBACK] Error sending Flight Voucher Confirmation (new voucher):', emailErr?.message || emailErr);
+                                console.error('❌ [FALLBACK] Error stack:', emailErr?.stack);
+                            }
+                        } else {
+                            if (!isFlightVoucherFallback) {
+                                console.log('⏭️ [FALLBACK] Skipping Flight Voucher email - not identified as Flight Voucher (new voucher)');
+                            }
+                            if (storeData.voucherData.flight_email_sent) {
+                                console.log('⏭️ [FALLBACK] Skipping Flight Voucher email - already sent (flight_email_sent=true) (new voucher)');
                             }
                         }
 
@@ -20337,49 +20423,78 @@ async function sendAutomaticBookingConfirmationEmail(bookingId, options = {}) {
 
 // Helper function to send automatic flight voucher confirmation email
 async function sendAutomaticFlightVoucherConfirmationEmail(voucherId, purchasingContactOverride = {}) {
+    console.log('🚀 [sendAutomaticFlightVoucherConfirmationEmail] START - voucherId:', voucherId, 'purchasingContactOverride:', JSON.stringify(purchasingContactOverride));
     try {
         // Ensure email service is available
         if (!isEmailServiceAvailable()) {
-            console.warn('Email service not configured, skipping automatic flight voucher confirmation email');
+            console.warn('❌ [sendAutomaticFlightVoucherConfirmationEmail] Email service not configured, skipping automatic flight voucher confirmation email');
             return;
         }
+        console.log('✅ [sendAutomaticFlightVoucherConfirmationEmail] Email service is available');
 
         // Fetch voucher details
         const voucherQuery = `SELECT * FROM all_vouchers WHERE id = ?`;
+        console.log('🔍 [sendAutomaticFlightVoucherConfirmationEmail] Fetching voucher from database, ID:', voucherId);
 
         con.query(voucherQuery, [voucherId], async (err, voucherRows) => {
             if (err) {
-                console.error('Error fetching voucher for email:', err);
+                console.error('❌ [sendAutomaticFlightVoucherConfirmationEmail] Error fetching voucher for email:', err);
                 return;
             }
 
             if (!voucherRows || voucherRows.length === 0) {
-                console.warn('Voucher not found for email:', voucherId);
+                console.warn('⚠️ [sendAutomaticFlightVoucherConfirmationEmail] Voucher not found for email, ID:', voucherId);
                 return;
             }
 
             const voucher = voucherRows[0];
+            console.log('✅ [sendAutomaticFlightVoucherConfirmationEmail] Voucher found:', {
+                id: voucher.id,
+                book_flight: voucher.book_flight,
+                voucher_type: voucher.voucher_type,
+                email: voucher.email,
+                purchaser_email: voucher.purchaser_email,
+                name: voucher.name,
+                purchaser_name: voucher.purchaser_name
+            });
 
             // Only send email for Flight Voucher type (not Gift Voucher)
             const bookFlightLower = (voucher.book_flight || '').toLowerCase();
             const isFlightVoucherBook = bookFlightLower.includes('flight voucher');
+            console.log('🔍 [sendAutomaticFlightVoucherConfirmationEmail] Checking voucher type - book_flight:', voucher.book_flight, 'isFlightVoucherBook:', isFlightVoucherBook);
+            
             if (!isFlightVoucherBook) {
-                console.log('Skipping automatic email - not a Flight Voucher:', voucher.book_flight);
+                console.log('⏭️ [sendAutomaticFlightVoucherConfirmationEmail] Skipping automatic email - not a Flight Voucher. book_flight:', voucher.book_flight);
                 return;
             }
 
             // Fallback to purchaser email/name if primary email/name missing
+            const originalEmail = voucher.email;
             if ((!voucher.email || !voucher.email.trim()) && (purchasingContactOverride.purchaser_email || voucher.purchaser_email)) {
                 voucher.email = (purchasingContactOverride.purchaser_email || voucher.purchaser_email || '').trim();
-                console.log('Using purchaser email fallback for Flight Voucher email:', voucher.email);
+                console.log('🔄 [sendAutomaticFlightVoucherConfirmationEmail] Using purchaser email fallback. Original:', originalEmail, 'New:', voucher.email);
             }
             if ((!voucher.name || !voucher.name.trim()) && (purchasingContactOverride.purchaser_name || voucher.purchaser_name)) {
                 voucher.name = (purchasingContactOverride.purchaser_name || voucher.purchaser_name || '').trim();
+                console.log('🔄 [sendAutomaticFlightVoucherConfirmationEmail] Using purchaser name fallback');
+            }
+
+            // Check if email is available
+            if (!voucher.email || !voucher.email.trim()) {
+                console.error('❌ [sendAutomaticFlightVoucherConfirmationEmail] Cannot send email - no email address available for voucher:', voucherId);
+                console.error('❌ [sendAutomaticFlightVoucherConfirmationEmail] Voucher email fields:', {
+                    email: voucher.email,
+                    purchaser_email: voucher.purchaser_email,
+                    purchasingContactOverride_email: purchasingContactOverride.purchaser_email
+                });
+                return;
             }
 
             // Debug logging for voucher data
             console.log('📧 [sendAutomaticFlightVoucherConfirmationEmail] Voucher data for email:', {
                 voucherId: voucherId,
+                email: voucher.email,
+                name: voucher.name,
                 paid: voucher.paid,
                 due: voucher.due,
                 subtotal: voucher.subtotal,
@@ -20388,14 +20503,17 @@ async function sendAutomaticFlightVoucherConfirmationEmail(voucherId, purchasing
                 numberOfPassengers: voucher.numberOfPassengers,
                 location: voucher.preferred_location || voucher.location,
                 experience_type: voucher.experience_type,
-                flight_type: voucher.flight_type
+                flight_type: voucher.flight_type,
+                book_flight: voucher.book_flight
             });
 
             // Continue with email sending
+            console.log('📤 [sendAutomaticFlightVoucherConfirmationEmail] Calling sendFlightVoucherEmailToCustomerAndOwner for voucher:', voucherId);
             sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId);
         });
     } catch (error) {
-        console.error('Error sending automatic flight voucher confirmation email:', error);
+        console.error('❌ [sendAutomaticFlightVoucherConfirmationEmail] Error sending automatic flight voucher confirmation email:', error);
+        console.error('❌ [sendAutomaticFlightVoucherConfirmationEmail] Error stack:', error.stack);
         // Don't throw error - email failure shouldn't break voucher creation
     }
 }
@@ -20672,18 +20790,27 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
 
 // Helper function to send flight voucher email to both customer and owner
 async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
+    console.log('🚀 [sendFlightVoucherEmailToCustomerAndOwner] START - voucherId:', voucherId, 'email:', voucher.email);
     try {
         // Check if email is provided
         if (!voucher.email) {
-            console.warn('No email address for voucher:', voucherId);
+            console.warn('❌ [sendFlightVoucherEmailToCustomerAndOwner] No email address for voucher:', voucherId);
+            console.warn('❌ [sendFlightVoucherEmailToCustomerAndOwner] Voucher data:', {
+                id: voucher.id,
+                email: voucher.email,
+                purchaser_email: voucher.purchaser_email,
+                name: voucher.name
+            });
             return;
         }
+        console.log('✅ [sendFlightVoucherEmailToCustomerAndOwner] Email address found:', voucher.email);
 
         // Fetch "Flight Voucher Confirmation" template from database
         const templateQuery = `SELECT * FROM email_templates WHERE name = 'Flight Voucher Confirmation' LIMIT 1`;
+        console.log('🔍 [sendFlightVoucherEmailToCustomerAndOwner] Fetching email template from database');
         con.query(templateQuery, (templateErr, templateRows) => {
             if (templateErr) {
-                console.error('❌ Error fetching Flight Voucher Confirmation template:', templateErr);
+                console.error('❌ [sendFlightVoucherEmailToCustomerAndOwner] Error fetching Flight Voucher Confirmation template:', templateErr);
                 // Continue with default template if fetch fails
             }
 
@@ -20691,7 +20818,7 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
 
             // Debug logging
             if (template) {
-                console.log('✅ Found Flight Voucher Confirmation template:', {
+                console.log('✅ [sendFlightVoucherEmailToCustomerAndOwner] Found Flight Voucher Confirmation template:', {
                     id: template.id,
                     name: template.name,
                     subject: template.subject,
@@ -20700,14 +20827,16 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                     edited: template.edited
                 });
             } else {
-                console.log('⚠️ Flight Voucher Confirmation template not found in database, using default');
+                console.log('⚠️ [sendFlightVoucherEmailToCustomerAndOwner] Flight Voucher Confirmation template not found in database, using default');
             }
 
             // Generate email HTML using database template (or default if template not found)
+            console.log('📝 [sendFlightVoucherEmailToCustomerAndOwner] Generating email HTML');
             const htmlBody = generateFlightVoucherConfirmationEmail(voucher, template);
             const textBody = `Thank you for choosing Fly Away Ballooning! Your hot air balloon experience voucher has been purchased. What an extraordinary gift — the experience awaits you or your lucky recipient!`;
 
             const subject = template?.subject || '🎈 Your Flight Voucher is ready';
+            console.log('📧 [sendFlightVoucherEmailToCustomerAndOwner] Email subject:', subject);
 
             // Prepare email content for customer
             const customerEmailContent = {
@@ -20724,6 +20853,11 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                     template_type: 'flight_voucher_confirmation_automatic'
                 }
             };
+            console.log('📧 [sendFlightVoucherEmailToCustomerAndOwner] Customer email content prepared:', {
+                to: customerEmailContent.to,
+                subject: customerEmailContent.subject,
+                htmlLength: customerEmailContent.html ? customerEmailContent.html.length : 0
+            });
 
             // Prepare email content for business owner (same content, different recipient)
             const ownerEmailContent = {
@@ -20744,16 +20878,17 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                     template_type: 'flight_voucher_confirmation_automatic_owner'
                 }
             };
+            console.log('📧 [sendFlightVoucherEmailToCustomerAndOwner] Owner email content prepared');
 
             // Send emails asynchronously
             (async () => {
                 try {
                     // Send email to customer
-                    console.log('📧 Sending automatic flight voucher confirmation email to customer:', voucher.email);
+                    console.log('📤 [sendFlightVoucherEmailToCustomerAndOwner] Sending automatic flight voucher confirmation email to customer:', voucher.email);
                     const { provider: customerProvider, messageId: customerMessageId } = await sendEmailWithFallback(customerEmailContent, {
                         context: 'flight_voucher_confirmation_customer'
                     });
-                    console.log(`✅ Automatic flight voucher confirmation email sent to customer via ${customerProvider}`);
+                    console.log(`✅ [sendFlightVoucherEmailToCustomerAndOwner] Automatic flight voucher confirmation email sent to customer via ${customerProvider}, messageId: ${customerMessageId}`);
 
                     // Send email to business owner
                     console.log('📧 Sending automatic flight voucher confirmation email to business owner: info@flyawayballooning.com');
@@ -20818,12 +20953,23 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                         }
                     });
                 } catch (emailErr) {
-                    console.error('Error sending emails:', emailErr);
+                    console.error('❌ [sendFlightVoucherEmailToCustomerAndOwner] Error sending emails:', emailErr);
+                    console.error('❌ [sendFlightVoucherEmailToCustomerAndOwner] Error details:', {
+                        message: emailErr?.message,
+                        code: emailErr?.code,
+                        stack: emailErr?.stack,
+                        response: emailErr?.response ? {
+                            statusCode: emailErr.response.statusCode,
+                            body: emailErr.response.body,
+                            headers: emailErr.response.headers
+                        } : null
+                    });
                 }
             })();
         });
     } catch (error) {
-        console.error('Error sending flight voucher email to customer and owner:', error);
+        console.error('❌ [sendFlightVoucherEmailToCustomerAndOwner] Error sending flight voucher email to customer and owner:', error);
+        console.error('❌ [sendFlightVoucherEmailToCustomerAndOwner] Error stack:', error?.stack);
         // Don't throw error - email failure shouldn't break voucher creation
     }
 }
