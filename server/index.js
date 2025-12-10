@@ -4443,8 +4443,11 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     });
                     
                     const voucherTypeCheck = storeData.voucherData.voucher_type && !storeData.voucherData.voucher_type.toLowerCase().includes('gift');
+                    // Check both book_flight and voucher_type for Flight Voucher identification
                     const bookFlightCheck = storeData.voucherData.book_flight && (storeData.voucherData.book_flight.toLowerCase().includes('flight voucher') || storeData.voucherData.book_flight.toLowerCase().includes('buy flight voucher'));
-                    const isFlightVoucher = voucherTypeCheck && bookFlightCheck;
+                    const voucherTypeIsFlightVoucher = storeData.voucherData.voucher_type && storeData.voucherData.voucher_type.toLowerCase().includes('flight voucher');
+                    // Flight Voucher if: (voucher_type is Flight Voucher) OR (book_flight contains flight voucher)
+                    const isFlightVoucher = voucherTypeCheck && (voucherTypeIsFlightVoucher || bookFlightCheck);
                     
                     console.log('🔍 [WEBHOOK] Flight Voucher check results:', {
                         voucherTypeCheck: voucherTypeCheck,
@@ -16316,8 +16319,11 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                         });
                         
                         const voucherTypeCheckExisting = storeData.voucherData.voucher_type && !storeData.voucherData.voucher_type.toLowerCase().includes('gift');
+                        // Check both book_flight and voucher_type for Flight Voucher identification
                         const bookFlightCheckExisting = storeData.voucherData.book_flight && (storeData.voucherData.book_flight.toLowerCase().includes('flight voucher') || storeData.voucherData.book_flight.toLowerCase().includes('buy flight voucher'));
-                        const isFlightVoucherExisting = voucherTypeCheckExisting && bookFlightCheckExisting;
+                        const voucherTypeIsFlightVoucherExisting = storeData.voucherData.voucher_type && storeData.voucherData.voucher_type.toLowerCase().includes('flight voucher');
+                        // Flight Voucher if: (voucher_type is Flight Voucher) OR (book_flight contains flight voucher)
+                        const isFlightVoucherExisting = voucherTypeCheckExisting && (voucherTypeIsFlightVoucherExisting || bookFlightCheckExisting);
                         
                         console.log('🔍 [FALLBACK] Flight Voucher check results (existing voucher):', {
                             voucherTypeCheck: voucherTypeCheckExisting,
@@ -16425,8 +16431,11 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                         });
                         
                         const voucherTypeCheckFallback = storeData.voucherData.voucher_type && !storeData.voucherData.voucher_type.toLowerCase().includes('gift');
+                        // Check both book_flight and voucher_type for Flight Voucher identification
                         const bookFlightCheckFallback = storeData.voucherData.book_flight && (storeData.voucherData.book_flight.toLowerCase().includes('flight voucher') || storeData.voucherData.book_flight.toLowerCase().includes('buy flight voucher'));
-                        const isFlightVoucherFallback = voucherTypeCheckFallback && bookFlightCheckFallback;
+                        const voucherTypeIsFlightVoucher = storeData.voucherData.voucher_type && storeData.voucherData.voucher_type.toLowerCase().includes('flight voucher');
+                        // Flight Voucher if: (voucher_type is Flight Voucher) OR (book_flight contains flight voucher)
+                        const isFlightVoucherFallback = voucherTypeCheckFallback && (voucherTypeIsFlightVoucher || bookFlightCheckFallback);
                         
                         console.log('🔍 [FALLBACK] Flight Voucher check results (new voucher):', {
                             voucherTypeCheck: voucherTypeCheckFallback,
@@ -20426,8 +20435,16 @@ async function sendAutomaticFlightVoucherConfirmationEmail(voucherId, purchasing
     console.log('🚀 [sendAutomaticFlightVoucherConfirmationEmail] START - voucherId:', voucherId, 'purchasingContactOverride:', JSON.stringify(purchasingContactOverride));
     try {
         // Ensure email service is available
-        if (!isEmailServiceAvailable()) {
+        const emailServiceAvailable = isEmailServiceAvailable();
+        console.log('🔍 [sendAutomaticFlightVoucherConfirmationEmail] Email service check:', {
+            available: emailServiceAvailable,
+            sendgridReady: typeof sendgridReady !== 'undefined' ? sendgridReady : 'undefined',
+            smtpTransporter: smtpTransporter ? 'configured' : 'not configured'
+        });
+        
+        if (!emailServiceAvailable) {
             console.warn('❌ [sendAutomaticFlightVoucherConfirmationEmail] Email service not configured, skipping automatic flight voucher confirmation email');
+            console.warn('❌ [sendAutomaticFlightVoucherConfirmationEmail] Please check SendGrid API key or SMTP configuration');
             return;
         }
         console.log('✅ [sendAutomaticFlightVoucherConfirmationEmail] Email service is available');
