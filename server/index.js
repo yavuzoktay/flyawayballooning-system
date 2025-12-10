@@ -20305,9 +20305,20 @@ async function sendAutomaticFlightVoucherConfirmationEmail(voucherId) {
             const voucher = voucherRows[0];
 
             // Only send email for Flight Voucher type (not Gift Voucher)
-            if (voucher.book_flight !== 'Flight Voucher') {
+            const bookFlightLower = (voucher.book_flight || '').toLowerCase();
+            const isFlightVoucherBook = bookFlightLower.includes('flight voucher');
+            if (!isFlightVoucherBook) {
                 console.log('Skipping automatic email - not a Flight Voucher:', voucher.book_flight);
                 return;
+            }
+
+            // Fallback to purchaser email/name if primary email/name missing
+            if ((!voucher.email || !voucher.email.trim()) && (purchasingContactOverride.purchaser_email || voucher.purchaser_email)) {
+                voucher.email = (purchasingContactOverride.purchaser_email || voucher.purchaser_email || '').trim();
+                console.log('Using purchaser email fallback for Flight Voucher email:', voucher.email);
+            }
+            if ((!voucher.name || !voucher.name.trim()) && (purchasingContactOverride.purchaser_name || voucher.purchaser_name)) {
+                voucher.name = (purchasingContactOverride.purchaser_name || voucher.purchaser_name || '').trim();
             }
 
             // Debug logging for voucher data
