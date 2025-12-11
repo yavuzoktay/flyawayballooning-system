@@ -1127,19 +1127,33 @@ app.post('/api/voucher-codes/validate', (req, res) => {
             // #endregion
             const fallbackSql = `
                 SELECT 
-                    v.*, 
+                    v.id,
                     v.voucher_ref AS code_from_vouchers,
                     CASE WHEN v.expires IS NOT NULL THEN v.expires ELSE DATE_ADD(v.created_at, INTERVAL 24 MONTH) END AS computed_expires,
+                    v.expires,
                     v.redeemed,
+                    v.experience_type,
+                    v.voucher_type,
+                    NULL AS actual_voucher_type,
+                    v.numberOfPassengers,
+                    v.pax,
+                    v.created_at,
                     'voucher_ref' AS code_source
                 FROM all_vouchers v
                 WHERE UPPER(v.voucher_ref) = UPPER(?)
                 UNION ALL
                 SELECT 
-                    b.*, 
+                    b.id,
                     b.voucher_code AS code_from_vouchers,
                     NULL AS computed_expires,
+                    b.expires,
                     NULL AS redeemed,
+                    b.experience_type,
+                    b.voucher_type AS voucher_type,
+                    NULL AS actual_voucher_type,
+                    b.numberOfPassengers,
+                    b.pax,
+                    b.created_at,
                     'booking_voucher_code' AS code_source
                 FROM all_booking b
                 WHERE UPPER(b.voucher_code) = UPPER(?)
