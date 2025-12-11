@@ -397,22 +397,24 @@ const CustomerPortal = () => {
 
                     {/* Action Buttons - Reschedule, Change Location, Cancel */}
                     {(() => {
-                        if (!bookingData.flight_date) return null;
-
-                        const flightDate = dayjs(bookingData.flight_date);
+                        const hasFlightDate = Boolean(bookingData.flight_date);
+                        const flightDate = hasFlightDate ? dayjs(bookingData.flight_date) : null;
                         const now = dayjs();
-                        const hoursUntilFlight = flightDate.diff(now, 'hour');
                         const isCancelled = bookingData.status && bookingData.status.toLowerCase() === 'cancelled';
+
+                        // If cancelled (admin side), allow customer to pick a new date/location immediately
+                        // by treating hoursUntilFlight as "far in future" when no upcoming flight is set.
+                        const hoursUntilFlight = flightDate ? flightDate.diff(now, 'hour') : 999999;
 
                         // Check if expiry date has passed
                         const expiryDate = bookingData.expires ? dayjs(bookingData.expires) : null;
                         const isExpired = expiryDate ? expiryDate.isBefore(now, 'day') : false;
 
-                        // Reschedule disabled if expired or within 120 hours
-                        const canReschedule = !isExpired && hoursUntilFlight > 120;
+                        // Reschedule disabled if expired or within 120 hours; cancelled overrides the window check
+                        const canReschedule = !isExpired && (isCancelled || hoursUntilFlight > 120);
 
-                        // Change Location disabled only if less than 120 hours (even if cancelled)
-                        const canChangeLocation = hoursUntilFlight > 120;
+                        // Change Location disabled only if less than 120 hours; cancelled overrides the window check
+                        const canChangeLocation = isCancelled || hoursUntilFlight > 120;
                         const canCancel = !isCancelled && hoursUntilFlight > 120;
 
                         return (
@@ -422,7 +424,11 @@ const CustomerPortal = () => {
                                     title={
                                         isExpired 
                                             ? "Voucher / Booking has expired"
-                                            : (!canReschedule ? "Less than 120 hours remaining until your flight" : "")
+                                            : (!canReschedule 
+                                                ? (isCancelled 
+                                                    ? "Flight cancelled - pick a new date"
+                                                    : "Less than 120 hours remaining until your flight")
+                                                : "")
                                     }
                                     arrow
                                 >
