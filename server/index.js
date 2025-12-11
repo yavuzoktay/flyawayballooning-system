@@ -1138,6 +1138,9 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                     v.numberOfPassengers,
                     v.pax,
                     v.created_at,
+                    v.name,
+                    v.location,
+                    v.preferred_location,
                     'voucher_ref' AS code_source
                 FROM all_vouchers v
                 WHERE UPPER(v.voucher_ref) = UPPER(?)
@@ -1154,6 +1157,9 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                     b.numberOfPassengers,
                     b.pax,
                     b.created_at,
+                    b.name,
+                    b.location,
+                    NULL AS preferred_location,
                     'booking_voucher_code' AS code_source
                 FROM all_booking b
                 WHERE UPPER(b.voucher_code) = UPPER(?)
@@ -1216,8 +1222,21 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                     return res.json({ success: false, message: 'Voucher already redeemed' });
                 }
                 // Treat as valid for redeem flow
+                // Build title: "name - voucher_type - location"
+                const voucherName = row.name || 'Guest';
+                const voucherType = row.voucher_type || row.actual_voucher_type || '';
+                const voucherLocation = row.preferred_location || row.location || '';
+                const titleParts = [voucherName];
+                if (voucherType) titleParts.push(voucherType);
+                if (voucherLocation) titleParts.push(voucherLocation);
+                const title = titleParts.join(' - ');
+                
+                // Format valid_until date
+                const validUntil = row.computed_expires || row.expires || null;
+                const validUntilFormatted = validUntil ? new Date(validUntil).toISOString() : null;
+                
                 // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:voucher-codes/validate:returningSuccess',message:'Returning success response for voucher',data:{code,code_source:row.code_source,redeemed:row.redeemed},timestamp:Date.now(),sessionId:'debug-session',runId:'voucherValidation',hypothesisId:'H-voucher-6'})}).catch(()=>{});
+                fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:voucher-codes/validate:returningSuccess',message:'Returning success response for voucher',data:{code,code_source:row.code_source,redeemed:row.redeemed,title,voucherName,voucherType,voucherLocation},timestamp:Date.now(),sessionId:'debug-session',runId:'voucherValidation',hypothesisId:'H-voucher-6'})}).catch(()=>{});
                 // #endregion
                 return res.json({
                     success: true,
@@ -1232,7 +1251,14 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                         expires: row.computed_expires || row.expires || null,
                         redeemed: row.redeemed || null,
                         final_amount: booking_amount,
-                        numberOfPassengers: row.numberOfPassengers || row.pax || null
+                        numberOfPassengers: row.numberOfPassengers || row.pax || null,
+                        // Frontend display fields
+                        title: title,
+                        name: voucherName,
+                        location: voucherLocation,
+                        discount_type: 'percentage', // Show as percentage for voucher redemption
+                        discount_value: 0.00, // No discount for voucher redemption (0.00% off)
+                        valid_until: validUntilFormatted
                     }
                 });
             });
