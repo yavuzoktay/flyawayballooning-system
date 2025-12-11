@@ -140,6 +140,61 @@ const normalizeEmailBodyStyles = (html = '') => {
         return kept.length ? `style="${kept.join('; ')}"` : '';
     });
 
+    // Normalize all img tags to match Upcoming Flight Reminder width constraints
+    normalized = normalized.replace(/<img([^>]*)>/gi, (match, attrs) => {
+        // Extract existing width and style attributes
+        const widthMatch = attrs.match(/width=["']?(\d+)["']?/i);
+        const styleMatch = attrs.match(/style=["']([^"']*)["']/i);
+        
+        // Build new style with Upcoming Flight Reminder constraints
+        let newStyle = 'width:100%; max-width:640px; height:auto; display:block; margin:0 auto; border:0; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; vertical-align:top; object-fit:cover; object-position:center;';
+        
+        // Preserve non-conflicting existing styles
+        if (styleMatch) {
+            const existingStyles = styleMatch[1];
+            const preserved = existingStyles.split(';')
+                .map(s => s.trim())
+                .filter(s => {
+                    const lower = s.toLowerCase();
+                    return s && 
+                           !lower.startsWith('width') && 
+                           !lower.startsWith('max-width') &&
+                           !lower.startsWith('height') &&
+                           !lower.startsWith('display') &&
+                           !lower.startsWith('margin') &&
+                           !lower.startsWith('border') &&
+                           !lower.startsWith('outline') &&
+                           !lower.startsWith('text-decoration') &&
+                           !lower.startsWith('-ms-interpolation') &&
+                           !lower.startsWith('vertical-align') &&
+                           !lower.startsWith('object-fit') &&
+                           !lower.startsWith('object-position');
+                });
+            if (preserved.length > 0) {
+                newStyle += ' ' + preserved.join('; ');
+            }
+        }
+        
+        // Remove old width and style attributes, add new ones
+        let newAttrs = attrs
+            .replace(/width=["']?\d+["']?/gi, '')
+            .replace(/style=["'][^"']*["']/gi, '')
+            .trim();
+        
+        // Add width attribute and normalized style
+        if (!newAttrs.match(/width=/i)) {
+            newAttrs = `width="640" ${newAttrs}`.trim();
+        }
+        if (!newAttrs.match(/style=/i)) {
+            newAttrs = `${newAttrs} style="${newStyle}"`.trim();
+        } else {
+            // Replace existing style
+            newAttrs = newAttrs.replace(/style=["'][^"']*["']/gi, `style="${newStyle}"`);
+        }
+        
+        return `<img ${newAttrs}>`;
+    });
+
     return normalized;
 };
 
