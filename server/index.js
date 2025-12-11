@@ -21106,8 +21106,26 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
             return;
         }
         
-        // NOTE: Do NOT set cache here - set it AFTER email is successfully sent to prevent race conditions
-        // Setting cache here causes email to be skipped if two calls happen simultaneously
+        // Set cache BEFORE sending email to prevent race conditions (only if not already set)
+        // If email sending fails, we'll clear the cache in the catch block
+        const existingCache = flightVoucherEmailCache.get(voucherId);
+        if (!existingCache || (nowTs - existingCache) >= 60000) {
+            flightVoucherEmailCache.set(voucherId, nowTs);
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:sendFlightVoucherEmailToCustomerAndOwner:cacheSetBeforeSend',message:'Cache set before sending email (race condition prevention)',data:{voucherId,nowTs,existingCache},timestamp:Date.now(),sessionId:'debug-session',runId:'duplicateEmail',hypothesisId:'H-dup-6'})}).catch(()=>{});
+            // #endregion
+        } else {
+            // Cache already set by another call, skip sending
+            console.log('⏭️ [sendFlightVoucherEmailToCustomerAndOwner] Skipping email - cache already set by another call:', {
+                voucherId,
+                existingCache,
+                ageMs: nowTs - existingCache
+            });
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:sendFlightVoucherEmailToCustomerAndOwner:skipDueToCache',message:'Skipping email - cache already set',data:{voucherId,existingCache,ageMs:nowTs-existingCache},timestamp:Date.now(),sessionId:'debug-session',runId:'duplicateEmail',hypothesisId:'H-dup-7'})}).catch(()=>{});
+            // #endregion
+            return;
+        }
 
         // Check if email is provided
         if (!voucher.email) {
@@ -21207,11 +21225,9 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                     });
                     console.log(`✅ [sendFlightVoucherEmailToCustomerAndOwner] Automatic flight voucher confirmation email sent to customer via ${customerProvider}, messageId: ${customerMessageId}`);
                     
-                    // Mark in cache AFTER email is successfully sent to prevent race conditions
-                    // This ensures email is sent before cache is set, preventing duplicate sends
-                    flightVoucherEmailCache.set(voucherId, nowTs);
+                    // Cache was already set before sending, so we don't need to set it again
                     // #region agent log
-                    fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:sendFlightVoucherEmailToCustomerAndOwner:cacheSetAfterSend',message:'Cache set after email sent',data:{voucherId,nowTs,customerMessageId},timestamp:Date.now(),sessionId:'debug-session',runId:'duplicateEmail',hypothesisId:'H-dup-5'})}).catch(()=>{});
+                    fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:sendFlightVoucherEmailToCustomerAndOwner:emailSentSuccess',message:'Email sent successfully, cache already set',data:{voucherId,nowTs,customerMessageId},timestamp:Date.now(),sessionId:'debug-session',runId:'duplicateEmail',hypothesisId:'H-dup-8'})}).catch(()=>{});
                     // #endregion
 
                     // Send email to business owner
@@ -21288,6 +21304,11 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                             headers: emailErr.response.headers
                         } : null
                     });
+                    // Clear cache on error so email can be retried
+                    flightVoucherEmailCache.delete(voucherId);
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:sendFlightVoucherEmailToCustomerAndOwner:cacheClearedOnError',message:'Cache cleared due to email send error',data:{voucherId,error:emailErr?.message||emailErr},timestamp:Date.now(),sessionId:'debug-session',runId:'duplicateEmail',hypothesisId:'H-dup-9'})}).catch(()=>{});
+                    // #endregion
                 }
             })();
         });
