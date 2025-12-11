@@ -20489,15 +20489,8 @@ async function sendAutomaticFlightVoucherConfirmationEmail(voucherId, purchasing
                 return;
             }
 
-            // In-memory duplicate guard: skip if sent recently (e.g., webhook + fallback)
-            const nowTs = Date.now();
-            const recentTs = flightVoucherEmailCache.get(voucherId);
-            if (recentTs && nowTs - recentTs < 5 * 60 * 1000) { // 5 minutes window
-                console.log('⏭️ [sendAutomaticFlightVoucherConfirmationEmail] Skipping email - recently sent (cache guard). voucherId:', voucherId);
-                return;
-            }
-
             // Prevent duplicate sends: check email_logs for existing flight voucher confirmation
+            const nowTs = Date.now();
             try {
                 const existingEmailLog = await new Promise((resolve) => {
                     const checkSql = `
@@ -20573,8 +20566,6 @@ async function sendAutomaticFlightVoucherConfirmationEmail(voucherId, purchasing
 
             // Continue with email sending
             console.log('📤 [sendAutomaticFlightVoucherConfirmationEmail] Calling sendFlightVoucherEmailToCustomerAndOwner for voucher:', voucherId);
-            // Mark in cache to prevent immediate duplicates
-            flightVoucherEmailCache.set(voucherId, nowTs);
             sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId);
         });
     } catch (error) {
@@ -20858,14 +20849,6 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
 async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
     console.log('🚀 [sendFlightVoucherEmailToCustomerAndOwner] START - voucherId:', voucherId, 'email:', voucher.email);
     try {
-        // Guard: skip if sent recently (cache)
-        const nowTs = Date.now();
-        const recentTs = flightVoucherEmailCache.get(voucherId);
-        if (recentTs && nowTs - recentTs < 5 * 60 * 1000) {
-            console.log('⏭️ [sendFlightVoucherEmailToCustomerAndOwner] Skipping email - recently sent (cache guard). voucherId:', voucherId);
-            return;
-        }
-
         // Guard: skip if email_logs already has an automatic flight voucher confirmation
         const existingEmailLog = await new Promise((resolve) => {
             const checkSql = `
@@ -20891,7 +20874,6 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                 emailLogId: existingEmailLog.id,
                 sent_at: existingEmailLog.sent_at
             });
-            flightVoucherEmailCache.set(voucherId, nowTs);
             return;
         }
 
