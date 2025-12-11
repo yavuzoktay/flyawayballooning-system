@@ -54,6 +54,7 @@ const CustomerPortal = () => {
     const [cancelFlightDialogOpen, setCancelFlightDialogOpen] = useState(false);
     const [cancellingFlight, setCancellingFlight] = useState(false);
     const [resendingConfirmation, setResendingConfirmation] = useState(false);
+    const [extendingVoucher, setExtendingVoucher] = useState(false);
 
     // Passenger edit states
     const [editingPassenger, setEditingPassenger] = useState(null);
@@ -192,6 +193,45 @@ const CustomerPortal = () => {
             alert(error.response?.data?.message || 'Failed to resend confirmation email. Please try again later.');
         } finally {
             setResendingConfirmation(false);
+        }
+    };
+
+    const handleExtendVoucher = async () => {
+        if (!bookingData?.id) {
+            alert('Booking information missing. Please refresh the page and try again.');
+            return;
+        }
+
+        const passengerCount = bookingData.passengers?.length || bookingData.pax || 1;
+        const totalAmount = 50 * passengerCount;
+        
+        const confirmMessage = `Extend your voucher by 12 months for £${totalAmount.toFixed(2)} (£50 per passenger × ${passengerCount} passenger${passengerCount > 1 ? 's' : ''})?\n\nThis will extend your voucher expiry date by 12 months from the current expiry date.`;
+        
+        if (!window.confirm(confirmMessage)) {
+            return;
+        }
+
+        setExtendingVoucher(true);
+        try {
+            const response = await axios.post(buildApiUrl('/api/customer-portal-extend-voucher'), {
+                bookingId: bookingData.id,
+                months: 12,
+                amount: totalAmount,
+                passengerCount: passengerCount
+            });
+
+            if (response.data?.success) {
+                alert(response.data.message || 'Voucher extended successfully!');
+                // Refresh booking data to show updated expiry date
+                await fetchBookingData();
+            } else {
+                alert(response.data?.message || 'Failed to extend voucher. Please try again.');
+            }
+        } catch (error) {
+            console.error('Customer Portal - Error extending voucher:', error);
+            alert(error.response?.data?.message || 'Failed to extend voucher. Please try again later.');
+        } finally {
+            setExtendingVoucher(false);
         }
     };
 
@@ -579,6 +619,35 @@ const CustomerPortal = () => {
                                     }}
                                 >
                                     {resendingConfirmation ? <CircularProgress size={20} /> : 'Resend Confirmation'}
+                                </Button>
+
+                                {/* Extend Voucher Button */}
+                                <Button
+                                    variant="outlined"
+                                    color="primary"
+                                    fullWidth
+                                    onClick={handleExtendVoucher}
+                                    disabled={extendingVoucher}
+                                    sx={{
+                                        mt: 1.5,
+                                        py: 1.25,
+                                        fontSize: '1rem',
+                                        fontWeight: 600,
+                                        textTransform: 'none',
+                                        borderRadius: 2,
+                                        borderColor: '#1d4ed8',
+                                        color: '#1d4ed8',
+                                        '&:hover': {
+                                            backgroundColor: '#eff6ff',
+                                            borderColor: '#1d4ed8'
+                                        },
+                                        '&.Mui-disabled': {
+                                            borderColor: '#d1d5db',
+                                            color: '#9ca3af'
+                                        }
+                                    }}
+                                >
+                                    {extendingVoucher ? <CircularProgress size={20} /> : 'Extend Voucher 12 Months – £50 per passenger'}
                                 </Button>
                             </Box>
                         );

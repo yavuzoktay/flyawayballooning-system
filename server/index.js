@@ -11936,6 +11936,160 @@ customerPortalResendPaths.forEach((path) => {
     app.post(path, handleCustomerPortalResendConfirmation);
 });
 
+// Customer Portal - Extend Voucher
+const handleCustomerPortalExtendVoucher = async (req, res) => {
+    const { bookingId, booking_id, reference, months, amount, passengerCount } = req.body || {};
+    const finalBookingId = bookingId || booking_id || reference;
+
+    if (!finalBookingId) {
+        return res.status(400).json({
+            success: false,
+            message: 'Booking ID is required'
+        });
+    }
+
+    if (!months || months <= 0) {
+        return res.status(400).json({
+            success: false,
+            message: 'Valid number of months is required'
+        });
+    }
+
+    if (!amount || amount <= 0) {
+        return res.status(400).json({
+            success: false,
+            message: 'Valid amount is required'
+        });
+    }
+
+    try {
+        console.log('📅 Customer Portal - Extend voucher request received for booking:', finalBookingId, 'months:', months, 'amount:', amount);
+
+        // Get booking and voucher information
+        const bookingInfo = await new Promise((resolve, reject) => {
+            con.query(`
+                SELECT 
+                    b.id,
+                    b.voucher_ref,
+                    b.voucher_code,
+                    b.expires,
+                    b.email,
+                    v.id AS voucher_id,
+                    v.expires AS voucher_expires,
+                    v.voucher_ref
+                FROM all_booking b
+                LEFT JOIN all_vouchers v ON v.voucher_ref = b.voucher_ref OR v.id = b.voucher_id
+                WHERE b.id = ? LIMIT 1
+            `, [finalBookingId], (err, rows) => {
+                if (err) {
+                    reject(err);
+                } else if (!rows || rows.length === 0) {
+                    resolve(null);
+                } else {
+                    resolve(rows[0]);
+                }
+            });
+        });
+
+        if (!bookingInfo) {
+            return res.status(404).json({
+                success: false,
+                message: 'Booking not found'
+            });
+        }
+
+        // Determine expiry date to extend
+        let currentExpires = null;
+        let updateTable = null;
+        let updateId = null;
+
+        if (bookingInfo.voucher_id && bookingInfo.voucher_expires) {
+            // Update voucher in all_vouchers table
+            currentExpires = new Date(bookingInfo.voucher_expires);
+            updateTable = 'all_vouchers';
+            updateId = bookingInfo.voucher_id;
+        } else if (bookingInfo.expires) {
+            // Update booking expiry
+            currentExpires = new Date(bookingInfo.expires);
+            updateTable = 'all_booking';
+            updateId = bookingInfo.id;
+        } else {
+            // Calculate from created_at + 24 months default
+            const createdDate = await new Promise((resolve, reject) => {
+                con.query('SELECT created_at FROM all_booking WHERE id = ? LIMIT 1', [finalBookingId], (err, rows) => {
+                    if (err) {
+                        reject(err);
+                    } else if (rows && rows.length > 0) {
+                        resolve(new Date(rows[0].created_at));
+                    } else {
+                        resolve(new Date());
+                    }
+                });
+            });
+            currentExpires = new Date(createdDate);
+            currentExpires.setMonth(currentExpires.getMonth() + 24);
+            updateTable = 'all_booking';
+            updateId = bookingInfo.id;
+        }
+
+        // Calculate new expiry date
+        const newExpires = new Date(currentExpires);
+        newExpires.setMonth(newExpires.getMonth() + months);
+
+        // Update expiry date in database
+        await new Promise((resolve, reject) => {
+            con.query(
+                `UPDATE ${updateTable} SET expires = ? WHERE id = ?`,
+                [newExpires.toISOString().split('T')[0], updateId],
+                (err) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve();
+                    }
+                }
+            );
+        });
+
+        // Also update booking expires if we updated voucher
+        if (updateTable === 'all_vouchers' && bookingInfo.id) {
+            await new Promise((resolve, reject) => {
+                con.query(
+                    'UPDATE all_booking SET expires = ? WHERE id = ?',
+                    [newExpires.toISOString().split('T')[0], bookingInfo.id],
+                    (err) => {
+                        if (err) {
+                            console.error('Error updating booking expires:', err);
+                        }
+                        resolve();
+                    }
+                );
+            });
+        }
+
+        console.log('✅ Customer Portal - Voucher extended successfully:', {
+            bookingId: finalBookingId,
+            oldExpires: currentExpires.toISOString().split('T')[0],
+            newExpires: newExpires.toISOString().split('T')[0],
+            months: months
+        });
+
+        return res.json({
+            success: true,
+            message: `Voucher extended successfully! New expiry date: ${newExpires.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}`,
+            newExpires: newExpires.toISOString().split('T')[0]
+        });
+    } catch (error) {
+        console.error('❌ Customer Portal - Error extending voucher:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to extend voucher'
+        });
+    }
+};
+
+app.post('/api/customer-portal-extend-voucher', handleCustomerPortalExtendVoucher);
+
 // Passenger tablosunda herhangi bir yolcunun weight bilgisini güncellemek için
 app.patch('/api/updatePassengerField', (req, res) => {
     const { passenger_id, field, value } = req.body;
