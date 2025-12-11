@@ -23,6 +23,12 @@ const { parsePassengerList, derivePaidAmount } = require('./lib/voucherMetrics')
 const PDFDocument = require('pdfkit');
 dotenv.config();
 
+// Optional: silence verbose console.log output (keeps warn/error)
+if (process.env.SILENCE_VERBOSE_LOGS === 'true') {
+    console.log = () => {};
+    console.debug = () => {};
+}
+
 // Configure SendGrid
 const resolveSendGridApiKey = () => {
     const candidates = [
