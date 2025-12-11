@@ -1151,7 +1151,7 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                     NULL AS computed_expires,
                     b.expires,
                     NULL AS redeemed,
-                    b.experience_type,
+                    b.experience AS experience_type,
                     b.voucher_type AS voucher_type,
                     NULL AS actual_voucher_type,
                     b.numberOfPassengers,
