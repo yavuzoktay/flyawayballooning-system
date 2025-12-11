@@ -3993,39 +3993,29 @@ const Manifest = () => {
         // Helper function to calculate expires date based on flight_attempts
         // If flight_attempts is a multiple of 3, add 6 months to expires date
         const calculateExpiresDate = (expiresDate, flightAttempts) => {
-          if (!expiresDate || !flightAttempts) return expiresDate;
-          
+          if (!expiresDate) return expiresDate;
+          const formatOut = 'DD/MM/YY';
           const attempts = parseInt(flightAttempts, 10) || 0;
           
-          // Check if flight_attempts is a multiple of 3 (3, 6, 9, 12, etc.)
-          if (attempts > 0 && attempts % 3 === 0) {
-            // Parse the expires date
-            let parsedDate;
-            if (typeof expiresDate === 'string' && expiresDate.includes('/')) {
-              // DD/MM/YYYY format
-              const parts = expiresDate.split('/');
+          const parseDate = (val) => {
+            if (typeof val === 'string' && val.includes('/')) {
+              const parts = val.split('/');
               if (parts.length === 3) {
-                parsedDate = dayjs(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
-              } else {
-                parsedDate = dayjs(expiresDate);
+                return dayjs(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
               }
-            } else {
-              parsedDate = dayjs(expiresDate);
             }
-            
-            if (parsedDate.isValid()) {
-              // Add 6 months to the expires date
-              const newExpiresDate = parsedDate.add(6, 'month');
-              return newExpiresDate.format('DD/MM/YYYY');
-            }
+            return dayjs(val);
+          };
+
+          let parsedDate = parseDate(expiresDate);
+          if (!parsedDate.isValid()) return expiresDate;
+
+          // Add 6 months if flight_attempts is a multiple of 3
+          if (attempts > 0 && attempts % 3 === 0) {
+            parsedDate = parsedDate.add(6, 'month');
           }
-          
-          // Return original date if not a multiple of 3 or parsing failed
-          if (typeof expiresDate === 'string' && expiresDate.includes('/')) {
-            return expiresDate; // Already in DD/MM/YYYY format
-          }
-          const parsedDate = dayjs(expiresDate);
-          return parsedDate.isValid() ? parsedDate.format('DD/MM/YYYY') : expiresDate;
+
+          return parsedDate.isValid() ? parsedDate.format(formatOut) : expiresDate;
         };
         
         // Calculate expires date based on flight_attempts (add 6 months if multiple of 3)
