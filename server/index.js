@@ -15679,8 +15679,14 @@ async function createVoucherFromWebhook(voucherData) {
 
                     // Send Flight Voucher Confirmation email if webhook hasn't sent it yet
                     // Check email_logs to prevent duplicates - if webhook already sent, skip
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:createBookingFromSession:flightVoucherCheck',message:'Checking Flight Voucher email eligibility (fallback)',data:{voucherId:result.insertId,normalizedBookFlight},timestamp:Date.now(),sessionId:'debug-session',runId:'noEmailDebug',hypothesisId:'H-noemail-8'})}).catch(()=>{});
+                    // #endregion
                     if (normalizedBookFlight === 'Flight Voucher') {
                         // Check if email was already sent by webhook handler
+                        // #region agent log
+                        fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:createBookingFromSession:emailLogsCheck',message:'Checking email_logs for existing email (fallback)',data:{voucherId:result.insertId},timestamp:Date.now(),sessionId:'debug-session',runId:'noEmailDebug',hypothesisId:'H-noemail-9'})}).catch(()=>{});
+                        // #endregion
                         con.query(`
                             SELECT id FROM email_logs 
                             WHERE context_type = 'voucher' 
@@ -15688,23 +15694,39 @@ async function createVoucherFromWebhook(voucherData) {
                               AND template_type = 'flight_voucher_confirmation_automatic'
                             LIMIT 1
                         `, [result.insertId], (emailLogErr, emailLogRows) => {
+                            // #region agent log
+                            fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:createBookingFromSession:emailLogsResult',message:'Email logs check result (fallback)',data:{voucherId:result.insertId,emailLogErr:emailLogErr?.message||null,emailLogRowsCount:emailLogRows?.length||0,willSend:!emailLogErr&&(!emailLogRows||emailLogRows.length===0)},timestamp:Date.now(),sessionId:'debug-session',runId:'noEmailDebug',hypothesisId:'H-noemail-10'})}).catch(()=>{});
+                            // #endregion
                             if (emailLogErr) {
                                 console.warn('⚠️ Could not check email_logs for Flight Voucher email (fallback):', emailLogErr?.message || emailLogErr);
                                 // If check fails, send email anyway (better to send duplicate than miss email)
                                 console.log('📧 [FALLBACK] Sending Flight Voucher Confirmation email (email_logs check failed) for voucher ID:', result.insertId);
+                                // #region agent log
+                                fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:createBookingFromSession:sendEmail',message:'Calling sendAutomaticFlightVoucherConfirmationEmail (fallback, check failed)',data:{voucherId:result.insertId},timestamp:Date.now(),sessionId:'debug-session',runId:'noEmailDebug',hypothesisId:'H-noemail-11'})}).catch(()=>{});
+                                // #endregion
                                 sendAutomaticFlightVoucherConfirmationEmail(result.insertId).catch((err) => {
                                     console.error('Error sending Flight Voucher Confirmation email (fallback):', err);
                                 });
                             } else if (!emailLogRows || emailLogRows.length === 0) {
                                 // Email not sent yet, send it now
                                 console.log('📧 [FALLBACK] Sending Flight Voucher Confirmation email (webhook did not send) for voucher ID:', result.insertId);
+                                // #region agent log
+                                fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:createBookingFromSession:sendEmail',message:'Calling sendAutomaticFlightVoucherConfirmationEmail (fallback, webhook did not send)',data:{voucherId:result.insertId},timestamp:Date.now(),sessionId:'debug-session',runId:'noEmailDebug',hypothesisId:'H-noemail-12'})}).catch(()=>{});
+                                // #endregion
                                 sendAutomaticFlightVoucherConfirmationEmail(result.insertId).catch((err) => {
                                     console.error('Error sending Flight Voucher Confirmation email (fallback):', err);
                                 });
                             } else {
                                 console.log('⏭️ [FALLBACK] Skipping Flight Voucher Confirmation email - already sent by webhook for voucher ID:', result.insertId);
+                                // #region agent log
+                                fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:createBookingFromSession:skipEmail',message:'Skipping email - already sent by webhook (fallback)',data:{voucherId:result.insertId},timestamp:Date.now(),sessionId:'debug-session',runId:'noEmailDebug',hypothesisId:'H-noemail-13'})}).catch(()=>{});
+                                // #endregion
                             }
                         });
+                    } else {
+                        // #region agent log
+                        fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:createBookingFromSession:notFlightVoucher',message:'Not a Flight Voucher, skipping email (fallback)',data:{voucherId:result.insertId,normalizedBookFlight},timestamp:Date.now(),sessionId:'debug-session',runId:'noEmailDebug',hypothesisId:'H-noemail-14'})}).catch(()=>{});
+                        // #endregion
                     }
 
                     // Note: Gift Voucher Confirmation email is sent in webhook handler, not here
