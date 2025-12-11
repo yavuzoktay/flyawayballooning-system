@@ -20858,6 +20858,43 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
 async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
     console.log('🚀 [sendFlightVoucherEmailToCustomerAndOwner] START - voucherId:', voucherId, 'email:', voucher.email);
     try {
+        // Guard: skip if sent recently (cache)
+        const nowTs = Date.now();
+        const recentTs = flightVoucherEmailCache.get(voucherId);
+        if (recentTs && nowTs - recentTs < 5 * 60 * 1000) {
+            console.log('⏭️ [sendFlightVoucherEmailToCustomerAndOwner] Skipping email - recently sent (cache guard). voucherId:', voucherId);
+            return;
+        }
+
+        // Guard: skip if email_logs already has an automatic flight voucher confirmation
+        const existingEmailLog = await new Promise((resolve) => {
+            const checkSql = `
+                SELECT id, sent_at
+                FROM email_logs
+                WHERE context_type = 'voucher'
+                  AND context_id = ?
+                  AND template_type = 'flight_voucher_confirmation_automatic'
+                ORDER BY sent_at DESC
+                LIMIT 1
+            `;
+            con.query(checkSql, [voucherId], (logErr, rows) => {
+                if (logErr) {
+                    console.warn('⚠️ [sendFlightVoucherEmailToCustomerAndOwner] Could not check existing email_logs (continuing):', logErr?.message || logErr);
+                    return resolve(null);
+                }
+                resolve(rows && rows.length > 0 ? rows[0] : null);
+            });
+        });
+        if (existingEmailLog) {
+            console.log('⏭️ [sendFlightVoucherEmailToCustomerAndOwner] Skipping email - already sent (email_logs exists):', {
+                voucherId,
+                emailLogId: existingEmailLog.id,
+                sent_at: existingEmailLog.sent_at
+            });
+            flightVoucherEmailCache.set(voucherId, nowTs);
+            return;
+        }
+
         // Check if email is provided
         if (!voucher.email) {
             console.warn('❌ [sendFlightVoucherEmailToCustomerAndOwner] No email address for voucher:', voucherId);
@@ -20949,6 +20986,9 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
             // Send emails asynchronously
             (async () => {
                 try {
+                    // Mark in cache before sending to avoid race with parallel callers
+                    flightVoucherEmailCache.set(voucherId, nowTs);
+
                     // Send email to customer
                     console.log('📤 [sendFlightVoucherEmailToCustomerAndOwner] Sending automatic flight voucher confirmation email to customer:', voucher.email);
                     const { provider: customerProvider, messageId: customerMessageId } = await sendEmailWithFallback(customerEmailContent, {
