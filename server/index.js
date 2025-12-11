@@ -15668,11 +15668,9 @@ async function createVoucherFromWebhook(voucherData) {
                     // Additional information for vouchers is already stored in additional_information_json column.
                     // Only bookings (not vouchers) should store data in additional_information_answers table.
 
-                    // Send automatic flight voucher confirmation email for Flight Voucher type
-                    if (normalizedBookFlight === 'Flight Voucher') {
-                        console.log('📧 Sending automatic Flight Voucher Confirmation email for voucher ID:', result.insertId);
-                        sendAutomaticFlightVoucherConfirmationEmail(result.insertId);
-                    }
+                    // NOTE: Flight Voucher Confirmation email is sent in webhook handler, not here
+                    // This prevents duplicate emails when createBookingFromSession fallback is called
+                    // Email will be sent when payment is completed via Stripe webhook
 
                     // Note: Gift Voucher Confirmation email is sent in webhook handler, not here
                     // This prevents duplicate emails when createBookingFromSession fallback is called
@@ -16394,21 +16392,11 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                             isFlightVoucher: isFlightVoucherExisting
                         });
                         
+                        // NOTE: Flight Voucher Confirmation email is sent in webhook handler, not here
+                        // This prevents duplicate emails when fallback is called
+                        // Email will be sent when payment is completed via Stripe webhook
                         if (isFlightVoucherExisting) {
-                            try {
-                                console.log('📧 [FALLBACK] Sending automatic Flight Voucher Confirmation email for existing voucher ID:', result);
-                                const contactOverrideExisting = {
-                                    purchaser_email: storeData.voucherData.purchaser_email || storeData.voucherData.email,
-                                    purchaser_name: storeData.voucherData.purchaser_name || storeData.voucherData.name,
-                                    purchaser_phone: storeData.voucherData.phone || storeData.voucherData.mobile,
-                                    purchaser_mobile: storeData.voucherData.mobile || storeData.voucherData.phone
-                                };
-                                console.log('📧 [FALLBACK] Contact override data (existing voucher):', JSON.stringify(contactOverrideExisting));
-                                await sendAutomaticFlightVoucherConfirmationEmail(result, contactOverrideExisting);
-                            } catch (emailErr) {
-                                console.error('❌ [FALLBACK] Error sending Flight Voucher Confirmation (existing voucher):', emailErr?.message || emailErr);
-                                console.error('❌ [FALLBACK] Error stack (existing voucher):', emailErr?.stack);
-                            }
+                            console.log('⏭️ [FALLBACK] Skipping Flight Voucher email - will be sent from webhook handler (existing voucher)');
                         } else {
                             if (!isFlightVoucherExisting) {
                                 console.log('⏭️ [FALLBACK] Skipping Flight Voucher email - not identified as Flight Voucher (existing voucher)');
@@ -16499,21 +16487,11 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                             isFlightVoucher: isFlightVoucherFallback
                         });
                         
+                        // NOTE: Flight Voucher Confirmation email is sent in webhook handler, not here
+                        // This prevents duplicate emails when fallback is called
+                        // Email will be sent when payment is completed via Stripe webhook
                         if (isFlightVoucherFallback) {
-                            try {
-                                console.log('📧 [FALLBACK] Sending automatic Flight Voucher Confirmation email from fallback for voucher ID:', result);
-                                const contactOverrideFallback = {
-                                    purchaser_email: storeData.voucherData.purchaser_email || storeData.voucherData.email,
-                                    purchaser_name: storeData.voucherData.purchaser_name || storeData.voucherData.name,
-                                    purchaser_phone: storeData.voucherData.phone || storeData.voucherData.mobile,
-                                    purchaser_mobile: storeData.voucherData.mobile || storeData.voucherData.phone
-                                };
-                                console.log('📧 [FALLBACK] Contact override data:', JSON.stringify(contactOverrideFallback));
-                                await sendAutomaticFlightVoucherConfirmationEmail(result, contactOverrideFallback);
-                            } catch (emailErr) {
-                                console.error('❌ [FALLBACK] Error sending Flight Voucher Confirmation (new voucher):', emailErr?.message || emailErr);
-                                console.error('❌ [FALLBACK] Error stack:', emailErr?.stack);
-                            }
+                            console.log('⏭️ [FALLBACK] Skipping Flight Voucher email - will be sent from webhook handler (new voucher)');
                         } else {
                             if (!isFlightVoucherFallback) {
                                 console.log('⏭️ [FALLBACK] Skipping Flight Voucher email - not identified as Flight Voucher (new voucher)');
@@ -20567,8 +20545,21 @@ async function sendAutomaticFlightVoucherConfirmationEmail(voucherId, purchasing
                 return;
             }
 
-            // Prevent duplicate sends: check email_logs for existing flight voucher confirmation
+            // Prevent duplicate sends: check cache and email_logs BEFORE proceeding
             const nowTs = Date.now();
+            
+            // Guard 1: Check in-memory cache first (fastest duplicate prevention)
+            const cachedTimestamp = flightVoucherEmailCache.get(voucherId);
+            if (cachedTimestamp && (nowTs - cachedTimestamp) < 60000) { // 60 second window
+                console.log('⏭️ [sendAutomaticFlightVoucherConfirmationEmail] Skipping email - already in cache (recent send):', {
+                    voucherId,
+                    cachedTimestamp,
+                    ageMs: nowTs - cachedTimestamp
+                });
+                return;
+            }
+            
+            // Guard 2: Check email_logs for existing automatic flight voucher confirmation
             try {
                 const existingEmailLog = await new Promise((resolve) => {
                     const checkSql = `
@@ -20595,13 +20586,16 @@ async function sendAutomaticFlightVoucherConfirmationEmail(voucherId, purchasing
                         emailLogId: existingEmailLog.id,
                         sent_at: existingEmailLog.sent_at
                     });
-                    // Cache to avoid re-attempt within window
+                    // Update cache to prevent future attempts
                     flightVoucherEmailCache.set(voucherId, nowTs);
                     return;
                 }
             } catch (dupCheckErr) {
                 console.warn('⚠️ [sendAutomaticFlightVoucherConfirmationEmail] Duplicate check failed (continuing):', dupCheckErr?.message || dupCheckErr);
             }
+            
+            // Guard 3: Set cache immediately to prevent race conditions
+            flightVoucherEmailCache.set(voucherId, nowTs);
 
             // Fallback to purchaser email/name if primary email/name missing
             const originalEmail = voucher.email;
@@ -20642,7 +20636,7 @@ async function sendAutomaticFlightVoucherConfirmationEmail(voucherId, purchasing
                 book_flight: voucher.book_flight
             });
 
-            // Continue with email sending
+            // Continue with email sending (duplicate checks already done above)
             console.log('📤 [sendAutomaticFlightVoucherConfirmationEmail] Calling sendFlightVoucherEmailToCustomerAndOwner for voucher:', voucherId);
             sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId);
         });
@@ -20927,8 +20921,26 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
 async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
     console.log('🚀 [sendFlightVoucherEmailToCustomerAndOwner] START - voucherId:', voucherId, 'email:', voucher.email);
     const nowTs = Date.now();
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:sendFlightVoucherEmailToCustomerAndOwner:start',message:'Function entry',data:{voucherId,email:voucher.email},timestamp:Date.now(),sessionId:'debug-session',runId:'duplicateEmail',hypothesisId:'H-dup-1'})}).catch(()=>{});
+    // #endregion
+    
     try {
-        // Guard: skip if email_logs already has an automatic flight voucher confirmation
+        // Guard 1: Check in-memory cache first (fastest duplicate prevention)
+        const cachedTimestamp = flightVoucherEmailCache.get(voucherId);
+        if (cachedTimestamp && (nowTs - cachedTimestamp) < 60000) { // 60 second window
+            console.log('⏭️ [sendFlightVoucherEmailToCustomerAndOwner] Skipping email - already in cache (recent send):', {
+                voucherId,
+                cachedTimestamp,
+                ageMs: nowTs - cachedTimestamp
+            });
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:sendFlightVoucherEmailToCustomerAndOwner:cacheCheck',message:'Skipped due to cache',data:{voucherId,cachedTimestamp,ageMs:nowTs-cachedTimestamp},timestamp:Date.now(),sessionId:'debug-session',runId:'duplicateEmail',hypothesisId:'H-dup-2'})}).catch(()=>{});
+            // #endregion
+            return;
+        }
+        
+        // Guard 2: Check email_logs for existing automatic flight voucher confirmation
         const existingEmailLog = await new Promise((resolve) => {
             const checkSql = `
                 SELECT id, sent_at
@@ -20953,8 +20965,19 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
                 emailLogId: existingEmailLog.id,
                 sent_at: existingEmailLog.sent_at
             });
+            // Update cache to prevent future attempts
+            flightVoucherEmailCache.set(voucherId, nowTs);
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:sendFlightVoucherEmailToCustomerAndOwner:emailLogsCheck',message:'Skipped due to email_logs',data:{voucherId,emailLogId:existingEmailLog.id,sent_at:existingEmailLog.sent_at},timestamp:Date.now(),sessionId:'debug-session',runId:'duplicateEmail',hypothesisId:'H-dup-3'})}).catch(()=>{});
+            // #endregion
             return;
         }
+        
+        // Guard 3: Set cache immediately to prevent race conditions
+        flightVoucherEmailCache.set(voucherId, nowTs);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:sendFlightVoucherEmailToCustomerAndOwner:cacheSet',message:'Cache set before sending',data:{voucherId,nowTs},timestamp:Date.now(),sessionId:'debug-session',runId:'duplicateEmail',hypothesisId:'H-dup-4'})}).catch(()=>{});
+        // #endregion
 
         // Check if email is provided
         if (!voucher.email) {
