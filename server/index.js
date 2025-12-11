@@ -4604,6 +4604,139 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
 
                     // Immediately return to prevent further processing
                     return res.json({ received: true });
+                } else if (storeData.type === 'extend_voucher') {
+                    console.log('Extending voucher via webhook:', storeData.extendVoucherData);
+                    
+                    if (!storeData.extendVoucherData) {
+                        console.error('Extend voucher data not found in session store');
+                        return res.status(400).json({ received: false, message: 'Extend voucher data not found' });
+                    }
+
+                    const { bookingId, months, passengerCount } = storeData.extendVoucherData;
+                    
+                    if (!bookingId || !months || months <= 0) {
+                        console.error('Invalid extend voucher data:', storeData.extendVoucherData);
+                        return res.status(400).json({ received: false, message: 'Invalid extend voucher data' });
+                    }
+
+                    try {
+                        // Get booking and voucher information
+                        const bookingInfo = await new Promise((resolve, reject) => {
+                            con.query(`
+                                SELECT 
+                                    b.id,
+                                    b.voucher_ref,
+                                    b.voucher_code,
+                                    b.expires,
+                                    b.email,
+                                    v.id AS voucher_id,
+                                    v.expires AS voucher_expires,
+                                    v.voucher_ref
+                                FROM all_booking b
+                                LEFT JOIN all_vouchers v ON v.voucher_ref = b.voucher_ref OR v.id = b.voucher_id
+                                WHERE b.id = ? LIMIT 1
+                            `, [bookingId], (err, rows) => {
+                                if (err) {
+                                    reject(err);
+                                } else if (!rows || rows.length === 0) {
+                                    resolve(null);
+                                } else {
+                                    resolve(rows[0]);
+                                }
+                            });
+                        });
+
+                        if (!bookingInfo) {
+                            console.error('Booking not found for extend voucher:', bookingId);
+                            return res.status(404).json({ received: false, message: 'Booking not found' });
+                        }
+
+                        // Determine expiry date to extend
+                        let currentExpires = null;
+                        let updateTable = null;
+                        let updateId = null;
+
+                        if (bookingInfo.voucher_id && bookingInfo.voucher_expires) {
+                            // Update voucher in all_vouchers table
+                            currentExpires = new Date(bookingInfo.voucher_expires);
+                            updateTable = 'all_vouchers';
+                            updateId = bookingInfo.voucher_id;
+                        } else if (bookingInfo.expires) {
+                            // Update booking expiry
+                            currentExpires = new Date(bookingInfo.expires);
+                            updateTable = 'all_booking';
+                            updateId = bookingInfo.id;
+                        } else {
+                            // Calculate from created_at + 24 months default
+                            const createdDate = await new Promise((resolve, reject) => {
+                                con.query('SELECT created_at FROM all_booking WHERE id = ? LIMIT 1', [bookingId], (err, rows) => {
+                                    if (err) {
+                                        reject(err);
+                                    } else if (rows && rows.length > 0) {
+                                        resolve(new Date(rows[0].created_at));
+                                    } else {
+                                        resolve(new Date());
+                                    }
+                                });
+                            });
+                            currentExpires = new Date(createdDate);
+                            currentExpires.setMonth(currentExpires.getMonth() + 24);
+                            updateTable = 'all_booking';
+                            updateId = bookingInfo.id;
+                        }
+
+                        // Calculate new expiry date
+                        const newExpires = new Date(currentExpires);
+                        newExpires.setMonth(newExpires.getMonth() + months);
+
+                        // Update expiry date in database
+                        await new Promise((resolve, reject) => {
+                            con.query(
+                                `UPDATE ${updateTable} SET expires = ? WHERE id = ?`,
+                                [newExpires.toISOString().split('T')[0], updateId],
+                                (err) => {
+                                    if (err) {
+                                        reject(err);
+                                    } else {
+                                        resolve();
+                                    }
+                                }
+                            );
+                        });
+
+                        // Also update booking expires if we updated voucher
+                        if (updateTable === 'all_vouchers' && bookingInfo.id) {
+                            await new Promise((resolve, reject) => {
+                                con.query(
+                                    'UPDATE all_booking SET expires = ? WHERE id = ?',
+                                    [newExpires.toISOString().split('T')[0], bookingInfo.id],
+                                    (err) => {
+                                        if (err) {
+                                            console.error('Error updating booking expires:', err);
+                                        }
+                                        resolve();
+                                    }
+                                );
+                            });
+                        }
+
+                        // Save payment history
+                        await savePaymentHistory(session, bookingId, null);
+
+                        console.log('✅ Voucher extended successfully via webhook:', {
+                            bookingId: bookingId,
+                            oldExpires: currentExpires.toISOString().split('T')[0],
+                            newExpires: newExpires.toISOString().split('T')[0],
+                            months: months
+                        });
+
+                        // Mark session as processed
+                        storeData.processed = true;
+                        return res.json({ received: true });
+                    } catch (error) {
+                        console.error('❌ Error extending voucher via webhook:', error);
+                        return res.status(500).json({ received: false, message: error.message || 'Failed to extend voucher' });
+                    }
                 }
 
                 // Retain session data for a grace period so fallback createBookingFromSession can read it
@@ -12088,7 +12221,7 @@ const handleCustomerPortalExtendVoucher = async (req, res) => {
     }
 };
 
-app.post('/api/customer-portal-extend-voucher', handleCustomerPortalExtendVoucher);
+// Extend voucher endpoint removed - now handled via Stripe webhook after payment
 
 // Passenger tablosunda herhangi bir yolcunun weight bilgisini güncellemek için
 app.patch('/api/updatePassengerField', (req, res) => {
@@ -15914,12 +16047,12 @@ app.post('/api/create-checkout-session', async (req, res) => {
             });
         }
 
-        const { totalPrice, currency = 'GBP', bookingData, voucherData, type, userSessionData } = req.body;
+        const { totalPrice, currency = 'GBP', bookingData, voucherData, type, userSessionData, extendVoucherData } = req.body;
         if (totalPrice === undefined || totalPrice === null || isNaN(Number(totalPrice))) {
             return res.status(400).json({ success: false, message: 'Invalid totalPrice' });
         }
-        if (!bookingData && !voucherData) {
-            return res.status(400).json({ success: false, message: 'Eksik veri: bookingData veya voucherData gereklidir.' });
+        if (!bookingData && !voucherData && !extendVoucherData) {
+            return res.status(400).json({ success: false, message: 'Eksik veri: bookingData, voucherData veya extendVoucherData gereklidir.' });
         }
 
         // Save user session data if provided
@@ -15985,6 +16118,30 @@ app.post('/api/create-checkout-session', async (req, res) => {
 
         console.log('Creating Stripe session with:', { amount, baseUrl, isProd });
 
+        // Determine product name and description based on type
+        let productName = 'Balloon Flight Booking';
+        let productDescription = 'Hot Air Balloon Flight Reservation';
+        if (type === 'voucher') {
+            productName = 'Balloon Flight Voucher';
+            productDescription = 'Hot Air Balloon Flight Voucher';
+        } else if (type === 'extend_voucher') {
+            productName = 'Extend Voucher 12 Months';
+            productDescription = `Extend your voucher by 12 months (${extendVoucherData?.passengerCount || 1} passenger${(extendVoucherData?.passengerCount || 1) > 1 ? 's' : ''})`;
+        }
+
+        // Determine success URL based on type
+        let successUrl = `${baseUrl}/?payment=success&session_id={CHECKOUT_SESSION_ID}&type=${type}`;
+        if (type === 'extend_voucher') {
+            // For extend voucher, redirect back to customer portal
+            const customerPortalToken = extendVoucherData?.token || '';
+            // Customer Portal is in balloning-system, so use baseUrl directly
+            if (customerPortalToken) {
+                successUrl = `${baseUrl}/customerPortal/${customerPortalToken}?payment=success&session_id={CHECKOUT_SESSION_ID}&type=extend_voucher`;
+            } else {
+                successUrl = `${baseUrl}/customerPortal?payment=success&session_id={CHECKOUT_SESSION_ID}&type=extend_voucher`;
+            }
+        }
+
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             line_items: [
@@ -15992,8 +16149,8 @@ app.post('/api/create-checkout-session', async (req, res) => {
                     price_data: {
                         currency,
                         product_data: {
-                            name: type === 'voucher' ? 'Balloon Flight Voucher' : 'Balloon Flight Booking',
-                            description: type === 'voucher' ? 'Hot Air Balloon Flight Voucher' : 'Hot Air Balloon Flight Reservation',
+                            name: productName,
+                            description: productDescription,
                         },
                         unit_amount: amount,
                     },
@@ -16001,7 +16158,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
                 },
             ],
             mode: 'payment',
-            success_url: `${baseUrl}/?payment=success&session_id={CHECKOUT_SESSION_ID}&type=${type}`,
+            success_url: successUrl,
             cancel_url: `${baseUrl}/?payment=cancel`,
             metadata: {
                 type: type || (voucherData ? 'voucher' : 'booking'),
@@ -16030,6 +16187,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
             type: type || (voucherData ? 'voucher' : 'booking'),
             bookingData,
             voucherData: normalizedVoucherData,
+            extendVoucherData: extendVoucherData || null, // Store extend voucher data
             userSessionData: userSessionData || null, // Store user session data
             timestamp: Date.now() // Add timestamp for debugging
         };

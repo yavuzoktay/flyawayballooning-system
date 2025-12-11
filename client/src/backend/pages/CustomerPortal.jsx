@@ -12,6 +12,10 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import '../components/CustomerPortal/CustomerPortalHeader.css';
+import { loadStripe } from '@stripe/stripe-js';
+import config from '../../config';
+
+const stripePromise = loadStripe(config.STRIPE_PUBLIC_KEY);
 
 const getApiBaseUrl = () => {
     if (process.env.REACT_APP_API_URL && process.env.REACT_APP_API_URL.trim()) {
@@ -105,7 +109,20 @@ const CustomerPortal = () => {
     };
 
     useEffect(() => {
-        fetchBookingData();
+        // Check for payment success from Stripe redirect
+        const urlParams = new URLSearchParams(window.location.search);
+        const paymentSuccess = urlParams.get('payment') === 'success';
+        const paymentType = urlParams.get('type');
+        
+        if (paymentSuccess && paymentType === 'extend_voucher') {
+            // Remove query parameters from URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+            // Show success message and refresh booking data
+            alert('Payment successful! Your voucher has been extended by 12 months.');
+            fetchBookingData();
+        } else {
+            fetchBookingData();
+        }
 
         // Fetch customer portal contents
         const fetchPortalContents = async () => {
@@ -205,7 +222,7 @@ const CustomerPortal = () => {
         const passengerCount = bookingData.passengers?.length || bookingData.pax || 1;
         const totalAmount = 50 * passengerCount;
         
-        const confirmMessage = `Extend your voucher by 12 months for £${totalAmount.toFixed(2)} (£50 per passenger × ${passengerCount} passenger${passengerCount > 1 ? 's' : ''})?\n\nThis will extend your voucher expiry date by 12 months from the current expiry date.`;
+        const confirmMessage = `Extend your voucher by 12 months for £${totalAmount.toFixed(2)} (£50 per passenger × ${passengerCount} passenger${passengerCount > 1 ? 's' : ''})?\n\nYou will be redirected to payment. After successful payment, your voucher expiry date will be extended by 12 months.`;
         
         if (!window.confirm(confirmMessage)) {
             return;
@@ -213,23 +230,34 @@ const CustomerPortal = () => {
 
         setExtendingVoucher(true);
         try {
-            const response = await axios.post(buildApiUrl('/api/customer-portal-extend-voucher'), {
-                bookingId: bookingData.id,
-                months: 12,
-                amount: totalAmount,
-                passengerCount: passengerCount
+            // Create Stripe checkout session for extend voucher
+            const sessionRes = await axios.post(buildApiUrl('/api/create-checkout-session'), {
+                totalPrice: totalAmount,
+                currency: 'GBP',
+                type: 'extend_voucher',
+                extendVoucherData: {
+                    bookingId: bookingData.id,
+                    months: 12,
+                    passengerCount: passengerCount,
+                    token: token // Include token for redirect back to customer portal
+                }
             });
 
-            if (response.data?.success) {
-                alert(response.data.message || 'Voucher extended successfully!');
-                // Refresh booking data to show updated expiry date
-                await fetchBookingData();
-            } else {
-                alert(response.data?.message || 'Failed to extend voucher. Please try again.');
+            if (!sessionRes.data.success) {
+                alert('Payment could not be initiated: ' + (sessionRes.data.message || 'Unknown error'));
+                return;
             }
+
+            // Redirect to Stripe checkout
+            const stripe = await stripePromise;
+            const { error } = await stripe.redirectToCheckout({ sessionId: sessionRes.data.sessionId });
+            if (error) {
+                alert('Stripe redirect error: ' + error.message);
+            }
+            // Payment success will be handled by webhook and success URL
         } catch (error) {
             console.error('Customer Portal - Error extending voucher:', error);
-            alert(error.response?.data?.message || 'Failed to extend voucher. Please try again later.');
+            alert(error.response?.data?.message || 'Failed to initiate payment. Please try again later.');
         } finally {
             setExtendingVoucher(false);
         }
