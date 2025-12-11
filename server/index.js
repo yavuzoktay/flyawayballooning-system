@@ -1124,7 +1124,7 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                     v.redeemed,
                     'voucher_ref' AS code_source
                 FROM all_vouchers v
-                WHERE v.voucher_ref = ?
+                WHERE UPPER(v.voucher_ref) = UPPER(?)
                 UNION ALL
                 SELECT 
                     b.*, 
@@ -1133,10 +1133,10 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                     NULL AS redeemed,
                     'booking_voucher_code' AS code_source
                 FROM all_booking b
-                WHERE b.voucher_code = ?
+                WHERE UPPER(b.voucher_code) = UPPER(?)
                 LIMIT 1
             `;
-            con.query(fallbackSql, [code.toUpperCase(), code.toUpperCase()], (fbErr, fbRows) => {
+            con.query(fallbackSql, [code, code], (fbErr, fbRows) => {
                 if (fbErr) {
                     console.error('Error in voucher fallback lookup:', fbErr);
                     return res.json({ success: false, message: 'Invalid or expired voucher code' });
@@ -1149,9 +1149,12 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                 if (row.code_source === 'voucher_ref') {
                     const now = new Date();
                     const exp = row.computed_expires ? new Date(row.computed_expires) : null;
-                    if (row.redeemed && String(row.redeemed).toLowerCase() === 'yes') {
+                    // Check if voucher is redeemed - only reject if explicitly "yes" or "1" or true
+                    const redeemedValue = row.redeemed ? String(row.redeemed).toLowerCase().trim() : '';
+                    if (redeemedValue === 'yes' || redeemedValue === '1' || redeemedValue === 'true') {
                         return res.json({ success: false, message: 'Voucher already redeemed' });
                     }
+                    // If redeemed is "No", "0", "false", or NULL, allow redemption
                     if (exp && now > exp) {
                         return res.json({ success: false, message: 'Voucher code has expired' });
                     }
