@@ -116,6 +116,33 @@ const shouldFallbackToSmtp = (error) => {
     return code === 401 || code === 403;
 };
 
+// Normalize inline styles so shared email layout controls typography
+const normalizeEmailBodyStyles = (html = '') => {
+    if (!html) return html;
+    const scrub = (content = '') => content
+        .split(';')
+        .map(s => s.trim())
+        .filter(s => {
+            const lower = s.toLowerCase();
+            return s &&
+                !lower.startsWith('font-size') &&
+                !lower.startsWith('font-family') &&
+                !lower.startsWith('line-height');
+        });
+
+    let normalized = html.replace(/style="([^"]*)"/gi, (m, styles) => {
+        const kept = scrub(styles);
+        return kept.length ? `style="${kept.join('; ')}"` : '';
+    });
+
+    normalized = normalized.replace(/style='([^']*)'/gi, (m, styles) => {
+        const kept = scrub(styles);
+        return kept.length ? `style="${kept.join('; ')}"` : '';
+    });
+
+    return normalized;
+};
+
 const sendEmailWithFallback = async (payload, { isBulk = false, context = 'generic-email' } = {}) => {
     const sendgridAvailable = sendgridReady;
 
@@ -21379,8 +21406,9 @@ app.post('/api/sendBookingEmail', async (req, res) => {
             input ? input.replace(/<!--[\s\S]*?-->/g, '') : input;
         const normalizeHtml = (html) => sanitizeComments(html || '');
 
-        const htmlBody = containsHtml ? normalizeHtml(message) : (message || '').replace(/\n/g, '<br>');
-        const textBody = containsHtml ? convertHtmlToText(message) : message;
+        const rawHtml = containsHtml ? normalizeHtml(message) : (message || '').replace(/\n/g, '<br>');
+        const htmlBody = normalizeEmailBodyStyles(rawHtml);
+        const textBody = containsHtml ? convertHtmlToText(htmlBody) : message;
 
         // Prepare email content
         // Always use info@flyawayballooning.com as from email address
