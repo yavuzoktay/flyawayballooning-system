@@ -20724,8 +20724,8 @@ async function sendAutomaticFlightVoucherConfirmationEmail(voucherId, purchasing
                 console.warn('⚠️ [sendAutomaticFlightVoucherConfirmationEmail] Duplicate check failed (continuing):', dupCheckErr?.message || dupCheckErr);
             }
             
-            // Guard 3: Set cache immediately to prevent race conditions
-            flightVoucherEmailCache.set(voucherId, nowTs);
+            // NOTE: Do NOT set cache here - let sendFlightVoucherEmailToCustomerAndOwner set it after email is sent
+            // Setting cache here causes race condition where sendFlightVoucherEmailToCustomerAndOwner skips email due to cache
             // #region agent log
             fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:sendAutomaticFlightVoucherConfirmationEmail:proceeding',message:'All guards passed, proceeding to send email',data:{voucherId},timestamp:Date.now(),sessionId:'debug-session',runId:'noEmailDebug',hypothesisId:'H-noemail-4'})}).catch(()=>{});
             // #endregion
@@ -21106,11 +21106,8 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
             return;
         }
         
-        // Guard 3: Set cache immediately to prevent race conditions
-        flightVoucherEmailCache.set(voucherId, nowTs);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:sendFlightVoucherEmailToCustomerAndOwner:cacheSet',message:'Cache set before sending',data:{voucherId,nowTs},timestamp:Date.now(),sessionId:'debug-session',runId:'duplicateEmail',hypothesisId:'H-dup-4'})}).catch(()=>{});
-        // #endregion
+        // NOTE: Do NOT set cache here - set it AFTER email is successfully sent to prevent race conditions
+        // Setting cache here causes email to be skipped if two calls happen simultaneously
 
         // Check if email is provided
         if (!voucher.email) {
@@ -21203,15 +21200,19 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
             // Send emails asynchronously
             (async () => {
                 try {
-                    // Mark in cache before sending to avoid race with parallel callers
-                    flightVoucherEmailCache.set(voucherId, nowTs);
-
                     // Send email to customer
                     console.log('📤 [sendFlightVoucherEmailToCustomerAndOwner] Sending automatic flight voucher confirmation email to customer:', voucher.email);
                     const { provider: customerProvider, messageId: customerMessageId } = await sendEmailWithFallback(customerEmailContent, {
                         context: 'flight_voucher_confirmation_customer'
                     });
                     console.log(`✅ [sendFlightVoucherEmailToCustomerAndOwner] Automatic flight voucher confirmation email sent to customer via ${customerProvider}, messageId: ${customerMessageId}`);
+                    
+                    // Mark in cache AFTER email is successfully sent to prevent race conditions
+                    // This ensures email is sent before cache is set, preventing duplicate sends
+                    flightVoucherEmailCache.set(voucherId, nowTs);
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:sendFlightVoucherEmailToCustomerAndOwner:cacheSetAfterSend',message:'Cache set after email sent',data:{voucherId,nowTs,customerMessageId},timestamp:Date.now(),sessionId:'debug-session',runId:'duplicateEmail',hypothesisId:'H-dup-5'})}).catch(()=>{});
+                    // #endregion
 
                     // Send email to business owner
                     console.log('📧 Sending automatic flight voucher confirmation email to business owner: info@flyawayballooning.com');
