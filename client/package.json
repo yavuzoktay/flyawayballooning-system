@@ -10,6 +10,7 @@
     "@mui/material": "^6.4.12",
     "@mui/system": "^6.4.1",
     "@mui/x-date-pickers": "^7.29.4",
+    "@stripe/stripe-js": "^8.5.3",
     "assert": "^2.1.0",
     "axios": "^1.10.0",
     "bootstrap": "^5.3.3",
