@@ -15677,9 +15677,35 @@ async function createVoucherFromWebhook(voucherData) {
                     // Additional information for vouchers is already stored in additional_information_json column.
                     // Only bookings (not vouchers) should store data in additional_information_answers table.
 
-                    // NOTE: Flight Voucher Confirmation email is sent in webhook handler, not here
-                    // This prevents duplicate emails when createBookingFromSession fallback is called
-                    // Email will be sent when payment is completed via Stripe webhook
+                    // Send Flight Voucher Confirmation email if webhook hasn't sent it yet
+                    // Check email_logs to prevent duplicates - if webhook already sent, skip
+                    if (normalizedBookFlight === 'Flight Voucher') {
+                        // Check if email was already sent by webhook handler
+                        con.query(`
+                            SELECT id FROM email_logs 
+                            WHERE context_type = 'voucher' 
+                              AND context_id = ? 
+                              AND template_type = 'flight_voucher_confirmation_automatic'
+                            LIMIT 1
+                        `, [result.insertId], (emailLogErr, emailLogRows) => {
+                            if (emailLogErr) {
+                                console.warn('⚠️ Could not check email_logs for Flight Voucher email (fallback):', emailLogErr?.message || emailLogErr);
+                                // If check fails, send email anyway (better to send duplicate than miss email)
+                                console.log('📧 [FALLBACK] Sending Flight Voucher Confirmation email (email_logs check failed) for voucher ID:', result.insertId);
+                                sendAutomaticFlightVoucherConfirmationEmail(result.insertId).catch((err) => {
+                                    console.error('Error sending Flight Voucher Confirmation email (fallback):', err);
+                                });
+                            } else if (!emailLogRows || emailLogRows.length === 0) {
+                                // Email not sent yet, send it now
+                                console.log('📧 [FALLBACK] Sending Flight Voucher Confirmation email (webhook did not send) for voucher ID:', result.insertId);
+                                sendAutomaticFlightVoucherConfirmationEmail(result.insertId).catch((err) => {
+                                    console.error('Error sending Flight Voucher Confirmation email (fallback):', err);
+                                });
+                            } else {
+                                console.log('⏭️ [FALLBACK] Skipping Flight Voucher Confirmation email - already sent by webhook for voucher ID:', result.insertId);
+                            }
+                        });
+                    }
 
                     // Note: Gift Voucher Confirmation email is sent in webhook handler, not here
                     // This prevents duplicate emails when createBookingFromSession fallback is called
@@ -16401,11 +16427,43 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                             isFlightVoucher: isFlightVoucherExisting
                         });
                         
-                        // NOTE: Flight Voucher Confirmation email is sent in webhook handler, not here
-                        // This prevents duplicate emails when fallback is called
-                        // Email will be sent when payment is completed via Stripe webhook
+                        // Send Flight Voucher Confirmation email if webhook hasn't sent it yet
                         if (isFlightVoucherExisting) {
-                            console.log('⏭️ [FALLBACK] Skipping Flight Voucher email - will be sent from webhook handler (existing voucher)');
+                            // Check if email was already sent by webhook handler
+                            con.query(`
+                                SELECT id FROM email_logs 
+                                WHERE context_type = 'voucher' 
+                                  AND context_id = ? 
+                                  AND template_type = 'flight_voucher_confirmation_automatic'
+                                LIMIT 1
+                            `, [result], (emailLogErr, emailLogRows) => {
+                                if (emailLogErr) {
+                                    console.warn('⚠️ [FALLBACK] Could not check email_logs for Flight Voucher email (existing voucher):', emailLogErr?.message || emailLogErr);
+                                    // If check fails, send email anyway (better to send duplicate than miss email)
+                                    console.log('📧 [FALLBACK] Sending Flight Voucher Confirmation email (email_logs check failed, existing voucher) for voucher ID:', result);
+                                    sendAutomaticFlightVoucherConfirmationEmail(result, {
+                                        purchaser_email: storeData.voucherData.purchaser_email || storeData.voucherData.email,
+                                        purchaser_name: storeData.voucherData.purchaser_name || storeData.voucherData.name,
+                                        purchaser_phone: storeData.voucherData.phone || storeData.voucherData.mobile,
+                                        purchaser_mobile: storeData.voucherData.mobile || storeData.voucherData.phone
+                                    }).catch((err) => {
+                                        console.error('❌ [FALLBACK] Error sending Flight Voucher Confirmation (existing voucher):', err?.message || err);
+                                    });
+                                } else if (!emailLogRows || emailLogRows.length === 0) {
+                                    // Email not sent yet, send it now
+                                    console.log('📧 [FALLBACK] Sending Flight Voucher Confirmation email (webhook did not send, existing voucher) for voucher ID:', result);
+                                    sendAutomaticFlightVoucherConfirmationEmail(result, {
+                                        purchaser_email: storeData.voucherData.purchaser_email || storeData.voucherData.email,
+                                        purchaser_name: storeData.voucherData.purchaser_name || storeData.voucherData.name,
+                                        purchaser_phone: storeData.voucherData.phone || storeData.voucherData.mobile,
+                                        purchaser_mobile: storeData.voucherData.mobile || storeData.voucherData.phone
+                                    }).catch((err) => {
+                                        console.error('❌ [FALLBACK] Error sending Flight Voucher Confirmation (existing voucher):', err?.message || err);
+                                    });
+                                } else {
+                                    console.log('⏭️ [FALLBACK] Skipping Flight Voucher email - already sent by webhook (existing voucher) for voucher ID:', result);
+                                }
+                            });
                         } else {
                             if (!isFlightVoucherExisting) {
                                 console.log('⏭️ [FALLBACK] Skipping Flight Voucher email - not identified as Flight Voucher (existing voucher)');
@@ -16496,11 +16554,43 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                             isFlightVoucher: isFlightVoucherFallback
                         });
                         
-                        // NOTE: Flight Voucher Confirmation email is sent in webhook handler, not here
-                        // This prevents duplicate emails when fallback is called
-                        // Email will be sent when payment is completed via Stripe webhook
+                        // Send Flight Voucher Confirmation email if webhook hasn't sent it yet
                         if (isFlightVoucherFallback) {
-                            console.log('⏭️ [FALLBACK] Skipping Flight Voucher email - will be sent from webhook handler (new voucher)');
+                            // Check if email was already sent by webhook handler
+                            con.query(`
+                                SELECT id FROM email_logs 
+                                WHERE context_type = 'voucher' 
+                                  AND context_id = ? 
+                                  AND template_type = 'flight_voucher_confirmation_automatic'
+                                LIMIT 1
+                            `, [result], (emailLogErr, emailLogRows) => {
+                                if (emailLogErr) {
+                                    console.warn('⚠️ [FALLBACK] Could not check email_logs for Flight Voucher email (new voucher):', emailLogErr?.message || emailLogErr);
+                                    // If check fails, send email anyway (better to send duplicate than miss email)
+                                    console.log('📧 [FALLBACK] Sending Flight Voucher Confirmation email (email_logs check failed, new voucher) for voucher ID:', result);
+                                    sendAutomaticFlightVoucherConfirmationEmail(result, {
+                                        purchaser_email: storeData.voucherData.purchaser_email || storeData.voucherData.email,
+                                        purchaser_name: storeData.voucherData.purchaser_name || storeData.voucherData.name,
+                                        purchaser_phone: storeData.voucherData.phone || storeData.voucherData.mobile,
+                                        purchaser_mobile: storeData.voucherData.mobile || storeData.voucherData.phone
+                                    }).catch((err) => {
+                                        console.error('❌ [FALLBACK] Error sending Flight Voucher Confirmation (new voucher):', err?.message || err);
+                                    });
+                                } else if (!emailLogRows || emailLogRows.length === 0) {
+                                    // Email not sent yet, send it now
+                                    console.log('📧 [FALLBACK] Sending Flight Voucher Confirmation email (webhook did not send, new voucher) for voucher ID:', result);
+                                    sendAutomaticFlightVoucherConfirmationEmail(result, {
+                                        purchaser_email: storeData.voucherData.purchaser_email || storeData.voucherData.email,
+                                        purchaser_name: storeData.voucherData.purchaser_name || storeData.voucherData.name,
+                                        purchaser_phone: storeData.voucherData.phone || storeData.voucherData.mobile,
+                                        purchaser_mobile: storeData.voucherData.mobile || storeData.voucherData.phone
+                                    }).catch((err) => {
+                                        console.error('❌ [FALLBACK] Error sending Flight Voucher Confirmation (new voucher):', err?.message || err);
+                                    });
+                                } else {
+                                    console.log('⏭️ [FALLBACK] Skipping Flight Voucher email - already sent by webhook (new voucher) for voucher ID:', result);
+                                }
+                            });
                         } else {
                             if (!isFlightVoucherFallback) {
                                 console.log('⏭️ [FALLBACK] Skipping Flight Voucher email - not identified as Flight Voucher (new voucher)');
