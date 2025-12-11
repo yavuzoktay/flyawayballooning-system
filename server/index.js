@@ -1132,6 +1132,7 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                     v.name,
                     NULL AS location,
                     v.preferred_location,
+                    v.paid,
                     'voucher_ref' AS code_source
                 FROM all_vouchers v
                 WHERE UPPER(v.voucher_ref) = UPPER(?)
@@ -1151,6 +1152,7 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                     b.name,
                     b.location,
                     NULL AS preferred_location,
+                    b.paid,
                     'booking_voucher_code' AS code_source
                 FROM all_booking b
                 WHERE UPPER(b.voucher_code) = UPPER(?)
@@ -1225,7 +1227,8 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                         // Provide expires for both voucher and booking sourced codes
                         expires: row.computed_expires || row.expires || null,
                         redeemed: row.redeemed || null,
-                        final_amount: booking_amount,
+                        final_amount: row.paid || booking_amount || 0, // Use voucher's paid amount, fallback to booking_amount
+                        voucher_amount: row.paid || null, // Original voucher amount
                         numberOfPassengers: row.numberOfPassengers || row.pax || null,
                         // Frontend display fields
                         title: title,
