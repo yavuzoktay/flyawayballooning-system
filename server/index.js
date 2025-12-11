@@ -20926,6 +20926,7 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
 // Helper function to send flight voucher email to both customer and owner
 async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
     console.log('🚀 [sendFlightVoucherEmailToCustomerAndOwner] START - voucherId:', voucherId, 'email:', voucher.email);
+    const nowTs = Date.now();
     try {
         // Guard: skip if email_logs already has an automatic flight voucher confirmation
         const existingEmailLog = await new Promise((resolve) => {
