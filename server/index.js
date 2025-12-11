@@ -143,12 +143,28 @@ const normalizeEmailBodyStyles = (html = '') => {
     return normalized;
 };
 
+// Ensure a consistent wrapper (Upcoming Flight Reminder typography)
+const ensureStandardEmailLayout = (html = '') => {
+    if (!html) return html;
+    const lower = html.toLowerCase();
+    if (lower.includes('<html') || lower.includes('<body') || lower.includes('data-upcoming-layout')) {
+        return html;
+    }
+    const wrapper = `<div data-upcoming-layout="true" style="font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; font-size:16px; line-height:1.7; color:#1f2937;">${html}</div>`;
+    return wrapper;
+};
+
 const sendEmailWithFallback = async (payload, { isBulk = false, context = 'generic-email' } = {}) => {
     const sendgridAvailable = sendgridReady;
 
+    // Apply normalization and shared layout before sending
+    const normalizedHtml = payload?.html ? normalizeEmailBodyStyles(payload.html) : payload?.html;
+    const wrappedHtml = normalizedHtml ? ensureStandardEmailLayout(normalizedHtml) : normalizedHtml;
+    const safePayload = { ...payload, html: wrappedHtml };
+
     if (sendgridAvailable) {
         try {
-            const response = isBulk ? await sgMail.sendMultiple(payload) : await sgMail.send(payload);
+            const response = isBulk ? await sgMail.sendMultiple(safePayload) : await sgMail.send(safePayload);
             const messageId = response?.[0]?.headers?.['x-message-id'] || response?.[0]?.body?.messageId || null;
             return { provider: 'sendgrid', messageId, response };
         } catch (error) {
@@ -175,7 +191,7 @@ const sendEmailWithFallback = async (payload, { isBulk = false, context = 'gener
             from: payload.from?.email ? `${payload.from.name || smtpConfig.fromName} <${payload.from.email}>` : getFallbackFrom(),
             to: recipient,
             subject: payload.subject,
-            html: payload.html,
+            html: wrappedHtml || payload.html,
             text: payload.text,
             headers: payload.custom_args ? Object.fromEntries(
                 Object.entries(payload.custom_args)
