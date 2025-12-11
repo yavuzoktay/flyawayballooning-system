@@ -211,6 +211,11 @@ const buildEmailLayout = ({
     footerLinks = [],
     emoji = '🎈'
 }) => {
+    // Normalize body/highlight styles so all templates share the same typography
+    // (font-size, font-family, line-height) as the Upcoming Flight Reminder.
+    const normalizedBodyHtml = normalizeTemplateBodyStyles(bodyHtml);
+    const normalizedHighlightHtml = normalizeTemplateBodyStyles(highlightHtml);
+
     const safeName = escapeHtml(customerName || 'Guest');
     const filteredSignatureLines = Array.isArray(signatureLines)
         ? signatureLines.filter((line) => typeof line === 'string' && line.trim() !== '')
@@ -236,9 +241,9 @@ const buildEmailLayout = ({
                </div>`
             : '';
 
-    const highlightSection = highlightHtml
+    const highlightSection = normalizedHighlightHtml
         ? `<div style="background:#e8e7ff; border-radius:12px; padding:16px 18px; margin-bottom:24px; color:#4338ca; font-size:15px; line-height:1.5;">
-                ${highlightHtml}
+                ${normalizedHighlightHtml}
            </div>`
         : '';
 
@@ -280,7 +285,7 @@ const buildEmailLayout = ({
                             ${highlightSection}
                             ${PERSONAL_NOTE_PLACEHOLDER}
                             <div style="font-size:16px; line-height:1.7; color:#1f2937;">
-                                ${bodyHtml}
+                                ${normalizedBodyHtml}
                             </div>
                             <div style="font-size:16px; line-height:1.7; color:#1f2937; margin-top:24px;">
                                 ${signatureHtml}
