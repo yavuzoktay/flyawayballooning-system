@@ -339,6 +339,38 @@ const getBookingConfirmationMessageHtml = (booking = {}) => {
     ]);
 };
 
+const buildBookingConfirmationEmail = ({ template, booking }) => {
+    const customerName = booking?.name || booking?.customer_name || 'Guest';
+    const subject = '🎈 Your flight is confirmed';
+
+    // Prefer custom template body if provided; otherwise use default message HTML
+    const customMessageHtml = template?.body
+        ? extractMessageFromTemplateBody(template.body)
+        : '';
+    const messageHtml = customMessageHtml || getBookingConfirmationMessageHtml(booking);
+    
+    // Replace prompts in the message (including [Receipt] if present)
+    const messageWithPrompts = replacePrompts(messageHtml, booking);
+    
+    // Check if [Receipt] prompt exists in the original message
+    // Only use messageWithPrompts (which already has receipt if prompt was present)
+    const hasReceiptPrompt = messageHtml.toLowerCase().indexOf('[receipt]') !== -1;
+    const bodyHtml = hasReceiptPrompt ? messageWithPrompts : messageWithPrompts;
+
+    return buildEmailLayout({
+        subject,
+        headline: '',
+        heroImage: HERO_IMAGE_URL,
+        bodyHtml,
+        customerName,
+        signatureLines: [],
+        footerLinks: [
+            { label: 'View FAQs', url: 'https://flyawayballooning.com/faq' },
+            { label: 'Contact us', url: 'mailto:hello@flyawayballooning.com' }
+        ]
+    });
+};
+
 const getBookingConfirmationReceiptHtml = (booking = {}) => {
     const receiptItems = Array.isArray(booking?.passengers) ? booking.passengers : [];
     
@@ -697,38 +729,9 @@ const DEFAULT_TEMPLATE_BUILDERS = {
             ]
         });
     },
-    'Booking Confirmation': ({ template, booking }) => {
-        const customerName = booking?.name || booking?.customer_name || 'Guest';
-        const subject = '🎈 Your flight is confirmed';
-
-        const customMessageHtml = template?.body
-            ? extractMessageFromTemplateBody(template.body)
-            : '';
-        const messageHtml = customMessageHtml || getBookingConfirmationMessageHtml(booking);
-        
-        // Replace prompts in the message (including [Receipt] if present)
-        const messageWithPrompts = replacePrompts(messageHtml, booking);
-        
-        // Check if [Receipt] prompt exists in the original message
-        // Only use messageWithPrompts (which already has receipt if prompt was present)
-        // Do NOT add receipt if [Receipt] prompt was not in the template
-        // Use indexOf instead of test() to avoid regex lastIndex issues
-        const hasReceiptPrompt = messageHtml.toLowerCase().indexOf('[receipt]') !== -1;
-        const bodyHtml = messageWithPrompts;
-
-        return buildEmailLayout({
-            subject,
-            headline: '',
-            heroImage: HERO_IMAGE_URL,
-            bodyHtml,
-            customerName,
-            signatureLines: [],
-            footerLinks: [
-                { label: 'View FAQs', url: 'https://flyawayballooning.com/faq' },
-                { label: 'Contact us', url: 'mailto:hello@flyawayballooning.com' }
-            ]
-        });
-    },
+    // Booking Confirmation builder (reused for "Your Flight Confirmation" alias)
+    'Booking Confirmation': buildBookingConfirmationEmail,
+    'Your Flight Confirmation': buildBookingConfirmationEmail,
     'Booking Rescheduled': ({ template, booking }) => {
         const customerName = booking?.name || booking?.customer_name || 'Guest';
         const subject = '🎈 Your flight is rescheduled';
@@ -868,6 +871,8 @@ export const getDefaultTemplateMessageHtml = (templateName, booking = DEFAULT_ED
         case 'follow up':
             return getFollowUpMessageHtml(booking);
         case 'booking confirmation':
+            return getBookingConfirmationMessageHtml(booking);
+        case 'your flight confirmation':
             return getBookingConfirmationMessageHtml(booking);
         case 'booking rescheduled':
             return getBookingRescheduledMessageHtml(booking);
