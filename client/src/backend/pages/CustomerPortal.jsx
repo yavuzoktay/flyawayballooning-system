@@ -12,10 +12,6 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import '../components/CustomerPortal/CustomerPortalHeader.css';
-import { loadStripe } from '@stripe/stripe-js';
-import config from '../../config';
-
-const stripePromise = loadStripe(config.STRIPE_PUBLIC_KEY);
 
 const getApiBaseUrl = () => {
     if (process.env.REACT_APP_API_URL && process.env.REACT_APP_API_URL.trim()) {
@@ -28,6 +24,10 @@ const getApiBaseUrl = () => {
 };
 
 const buildApiUrl = (path) => {
+    // If path is already a full URL, return it as is
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+        return path;
+    }
     const base = getApiBaseUrl();
     if (!base) {
         return path;
@@ -117,9 +117,106 @@ const CustomerPortal = () => {
         if (paymentSuccess && paymentType === 'extend_voucher') {
             // Remove query parameters from URL
             window.history.replaceState({}, document.title, window.location.pathname);
-            // Show success message and refresh booking data
+            // Show success message
             alert('Payment successful! Your voucher has been extended by 12 months.');
-            fetchBookingData();
+            
+            // Async function to handle payment success flow
+            const handlePaymentSuccess = async () => {
+                // First, fetch current booking data to get the baseline expiry date
+                // This ensures we have the previous expiry date even if bookingData state is stale
+                let previousExpires = null;
+                let currentBookingId = null;
+                try {
+                    const encodedToken = encodeURIComponent(token);
+                    const baselineResponse = await axios.get(`/api/customer-portal-booking/${encodedToken}`);
+                    if (baselineResponse.data.success) {
+                        previousExpires = baselineResponse.data.data?.expires;
+                        currentBookingId = baselineResponse.data.data?.id;
+                        setBookingData(baselineResponse.data.data); // Update state with current data
+                    }
+                } catch (error) {
+                    console.error('Error fetching baseline booking data:', error);
+                    // Use bookingData state as fallback
+                    previousExpires = bookingData?.expires;
+                    currentBookingId = bookingData?.id;
+                }
+                
+                // Try to extend voucher directly via API (fallback if webhook doesn't work)
+                if (currentBookingId) {
+                    try {
+                        console.log('🔄 Customer Portal - Attempting to extend voucher directly via API...');
+                        const extendResponse = await axios.post('/api/customer-portal-extend-voucher', {
+                            bookingId: currentBookingId,
+                            months: 12,
+                            sessionId: urlParams.get('session_id')
+                        });
+                        if (extendResponse.data.success) {
+                            console.log('✅ Customer Portal - Voucher extended successfully via direct API:', extendResponse.data.data);
+                            // Update previousExpires to the new value so retry mechanism knows it's updated
+                            previousExpires = extendResponse.data.data.newExpires;
+                        }
+                    } catch (error) {
+                        console.error('❌ Customer Portal - Error extending voucher via direct API:', error);
+                        // Continue with retry mechanism as fallback
+                    }
+                }
+            
+            // Wait for webhook to process (webhook may take a few seconds to update database)
+            // Then fetch booking data with retries to ensure we get the updated expiry date
+            const fetchWithRetry = async (retryCount = 0, maxRetries = 5, baselineExpires = previousExpires) => {
+                // First wait: 4 seconds to allow webhook to process
+                // Subsequent retries: 2 seconds between each
+                const delay = retryCount === 0 ? 4000 : 2000;
+                
+                if (retryCount > 0) {
+                    console.log(`🔄 Retrying fetchBookingData (attempt ${retryCount + 1}/${maxRetries + 1})...`);
+                } else {
+                    console.log('⏳ Waiting for webhook to process (4 seconds)...');
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, delay));
+                
+                try {
+                    // Fetch fresh booking data
+                    const encodedToken = encodeURIComponent(token);
+                    const response = await axios.get(`/api/customer-portal-booking/${encodedToken}`);
+                    
+                    if (response.data.success) {
+                        const newExpires = response.data.data?.expires;
+                        setBookingData(response.data.data);
+                        
+                        console.log(`📅 Expiry date check - Previous: ${baselineExpires}, New: ${newExpires}`);
+                        
+                        // Check if expiry date has changed (indicating webhook has processed)
+                        // If expiry date hasn't changed and we haven't exhausted retries, retry once more
+                        if (baselineExpires && newExpires === baselineExpires && retryCount < maxRetries) {
+                            console.log('⚠️ Expiry date not updated yet, retrying...');
+                            setTimeout(() => {
+                                fetchWithRetry(retryCount + 1, maxRetries, baselineExpires);
+                            }, 2000);
+                        } else {
+                            if (baselineExpires && newExpires !== baselineExpires) {
+                                console.log('✅ Expiry date updated successfully!');
+                            } else if (!baselineExpires) {
+                                console.log('ℹ️ No previous expiry date to compare');
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error fetching booking data on retry:', error);
+                    if (retryCount < maxRetries) {
+                        setTimeout(() => {
+                            fetchWithRetry(retryCount + 1, maxRetries, baselineExpires);
+                        }, 2000);
+                    }
+                }
+            };
+            
+            fetchWithRetry();
+            };
+            
+            // Call the async function
+            handlePaymentSuccess();
         } else {
             fetchBookingData();
         }
@@ -248,11 +345,15 @@ const CustomerPortal = () => {
                 return;
             }
 
-            // Redirect to Stripe checkout
-            const stripe = await stripePromise;
-            const { error } = await stripe.redirectToCheckout({ sessionId: sessionRes.data.sessionId });
-            if (error) {
-                alert('Stripe redirect error: ' + error.message);
+            // Redirect to Stripe checkout using session URL
+            if (sessionRes.data.sessionUrl) {
+                window.location.href = sessionRes.data.sessionUrl;
+            } else if (sessionRes.data.sessionId) {
+                // Fallback: construct URL from sessionId (Stripe standard format)
+                const sessionUrl = `https://checkout.stripe.com/c/pay/${sessionRes.data.sessionId}`;
+                window.location.href = sessionUrl;
+            } else {
+                alert('Payment session could not be created. Please try again.');
             }
             // Payment success will be handled by webhook and success URL
         } catch (error) {

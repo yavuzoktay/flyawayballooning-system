@@ -4314,9 +4314,9 @@ async function savePaymentHistory(session, bookingId, voucherId) {
 
 // Stripe Webhook endpoint
 app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-    console.log('Stripe webhook endpoint hit!');
-    console.log('Webhook body length:', req.body ? req.body.length : 'undefined');
-    console.log('Webhook headers:', req.headers);
+    console.log('🔔 Stripe webhook endpoint hit!');
+    console.log('🔔 Webhook body length:', req.body ? req.body.length : 'undefined');
+    console.log('🔔 Webhook headers:', req.headers);
 
     const sig = req.headers['stripe-signature'];
     let event;
@@ -4341,8 +4341,8 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
     try {
         if (event.type === 'checkout.session.completed') {
             const session = event.data.object;
-            console.log('Checkout session completed:', session.id);
-            console.log('Session metadata:', session.metadata);
+            console.log('✅ Webhook: Checkout session completed:', session.id);
+            console.log('✅ Webhook: Session metadata:', session.metadata);
 
             const session_id = session.id;
             console.log('Using session ID:', session_id);
@@ -4364,12 +4364,19 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             }
 
             // Session ID kontrolü - session data var mı kontrol et
-            if (!storeData.bookingData && !storeData.voucherData) {
-                console.log('No booking/voucher data found for session:', session_id);
-                return res.status(400).send('No booking/voucher data found');
+            // For extend_voucher type, we don't need bookingData or voucherData
+            if (!storeData.bookingData && !storeData.voucherData && !storeData.extendVoucherData) {
+                console.log('❌ No booking/voucher/extendVoucher data found for session:', session_id);
+                console.log('❌ Store data type:', storeData.type);
+                console.log('❌ Store data keys:', Object.keys(storeData));
+                return res.status(400).send('No booking/voucher/extendVoucher data found');
             }
 
-            console.log('Processing webhook for session:', session_id, 'Type:', storeData.type);
+            console.log('🔄 Processing webhook for session:', session_id, 'Type:', storeData.type);
+            console.log('🔄 Store data keys:', Object.keys(storeData));
+            if (storeData.extendVoucherData) {
+                console.log('🔄 Extend voucher data present:', JSON.stringify(storeData.extendVoucherData, null, 2));
+            }
 
             try {
                 if (storeData.type === 'booking') {
@@ -4605,19 +4612,24 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     // Immediately return to prevent further processing
                     return res.json({ received: true });
                 } else if (storeData.type === 'extend_voucher') {
-                    console.log('Extending voucher via webhook:', storeData.extendVoucherData);
+                    console.log('🔄 Webhook: Extending voucher via webhook');
+                    console.log('🔄 Webhook: Extend voucher data:', JSON.stringify(storeData.extendVoucherData, null, 2));
                     
                     if (!storeData.extendVoucherData) {
-                        console.error('Extend voucher data not found in session store');
+                        console.error('❌ Webhook: Extend voucher data not found in session store');
                         return res.status(400).json({ received: false, message: 'Extend voucher data not found' });
                     }
 
                     const { bookingId, months, passengerCount } = storeData.extendVoucherData;
                     
+                    console.log('🔄 Webhook: Parsed extend voucher data:', { bookingId, months, passengerCount });
+                    
                     if (!bookingId || !months || months <= 0) {
-                        console.error('Invalid extend voucher data:', storeData.extendVoucherData);
+                        console.error('❌ Webhook: Invalid extend voucher data:', storeData.extendVoucherData);
                         return res.status(400).json({ received: false, message: 'Invalid extend voucher data' });
                     }
+                    
+                    console.log(`✅ Webhook: Processing extend voucher - Booking ID: ${bookingId}, Months: ${months}, Passengers: ${passengerCount}`);
 
                     try {
                         // Get booking and voucher information
@@ -4625,7 +4637,6 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                             con.query(`
                                 SELECT 
                                     b.id,
-                                    b.voucher_ref,
                                     b.voucher_code,
                                     b.expires AS booking_expires,
                                     b.email,
@@ -4634,14 +4645,16 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                                     v.expires AS voucher_expires,
                                     v.voucher_ref AS voucher_table_ref
                                 FROM all_booking b
-                                LEFT JOIN all_vouchers v ON v.voucher_ref = b.voucher_ref OR v.voucher_ref = b.voucher_code
+                                LEFT JOIN all_vouchers v ON v.voucher_ref = b.voucher_code
                                 WHERE b.id = ? LIMIT 1
                             `, [bookingId], (err, rows) => {
                                 if (err) {
+                                    console.error('❌ Webhook: Error querying booking info:', err);
                                     reject(err);
-                                } else if (!rows || rows.length > 0) {
+                                } else if (rows && rows.length > 0) {
                                     resolve(rows[0]);
                                 } else {
+                                    console.error('❌ Webhook: No booking found for ID:', bookingId);
                                     resolve(null);
                                 }
                             });
@@ -4657,8 +4670,8 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                             bookingExpires: bookingInfo.booking_expires,
                             voucherId: bookingInfo.voucher_id,
                             voucherExpires: bookingInfo.voucher_expires,
-                            voucherRef: bookingInfo.voucher_ref,
-                            voucherCode: bookingInfo.voucher_code
+                            voucherCode: bookingInfo.voucher_code,
+                            voucherTableRef: bookingInfo.voucher_table_ref
                         });
 
                         // Determine current expiry date - prioritize booking expires, then voucher expires, then calculate from created_at
@@ -4681,28 +4694,62 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                             currentExpires.setMonth(currentExpires.getMonth() + 24);
                         }
 
-                        // Calculate new expiry date
+                        // Calculate new expiry date - add months to current expiry date
                         const newExpires = new Date(currentExpires);
-                        newExpires.setMonth(newExpires.getMonth() + months);
+                        const currentYear = newExpires.getFullYear();
+                        const currentMonth = newExpires.getMonth();
+                        const currentDay = newExpires.getDate();
+                        
+                        // Add months (12 months = 1 year)
+                        const newYear = currentYear + Math.floor((currentMonth + months) / 12);
+                        const newMonth = (currentMonth + months) % 12;
+                        
+                        // Create new date with proper year and month
+                        const calculatedDate = new Date(newYear, newMonth, currentDay);
+                        
+                        // Use calculated date or fallback to setMonth if calculation fails
+                        if (isNaN(calculatedDate.getTime())) {
+                            console.warn('⚠️ Webhook: Date calculation failed, using setMonth fallback');
+                            newExpires.setMonth(newExpires.getMonth() + months);
+                        } else {
+                            newExpires.setFullYear(newYear);
+                            newExpires.setMonth(newMonth);
+                            newExpires.setDate(currentDay);
+                        }
+                        
                         const newExpiresFormatted = newExpires.toISOString().split('T')[0];
 
                         console.log('📅 Webhook: Extending expiry date:', {
                             oldExpires: currentExpires.toISOString().split('T')[0],
+                            oldExpiresFormatted: `${currentDay}/${currentMonth + 1}/${currentYear}`,
                             newExpires: newExpiresFormatted,
-                            months: months
+                            newExpiresFormatted: `${newExpires.getDate()}/${newExpires.getMonth() + 1}/${newExpires.getFullYear()}`,
+                            months: months,
+                            calculation: `${currentYear}-${currentMonth + 1}-${currentDay} + ${months} months = ${newExpires.getFullYear()}-${newExpires.getMonth() + 1}-${newExpires.getDate()}`
                         });
 
                         // ALWAYS update all_booking.expires (this is what Customer Portal and Booking Details use)
                         await new Promise((resolve, reject) => {
+                            console.log(`🔄 Webhook: Executing UPDATE all_booking SET expires = '${newExpiresFormatted}' WHERE id = ${bookingInfo.id}`);
                             con.query(
                                 'UPDATE all_booking SET expires = ? WHERE id = ?',
                                 [newExpiresFormatted, bookingInfo.id],
                                 (err, result) => {
                                     if (err) {
                                         console.error('❌ Webhook: Error updating all_booking.expires:', err);
+                                        console.error('❌ Webhook: Error details:', JSON.stringify(err));
                                         reject(err);
                                     } else {
                                         console.log('✅ Webhook: Updated all_booking.expires for booking', bookingInfo.id, 'to', newExpiresFormatted);
+                                        console.log('✅ Webhook: Update result - affectedRows:', result.affectedRows, 'changedRows:', result.changedRows);
+                                        // Verify the update by querying the database
+                                        con.query('SELECT expires FROM all_booking WHERE id = ?', [bookingInfo.id], (verifyErr, verifyRows) => {
+                                            if (verifyErr) {
+                                                console.error('❌ Webhook: Error verifying update:', verifyErr);
+                                            } else if (verifyRows && verifyRows.length > 0) {
+                                                console.log('✅ Webhook: Verified - expires in DB is now:', verifyRows[0].expires);
+                                            }
+                                        });
                                         resolve();
                                     }
                                 }
@@ -11406,6 +11453,7 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         }
 
         console.log('✅ Customer Portal - Booking found:', booking.id);
+        console.log('📅 Customer Portal - Booking expires from DB:', booking.expires);
 
         // Get voucher_type and voucher_type_detail from all_vouchers if booking was created from redeem voucher
         // This matches the logic in getAllBookingData endpoint
@@ -11534,6 +11582,166 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             message: 'Internal server error',
             error: error.message,
             details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
+    }
+});
+
+// Customer Portal - Extend Voucher (Direct API endpoint - fallback if webhook doesn't work)
+app.post('/api/customer-portal-extend-voucher', async (req, res) => {
+    const { bookingId, months = 12, sessionId } = req.body;
+    
+    console.log('🔄 Customer Portal - Extend voucher API called:', { bookingId, months, sessionId });
+    
+    if (!bookingId) {
+        return res.status(400).json({ success: false, message: 'Booking ID is required' });
+    }
+    
+    try {
+        // Get booking and voucher information
+        const bookingInfo = await new Promise((resolve, reject) => {
+            con.query(`
+                SELECT 
+                    b.id,
+                    b.voucher_code,
+                    b.expires AS booking_expires,
+                    b.email,
+                    b.created_at,
+                    v.id AS voucher_id,
+                    v.expires AS voucher_expires,
+                    v.voucher_ref AS voucher_table_ref
+                FROM all_booking b
+                LEFT JOIN all_vouchers v ON v.voucher_ref = b.voucher_code
+                WHERE b.id = ? LIMIT 1
+            `, [bookingId], (err, rows) => {
+                if (err) {
+                    console.error('❌ Customer Portal - Error querying booking info:', err);
+                    reject(err);
+                } else if (rows && rows.length > 0) {
+                    resolve(rows[0]);
+                } else {
+                    console.error('❌ Customer Portal - No booking found for ID:', bookingId);
+                    resolve(null);
+                }
+            });
+        });
+        
+        if (!bookingInfo) {
+            return res.status(404).json({ success: false, message: 'Booking not found' });
+        }
+        
+        console.log('🔍 Customer Portal - Booking info retrieved:', {
+            bookingId: bookingInfo.id,
+            bookingExpires: bookingInfo.booking_expires,
+            voucherId: bookingInfo.voucher_id,
+            voucherExpires: bookingInfo.voucher_expires,
+            voucherCode: bookingInfo.voucher_code,
+            voucherTableRef: bookingInfo.voucher_table_ref
+        });
+        
+        // Determine current expiry date
+        let currentExpires = null;
+        
+        if (bookingInfo.booking_expires) {
+            currentExpires = new Date(bookingInfo.booking_expires);
+            console.log('📅 Customer Portal - Using booking expires date:', currentExpires.toISOString().split('T')[0]);
+        } else if (bookingInfo.voucher_expires) {
+            currentExpires = new Date(bookingInfo.voucher_expires);
+            console.log('📅 Customer Portal - Using voucher expires date:', currentExpires.toISOString().split('T')[0]);
+        } else if (bookingInfo.created_at) {
+            currentExpires = new Date(bookingInfo.created_at);
+            currentExpires.setMonth(currentExpires.getMonth() + 24);
+            console.log('📅 Customer Portal - Calculated expires from created_at + 24 months:', currentExpires.toISOString().split('T')[0]);
+        } else {
+            console.error('❌ Customer Portal - No expiry date found, using current date + 24 months');
+            currentExpires = new Date();
+            currentExpires.setMonth(currentExpires.getMonth() + 24);
+        }
+        
+        // Calculate new expiry date - add months to current expiry date
+        const newExpires = new Date(currentExpires);
+        const currentYear = newExpires.getFullYear();
+        const currentMonth = newExpires.getMonth();
+        const currentDay = newExpires.getDate();
+        
+        // Add months (12 months = 1 year)
+        const newYear = currentYear + Math.floor((currentMonth + months) / 12);
+        const newMonth = (currentMonth + months) % 12;
+        
+        // Create new date with proper year and month
+        const calculatedDate = new Date(newYear, newMonth, currentDay);
+        
+        // Use calculated date or fallback to setMonth if calculation fails
+        if (isNaN(calculatedDate.getTime())) {
+            console.warn('⚠️ Customer Portal - Date calculation failed, using setMonth fallback');
+            newExpires.setMonth(newExpires.getMonth() + months);
+        } else {
+            newExpires.setFullYear(newYear);
+            newExpires.setMonth(newMonth);
+            newExpires.setDate(currentDay);
+        }
+        
+        const newExpiresFormatted = newExpires.toISOString().split('T')[0];
+        
+        console.log('📅 Customer Portal - Extending expiry date:', {
+            oldExpires: currentExpires.toISOString().split('T')[0],
+            newExpires: newExpiresFormatted,
+            months: months,
+            calculation: `${currentYear}-${currentMonth + 1}-${currentDay} + ${months} months = ${newExpires.getFullYear()}-${newExpires.getMonth() + 1}-${newExpires.getDate()}`
+        });
+        
+        // ALWAYS update all_booking.expires
+        await new Promise((resolve, reject) => {
+            console.log(`🔄 Customer Portal - Executing UPDATE all_booking SET expires = '${newExpiresFormatted}' WHERE id = ${bookingInfo.id}`);
+            con.query(
+                'UPDATE all_booking SET expires = ? WHERE id = ?',
+                [newExpiresFormatted, bookingInfo.id],
+                (err, result) => {
+                    if (err) {
+                        console.error('❌ Customer Portal - Error updating all_booking.expires:', err);
+                        reject(err);
+                    } else {
+                        console.log('✅ Customer Portal - Updated all_booking.expires for booking', bookingInfo.id, 'to', newExpiresFormatted);
+                        console.log('✅ Customer Portal - Update result - affectedRows:', result.affectedRows);
+                        resolve();
+                    }
+                }
+            );
+        });
+        
+        // Also update all_vouchers.expires if voucher exists
+        if (bookingInfo.voucher_id) {
+            await new Promise((resolve, reject) => {
+                con.query(
+                    'UPDATE all_vouchers SET expires = ? WHERE id = ?',
+                    [newExpiresFormatted, bookingInfo.voucher_id],
+                    (err, result) => {
+                        if (err) {
+                            console.error('❌ Customer Portal - Error updating all_vouchers.expires:', err);
+                        } else {
+                            console.log('✅ Customer Portal - Updated all_vouchers.expires for voucher', bookingInfo.voucher_id, 'to', newExpiresFormatted);
+                        }
+                        resolve();
+                    }
+                );
+            });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Voucher expiry date extended successfully',
+            data: {
+                bookingId: bookingInfo.id,
+                oldExpires: currentExpires.toISOString().split('T')[0],
+                newExpires: newExpiresFormatted,
+                months: months
+            }
+        });
+    } catch (error) {
+        console.error('❌ Customer Portal - Error extending voucher:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error extending voucher',
+            error: error.message
         });
     }
 });
