@@ -273,7 +273,7 @@ const buildEmailLayout = ({
                                         </v:textbox>
                                         </v:rect>
                                         <![endif]-->
-                                        <img src="${heroImage}" alt="Fly Away Ballooning" width="640" style="width:100%; height:auto; min-height:220px; display:block; border:0; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; background-color:#ffffff; vertical-align:top; object-fit:cover; object-position:center; border-radius:24px 24px 0 0;" />
+                                        <img src="${heroImage}" alt="Fly Away Ballooning" width="640" style="width:100%; max-width:640px; height:auto; min-height:220px; display:block; margin:0 auto; border:0; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; background-color:#ffffff; vertical-align:top; object-fit:cover; object-position:center; border-radius:24px 24px 0 0;" />
                                     </td>
                                 </tr>
                             </table>
