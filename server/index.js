@@ -98,6 +98,10 @@ const getFallbackFrom = () => {
     return `${name} <${email}>`;
 };
 
+// In-memory caches to prevent duplicate email sends within a short window
+const flightVoucherEmailCache = new Map(); // voucherId -> timestamp
+const giftVoucherEmailCache = new Map();   // voucherId -> timestamp
+
 const isEmailServiceAvailable = () => sendgridReady || !!smtpTransporter;
 
 const shouldFallbackToSmtp = (error) => {
@@ -20485,6 +20489,14 @@ async function sendAutomaticFlightVoucherConfirmationEmail(voucherId, purchasing
                 return;
             }
 
+            // In-memory duplicate guard: skip if sent recently (e.g., webhook + fallback)
+            const nowTs = Date.now();
+            const recentTs = flightVoucherEmailCache.get(voucherId);
+            if (recentTs && nowTs - recentTs < 5 * 60 * 1000) { // 5 minutes window
+                console.log('⏭️ [sendAutomaticFlightVoucherConfirmationEmail] Skipping email - recently sent (cache guard). voucherId:', voucherId);
+                return;
+            }
+
             // Prevent duplicate sends: check email_logs for existing flight voucher confirmation
             try {
                 const existingEmailLog = await new Promise((resolve) => {
@@ -20512,6 +20524,8 @@ async function sendAutomaticFlightVoucherConfirmationEmail(voucherId, purchasing
                         emailLogId: existingEmailLog.id,
                         sent_at: existingEmailLog.sent_at
                     });
+                    // Cache to avoid re-attempt within window
+                    flightVoucherEmailCache.set(voucherId, nowTs);
                     return;
                 }
             } catch (dupCheckErr) {
@@ -20559,6 +20573,8 @@ async function sendAutomaticFlightVoucherConfirmationEmail(voucherId, purchasing
 
             // Continue with email sending
             console.log('📤 [sendAutomaticFlightVoucherConfirmationEmail] Calling sendFlightVoucherEmailToCustomerAndOwner for voucher:', voucherId);
+            // Mark in cache to prevent immediate duplicates
+            flightVoucherEmailCache.set(voucherId, nowTs);
             sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId);
         });
     } catch (error) {
