@@ -4270,6 +4270,9 @@ async function savePaymentHistory(session, bookingId, voucherId) {
 // Stripe Webhook endpoint
 app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
     console.log('Stripe webhook endpoint hit!');
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:stripe-webhook:entry',message:'Webhook endpoint hit',data:{bodyLength:req.body?.length,hasSignature:!!req.headers['stripe-signature']},timestamp:Date.now(),sessionId:'debug-session',runId:'noEmailDebug',hypothesisId:'H-noemail-5'})}).catch(()=>{});
+    // #endregion
     console.log('Webhook body length:', req.body ? req.body.length : 'undefined');
     console.log('Webhook headers:', req.headers);
 
@@ -4297,6 +4300,9 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
         if (event.type === 'checkout.session.completed') {
             const session = event.data.object;
             console.log('Checkout session completed:', session.id);
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:stripe-webhook:checkout.session.completed',message:'Checkout session completed event received',data:{sessionId:session.id,metadata:session.metadata},timestamp:Date.now(),sessionId:'debug-session',runId:'noEmailDebug',hypothesisId:'H-noemail-6'})}).catch(()=>{});
+            // #endregion
             console.log('Session metadata:', session.metadata);
 
             const session_id = session.id;
@@ -4451,6 +4457,9 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     // Direct database insertion instead of HTTP call
                     const voucherId = await createVoucherFromWebhook(storeData.voucherData);
                     console.log('Webhook voucher creation completed, ID:', voucherId);
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:stripe-webhook:voucherCreated',message:'Voucher created from webhook',data:{voucherId,book_flight:storeData.voucherData.book_flight,voucher_type:storeData.voucherData.voucher_type},timestamp:Date.now(),sessionId:'debug-session',runId:'noEmailDebug',hypothesisId:'H-noemail-7'})}).catch(()=>{});
+                    // #endregion
 
                     // Store voucher ID in session data to prevent duplicate creation
                     storeData.voucherData.voucher_id = voucherId;
@@ -17335,10 +17344,10 @@ const runDatabaseMigrations = () => {
             fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run-numberOfPassengers',hypothesisId:'H1',location:'server/index.js:runDatabaseMigrations:skipAlter',message:'Column exists, skipping ALTER',data:{exists},timestamp:Date.now()})}).catch(()=>{});
             // #endregion
         } else {
-            const addNumberOfPassengersColumn = `
-                ALTER TABLE all_vouchers 
-                ADD COLUMN numberOfPassengers INT DEFAULT 1 COMMENT 'Number of passengers for this voucher'
-            `;
+    const addNumberOfPassengersColumn = `
+        ALTER TABLE all_vouchers 
+        ADD COLUMN numberOfPassengers INT DEFAULT 1 COMMENT 'Number of passengers for this voucher'
+    `;
 
             con.query(addNumberOfPassengersColumn, (alterErr, result) => {
                 // #region agent log
@@ -17347,8 +17356,8 @@ const runDatabaseMigrations = () => {
 
                 if (alterErr) {
                     console.error('Error adding numberOfPassengers column:', alterErr);
-                } else {
-                    console.log('✅ numberOfPassengers column added successfully');
+        } else {
+            console.log('✅ numberOfPassengers column added successfully');
                 }
             });
         }
@@ -20547,9 +20556,15 @@ async function sendAutomaticFlightVoucherConfirmationEmail(voucherId, purchasing
 
             // Prevent duplicate sends: check cache and email_logs BEFORE proceeding
             const nowTs = Date.now();
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:sendAutomaticFlightVoucherConfirmationEmail:guardCheck',message:'Starting duplicate guard checks',data:{voucherId,nowTs},timestamp:Date.now(),sessionId:'debug-session',runId:'noEmailDebug',hypothesisId:'H-noemail-1'})}).catch(()=>{});
+            // #endregion
             
             // Guard 1: Check in-memory cache first (fastest duplicate prevention)
             const cachedTimestamp = flightVoucherEmailCache.get(voucherId);
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:sendAutomaticFlightVoucherConfirmationEmail:cacheCheck',message:'Cache check result',data:{voucherId,cachedTimestamp,ageMs:cachedTimestamp?nowTs-cachedTimestamp:null,willSkip:cachedTimestamp&&(nowTs-cachedTimestamp)<60000},timestamp:Date.now(),sessionId:'debug-session',runId:'noEmailDebug',hypothesisId:'H-noemail-2'})}).catch(()=>{});
+            // #endregion
             if (cachedTimestamp && (nowTs - cachedTimestamp) < 60000) { // 60 second window
                 console.log('⏭️ [sendAutomaticFlightVoucherConfirmationEmail] Skipping email - already in cache (recent send):', {
                     voucherId,
@@ -20579,6 +20594,9 @@ async function sendAutomaticFlightVoucherConfirmationEmail(voucherId, purchasing
                         resolve(rows && rows.length > 0 ? rows[0] : null);
                     });
                 });
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:sendAutomaticFlightVoucherConfirmationEmail:emailLogsCheck',message:'Email logs check result',data:{voucherId,existingEmailLog:!!existingEmailLog,emailLogId:existingEmailLog?.id,sent_at:existingEmailLog?.sent_at,willSkip:!!existingEmailLog},timestamp:Date.now(),sessionId:'debug-session',runId:'noEmailDebug',hypothesisId:'H-noemail-3'})}).catch(()=>{});
+                // #endregion
 
                 if (existingEmailLog) {
                     console.log('⏭️ [sendAutomaticFlightVoucherConfirmationEmail] Skipping email - already sent (email_logs exists):', {
@@ -20596,6 +20614,9 @@ async function sendAutomaticFlightVoucherConfirmationEmail(voucherId, purchasing
             
             // Guard 3: Set cache immediately to prevent race conditions
             flightVoucherEmailCache.set(voucherId, nowTs);
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:sendAutomaticFlightVoucherConfirmationEmail:proceeding',message:'All guards passed, proceeding to send email',data:{voucherId},timestamp:Date.now(),sessionId:'debug-session',runId:'noEmailDebug',hypothesisId:'H-noemail-4'})}).catch(()=>{});
+            // #endregion
 
             // Fallback to purchaser email/name if primary email/name missing
             const originalEmail = voucher.email;
