@@ -1085,9 +1085,6 @@ app.post('/api/voucher-codes/validate', (req, res) => {
     } = req.body;
 
     console.log('Voucher validation request:', { code, location, experience, voucher_type, booking_amount });
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:voucher-codes/validate:entry',message:'Voucher validation endpoint called',data:{code,codeType:typeof code,codeLength:code?.length,location,experience,voucher_type,booking_amount},timestamp:Date.now(),sessionId:'debug-session',runId:'voucherValidation',hypothesisId:'H-voucher-0'})}).catch(()=>{});
-    // #endregion
 
     if (!code) {
         return res.status(400).json({ success: false, message: 'Voucher code is required' });
@@ -1110,9 +1107,6 @@ app.post('/api/voucher-codes/validate', (req, res) => {
     console.log('SQL params:', [code.toUpperCase()]);
 
     con.query(sql, [code.toUpperCase()], (err, result) => {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:voucher-codes/validate:firstQueryResult',message:'First query (voucher_codes table) result',data:{code,codeUpper:code.toUpperCase(),err:err?.message||null,resultCount:result?.length||0,foundInVoucherCodes:!!(result&&result.length>0)},timestamp:Date.now(),sessionId:'debug-session',runId:'voucherValidation',hypothesisId:'H-voucher-0a'})}).catch(()=>{});
-        // #endregion
         if (err) {
             console.error('Error validating voucher code:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err.message });
@@ -1122,9 +1116,6 @@ app.post('/api/voucher-codes/validate', (req, res) => {
 
         if (result.length === 0) {
             console.log('No voucher_codes match. Falling back to all_vouchers/all_booking for voucher_ref/voucher_code...');
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:voucher-codes/validate:fallbackStart',message:'Starting fallback voucher lookup',data:{code,codeUpper:code.toUpperCase()},timestamp:Date.now(),sessionId:'debug-session',runId:'voucherValidation',hypothesisId:'H-voucher-1'})}).catch(()=>{});
-            // #endregion
             const fallbackSql = `
                 SELECT 
                     v.id,
@@ -1166,32 +1157,20 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                 LIMIT 1
             `;
             con.query(fallbackSql, [code, code], (fbErr, fbRows) => {
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:voucher-codes/validate:fallbackResult',message:'Fallback query result',data:{code,fbErr:fbErr?.message||null,fbRowsCount:fbRows?.length||0,foundVoucher:!!(fbRows&&fbRows.length>0)},timestamp:Date.now(),sessionId:'debug-session',runId:'voucherValidation',hypothesisId:'H-voucher-2'})}).catch(()=>{});
-                // #endregion
                 if (fbErr) {
                     console.error('Error in voucher fallback lookup:', fbErr);
                     return res.json({ success: false, message: 'Invalid or expired voucher code' });
                 }
                 if (!fbRows || fbRows.length === 0) {
-                    // #region agent log
-                    fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:voucher-codes/validate:noVoucherFound',message:'No voucher found in fallback query',data:{code},timestamp:Date.now(),sessionId:'debug-session',runId:'voucherValidation',hypothesisId:'H-voucher-3'})}).catch(()=>{});
-                    // #endregion
                     return res.json({ success: false, message: 'Invalid or expired voucher code' });
                 }
                 const row = fbRows[0];
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:voucher-codes/validate:voucherFound',message:'Voucher found in fallback query',data:{code,code_source:row.code_source,voucher_ref:row.voucher_ref,redeemed:row.redeemed,redeemedType:typeof row.redeemed,expires:row.computed_expires||row.expires},timestamp:Date.now(),sessionId:'debug-session',runId:'voucherValidation',hypothesisId:'H-voucher-4'})}).catch(()=>{});
-                // #endregion
                 // Basic checks for voucher_ref path
                 if (row.code_source === 'voucher_ref') {
                     const now = new Date();
                     const exp = row.computed_expires ? new Date(row.computed_expires) : null;
                     // Check if voucher is redeemed - only reject if explicitly "yes" or "1" or true
                     const redeemedValue = row.redeemed ? String(row.redeemed).toLowerCase().trim() : '';
-                    // #region agent log
-                    fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:voucher-codes/validate:redeemedCheck',message:'Checking redeemed status',data:{code,redeemed:row.redeemed,redeemedValue,isRedeemed:redeemedValue==='yes'||redeemedValue==='1'||redeemedValue==='true',exp,now:now.toISOString(),expired:exp&&now>exp},timestamp:Date.now(),sessionId:'debug-session',runId:'voucherValidation',hypothesisId:'H-voucher-5'})}).catch(()=>{});
-                    // #endregion
                     if (redeemedValue === 'yes' || redeemedValue === '1' || redeemedValue === 'true') {
                         return res.json({ success: false, message: 'Voucher already redeemed' });
                     }
@@ -1234,10 +1213,6 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                 // Format valid_until date
                 const validUntil = row.computed_expires || row.expires || null;
                 const validUntilFormatted = validUntil ? new Date(validUntil).toISOString() : null;
-                
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:voucher-codes/validate:returningSuccess',message:'Returning success response for voucher',data:{code,code_source:row.code_source,redeemed:row.redeemed,title,voucherName,voucherType,voucherLocation},timestamp:Date.now(),sessionId:'debug-session',runId:'voucherValidation',hypothesisId:'H-voucher-6'})}).catch(()=>{});
-                // #endregion
                 return res.json({
                     success: true,
                     message: 'Voucher code is valid',
