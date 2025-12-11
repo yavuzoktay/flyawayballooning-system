@@ -4627,107 +4627,119 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                                     b.id,
                                     b.voucher_ref,
                                     b.voucher_code,
-                                    b.expires,
+                                    b.expires AS booking_expires,
                                     b.email,
+                                    b.created_at,
                                     v.id AS voucher_id,
                                     v.expires AS voucher_expires,
-                                    v.voucher_ref
+                                    v.voucher_ref AS voucher_table_ref
                                 FROM all_booking b
-                                LEFT JOIN all_vouchers v ON v.voucher_ref = b.voucher_ref OR v.id = b.voucher_id
+                                LEFT JOIN all_vouchers v ON v.voucher_ref = b.voucher_ref OR v.voucher_ref = b.voucher_code
                                 WHERE b.id = ? LIMIT 1
                             `, [bookingId], (err, rows) => {
                                 if (err) {
                                     reject(err);
-                                } else if (!rows || rows.length === 0) {
-                                    resolve(null);
-                                } else {
+                                } else if (!rows || rows.length > 0) {
                                     resolve(rows[0]);
+                                } else {
+                                    resolve(null);
                                 }
                             });
                         });
 
                         if (!bookingInfo) {
-                            console.error('Booking not found for extend voucher:', bookingId);
+                            console.error('❌ Webhook: Booking not found for extend voucher:', bookingId);
                             return res.status(404).json({ received: false, message: 'Booking not found' });
                         }
 
-                        // Determine expiry date to extend
-                        let currentExpires = null;
-                        let updateTable = null;
-                        let updateId = null;
+                        console.log('🔍 Webhook: Booking info retrieved:', {
+                            bookingId: bookingInfo.id,
+                            bookingExpires: bookingInfo.booking_expires,
+                            voucherId: bookingInfo.voucher_id,
+                            voucherExpires: bookingInfo.voucher_expires,
+                            voucherRef: bookingInfo.voucher_ref,
+                            voucherCode: bookingInfo.voucher_code
+                        });
 
-                        if (bookingInfo.voucher_id && bookingInfo.voucher_expires) {
-                            // Update voucher in all_vouchers table
+                        // Determine current expiry date - prioritize booking expires, then voucher expires, then calculate from created_at
+                        let currentExpires = null;
+                        
+                        if (bookingInfo.booking_expires) {
+                            currentExpires = new Date(bookingInfo.booking_expires);
+                            console.log('📅 Webhook: Using booking expires date:', currentExpires.toISOString().split('T')[0]);
+                        } else if (bookingInfo.voucher_expires) {
                             currentExpires = new Date(bookingInfo.voucher_expires);
-                            updateTable = 'all_vouchers';
-                            updateId = bookingInfo.voucher_id;
-                        } else if (bookingInfo.expires) {
-                            // Update booking expiry
-                            currentExpires = new Date(bookingInfo.expires);
-                            updateTable = 'all_booking';
-                            updateId = bookingInfo.id;
-                        } else {
+                            console.log('📅 Webhook: Using voucher expires date:', currentExpires.toISOString().split('T')[0]);
+                        } else if (bookingInfo.created_at) {
                             // Calculate from created_at + 24 months default
-                            const createdDate = await new Promise((resolve, reject) => {
-                                con.query('SELECT created_at FROM all_booking WHERE id = ? LIMIT 1', [bookingId], (err, rows) => {
-                                    if (err) {
-                                        reject(err);
-                                    } else if (rows && rows.length > 0) {
-                                        resolve(new Date(rows[0].created_at));
-                                    } else {
-                                        resolve(new Date());
-                                    }
-                                });
-                            });
-                            currentExpires = new Date(createdDate);
+                            currentExpires = new Date(bookingInfo.created_at);
                             currentExpires.setMonth(currentExpires.getMonth() + 24);
-                            updateTable = 'all_booking';
-                            updateId = bookingInfo.id;
+                            console.log('📅 Webhook: Calculated expires from created_at + 24 months:', currentExpires.toISOString().split('T')[0]);
+                        } else {
+                            console.error('❌ Webhook: No expiry date found, using current date + 24 months');
+                            currentExpires = new Date();
+                            currentExpires.setMonth(currentExpires.getMonth() + 24);
                         }
 
                         // Calculate new expiry date
                         const newExpires = new Date(currentExpires);
                         newExpires.setMonth(newExpires.getMonth() + months);
+                        const newExpiresFormatted = newExpires.toISOString().split('T')[0];
 
-                        // Update expiry date in database
+                        console.log('📅 Webhook: Extending expiry date:', {
+                            oldExpires: currentExpires.toISOString().split('T')[0],
+                            newExpires: newExpiresFormatted,
+                            months: months
+                        });
+
+                        // ALWAYS update all_booking.expires (this is what Customer Portal and Booking Details use)
                         await new Promise((resolve, reject) => {
                             con.query(
-                                `UPDATE ${updateTable} SET expires = ? WHERE id = ?`,
-                                [newExpires.toISOString().split('T')[0], updateId],
-                                (err) => {
+                                'UPDATE all_booking SET expires = ? WHERE id = ?',
+                                [newExpiresFormatted, bookingInfo.id],
+                                (err, result) => {
                                     if (err) {
+                                        console.error('❌ Webhook: Error updating all_booking.expires:', err);
                                         reject(err);
                                     } else {
+                                        console.log('✅ Webhook: Updated all_booking.expires for booking', bookingInfo.id, 'to', newExpiresFormatted);
                                         resolve();
                                     }
                                 }
                             );
                         });
 
-                        // Also update booking expires if we updated voucher
-                        if (updateTable === 'all_vouchers' && bookingInfo.id) {
+                        // Also update all_vouchers.expires if voucher exists
+                        if (bookingInfo.voucher_id) {
                             await new Promise((resolve, reject) => {
                                 con.query(
-                                    'UPDATE all_booking SET expires = ? WHERE id = ?',
-                                    [newExpires.toISOString().split('T')[0], bookingInfo.id],
-                                    (err) => {
+                                    'UPDATE all_vouchers SET expires = ? WHERE id = ?',
+                                    [newExpiresFormatted, bookingInfo.voucher_id],
+                                    (err, result) => {
                                         if (err) {
-                                            console.error('Error updating booking expires:', err);
+                                            console.error('❌ Webhook: Error updating all_vouchers.expires:', err);
+                                            // Don't reject, just log error - booking update is more important
+                                        } else {
+                                            console.log('✅ Webhook: Updated all_vouchers.expires for voucher', bookingInfo.voucher_id, 'to', newExpiresFormatted);
                                         }
                                         resolve();
                                     }
                                 );
                             });
+                        } else {
+                            console.log('ℹ️ Webhook: No voucher_id found, skipping all_vouchers update');
                         }
 
                         // Save payment history
                         await savePaymentHistory(session, bookingId, null);
 
-                        console.log('✅ Voucher extended successfully via webhook:', {
-                            bookingId: bookingId,
+                        console.log('✅ Webhook: Voucher extended successfully:', {
+                            bookingId: bookingInfo.id,
+                            voucherId: bookingInfo.voucher_id || 'N/A',
                             oldExpires: currentExpires.toISOString().split('T')[0],
-                            newExpires: newExpires.toISOString().split('T')[0],
-                            months: months
+                            newExpires: newExpiresFormatted,
+                            months: months,
+                            updatedTables: ['all_booking', bookingInfo.voucher_id ? 'all_vouchers' : 'none'].filter(t => t !== 'none')
                         });
 
                         // Mark session as processed
@@ -16209,8 +16221,8 @@ app.post('/api/create-checkout-session', async (req, res) => {
 
         console.log('Session stored and metadata updated');
         console.log('Session store contents:', Object.keys(stripeSessionStore));
-        console.log('Sending response:', { success: true, sessionId: session_id });
-        res.json({ success: true, sessionId: session_id });
+        console.log('Sending response:', { success: true, sessionId: session_id, sessionUrl: session.url });
+        res.json({ success: true, sessionId: session_id, sessionUrl: session.url });
     } catch (error) {
         console.error('Stripe Checkout Session error:', error);
         const details = {
