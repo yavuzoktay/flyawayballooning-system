@@ -20485,6 +20485,39 @@ async function sendAutomaticFlightVoucherConfirmationEmail(voucherId, purchasing
                 return;
             }
 
+            // Prevent duplicate sends: check email_logs for existing flight voucher confirmation
+            try {
+                const existingEmailLog = await new Promise((resolve) => {
+                    const checkSql = `
+                        SELECT id, sent_at, template_type
+                        FROM email_logs
+                        WHERE context_type = 'voucher'
+                          AND context_id = ?
+                          AND template_type = 'flight_voucher_confirmation_automatic'
+                        ORDER BY sent_at DESC
+                        LIMIT 1
+                    `;
+                    con.query(checkSql, [voucherId], (logErr, rows) => {
+                        if (logErr) {
+                            console.warn('⚠️ [sendAutomaticFlightVoucherConfirmationEmail] Could not check existing email_logs (continuing):', logErr?.message || logErr);
+                            return resolve(null);
+                        }
+                        resolve(rows && rows.length > 0 ? rows[0] : null);
+                    });
+                });
+
+                if (existingEmailLog) {
+                    console.log('⏭️ [sendAutomaticFlightVoucherConfirmationEmail] Skipping email - already sent (email_logs exists):', {
+                        voucherId,
+                        emailLogId: existingEmailLog.id,
+                        sent_at: existingEmailLog.sent_at
+                    });
+                    return;
+                }
+            } catch (dupCheckErr) {
+                console.warn('⚠️ [sendAutomaticFlightVoucherConfirmationEmail] Duplicate check failed (continuing):', dupCheckErr?.message || dupCheckErr);
+            }
+
             // Fallback to purchaser email/name if primary email/name missing
             const originalEmail = voucher.email;
             if ((!voucher.email || !voucher.email.trim()) && (purchasingContactOverride.purchaser_email || voucher.purchaser_email)) {
