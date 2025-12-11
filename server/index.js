@@ -1139,7 +1139,7 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                     NULL AS pax,
                     v.created_at,
                     v.name,
-                    v.location,
+                    NULL AS location,
                     v.preferred_location,
                     'voucher_ref' AS code_source
                 FROM all_vouchers v
