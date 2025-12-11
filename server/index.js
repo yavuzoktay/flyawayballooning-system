@@ -16474,7 +16474,7 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                             } catch (emailErr) {
                                 console.error('Error sending Gift Voucher Confirmation (new voucher):', emailErr?.message || emailErr);
                             }
-                        }
+                    }
                         // Voucher code generation is now handled by frontend only
                         // Webhook only creates the voucher entry
                         console.log('Voucher code generation skipped - will be handled by frontend');
@@ -17268,17 +17268,49 @@ app.post('/api/createTestBooking', (req, res) => {
 const runDatabaseMigrations = () => {
     console.log('Running database migrations...');
 
-    // Add numberOfPassengers column to all_vouchers table
-    const addNumberOfPassengersColumn = `
-        ALTER TABLE all_vouchers 
-        ADD COLUMN numberOfPassengers INT DEFAULT 1 COMMENT 'Number of passengers for this voucher'
+    // Add numberOfPassengers column to all_vouchers table (idempotent)
+    const checkNumberOfPassengersSql = `
+        SELECT COUNT(*) AS cnt
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'all_vouchers'
+          AND column_name = 'numberOfPassengers'
     `;
 
-    con.query(addNumberOfPassengersColumn, (err, result) => {
+    con.query(checkNumberOfPassengersSql, (err, rows) => {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run-numberOfPassengers',hypothesisId:'H1',location:'server/index.js:runDatabaseMigrations:checkNumberOfPassengers',message:'Check numberOfPassengers column existence',data:{err:err?{code:err.code,message:err.message}:null,rows},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+
         if (err) {
-            console.error('Error adding numberOfPassengers column:', err);
+            console.error('Error checking numberOfPassengers column:', err);
+            return;
+        }
+
+        const exists = rows && rows[0] && Number(rows[0].cnt) > 0;
+
+        if (exists) {
+            console.log('✅ numberOfPassengers column already exists on all_vouchers (skipping ALTER)');
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run-numberOfPassengers',hypothesisId:'H1',location:'server/index.js:runDatabaseMigrations:skipAlter',message:'Column exists, skipping ALTER',data:{exists},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
         } else {
-            console.log('✅ numberOfPassengers column added successfully');
+            const addNumberOfPassengersColumn = `
+                ALTER TABLE all_vouchers 
+                ADD COLUMN numberOfPassengers INT DEFAULT 1 COMMENT 'Number of passengers for this voucher'
+            `;
+
+            con.query(addNumberOfPassengersColumn, (alterErr, result) => {
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run-numberOfPassengers',hypothesisId:'H1',location:'server/index.js:runDatabaseMigrations:alter',message:'Attempted to add numberOfPassengers column',data:{error:alterErr?{code:alterErr.code,message:alterErr.message}:null,affectedRows:result?.affectedRows},timestamp:Date.now()})}).catch(()=>{});
+                // #endregion
+
+                if (alterErr) {
+                    console.error('Error adding numberOfPassengers column:', alterErr);
+                } else {
+                    console.log('✅ numberOfPassengers column added successfully');
+                }
+            });
         }
     });
 
