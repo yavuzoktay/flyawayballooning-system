@@ -140,61 +140,6 @@ const normalizeEmailBodyStyles = (html = '') => {
         return kept.length ? `style="${kept.join('; ')}"` : '';
     });
 
-    // Normalize all img tags to match Upcoming Flight Reminder width constraints
-    normalized = normalized.replace(/<img([^>]*)>/gi, (match, attrs) => {
-        // Extract existing width and style attributes
-        const widthMatch = attrs.match(/width=["']?(\d+)["']?/i);
-        const styleMatch = attrs.match(/style=["']([^"']*)["']/i);
-        
-        // Build new style with Upcoming Flight Reminder constraints
-        let newStyle = 'width:100%; max-width:640px; height:auto; display:block; margin:0 auto; border:0; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; vertical-align:top; object-fit:cover; object-position:center;';
-        
-        // Preserve non-conflicting existing styles
-        if (styleMatch) {
-            const existingStyles = styleMatch[1];
-            const preserved = existingStyles.split(';')
-                .map(s => s.trim())
-                .filter(s => {
-                    const lower = s.toLowerCase();
-                    return s && 
-                           !lower.startsWith('width') && 
-                           !lower.startsWith('max-width') &&
-                           !lower.startsWith('height') &&
-                           !lower.startsWith('display') &&
-                           !lower.startsWith('margin') &&
-                           !lower.startsWith('border') &&
-                           !lower.startsWith('outline') &&
-                           !lower.startsWith('text-decoration') &&
-                           !lower.startsWith('-ms-interpolation') &&
-                           !lower.startsWith('vertical-align') &&
-                           !lower.startsWith('object-fit') &&
-                           !lower.startsWith('object-position');
-                });
-            if (preserved.length > 0) {
-                newStyle += ' ' + preserved.join('; ');
-            }
-        }
-        
-        // Remove old width and style attributes, add new ones
-        let newAttrs = attrs
-            .replace(/width=["']?\d+["']?/gi, '')
-            .replace(/style=["'][^"']*["']/gi, '')
-            .trim();
-        
-        // Add width attribute and normalized style
-        if (!newAttrs.match(/width=/i)) {
-            newAttrs = `width="640" ${newAttrs}`.trim();
-        }
-        if (!newAttrs.match(/style=/i)) {
-            newAttrs = `${newAttrs} style="${newStyle}"`.trim();
-        } else {
-            // Replace existing style
-            newAttrs = newAttrs.replace(/style=["'][^"']*["']/gi, `style="${newStyle}"`);
-        }
-        
-        return `<img ${newAttrs}>`;
-    });
-
     return normalized;
 };
 
@@ -4553,18 +4498,28 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     // Check both book_flight and voucher_type for Flight Voucher identification
                     const bookFlightCheck = storeData.voucherData.book_flight && (storeData.voucherData.book_flight.toLowerCase().includes('flight voucher') || storeData.voucherData.book_flight.toLowerCase().includes('buy flight voucher'));
                     const voucherTypeIsFlightVoucher = storeData.voucherData.voucher_type && storeData.voucherData.voucher_type.toLowerCase().includes('flight voucher');
-                    // Flight Voucher if: (voucher_type is Flight Voucher) OR (book_flight contains flight voucher)
-                    const isFlightVoucher = voucherTypeCheck && (voucherTypeIsFlightVoucher || bookFlightCheck);
+                    // Flight Voucher if: book_flight contains flight voucher (primary check) OR (voucher_type exists, is not gift, and is flight voucher)
+                    // This ensures "Buy Flight Voucher" works even if voucher_type is null/empty
+                    const isFlightVoucher = bookFlightCheck || (voucherTypeCheck && voucherTypeIsFlightVoucher);
                     
                     console.log('🔍 [WEBHOOK] Flight Voucher check results:', {
                         voucherTypeCheck: voucherTypeCheck,
                         bookFlightCheck: bookFlightCheck,
-                        isFlightVoucher: isFlightVoucher
+                        voucherTypeIsFlightVoucher: voucherTypeIsFlightVoucher,
+                        isFlightVoucher: isFlightVoucher,
+                        book_flight: storeData.voucherData.book_flight,
+                        voucher_type: storeData.voucherData.voucher_type
                     });
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:webhook:flightVoucherCheck',message:'Flight Voucher eligibility check',data:{voucherId,voucherTypeCheck,bookFlightCheck,voucherTypeIsFlightVoucher,isFlightVoucher,book_flight:storeData.voucherData.book_flight,voucher_type:storeData.voucherData.voucher_type},timestamp:Date.now(),sessionId:'debug-session',runId:'flightVoucherEmail',hypothesisId:'H-fv-1'})}).catch(()=>{});
+                    // #endregion
                     
                     if (isFlightVoucher) {
                         try {
                             console.log('📧 [WEBHOOK] Sending automatic Flight Voucher Confirmation email from webhook for voucher ID:', voucherId);
+                            // #region agent log
+                            fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:webhook:sendFlightVoucherEmail',message:'Attempting to send Flight Voucher Confirmation email',data:{voucherId,book_flight:storeData.voucherData.book_flight,voucher_type:storeData.voucherData.voucher_type},timestamp:Date.now(),sessionId:'debug-session',runId:'flightVoucherEmail',hypothesisId:'H-fv-2'})}).catch(()=>{});
+                            // #endregion
                             const contactOverride = {
                                 purchaser_email: storeData.voucherData.purchaser_email || storeData.voucherData.email,
                                 purchaser_name: storeData.voucherData.purchaser_name || storeData.voucherData.name,
@@ -4572,14 +4527,23 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                                 purchaser_mobile: storeData.voucherData.mobile || storeData.voucherData.phone
                             };
                             console.log('📧 [WEBHOOK] Contact override data:', JSON.stringify(contactOverride));
-                            sendAutomaticFlightVoucherConfirmationEmail(voucherId, contactOverride);
+                            await sendAutomaticFlightVoucherConfirmationEmail(voucherId, contactOverride);
+                            // #region agent log
+                            fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:webhook:sendFlightVoucherEmail',message:'Flight Voucher Confirmation email send completed',data:{voucherId},timestamp:Date.now(),sessionId:'debug-session',runId:'flightVoucherEmail',hypothesisId:'H-fv-3'})}).catch(()=>{});
+                            // #endregion
                         } catch (emailErr) {
                             console.error('❌ [WEBHOOK] Error sending Flight Voucher Confirmation email from webhook:', emailErr?.message || emailErr);
                             console.error('❌ [WEBHOOK] Error stack:', emailErr?.stack);
+                            // #region agent log
+                            fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:webhook:sendFlightVoucherEmail',message:'Error sending Flight Voucher Confirmation email',data:{voucherId,error:emailErr?.message||emailErr},timestamp:Date.now(),sessionId:'debug-session',runId:'flightVoucherEmail',hypothesisId:'H-fv-4'})}).catch(()=>{});
+                            // #endregion
                         }
                     } else {
                         if (!isFlightVoucher) {
                             console.log('⏭️ [WEBHOOK] Skipping Flight Voucher email - not identified as Flight Voucher');
+                            // #region agent log
+                            fetch('http://127.0.0.1:7242/ingest/36e4d8c5-d866-4ae6-93cc-77ffdac6684f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:webhook:skipFlightVoucherEmail',message:'Skipping Flight Voucher email - not identified',data:{voucherId,book_flight:storeData.voucherData.book_flight,voucher_type:storeData.voucherData.voucher_type,isFlightVoucher},timestamp:Date.now(),sessionId:'debug-session',runId:'flightVoucherEmail',hypothesisId:'H-fv-5'})}).catch(()=>{});
+                            // #endregion
                         }
                     }
 
