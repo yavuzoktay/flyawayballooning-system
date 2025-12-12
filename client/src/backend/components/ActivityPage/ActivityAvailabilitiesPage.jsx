@@ -242,44 +242,19 @@ const ActivityAvailabilitiesPage = () => {
                                     const hasProposalFlight = voucherTypes.some(vt => vt.toLowerCase().includes('proposal flight'));
                                     const hasPrivateCharter = voucherTypes.some(vt => vt.toLowerCase().includes('private charter'));
                                     
-                                    // If both Private Charter and Proposal Flight exist, show both
-                                    if (hasPrivateCharter && hasProposalFlight) {
-                                        return (
-                                            <div style={{ display: 'flex', flexWrap: 'nowrap', gap: '4px' }}>
-                                                <Chip 
-                                                    key="private-charter"
-                                                    label="Private Charter" 
-                                                    size="small" 
-                                                    color="primary" 
-                                                    variant="outlined"
-                                                />
-                                                <Chip 
-                                                    key="proposal"
-                                                    label="Proposal" 
-                                                    size="small" 
-                                                    color="primary" 
-                                                    variant="outlined"
-                                                />
-                                            </div>
-                                        );
-                                    }
+                                    // Parse flight_types
+                                    const flightTypes = row.flight_types && row.flight_types !== 'All' 
+                                        ? row.flight_types.split(',').map(t => t.trim()).filter(Boolean)
+                                        : [];
                                     
-                                    // If only Proposal Flight exists, show only "Proposal"
-                                    if (hasProposalFlight) {
-                                        return (
-                                            <Chip 
-                                                label="Proposal" 
-                                                size="small" 
-                                                color="primary" 
-                                                variant="outlined"
-                                            />
-                                        );
-                                    }
+                                    // Build chips array - show both voucher types AND flight types
+                                    const chips = [];
                                     
-                                    // If only Private Charter exists, show only "Private Charter"
+                                    // Add Private Charter chip if exists
                                     if (hasPrivateCharter) {
-                                        return (
+                                        chips.push(
                                             <Chip 
+                                                key="private-charter"
                                                 label="Private Charter" 
                                                 size="small" 
                                                 color="primary" 
@@ -288,19 +263,34 @@ const ActivityAvailabilitiesPage = () => {
                                         );
                                     }
                                     
-                                    // Otherwise, show flight_types as before
-                                    if (row.flight_types && row.flight_types !== 'All') {
-                                        return row.flight_types.split(',').map((type, index) => (
+                                    // Add Proposal chip if exists
+                                    if (hasProposalFlight) {
+                                        chips.push(
                                             <Chip 
-                                                key={index} 
+                                                key="proposal"
+                                                label="Proposal" 
+                                                size="small" 
+                                                color="primary" 
+                                                variant="outlined"
+                                            />
+                                        );
+                                    }
+                                    
+                                    // Add flight types chips (Shared, Private, etc.)
+                                    flightTypes.forEach((type, index) => {
+                                        chips.push(
+                                            <Chip 
+                                                key={`flight-type-${index}`}
                                                 label={type.trim()} 
                                                 size="small" 
                                                 color="primary" 
                                                 variant="outlined"
-                                                sx={{ mr: 0.5, mb: 0.5 }}
                                             />
-                                        ));
-                                    } else {
+                                        );
+                                    });
+                                    
+                                    // If no chips, show "All"
+                                    if (chips.length === 0) {
                                         return (
                                             <Chip 
                                                 label="All" 
@@ -310,6 +300,13 @@ const ActivityAvailabilitiesPage = () => {
                                             />
                                         );
                                     }
+                                    
+                                    // Return chips in a flex container
+                                    return (
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                            {chips}
+                                        </div>
+                                    );
                                 })()}
                             </TableCell>
                             <TableCell>
