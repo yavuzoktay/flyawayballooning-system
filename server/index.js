@@ -16380,6 +16380,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
             mode: 'payment',
             success_url: successUrl,
             cancel_url: `${baseUrl}/?payment=cancel`,
+            allow_promotion_codes: true,
             metadata: {
                 type: type || (voucherData ? 'voucher' : 'booking'),
                 session_id: 'PLACEHOLDER' // Will be updated below
