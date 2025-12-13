@@ -21811,7 +21811,11 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
 async function generateGiftVoucherPDF(voucher) {
     return new Promise((resolve, reject) => {
         try {
-            const doc = new PDFDocument({ margin: 50 });
+            // Landscape orientation for the new design
+            const doc = new PDFDocument({ 
+                size: [792, 612], // Landscape: 11x8.5 inches in points (72 DPI)
+                margin: 0
+            });
             const chunks = [];
             
             doc.on('data', chunk => chunks.push(chunk));
@@ -21821,35 +21825,149 @@ async function generateGiftVoucherPDF(voucher) {
             });
             doc.on('error', reject);
             
-            // Header
+            const pageWidth = 792;
+            const pageHeight = 612;
+            const leftSectionWidth = pageWidth * 0.35; // 35% of page width
+            const rightSectionWidth = pageWidth * 0.65; // 65% of page width
+            
+            // Background color (light beige/off-white)
+            doc.rect(0, 0, pageWidth, pageHeight)
+               .fillColor('#faf9f6')
+               .fill();
+            
+            // Orange gradient shape at bottom
+            // Create gradient effect using multiple rectangles with varying opacity
+            const gradientHeight = pageHeight * 0.2; // 20% of page height
+            const gradientStartY = pageHeight - gradientHeight;
+            
+            // Draw gradient shape (irregular polygon)
+            doc.save();
+            doc.path('M 0 ' + pageHeight + ' L 0 ' + gradientStartY + ' L ' + (leftSectionWidth * 0.8) + ' ' + (gradientStartY + gradientHeight * 0.3) + ' L ' + (leftSectionWidth * 1.2) + ' ' + (gradientStartY + gradientHeight * 0.5) + ' L ' + pageWidth + ' ' + (gradientStartY + gradientHeight * 0.7) + ' L ' + pageWidth + ' ' + pageHeight + ' Z')
+               .fillColor('#ff6b35')
+               .fill();
+            doc.restore();
+            
+            // Diagonal line separating left and right sections
+            const diagonalStartX = pageWidth * 0.35;
+            const diagonalStartY = 0;
+            const diagonalEndX = pageWidth * 0.15;
+            const diagonalEndY = pageHeight * 0.75;
+            
+            doc.moveTo(diagonalStartX, diagonalStartY)
+               .lineTo(diagonalEndX, diagonalEndY)
+               .strokeColor('#333333')
+               .lineWidth(1)
+               .stroke();
+            
+            // LEFT SECTION
+            const leftPadding = 40;
+            const leftContentX = leftPadding;
+            
+            // Hot air balloon logo (simple outline - using text/unicode as placeholder)
+            // In production, you might want to use an actual image file
+            const balloonY = 80;
+            doc.fontSize(60)
+               .fillColor('#333333')
+               .text('🎈', leftContentX, balloonY);
+            
+            // Company name
+            const companyNameY = balloonY + 80;
             doc.fontSize(24)
-               .fillColor('#1e40af')
-               .text('Gift Voucher', { align: 'center' });
-            
-            doc.moveDown(2);
-            
-            // Recipient Name
-            const recipientName = voucher.recipient_name || voucher.name || 'Recipient';
-            doc.fontSize(16)
-               .fillColor('#000000')
-               .text('Recipient Name:', { continued: true })
-               .fontSize(14)
-               .text(` ${recipientName}`, { align: 'left' });
-            
-            doc.moveDown(1.5);
-            
-            // Voucher Code
-            const voucherCode = voucher.voucher_ref || voucher.voucher_code || 'N/A';
-            doc.fontSize(16)
-               .fillColor('#000000')
-               .text('Voucher Code:', { continued: true })
-               .fontSize(14)
+               .fillColor('#1a1a1a')
                .font('Helvetica-Bold')
-               .text(` ${voucherCode}`, { align: 'left' });
+               .text('Fly Away', leftContentX, companyNameY)
+               .text('Ballooning', leftContentX, companyNameY + 35);
             
-            doc.moveDown(1.5);
+            // Website URL at bottom (on orange gradient)
+            const websiteY = pageHeight - 30;
+            doc.fontSize(12)
+               .fillColor('#1a1a1a')
+               .font('Helvetica-Bold')
+               .text('FLYAWAYBALLOONING.COM', leftContentX, websiteY);
             
-            // Expiry Date
+            // RIGHT SECTION
+            const rightStartX = leftSectionWidth + 20;
+            const rightPadding = 40;
+            const rightContentX = rightStartX + rightPadding;
+            
+            // Main title "GIFT VOUCHER"
+            const titleY = 60;
+            doc.fontSize(42)
+               .fillColor('#1a1a1a')
+               .font('Helvetica-Bold')
+               .text('GIFT VOUCHER', rightContentX, titleY);
+            
+            // Subtitle "YOUR TICKET TO THE SKIES"
+            const subtitleY = titleY + 55;
+            doc.fontSize(14)
+               .fillColor('#ff6b35')
+               .font('Helvetica-Bold')
+               .text('YOUR TICKET TO THE SKIES', rightContentX, subtitleY);
+            
+            // Information fields
+            const fieldStartY = subtitleY + 80;
+            const fieldSpacing = 70;
+            const fieldLabelWidth = 100;
+            const fieldBoxWidth = 300;
+            const fieldBoxHeight = 35;
+            const fieldBoxX = rightContentX + fieldLabelWidth + 20;
+            
+            // DEAR field
+            let currentY = fieldStartY;
+            doc.fontSize(12)
+               .fillColor('#1a1a1a')
+               .font('Helvetica-Bold')
+               .text('DEAR', rightContentX, currentY + 10);
+            
+            // Recipient name box
+            const recipientName = voucher.recipient_name || voucher.name || 'Recipient';
+            doc.rect(fieldBoxX, currentY, fieldBoxWidth, fieldBoxHeight)
+               .fillColor('#f5f5f5')
+               .fill()
+               .strokeColor('#cccccc')
+               .lineWidth(1)
+               .stroke();
+            
+            doc.fontSize(12)
+               .fillColor('#1a1a1a')
+               .font('Helvetica')
+               .text(recipientName, fieldBoxX + 10, currentY + 10, {
+                   width: fieldBoxWidth - 20,
+                   ellipsis: true
+               });
+            
+            // CODE field
+            currentY += fieldSpacing;
+            doc.fontSize(12)
+               .fillColor('#1a1a1a')
+               .font('Helvetica-Bold')
+               .text('CODE', rightContentX, currentY + 10);
+            
+            // Voucher code box
+            const voucherCode = voucher.voucher_ref || voucher.voucher_code || 'N/A';
+            doc.rect(fieldBoxX, currentY, fieldBoxWidth, fieldBoxHeight)
+               .fillColor('#f5f5f5')
+               .fill()
+               .strokeColor('#cccccc')
+               .lineWidth(1)
+               .stroke();
+            
+            doc.fontSize(14)
+               .fillColor('#1a1a1a')
+               .font('Helvetica-Bold')
+               .text(voucherCode, fieldBoxX + 10, currentY + 8, {
+                   width: fieldBoxWidth - 20,
+                   ellipsis: true
+               });
+            
+            // EXPIRY field
+            currentY += fieldSpacing;
+            doc.fontSize(12)
+               .fillColor('#1a1a1a')
+               .font('Helvetica-Bold')
+               .text('EXPIRY', rightContentX, currentY + 10);
+            
+            // Expiry date box
             let expiryDate = 'N/A';
             if (voucher.expires) {
                 expiryDate = moment(voucher.expires).format('MMMM D, YYYY');
@@ -21860,20 +21978,34 @@ async function generateGiftVoucherPDF(voucher) {
                 expiryDate = moment(voucher.created_at).add(monthsToAdd, 'months').format('MMMM D, YYYY');
             }
             
-            doc.fontSize(16)
-               .fillColor('#000000')
+            doc.rect(fieldBoxX, currentY, fieldBoxWidth, fieldBoxHeight)
+               .fillColor('#f5f5f5')
+               .fill()
+               .strokeColor('#cccccc')
+               .lineWidth(1)
+               .stroke();
+            
+            doc.fontSize(12)
+               .fillColor('#1a1a1a')
                .font('Helvetica')
-               .text('Expiry Date:', { continued: true })
-               .fontSize(14)
-               .text(` ${expiryDate}`, { align: 'left' });
+               .text(expiryDate, fieldBoxX + 10, currentY + 10, {
+                   width: fieldBoxWidth - 20,
+                   ellipsis: true
+               });
             
-            doc.moveDown(2);
+            // Terms and conditions at bottom right
+            const termsY = pageHeight - 120;
+            const termsWidth = rightSectionWidth - rightPadding * 2;
+            const termsText = "Your gift voucher is valid until the expiry date shown. Within this validity period, you must have either flown or booked onto a minimum of six flights that were cancelled in order to qualify for a free extension. Any booked flight must be within the voucher's validity period.";
             
-            // Footer
-            doc.fontSize(10)
-               .fillColor('#666666')
-               .text('Fly Away Ballooning', { align: 'center' })
-               .text('www.flyawayballooning.com', { align: 'center' });
+            doc.fontSize(9)
+               .fillColor('#1a1a1a')
+               .font('Helvetica')
+               .text(termsText, rightContentX, termsY, {
+                   width: termsWidth,
+                   align: 'left',
+                   lineGap: 3
+               });
             
             doc.end();
         } catch (error) {
