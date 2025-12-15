@@ -5293,36 +5293,86 @@ setBookingDetail(finalVoucherDetail);
                                                                                 style={{ marginRight: 4, width: 70 }}
                                                                             />
                                                                             )}
-                                                                            <Button size="small" onClick={async () => {
-                                                                                // Save passenger price
-                                                                                const newPrice = parseFloat(editPassengerPrice) || 0;
-                                                                                await axios.patch('/api/updatePassengerField', {
-                                                                                    passenger_id: p.id,
-                                                                                    field: 'price',
-                                                                                    value: newPrice
-                                                                                });
-                                                                                // Update local state
-                                                                                const updatedPrices = bookingDetail.passengers.map((pp, idx) =>
-                                                                                    pp.id === p.id ? newPrice : (pp.price ? parseFloat(pp.price) : 0)
-                                                                                );
-                                                                                // Update paid in backend
-                                                                                const newPaid = updatedPrices.reduce((sum, v) => sum + v, 0);
-                                                                                await axios.patch('/api/updateBookingField', {
-                                                                                    booking_id: bookingDetail.booking.id,
-                                                                                    field: 'paid',
-                                                                                    value: newPaid
-                                                                                });
-                                                                                setBookingDetail(prev => ({
-                                                                                    ...prev,
-                                                                                    booking: { ...prev.booking, paid: newPaid },
-                                                                                    passengers: prev.passengers.map(pp =>
-                                                                                        pp.id === p.id ? { ...pp, price: newPrice } : pp
-                                                                                    )
-                                                                                }));
-                                                                                setEditPassengerPrices(updatedPrices);
-                                                                                setEditingPassenger(null);
-                                                                                setEditPassengerPrice("");
-                                                                            }} disabled={savingPassengerEdit}>Save</Button>
+                                                                            <Button
+                                                                                size="small"
+                                                                                onClick={async () => {
+                                                                                    try {
+                                                                                        setSavingPassengerEdit(true);
+
+                                                                                        // 1) Update name & weight fields if changed
+                                                                                        const fieldUpdates = [];
+                                                                                        if (editPassengerFirstName !== (p.first_name || '')) {
+                                                                                            fieldUpdates.push({ field: 'first_name', value: editPassengerFirstName });
+                                                                                        }
+                                                                                        if (editPassengerLastName !== (p.last_name || '')) {
+                                                                                            fieldUpdates.push({ field: 'last_name', value: editPassengerLastName });
+                                                                                        }
+                                                                                        if (editPassengerWeight !== (p.weight || '')) {
+                                                                                            fieldUpdates.push({ field: 'weight', value: editPassengerWeight });
+                                                                                        }
+
+                                                                                        if (fieldUpdates.length > 0) {
+                                                                                            await Promise.all(
+                                                                                                fieldUpdates.map(update =>
+                                                                                                    axios.patch('/api/updatePassengerField', {
+                                                                                                        passenger_id: p.id,
+                                                                                                        field: update.field,
+                                                                                                        value: update.value
+                                                                                                    })
+                                                                                                )
+                                                                                            );
+                                                                                        }
+
+                                                                                        // 2) Save passenger price (existing behaviour)
+                                                                                        const newPrice = parseFloat(editPassengerPrice) || 0;
+                                                                                        await axios.patch('/api/updatePassengerField', {
+                                                                                            passenger_id: p.id,
+                                                                                            field: 'price',
+                                                                                            value: newPrice
+                                                                                        });
+
+                                                                                        // 3) Update local state (booking.paid and passenger fields)
+                                                                                        const updatedPrices = bookingDetail.passengers.map((pp) =>
+                                                                                            pp.id === p.id ? newPrice : (pp.price ? parseFloat(pp.price) : 0)
+                                                                                        );
+                                                                                        const newPaid = updatedPrices.reduce((sum, v) => sum + v, 0);
+
+                                                                                        await axios.patch('/api/updateBookingField', {
+                                                                                            booking_id: bookingDetail.booking.id,
+                                                                                            field: 'paid',
+                                                                                            value: newPaid
+                                                                                        });
+
+                                                                                        setBookingDetail(prev => ({
+                                                                                            ...prev,
+                                                                                            booking: { ...prev.booking, paid: newPaid },
+                                                                                            passengers: prev.passengers.map(pp =>
+                                                                                                pp.id === p.id
+                                                                                                    ? {
+                                                                                                        ...pp,
+                                                                                                        first_name: editPassengerFirstName,
+                                                                                                        last_name: editPassengerLastName,
+                                                                                                        weight: editPassengerWeight,
+                                                                                                        price: newPrice
+                                                                                                    }
+                                                                                                    : pp
+                                                                                            )
+                                                                                        }));
+
+                                                                                        setEditPassengerPrices(updatedPrices);
+                                                                                        setEditingPassenger(null);
+                                                                                        setEditPassengerPrice("");
+                                                                                    } catch (error) {
+                                                                                        console.error('Failed to save passenger details:', error);
+                                                                                        alert('Failed to update passenger details');
+                                                                                    } finally {
+                                                                                        setSavingPassengerEdit(false);
+                                                                                    }
+                                                                                }}
+                                                                                disabled={savingPassengerEdit}
+                                                                            >
+                                                                                Save
+                                                                            </Button>
                                                                             <Button size="small" onClick={handleCancelPassengerEdit} disabled={savingPassengerEdit}>Cancel</Button>
                                                                         </>
                                                                     ) : (
