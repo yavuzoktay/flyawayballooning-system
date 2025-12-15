@@ -22584,9 +22584,17 @@ app.get('/api/voucherEmails/:contextId', (req, res) => {
     });
 });
 
+// SendGrid Event Webhook - Test endpoint to verify accessibility
+app.get('/api/sendgrid/webhook', (req, res) => {
+    console.log('📧 [SendGrid Webhook] GET test request received');
+    res.json({ success: true, message: 'SendGrid webhook endpoint is accessible', timestamp: new Date().toISOString() });
+});
+
 // SendGrid Event Webhook to track deliveries/opens/clicks
 // Configure this URL in SendGrid: POST https://YOUR_DOMAIN/api/sendgrid/webhook
 app.post('/api/sendgrid/webhook', (req, res) => {
+    console.log('📧 [SendGrid Webhook] Received event webhook');
+    console.log('📧 [SendGrid Webhook] Body:', JSON.stringify(req.body).substring(0, 500));
     try {
         let events = Array.isArray(req.body) ? req.body : [];
 
@@ -22613,11 +22621,14 @@ app.post('/api/sendgrid/webhook', (req, res) => {
         }
 
         // Process each event; update by message_id primarily
+        console.log(`📧 [SendGrid Webhook] Processing ${events.length} events`);
         events.forEach((evt) => {
             const messageId = evt['sg_message_id'] || evt['sg_message_id_v2'] || evt['smtp-id'] || (evt['headers'] && /X-Message-Id:\s*(.*)/i.test(evt['headers']) ? RegExp.$1.trim() : null);
             const email = evt.email || evt.recipient || null;
             const eventType = evt.event || evt.event_type || null; // delivered, open, click, bounce, dropped, spamreport, deferred
             const eventTime = evt.timestamp ? new Date(evt.timestamp * 1000) : new Date();
+
+            console.log(`📧 [SendGrid Webhook] Event: ${eventType}, Email: ${email}, MessageId: ${messageId?.substring(0, 30)}...`);
 
             if (!messageId && !email) return;
 
@@ -22636,9 +22647,11 @@ app.post('/api/sendgrid/webhook', (req, res) => {
             }
 
             if (updateSql) {
-                con.query(updateSql, params, (err) => {
+                con.query(updateSql, params, (err, result) => {
                     if (err) {
-                        console.error('Error updating email_logs from webhook:', err, evt);
+                        console.error('❌ [SendGrid Webhook] Error updating email_logs:', err, evt);
+                    } else {
+                        console.log(`✅ [SendGrid Webhook] Updated email_logs: ${eventType}, Affected rows: ${result?.affectedRows}`);
                     }
                 });
             }
