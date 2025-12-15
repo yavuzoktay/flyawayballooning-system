@@ -4406,27 +4406,12 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                         storeData.bookingData = storeData.bookingData || {};
                         storeData.bookingData.userSessionData = storeData.userSessionData;
                     }
-                    // Direct database insertion instead of HTTP call
-                    const bookingId = await createBookingFromWebhook(storeData.bookingData);
-                    console.log('Webhook booking creation completed, ID:', bookingId);
+                    // Direct database insertion instead of HTTP call - pass session_id for payment tracking
+                    const bookingId = await createBookingFromWebhook(storeData.bookingData, session_id);
+                    console.log('Webhook booking creation completed, ID:', bookingId, 'Session ID:', session_id);
 
                     // Save payment information
                     await savePaymentHistory(session, bookingId, null);
-
-                    // Update booking with stripe_session_id
-                    if (bookingId) {
-                        con.query(
-                            'UPDATE all_booking SET stripe_session_id = ? WHERE id = ?',
-                            [session_id, bookingId],
-                            (err) => {
-                                if (err) {
-                                    console.error('Error updating booking with stripe_session_id:', err);
-                                } else {
-                                    console.log('✅ Booking updated with stripe_session_id');
-                                }
-                            }
-                        );
-                    }
 
                     // Save user session data if provided
                     if (storeData.userSessionData && storeData.userSessionData.session_id && bookingId) {
@@ -15510,7 +15495,7 @@ app.delete('/api/date-requests/:id', (req, res) => {
 const stripeSessionStore = {};
 
 // Webhook için booking oluşturma fonksiyonu
-async function createBookingFromWebhook(bookingData) {
+async function createBookingFromWebhook(bookingData, stripe_session_id = null) {
     return new Promise((resolve, reject) => {
         function emptyToNull(val) {
             if (val === '' || val === undefined || val === null) {
@@ -15646,8 +15631,8 @@ async function createBookingFromWebhook(bookingData) {
                     ballooning_reason, prefer, weight, email, phone, choose_add_on,
                     preferred_location, preferred_time, preferred_day, flight_attempts,
                     activity_id, time_slot, experience, voucher_type, voucher_discount, original_amount,
-                    add_to_booking_items_total_price, weather_refund_total_price, flight_type_source
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    add_to_booking_items_total_price, weather_refund_total_price, flight_type_source, stripe_session_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
 
             console.log('=== WEBHOOK PAX COUNT DEBUG ===');
@@ -15689,7 +15674,8 @@ async function createBookingFromWebhook(bookingData) {
                 base_original_amount, // original_amount (base price excluding add-ons and weather refund)
                 add_on_total_price, // add_to_booking_items_total_price
                 weather_refund_total_price, // weather_refund_total_price
-                flight_type_source // flight_type_source ('Redeem Voucher' if activitySelect is 'Redeem Voucher', otherwise flight_type/experience)
+                flight_type_source, // flight_type_source ('Redeem Voucher' if activitySelect is 'Redeem Voucher', otherwise flight_type/experience)
+                stripe_session_id // stripe_session_id for payment tracking
             ];
 
             con.query(bookingSql, bookingValues, (err, result) => {
@@ -16802,26 +16788,14 @@ app.post('/api/createBookingFromSession', async (req, res) => {
             // Acquire a simple in-memory lock
             storeData.processing = true;
             try {
-                result = await createBookingFromWebhook(storeData.bookingData);
-                console.log('Booking created successfully, ID:', result);
+                // Pass session_id to createBookingFromWebhook so it's included in the INSERT
+                result = await createBookingFromWebhook(storeData.bookingData, session_id);
+                console.log('Booking created successfully, ID:', result, 'Session ID:', session_id);
 
                 // Save payment history from Stripe session
                 try {
                     const session = await stripe.checkout.sessions.retrieve(session_id);
                     await savePaymentHistory(session, result, null);
-
-                    // Update booking with stripe_session_id
-                    con.query(
-                        'UPDATE all_booking SET stripe_session_id = ? WHERE id = ?',
-                        [session_id, result],
-                        (err) => {
-                            if (err) {
-                                console.error('Error updating booking with stripe_session_id:', err);
-                            } else {
-                                console.log('✅ Booking updated with stripe_session_id');
-                            }
-                        }
-                    );
                 } catch (paymentHistoryError) {
                     console.error('Error saving payment history in createBookingFromSession:', paymentHistoryError);
                     // Continue even if payment history fails - booking is still valid
