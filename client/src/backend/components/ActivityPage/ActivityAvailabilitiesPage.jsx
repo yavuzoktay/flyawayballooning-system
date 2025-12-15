@@ -253,13 +253,13 @@ const ActivityAvailabilitiesPage = () => {
                                     // Add Private Charter chip if exists
                                     if (hasPrivateCharter) {
                                         chips.push(
-                                            <Chip 
-                                                key="private-charter"
-                                                label="Private Charter" 
-                                                size="small" 
-                                                color="primary" 
-                                                variant="outlined"
-                                            />
+                                                <Chip 
+                                                    key="private-charter"
+                                                    label="Private Charter" 
+                                                    size="small" 
+                                                    color="primary" 
+                                                    variant="outlined"
+                                                />
                                         );
                                     }
                                     

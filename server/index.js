@@ -1890,18 +1890,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
             console.log('SQL:', bookingSql);
             console.log('Values:', bookingValues);
 
-            con.query(bookingSql, bookingValues, (err, result) => {
-                if (err) {
-                    console.error('=== REDEEM BOOKING ERROR ===');
-                    console.error('Error:', err);
-                    return res.status(500).json({
-                        success: false,
-                        error: 'Database query failed to create booking',
-                        details: err.message
-                    });
-                }
-
-                const bookingId = result.insertId;
+            function handleRedeemBookingSuccess(bookingId) {
                 console.log('=== REDEEM BOOKING SUCCESS ===');
 
                 // Save user session data if provided
@@ -2079,12 +2068,59 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     });
                 }
 
-        res.json({
-            success: true,
-            message: 'Booking created successfully',
-            bookingId: bookingId
-        });
-    });
+                res.json({
+                    success: true,
+                    message: 'Booking created successfully',
+                    bookingId: bookingId
+                });
+            }
+
+            con.query(bookingSql, bookingValues, (err, result) => {
+                if (err) {
+                    console.error('=== REDEEM BOOKING ERROR ===');
+                    console.error('Error:', err);
+
+                    // If the error is caused by a missing referenced voucher_code in voucher_codes table,
+                    // retry the insert with voucher_code set to NULL so that the booking can still be created.
+                    const isForeignKeyVoucherError =
+                        err.code === 'ER_NO_REFERENCED_ROW_2' ||
+                        (typeof err.message === 'string' &&
+                            err.message.includes('a foreign key constraint fails') &&
+                            err.message.includes('voucher_code'));
+
+                    if (cleanVoucherCode && isForeignKeyVoucherError) {
+                        console.warn('⚠️ Redeem booking failed due to missing voucher_codes row for voucher_code. Retrying insert with NULL voucher_code.');
+
+                        const fallbackValues = [...bookingValues];
+                        // voucher_code is at index 8 in bookingValues
+                        fallbackValues[8] = null;
+
+                        return con.query(bookingSql, fallbackValues, (fallbackErr, fallbackResult) => {
+                            if (fallbackErr) {
+                                console.error('❌ Redeem booking fallback insert also failed:', fallbackErr);
+                                return res.status(500).json({
+                                    success: false,
+                                    error: 'Database query failed to create booking',
+                                    details: fallbackErr.message
+                                });
+                            }
+
+                            const bookingId = fallbackResult.insertId;
+                            console.log('=== REDEEM BOOKING SUCCESS (fallback, voucher_code set to NULL) ===');
+                            return handleRedeemBookingSuccess(bookingId);
+                        });
+                    }
+
+                    return res.status(500).json({
+                        success: false,
+                        error: 'Database query failed to create booking',
+                        details: err.message
+                    });
+                }
+
+                const bookingId = result.insertId;
+                return handleRedeemBookingSuccess(bookingId);
+            });
         } // end of createBookingWithPrice
     } // end of createRedeemBookingLogic
 });
@@ -8151,10 +8187,7 @@ app.post('/api/createBooking', (req, res) => {
             bookingStatus, // Use status from request body or default to 'Confirmed'
             paid || totalPrice, // Use paid amount from Gift Voucher Details if provided, otherwise use totalPrice
             0,
-            // For Redeem Voucher bookings, do NOT persist voucher_code into all_booking
-            // because it may not exist in voucher_codes table (legacy/manual vouchers),
-            // which would violate the foreign key constraint all_booking.voucher_code -> voucher_codes.code.
-            activitySelect === 'Redeem Voucher' ? null : (voucher_code || null),
+            voucher_code || null,
             nowDate,
             expiresDateFinal,
             0, // manual_status_override
@@ -11407,10 +11440,17 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
 
         console.log('🔑 Customer Portal - Parsed values:', { bookingId, voucherRef, email, createdAt });
 
-        // Try to find booking by ID first
+        // If the first part comes from a synthetic "voucher-<id>" identifier (used for Buy Flight Voucher),
+        // do NOT treat it as a booking ID – the real booking is looked up via voucherRef/email.
+        const isSyntheticVoucherId = bookingId && bookingId.startsWith('voucher-');
+
+        // Try to find booking by ID first (only when it's not a synthetic voucher id)
         let booking = null;
-        if (bookingId) {
+        if (bookingId && !isSyntheticVoucherId) {
             // Try multiple ID formats: string, integer, and CAST to handle any type mismatch
+            const parsedInt = parseInt(bookingId, 10);
+            const numericBookingId = Number.isNaN(parsedInt) ? null : parsedInt;
+
             const [bookingRowsById] = await new Promise((resolve, reject) => {
                 con.query(`
                     SELECT * FROM all_booking 
@@ -11419,7 +11459,7 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                        OR CAST(id AS CHAR) = ?
                        OR CAST(id AS UNSIGNED) = ?
                     LIMIT 1
-                `, [bookingId, parseInt(bookingId), String(bookingId), parseInt(bookingId)], (err, rows) => {
+                `, [bookingId, numericBookingId, String(bookingId), numericBookingId], (err, rows) => {
                     if (err) {
                         console.error('Error searching by ID:', err);
                         reject(err);
