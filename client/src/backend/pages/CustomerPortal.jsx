@@ -575,16 +575,39 @@ const CustomerPortal = () => {
                         // by treating hoursUntilFlight as "far in future" when no upcoming flight is set.
                         const hoursUntilFlight = flightDate ? flightDate.diff(now, 'hour') : 999999;
 
-                        // Check if expiry date has passed
+                        // Check if expiry date has passed (compare by day to avoid time-of-day edge cases)
                         const expiryDate = bookingData.expires ? dayjs(bookingData.expires) : null;
                         const isExpired = expiryDate ? expiryDate.isBefore(now, 'day') : false;
 
-                        // Reschedule disabled if expired or within 120 hours; cancelled overrides the window check
-                        const canReschedule = !isExpired && (isCancelled || hoursUntilFlight > 120);
+                        // If voucher / booking has expired, ALL actions in the portal must be disabled
+                        // regardless of flight date / 120-hour rules.
+                        let canReschedule;
+                        let canChangeLocation;
+                        let canCancel;
+                        let canResendConfirmation;
+                        let canExtendVoucher;
 
-                        // Change Location disabled only if less than 120 hours; cancelled overrides the window check
-                        const canChangeLocation = isCancelled || hoursUntilFlight > 120;
-                        const canCancel = !isCancelled && hoursUntilFlight > 120;
+                        if (isExpired) {
+                            canReschedule = false;
+                            canChangeLocation = false;
+                            canCancel = false;
+                            canResendConfirmation = false;
+                            canExtendVoucher = false;
+                        } else {
+                            // Normal (non-expired) behaviour:
+                            // Reschedule disabled within 120 hours; cancelled overrides the window check
+                            canReschedule = isCancelled || hoursUntilFlight > 120;
+
+                            // Change Location disabled only if less than 120 hours; cancelled overrides the window check
+                            canChangeLocation = isCancelled || hoursUntilFlight > 120;
+
+                            // Cancel disabled if already cancelled or less than 120 hours
+                            canCancel = !isCancelled && hoursUntilFlight > 120;
+
+                            // Resend / Extend actions available while not in a loading state
+                            canResendConfirmation = !resendingConfirmation;
+                            canExtendVoucher = !extendingVoucher;
+                        }
 
                         return (
                             <Box sx={{ mt: 3, pt: 3, borderTop: '1px solid #d1d5db' }}>
@@ -638,7 +661,11 @@ const CustomerPortal = () => {
 
                                 {/* Change Flight Location Button - Disabled if cancelled or less than 120 hours */}
                                 <Tooltip 
-                                    title={!canChangeLocation ? "Less than 120 hours remaining until your flight" : ""}
+                                    title={
+                                        isExpired
+                                            ? "Voucher / Booking has expired"
+                                            : (!canChangeLocation ? "Less than 120 hours remaining until your flight" : "")
+                                    }
                                     arrow
                                 >
                                     <span style={{ display: 'block', width: '100%' }}>
@@ -684,7 +711,13 @@ const CustomerPortal = () => {
 
                                 {/* Cancel Flight Button - Always visible, but disabled if cancelled or less than 120 hours */}
                                 <Tooltip
-                                    title={isCancelled ? "Flight is cancelled" : (!canCancel ? "Less than 120 hours remaining until your flight" : "")}
+                                    title={
+                                        isExpired
+                                            ? "Voucher / Booking has expired"
+                                            : (isCancelled
+                                                ? "Flight is cancelled"
+                                                : (!canCancel ? "Less than 120 hours remaining until your flight" : ""))
+                                    }
                                     arrow
                                 >
                                     <span style={{ display: 'block', width: '100%' }}>
@@ -728,56 +761,78 @@ const CustomerPortal = () => {
                                 </Tooltip>
 
                                 {/* Resend Confirmation Button */}
-                                <Button
-                                    variant="text"
-                                    color="primary"
-                                    fullWidth
-                                    onClick={handleResendConfirmation}
-                                    disabled={resendingConfirmation}
-                                    sx={{
-                                        mt: 1.5,
-                                        py: 1.25,
-                                        fontSize: '1rem',
-                                        fontWeight: 600,
-                                        textTransform: 'none',
-                                        borderRadius: 2,
-                                        color: '#1d4ed8',
-                                        '&:hover': {
-                                            backgroundColor: '#eff6ff'
-                                        }
-                                    }}
+                                <Tooltip
+                                    title={isExpired ? "Voucher / Booking has expired" : ""}
+                                    arrow
                                 >
-                                    {resendingConfirmation ? <CircularProgress size={20} /> : 'Resend Confirmation'}
-                                </Button>
+                                    <span style={{ display: 'block', width: '100%' }}>
+                                        <Button
+                                            variant="text"
+                                            color="primary"
+                                            fullWidth
+                                            onClick={handleResendConfirmation}
+                                            disabled={!canResendConfirmation}
+                                            sx={{
+                                                mt: 1.5,
+                                                py: 1.25,
+                                                fontSize: '1rem',
+                                                fontWeight: 600,
+                                                textTransform: 'none',
+                                                borderRadius: 2,
+                                                color: canResendConfirmation ? '#1d4ed8' : '#9ca3af',
+                                                '&:hover': canResendConfirmation ? {
+                                                    backgroundColor: '#eff6ff'
+                                                } : {
+                                                    backgroundColor: 'transparent'
+                                                },
+                                                '&.Mui-disabled': {
+                                                    color: '#9ca3af'
+                                                }
+                                            }}
+                                        >
+                                            {resendingConfirmation ? <CircularProgress size={20} /> : 'Resend Confirmation'}
+                                        </Button>
+                                    </span>
+                                </Tooltip>
 
                                 {/* Extend Voucher Button */}
-                                <Button
-                                    variant="outlined"
-                                    color="primary"
-                                    fullWidth
-                                    onClick={handleExtendVoucher}
-                                    disabled={extendingVoucher}
-                                    sx={{
-                                        mt: 1.5,
-                                        py: 1.25,
-                                        fontSize: '1rem',
-                                        fontWeight: 600,
-                                        textTransform: 'none',
-                                        borderRadius: 2,
-                                        borderColor: '#1d4ed8',
-                                        color: '#1d4ed8',
-                                        '&:hover': {
-                                            backgroundColor: '#eff6ff',
-                                            borderColor: '#1d4ed8'
-                                        },
-                                        '&.Mui-disabled': {
-                                            borderColor: '#d1d5db',
-                                            color: '#9ca3af'
-                                        }
-                                    }}
+                                <Tooltip
+                                    title={isExpired ? "Voucher / Booking has expired" : ""}
+                                    arrow
                                 >
-                                    {extendingVoucher ? <CircularProgress size={20} /> : 'Extend Voucher 12 Months – £50 per passenger'}
-                                </Button>
+                                    <span style={{ display: 'block', width: '100%' }}>
+                                        <Button
+                                            variant="outlined"
+                                            color="primary"
+                                            fullWidth
+                                            onClick={handleExtendVoucher}
+                                            disabled={!canExtendVoucher}
+                                            sx={{
+                                                mt: 1.5,
+                                                py: 1.25,
+                                                fontSize: '1rem',
+                                                fontWeight: 600,
+                                                textTransform: 'none',
+                                                borderRadius: 2,
+                                                borderColor: canExtendVoucher ? '#1d4ed8' : '#d1d5db',
+                                                color: canExtendVoucher ? '#1d4ed8' : '#9ca3af',
+                                                '&:hover': canExtendVoucher ? {
+                                                    backgroundColor: '#eff6ff',
+                                                    borderColor: '#1d4ed8'
+                                                } : {
+                                                    backgroundColor: '#f3f4f6',
+                                                    borderColor: '#d1d5db'
+                                                },
+                                                '&.Mui-disabled': {
+                                                    borderColor: '#d1d5db',
+                                                    color: '#9ca3af'
+                                                }
+                                            }}
+                                        >
+                                            {extendingVoucher ? <CircularProgress size={20} /> : 'Extend Voucher 12 Months – £50 per passenger'}
+                                        </Button>
+                                    </span>
+                                </Tooltip>
                             </Box>
                         );
                     })()}
