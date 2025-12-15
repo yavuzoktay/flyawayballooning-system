@@ -7916,6 +7916,27 @@ app.post('/api/createBooking', (req, res) => {
             return null;
         }
 
+        if (email_template_override === 'Booking Rescheduled') {
+            const baseType = email_template_type_override || 'booking_rescheduled_automatic';
+            return {
+                templateName: 'Booking Rescheduled',
+                templateType: baseType,
+                ownerTemplateType: `${baseType}_owner`,
+                subjectFallback: '🎈 Your flight is rescheduled',
+                ownerSubjectPrefix: '📧 Booking Rescheduled - ',
+                ownerBannerTitle: 'Booking Rescheduled',
+                ownerTextIntro: 'This reschedule confirmation was automatically sent to:',
+                ownerMessageLead: 'Booking reschedule confirmation sent to customer.',
+                textBodyFallback: (bookingRecord) => {
+                    const formattedDate = bookingRecord.flight_date
+                        ? moment(bookingRecord.flight_date).format('MMMM D, YYYY [at] h:mm A')
+                        : 'TBD';
+                    const locationLabel = bookingRecord.location || 'our launch site';
+                    return `Your flight has been rescheduled for ${formattedDate} at ${locationLabel}. We'll be in touch closer to the day with weather updates and check-in details.`;
+                }
+            };
+        }
+
         if (email_template_override === 'Passenger Rescheduling Information') {
             const baseType = email_template_type_override || 'passenger_reschedule_information_automatic';
             return {
@@ -11912,6 +11933,28 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
         };
 
         console.log('✅ Customer Portal Reschedule - Successfully rescheduled booking:', bookingId);
+
+        // Send "Booking Rescheduled" email to customer and owner
+        try {
+            const formattedDate = updatedBooking.flight_date
+                ? moment(updatedBooking.flight_date).format('MMMM D, YYYY [at] h:mm A')
+                : 'TBD';
+            const locationLabel = updatedBooking.location || 'our launch site';
+            await sendEmailToCustomerAndOwner(updatedBooking, bookingId, {
+                templateName: 'Booking Rescheduled',
+                templateType: 'booking_rescheduled_automatic',
+                ownerTemplateType: 'booking_rescheduled_automatic_owner',
+                subjectFallback: '🎈 Your flight is rescheduled',
+                ownerSubjectPrefix: '📧 Booking Rescheduled - ',
+                ownerBannerTitle: 'Booking Rescheduled',
+                ownerTextIntro: 'This reschedule confirmation was automatically sent to:',
+                ownerMessageLead: 'Booking reschedule confirmation sent to customer.',
+                textBodyFallback: `Your flight has been rescheduled for ${formattedDate} at ${locationLabel}. We'll be in touch closer to the day with weather updates and check-in details.`
+            });
+        } catch (emailErr) {
+            console.error('❌ Customer Portal Reschedule - Failed to send Booking Rescheduled email:', emailErr);
+        }
+
         res.json(response);
     } catch (error) {
         console.error('❌ Customer Portal Reschedule - Error:', error);
@@ -21364,8 +21407,20 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
             ownerBannerTitle = 'New Booking Confirmation',
             ownerTextIntro = 'This booking confirmation was automatically sent to:',
             ownerMessageLead = 'New booking confirmation sent to customer.',
-            textBodyFallback = null
+            textBodyFallback = null,
+            skipOwnerCopy = false
         } = options || {};
+
+        // Templates that should send a copy to admin (owner)
+        // All other templates will only send to customer
+        const templatesWithOwnerCopy = [
+            'Booking Confirmation',
+            'Flight Voucher Confirmation',
+            'Gift Voucher Confirmation',
+            'Gift Card Confirmation'
+        ];
+        const shouldSendToOwner = !skipOwnerCopy && templatesWithOwnerCopy.includes(templateName);
+        console.log(`📧 [sendEmailToCustomerAndOwner] Template: ${templateName}, shouldSendToOwner: ${shouldSendToOwner}`);
 
         // Check if email is provided
         if (!booking.email || !booking.email.trim()) {
@@ -21477,12 +21532,20 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
                     });
                     console.log(`✅ [sendEmailToCustomerAndOwner] Automatic booking confirmation email sent to customer via ${customerProvider}`);
 
-                    // Send email to business owner
-                    console.log('📧 [sendEmailToCustomerAndOwner] Sending automatic booking confirmation email to business owner: info@flyawayballooning.com');
-                    const { provider: ownerProvider, messageId: ownerMessageId } = await sendEmailWithFallback(ownerEmailContent, {
-                        context: 'auto_booking_confirmation_owner'
-                    });
-                    console.log(`✅ [sendEmailToCustomerAndOwner] Automatic booking confirmation email sent to business owner via ${ownerProvider}`);
+                    // Send email to business owner (only for specific templates)
+                    let ownerProvider = null;
+                    let ownerMessageId = null;
+                    if (shouldSendToOwner) {
+                        console.log('📧 [sendEmailToCustomerAndOwner] Sending automatic booking confirmation email to business owner: info@flyawayballooning.com');
+                        const ownerResult = await sendEmailWithFallback(ownerEmailContent, {
+                            context: 'auto_booking_confirmation_owner'
+                        });
+                        ownerProvider = ownerResult.provider;
+                        ownerMessageId = ownerResult.messageId;
+                        console.log(`✅ [sendEmailToCustomerAndOwner] Automatic booking confirmation email sent to business owner via ${ownerProvider}`);
+                    } else {
+                        console.log(`📧 [sendEmailToCustomerAndOwner] Skipping owner copy for template: ${templateName}`);
+                    }
 
                     // Log email activity for customer
                     const logSql = `
@@ -21523,22 +21586,24 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
                         }
                     });
 
-                    // Log email activity for business owner
-                    con.query(logSql, [
-                        bookingId,
-                        'info@flyawayballooning.com',
-                        ownerEmailContent.subject,
-                        ownerTemplateType,
-                        ownerEmailContent.html,
-                        ownerEmailContent.text,
-                        ownerMessageId,
-                        contextType,
-                        contextId
-                    ], (logErr) => {
-                        if (logErr) {
-                            console.error('Error logging automatic owner email:', logErr);
-                        }
-                    });
+                    // Log email activity for business owner (only if sent)
+                    if (shouldSendToOwner && ownerMessageId) {
+                        con.query(logSql, [
+                            bookingId,
+                            'info@flyawayballooning.com',
+                            ownerEmailContent.subject,
+                            ownerTemplateType,
+                            ownerEmailContent.html,
+                            ownerEmailContent.text,
+                            ownerMessageId,
+                            contextType,
+                            contextId
+                        ], (logErr) => {
+                            if (logErr) {
+                                console.error('Error logging automatic owner email:', logErr);
+                            }
+                        });
+                    }
                 } catch (emailErr) {
                     console.error('❌ [sendEmailToCustomerAndOwner] Error sending emails:', emailErr);
                     console.error('❌ [sendEmailToCustomerAndOwner] Error details:', {

@@ -2126,8 +2126,8 @@ const Manifest = () => {
                 additionalInfo: { notes: bookingDetail.booking.additional_notes || '' },
                 voucher_code: bookingDetail.booking.voucher_code || null,
                 flight_attempts: currentAttempts, // Preserve attempts value during rebook
-                email_template_override: 'Passenger Rescheduling Information',
-                email_template_type_override: 'passenger_reschedule_information_automatic',
+                email_template_override: 'Booking Rescheduled',
+                email_template_type_override: 'booking_rescheduled_automatic',
                 history_entries: historyEntriesPayload
             };
             // First delete the old booking
