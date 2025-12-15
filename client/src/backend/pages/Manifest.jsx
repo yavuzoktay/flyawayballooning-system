@@ -756,21 +756,28 @@ const Manifest = () => {
         if (!bookingId) return;
         setPaymentHistoryLoading(true);
         try {
+            // First, try to fetch existing payment history from database
             const response = await axios.get(`/api/booking-payment-history/${bookingId}`);
             const paymentData = response.data?.data || [];
             
-            // If no payment history but booking has stripe_session_id, try to sync
-            if (paymentData.length === 0 && bookingDetail?.booking?.stripe_session_id) {
+            // If no payment history found, try to sync from Stripe
+            // This will work even if stripe_session_id is not in the current bookingDetail state
+            if (paymentData.length === 0) {
                 try {
+                    console.log(`[PaymentHistory] No records found for booking ${bookingId}, attempting sync...`);
                     await axios.post(`/api/sync-payment-history/${bookingId}`);
                     // Fetch again after sync
                     const syncResponse = await axios.get(`/api/booking-payment-history/${bookingId}`);
-                    setPaymentHistory(syncResponse.data?.data || []);
+                    const syncedData = syncResponse.data?.data || [];
+                    console.log(`[PaymentHistory] After sync, found ${syncedData.length} records`);
+                    setPaymentHistory(syncedData);
                 } catch (syncError) {
-                    console.error('Error syncing payment history:', syncError);
+                    // Sync failed (maybe no stripe_session_id), just show empty
+                    console.log('[PaymentHistory] Sync failed or no stripe_session_id:', syncError?.response?.data?.message || syncError.message);
                     setPaymentHistory([]);
                 }
             } else {
+                console.log(`[PaymentHistory] Found ${paymentData.length} records for booking ${bookingId}`);
                 setPaymentHistory(paymentData);
             }
         } catch (error) {
