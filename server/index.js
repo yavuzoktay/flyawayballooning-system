@@ -22590,6 +22590,20 @@ app.get('/api/sendgrid/webhook', (req, res) => {
     res.json({ success: true, message: 'SendGrid webhook endpoint is accessible', timestamp: new Date().toISOString() });
 });
 
+// Diagnostic endpoint to check email_logs
+app.get('/api/email-logs/recent', (req, res) => {
+    const sql = `SELECT id, recipient_email, subject, message_id, opens, clicks, status, sent_at 
+                 FROM email_logs 
+                 ORDER BY sent_at DESC 
+                 LIMIT 10`;
+    con.query(sql, (err, rows) => {
+        if (err) {
+            return res.status(500).json({ success: false, error: err.message });
+        }
+        res.json({ success: true, count: rows.length, logs: rows });
+    });
+});
+
 // SendGrid Event Webhook to track deliveries/opens/clicks
 // Configure this URL in SendGrid: POST https://YOUR_DOMAIN/api/sendgrid/webhook
 app.post('/api/sendgrid/webhook', (req, res) => {
