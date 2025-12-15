@@ -1116,46 +1116,55 @@ app.post('/api/voucher-codes/validate', (req, res) => {
 
         if (result.length === 0) {
             console.log('No voucher_codes match. Falling back to all_vouchers/all_booking for voucher_ref/voucher_code...');
+            // Query vouchers - order by expires DESC to get the one with latest expiry date (in case of duplicates)
             const fallbackSql = `
-                SELECT 
-                    v.id,
-                    v.voucher_ref AS code_from_vouchers,
-                    CASE WHEN v.expires IS NOT NULL THEN v.expires ELSE DATE_ADD(v.created_at, INTERVAL 24 MONTH) END AS computed_expires,
-                    v.expires,
-                    v.redeemed,
-                    v.experience_type,
-                    v.voucher_type,
-                    NULL AS actual_voucher_type,
-                    v.numberOfPassengers,
-                    NULL AS pax,
-                    v.created_at,
-                    v.name,
-                    NULL AS location,
-                    v.preferred_location,
-                    v.paid,
-                    'voucher_ref' AS code_source
-                FROM all_vouchers v
-                WHERE UPPER(v.voucher_ref) = UPPER(?)
+                SELECT * FROM (
+                    SELECT 
+                        v.id,
+                        v.voucher_ref AS code_from_vouchers,
+                        CASE WHEN v.expires IS NOT NULL THEN v.expires ELSE DATE_ADD(v.created_at, INTERVAL 24 MONTH) END AS computed_expires,
+                        v.expires,
+                        v.redeemed,
+                        v.experience_type,
+                        v.voucher_type,
+                        NULL AS actual_voucher_type,
+                        v.numberOfPassengers,
+                        NULL AS pax,
+                        v.created_at,
+                        v.name,
+                        NULL AS location,
+                        v.preferred_location,
+                        v.paid,
+                        'voucher_ref' AS code_source
+                    FROM all_vouchers v
+                    WHERE UPPER(v.voucher_ref) = UPPER(?)
+                    ORDER BY v.expires DESC, v.created_at DESC
+                    LIMIT 1
+                ) AS voucher_result
                 UNION ALL
-                SELECT 
-                    b.id,
-                    b.voucher_code AS code_from_vouchers,
-                    NULL AS computed_expires,
-                    b.expires,
-                    NULL AS redeemed,
-                    b.experience AS experience_type,
-                    b.voucher_type AS voucher_type,
-                    NULL AS actual_voucher_type,
-                    NULL AS numberOfPassengers,
-                    b.pax,
-                    b.created_at,
-                    b.name,
-                    b.location,
-                    NULL AS preferred_location,
-                    b.paid,
-                    'booking_voucher_code' AS code_source
-                FROM all_booking b
-                WHERE UPPER(b.voucher_code) = UPPER(?)
+                SELECT * FROM (
+                    SELECT 
+                        b.id,
+                        b.voucher_code AS code_from_vouchers,
+                        NULL AS computed_expires,
+                        b.expires,
+                        NULL AS redeemed,
+                        b.experience AS experience_type,
+                        b.voucher_type AS voucher_type,
+                        NULL AS actual_voucher_type,
+                        NULL AS numberOfPassengers,
+                        b.pax,
+                        b.created_at,
+                        b.name,
+                        b.location,
+                        NULL AS preferred_location,
+                        b.paid,
+                        'booking_voucher_code' AS code_source
+                    FROM all_booking b
+                    WHERE UPPER(b.voucher_code) = UPPER(?)
+                    ORDER BY b.created_at DESC
+                    LIMIT 1
+                ) AS booking_result
                 LIMIT 1
             `;
             con.query(fallbackSql, [code, code], (fbErr, fbRows) => {
