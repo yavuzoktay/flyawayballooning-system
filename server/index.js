@@ -8151,7 +8151,10 @@ app.post('/api/createBooking', (req, res) => {
             bookingStatus, // Use status from request body or default to 'Confirmed'
             paid || totalPrice, // Use paid amount from Gift Voucher Details if provided, otherwise use totalPrice
             0,
-            voucher_code || null,
+            // For Redeem Voucher bookings, do NOT persist voucher_code into all_booking
+            // because it may not exist in voucher_codes table (legacy/manual vouchers),
+            // which would violate the foreign key constraint all_booking.voucher_code -> voucher_codes.code.
+            activitySelect === 'Redeem Voucher' ? null : (voucher_code || null),
             nowDate,
             expiresDateFinal,
             0, // manual_status_override
