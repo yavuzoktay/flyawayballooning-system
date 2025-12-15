@@ -1170,33 +1170,96 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                 // Basic checks for voucher_ref path
                 if (row.code_source === 'voucher_ref') {
                     const now = new Date();
-                    const exp = row.computed_expires ? new Date(row.computed_expires) : null;
+                    now.setHours(0, 0, 0, 0); // Reset time for accurate date comparison
+                    
+                    // Parse expires date properly - handle various formats
+                    let exp = null;
+                    if (row.computed_expires) {
+                        const expDate = row.computed_expires;
+                        // Check if it's already a Date object from MySQL
+                        if (expDate instanceof Date) {
+                            exp = expDate;
+                        } else if (typeof expDate === 'string') {
+                            // Try parsing as ISO format first, then DD/MM/YYYY
+                            exp = new Date(expDate);
+                            if (isNaN(exp.getTime())) {
+                                // Try DD/MM/YYYY format
+                                const parts = expDate.split(/[\/\-\.]/);
+                                if (parts.length === 3) {
+                                    // Assume DD/MM/YYYY format
+                                    exp = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                                }
+                            }
+                        }
+                    }
+                    
+                    console.log('=== VOUCHER EXPIRY DEBUG ===');
+                    console.log('Voucher code:', code);
+                    console.log('Raw computed_expires:', row.computed_expires);
+                    console.log('Parsed exp date:', exp);
+                    console.log('Now:', now);
+                    console.log('Is exp valid date?', exp && !isNaN(exp.getTime()));
+                    if (exp && !isNaN(exp.getTime())) {
+                        console.log('now > exp?', now > exp);
+                    }
+                    
                     // Check if voucher is redeemed - only reject if explicitly "yes" or "1" or true
                     const redeemedValue = row.redeemed ? String(row.redeemed).toLowerCase().trim() : '';
                     if (redeemedValue === 'yes' || redeemedValue === '1' || redeemedValue === 'true') {
                         return res.json({ success: false, message: 'Voucher already redeemed' });
                     }
                     // If redeemed is "No", "0", "false", or NULL, allow redemption
-                    if (exp && now > exp) {
-                        return res.json({ success: false, message: 'Voucher code has expired' });
+                    // Only check expiry if exp is a valid date
+                    if (exp && !isNaN(exp.getTime())) {
+                        exp.setHours(0, 0, 0, 0); // Reset time for accurate date comparison
+                        if (now > exp) {
+                            console.log('Voucher EXPIRED:', code);
+                            return res.json({ success: false, message: 'Voucher code has expired' });
+                        }
                     }
+                    console.log('Voucher NOT expired:', code);
                 }
                 // Also validate when the code originates from booking table
                 else if (row.code_source === 'booking_voucher_code') {
                     const now = new Date();
+                    now.setHours(0, 0, 0, 0); // Reset time for accurate date comparison
+                    
                     // Prefer explicit expires; otherwise compute 24 months from created_at if available
                     let exp = null;
                     if (row.expires) {
-                        exp = new Date(row.expires);
+                        const expDate = row.expires;
+                        // Handle various date formats
+                        if (expDate instanceof Date) {
+                            exp = expDate;
+                        } else if (typeof expDate === 'string') {
+                            exp = new Date(expDate);
+                            if (isNaN(exp.getTime())) {
+                                // Try DD/MM/YYYY format
+                                const parts = expDate.split(/[\/\-\.]/);
+                                if (parts.length === 3) {
+                                    exp = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                                }
+                            }
+                        }
                     } else if (row.created_at) {
                         const created = new Date(row.created_at);
-                        exp = new Date(created.getTime());
-                        exp.setMonth(exp.getMonth() + 24);
+                        if (!isNaN(created.getTime())) {
+                            exp = new Date(created.getTime());
+                            exp.setMonth(exp.getMonth() + 24);
+                        }
                     }
                     
-                    // First check if voucher has expired
-                    if (exp && now > exp) {
-                        return res.json({ success: false, message: 'Voucher code has expired. The expiration date has passed.' });
+                    console.log('=== BOOKING VOUCHER EXPIRY DEBUG ===');
+                    console.log('Voucher code:', code);
+                    console.log('Raw expires:', row.expires);
+                    console.log('Parsed exp date:', exp);
+                    
+                    // First check if voucher has expired - only if exp is valid
+                    if (exp && !isNaN(exp.getTime())) {
+                        exp.setHours(0, 0, 0, 0);
+                        if (now > exp) {
+                            return res.json({ success: false, message: 'Voucher code has expired. The expiration date has passed.' });
+                        }
                     }
                     
                     // If code already exists on a booking, treat as redeemed/used
