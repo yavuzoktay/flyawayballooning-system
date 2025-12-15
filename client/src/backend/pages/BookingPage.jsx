@@ -3427,8 +3427,8 @@ setBookingDetail(finalVoucherDetail);
                 voucher_code: bookingDetail.booking.voucher_code || null,
                 flight_attempts: currentAttempts, // Preserve attempts count when rebooking
                 status: 'Scheduled', // Set status to Scheduled for rebook operations
-                email_template_override: 'Passenger Rescheduling Information',
-                email_template_type_override: 'passenger_reschedule_information_automatic',
+                email_template_override: 'Booking Rescheduled',
+                email_template_type_override: 'booking_rescheduled_automatic',
                 history_entries: historyEntriesPayload
             };
 
