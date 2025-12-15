@@ -22637,12 +22637,28 @@ app.post('/api/sendgrid/webhook', (req, res) => {
         // Process each event; update by message_id primarily
         console.log(`📧 [SendGrid Webhook] Processing ${events.length} events`);
         events.forEach((evt) => {
-            const messageId = evt['sg_message_id'] || evt['sg_message_id_v2'] || evt['smtp-id'] || (evt['headers'] && /X-Message-Id:\s*(.*)/i.test(evt['headers']) ? RegExp.$1.trim() : null);
+            // SendGrid sg_message_id format: "BASE64_ID.filterdrecv-xxx.N"
+            // We store only the first part (BASE64_ID) in email_logs
+            let rawMessageId = evt['sg_message_id'] || evt['sg_message_id_v2'] || evt['smtp-id'] || (evt['headers'] && /X-Message-Id:\s*(.*)/i.test(evt['headers']) ? RegExp.$1.trim() : null);
+            
+            // Extract just the base message_id (first part before .filter)
+            let messageId = rawMessageId;
+            if (rawMessageId && rawMessageId.includes('.filter')) {
+                messageId = rawMessageId.split('.filter')[0];
+            } else if (rawMessageId && rawMessageId.includes('.')) {
+                // Fallback: take the first part before any dot (but keep base64 chars which may include dots)
+                // SendGrid base64 IDs don't contain dots, so split on first dot
+                const parts = rawMessageId.split('.');
+                if (parts[0] && parts[0].length >= 20) {
+                    messageId = parts[0];
+                }
+            }
+            
             const email = evt.email || evt.recipient || null;
             const eventType = evt.event || evt.event_type || null; // delivered, open, click, bounce, dropped, spamreport, deferred
             const eventTime = evt.timestamp ? new Date(evt.timestamp * 1000) : new Date();
 
-            console.log(`📧 [SendGrid Webhook] Event: ${eventType}, Email: ${email}, MessageId: ${messageId?.substring(0, 30)}...`);
+            console.log(`📧 [SendGrid Webhook] Event: ${eventType}, Email: ${email}, RawMessageId: ${rawMessageId?.substring(0, 50)}, ExtractedMessageId: ${messageId}`);
 
             if (!messageId && !email) return;
 
