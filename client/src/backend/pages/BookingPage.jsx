@@ -1701,7 +1701,7 @@ setBookingDetail(finalVoucherDetail);
             return;
         }
 
-        // Fallback: try to locate booking by voucher_code using getAllBookingData
+        // Fallback: try to locate booking by voucher_code using dedicated endpoint
         const voucherRef =
             source?.voucher_ref ||
             source?.voucher_code ||
@@ -1782,56 +1782,19 @@ setBookingDetail(finalVoucherDetail);
                 } catch (e) { }
                 // #endregion
 
-                // If no direct match by voucher_code, try heuristic search in bookings
+                // If no direct match by voucher_code, do NOT guess by name/email
+                // to avoid opening wrong booking. Just inform the user.
                 if (!rows || rows.length === 0) {
-                    const searchKey =
-                        (source?.email || source?.purchaser_email || '').toString().trim() ||
-                        (source?.name || source?.purchaser_name || '').toString().trim();
-
-                    if (searchKey) {
-                        try {
-                            const fallbackRes = await axios.get('/api/getAllBookingData', {
-                                params: { search: searchKey }
-                            });
-                            const bookingRows = Array.isArray(fallbackRes.data?.data) ? fallbackRes.data.data : [];
-
-                            // #region agent log
-                            try {
-                                fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        sessionId: 'debug-session',
-                                        runId: 'post-fix',
-                                        hypothesisId: 'H4',
-                                        location: 'BookingPage.jsx:handleVoucherRefClick:fallbackSearch',
-                                        message: 'Fallback search in getAllBookingData',
-                                        data: {
-                                            voucherRef,
-                                            searchKey,
-                                            rowCount: bookingRows.length,
-                                            firstRowId: bookingRows[0]?.id || null
-                                        },
-                                        timestamp: Date.now()
-                                    })
-                                }).catch(() => { });
-                            } catch (e) { }
-                            // #endregion
-
-                            if (bookingRows.length > 0 && bookingRows[0]?.id) {
-                                openBookingDetails(bookingRows[0].id);
-                                return;
-                            }
-                        } catch (e) {
-                            // ignore and fall through to alert
-                        }
-                    }
-
                     alert('No related booking found for this voucher yet.');
                     return;
                 }
 
-                const found = rows[0];
+                // If multiple bookings are found for the same voucher code,
+                // prefer redeem voucher bookings over others.
+                let found =
+                    rows.find(r => r.flight_type_source === 'Redeem Voucher') ||
+                    rows.find(r => r.redeemed_voucher === 'Yes') ||
+                    rows[0];
                 if (!found?.id) {
                     alert('No related booking found for this voucher yet.');
                     return;
