@@ -1833,8 +1833,137 @@ app.post('/api/createRedeemBooking', (req, res) => {
         function createBookingWithPrice(paidAmount, expiresDateFinal, resolvedVoucherType) {
             console.log('=== CREATING BOOKING WITH PAID AMOUNT:', paidAmount, 'AND EXPIRE DATE:', expiresDateFinal, '===');
 
-            // Simple SQL with only essential columns (including expires, flight_attempts, flight_type_source, voucher_type)
-            const bookingSql = `
+            // Generate a new voucher code for this booking (Redeem Voucher creates a Book Flight booking)
+            const generateNewVoucherCode = (callback) => {
+                const year = new Date().getFullYear().toString().slice(-2); // Get last 2 digits of year
+                
+                // Map flight types to category codes
+                const categoryMap = {
+                    'Weekday Morning': 'WM',
+                    'Weekday Flex': 'WF',
+                    'Anytime': 'AT',
+                    'Any Day Flight': 'AT',
+                    'Flexible Weekday': 'WF',
+                    'Shared Flight': 'AT' // Default for Shared Flight
+                };
+                
+                // Determine category code from resolvedVoucherType or chooseFlightType
+                let categoryCode = 'AT'; // Default
+                if (resolvedVoucherType && categoryMap[resolvedVoucherType]) {
+                    categoryCode = categoryMap[resolvedVoucherType];
+                } else if (chooseFlightType && chooseFlightType.type) {
+                    // Try to map from flight type
+                    const flightTypeMap = {
+                        'Private Charter': 'AT',
+                        'Shared Flight': 'AT'
+                    };
+                    categoryCode = flightTypeMap[chooseFlightType.type] || 'AT';
+                }
+                
+                const prefix = 'B'; // 'B' for Book Flight (Redeem Voucher creates a Book Flight booking)
+                
+                // Generate unique serial (3 characters)
+                const generateSerial = () => {
+                    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                    let result = '';
+                    for (let i = 0; i < 3; i++) {
+                        result += chars.charAt(Math.floor(Math.random() * chars.length));
+                    }
+                    return result;
+                };
+                
+                // Generate unique voucher code
+                let voucherCode;
+                let isUnique = false;
+                let attempts = 0;
+                const maxAttempts = 10;
+                
+                const tryGenerateCode = () => {
+                    if (attempts >= maxAttempts) {
+                        console.error('Failed to generate unique voucher code after', maxAttempts, 'attempts');
+                        return callback(null);
+                    }
+                    
+                    const serial = generateSerial();
+                    voucherCode = `${prefix}${categoryCode}${year}${serial}`;
+                    
+                    // Check if code already exists in both tables
+                    const checkSql = `
+                        SELECT id FROM all_vouchers WHERE voucher_ref = ?
+                        UNION
+                        SELECT id FROM all_booking WHERE voucher_code = ?
+                    `;
+                    
+                    con.query(checkSql, [voucherCode, voucherCode], (checkErr, checkResult) => {
+                        if (checkErr) {
+                            console.error('Error checking voucher code uniqueness:', checkErr);
+                            return callback(null);
+                        }
+                        
+                        if (checkResult.length === 0) {
+                            // Code is unique
+                            isUnique = true;
+                            console.log('✅ Generated new voucher code for Redeem Voucher booking:', voucherCode);
+                            callback(voucherCode);
+                        } else {
+                            // Code exists, try again
+                            attempts++;
+                            setTimeout(tryGenerateCode, 10);
+                        }
+                    });
+                };
+                
+                tryGenerateCode();
+            };
+
+            // Generate new voucher code first, then create booking
+            generateNewVoucherCode((newVoucherCode) => {
+                if (!newVoucherCode) {
+                    console.warn('⚠️ Failed to generate new voucher code, using redeemed voucher code as fallback');
+                    // Fallback to using redeemed voucher code if generation fails
+                    createBookingWithGeneratedCode(cleanVoucherCode);
+                    return;
+                }
+
+                // Create voucher_codes entry for the new voucher code
+                const title = `${passengerName} - Book Flight - ${chooseLocation}`;
+                const voucherCodeSql = `
+                    INSERT INTO voucher_codes (
+                        code, title, valid_from, valid_until, max_uses, current_uses,
+                        applicable_locations, applicable_experiences, applicable_voucher_types,
+                        is_active, created_at, updated_at, source_type, customer_email, paid_amount
+                    ) VALUES (?, ?, NOW(), ?, 1, 0, ?, ?, ?, 1, NOW(), NOW(), 'redeem_booking', ?, ?)
+                `;
+                
+                const validUntil = expiresDateFinal ? moment(expiresDateFinal).format('YYYY-MM-DD') : moment().add(24, 'months').format('YYYY-MM-DD');
+                
+                const voucherCodeValues = [
+                    newVoucherCode,
+                    title,
+                    validUntil,
+                    chooseLocation || null,
+                    resolvedVoucherType || null,
+                    resolvedVoucherType || null,
+                    passengerData[0].email || null,
+                    paidAmount || 0
+                ];
+                
+                con.query(voucherCodeSql, voucherCodeValues, (voucherCodeErr) => {
+                    if (voucherCodeErr) {
+                        console.warn('⚠️ Warning: Could not create voucher_codes entry:', voucherCodeErr.message);
+                        // Continue with booking creation even if voucher_codes entry fails
+                    } else {
+                        console.log('✅ Created voucher_codes entry for new voucher code:', newVoucherCode);
+                    }
+                    
+                    // Proceed with booking creation using the new voucher code
+                    createBookingWithGeneratedCode(newVoucherCode);
+                });
+            });
+
+            function createBookingWithGeneratedCode(generatedVoucherCode) {
+                // Simple SQL with only essential columns (including expires, flight_attempts, flight_type_source, voucher_type)
+                const bookingSql = `
         INSERT INTO all_booking (
             name,
             flight_type, 
@@ -1858,45 +1987,64 @@ app.post('/api/createRedeemBooking', (req, res) => {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-            // Use actual passenger count from passengerData array
-            const actualPaxCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
-            console.log('=== REDEEM BOOKING PAX COUNT DEBUG ===');
-            console.log('passengerData.length:', passengerData?.length);
-            console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
-            console.log('actualPaxCount (FINAL):', actualPaxCount);
-            console.log('activity_id:', activity_id);
-            console.log('cleanVoucherCode:', cleanVoucherCode);
-            console.log('paidAmount (original voucher price):', paidAmount);
-            console.log('resolvedVoucherType:', resolvedVoucherType || null);
+                // Use actual passenger count from passengerData array
+                const actualPaxCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
+                console.log('=== REDEEM BOOKING PAX COUNT DEBUG ===');
+                console.log('passengerData.length:', passengerData?.length);
+                console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
+                console.log('actualPaxCount (FINAL):', actualPaxCount);
+                console.log('activity_id:', activity_id);
+                console.log('cleanVoucherCode (redeemed):', cleanVoucherCode);
+                console.log('generatedVoucherCode (new):', generatedVoucherCode);
+                console.log('paidAmount (original voucher price):', paidAmount);
+                console.log('resolvedVoucherType:', resolvedVoucherType || null);
 
-            const bookingValues = [
-                passengerName,
-                chooseFlightType.type || 'Shared Flight',
-                bookingDateTime,
-                actualPaxCount, // Use actual passenger count instead of chooseFlightType.passengerCount
-                chooseLocation,
-                'Open',
-                paidAmount, // Use original voucher price instead of totalPrice
-                0,
-                cleanVoucherCode,
-                now, // created_at
-                expiresDateFinal || null, // expires - calculated from voucher created_at
-                passengerData[0].email || null,
-                passengerData[0].phone || null,
-                activity_id || null,
-                'Yes', // Redeem Voucher bookings always have redeemed_voucher = Yes
-                0, // flight_attempts (always 0 for redeem voucher bookings)
-                'Redeem Voucher', // flight_type_source (always 'Redeem Voucher' for this endpoint)
-                resolvedVoucherType || null,
-                null
-            ];
+                const bookingValues = [
+                    passengerName,
+                    chooseFlightType.type || 'Shared Flight',
+                    bookingDateTime,
+                    actualPaxCount, // Use actual passenger count instead of chooseFlightType.passengerCount
+                    chooseLocation,
+                    'Open',
+                    paidAmount, // Use original voucher price instead of totalPrice
+                    0,
+                    generatedVoucherCode, // Use the newly generated voucher code
+                    now, // created_at
+                    expiresDateFinal || null, // expires - calculated from voucher created_at
+                    passengerData[0].email || null,
+                    passengerData[0].phone || null,
+                    activity_id || null,
+                    'Yes', // Redeem Voucher bookings always have redeemed_voucher = Yes
+                    0, // flight_attempts (always 0 for redeem voucher bookings)
+                    'Redeem Voucher', // flight_type_source (always 'Redeem Voucher' for this endpoint)
+                    resolvedVoucherType || null,
+                    null
+                ];
 
-            console.log('=== REDEEM BOOKING SQL ===');
-            console.log('SQL:', bookingSql);
-            console.log('Values:', bookingValues);
+                console.log('=== REDEEM BOOKING SQL ===');
+                console.log('SQL:', bookingSql);
+                console.log('Values:', bookingValues);
 
-            function handleRedeemBookingSuccess(bookingId) {
-                console.log('=== REDEEM BOOKING SUCCESS ===');
+                function handleRedeemBookingSuccess(bookingId) {
+                    console.log('=== REDEEM BOOKING SUCCESS ===');
+                    console.log('✅ Booking created with generated voucher code:', generatedVoucherCode);
+
+                    // Ensure voucher_code is set in all_booking (fallback update for safety)
+                    if (generatedVoucherCode && generatedVoucherCode.trim()) {
+                        con.query(
+                            'UPDATE all_booking SET voucher_code = ? WHERE id = ? AND (voucher_code IS NULL OR voucher_code = "")',
+                            [generatedVoucherCode.trim(), bookingId],
+                            (linkErr) => {
+                                if (linkErr) {
+                                    console.error('Error linking booking with voucher_code:', linkErr);
+                                } else {
+                                    console.log('✅ Voucher code linked to Redeem Voucher booking:', generatedVoucherCode.trim());
+                                }
+                            }
+                        );
+                    } else {
+                        console.warn('⚠️ Warning: Redeem Voucher booking created without voucher_code. Booking ID:', bookingId);
+                    }
 
                 // Save user session data if provided
                 if (userSessionData && userSessionData.session_id) {
@@ -2073,59 +2221,61 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     });
                 }
 
-                res.json({
-                    success: true,
-                    message: 'Booking created successfully',
-                    bookingId: bookingId
-                });
-            }
-
-            con.query(bookingSql, bookingValues, (err, result) => {
-                if (err) {
-                    console.error('=== REDEEM BOOKING ERROR ===');
-                    console.error('Error:', err);
-
-                    // If the error is caused by a missing referenced voucher_code in voucher_codes table,
-                    // retry the insert with voucher_code set to NULL so that the booking can still be created.
-                    const isForeignKeyVoucherError =
-                        err.code === 'ER_NO_REFERENCED_ROW_2' ||
-                        (typeof err.message === 'string' &&
-                            err.message.includes('a foreign key constraint fails') &&
-                            err.message.includes('voucher_code'));
-
-                    if (cleanVoucherCode && isForeignKeyVoucherError) {
-                        console.warn('⚠️ Redeem booking failed due to missing voucher_codes row for voucher_code. Retrying insert with NULL voucher_code.');
-
-                        const fallbackValues = [...bookingValues];
-                        // voucher_code is at index 8 in bookingValues
-                        fallbackValues[8] = null;
-
-                        return con.query(bookingSql, fallbackValues, (fallbackErr, fallbackResult) => {
-                            if (fallbackErr) {
-                                console.error('❌ Redeem booking fallback insert also failed:', fallbackErr);
-                                return res.status(500).json({
-                                    success: false,
-                                    error: 'Database query failed to create booking',
-                                    details: fallbackErr.message
-                                });
-                            }
-
-                            const bookingId = fallbackResult.insertId;
-                            console.log('=== REDEEM BOOKING SUCCESS (fallback, voucher_code set to NULL) ===');
-                            return handleRedeemBookingSuccess(bookingId);
-                        });
-                    }
-
-                    return res.status(500).json({
-                        success: false,
-                        error: 'Database query failed to create booking',
-                        details: err.message
+                    res.json({
+                        success: true,
+                        message: 'Booking created successfully',
+                        bookingId: bookingId,
+                        voucher_code: generatedVoucherCode // Return the newly generated voucher code
                     });
                 }
 
-                const bookingId = result.insertId;
-                return handleRedeemBookingSuccess(bookingId);
-            });
+                con.query(bookingSql, bookingValues, (err, result) => {
+                    if (err) {
+                        console.error('=== REDEEM BOOKING ERROR ===');
+                        console.error('Error:', err);
+
+                        // If the error is caused by a missing referenced voucher_code in voucher_codes table,
+                        // retry the insert with voucher_code set to NULL so that the booking can still be created.
+                        const isForeignKeyVoucherError =
+                            err.code === 'ER_NO_REFERENCED_ROW_2' ||
+                            (typeof err.message === 'string' &&
+                                err.message.includes('a foreign key constraint fails') &&
+                                err.message.includes('voucher_code'));
+
+                        if (generatedVoucherCode && isForeignKeyVoucherError) {
+                            console.warn('⚠️ Redeem booking failed due to missing voucher_codes row for voucher_code. Retrying insert with NULL voucher_code.');
+
+                            const fallbackValues = [...bookingValues];
+                            // voucher_code is at index 8 in bookingValues
+                            fallbackValues[8] = null;
+
+                            return con.query(bookingSql, fallbackValues, (fallbackErr, fallbackResult) => {
+                                if (fallbackErr) {
+                                    console.error('❌ Redeem booking fallback insert also failed:', fallbackErr);
+                                    return res.status(500).json({
+                                        success: false,
+                                        error: 'Database query failed to create booking',
+                                        details: fallbackErr.message
+                                    });
+                                }
+
+                                const bookingId = fallbackResult.insertId;
+                                console.log('=== REDEEM BOOKING SUCCESS (fallback, voucher_code set to NULL) ===');
+                                return handleRedeemBookingSuccess(bookingId);
+                            });
+                        }
+
+                        return res.status(500).json({
+                            success: false,
+                            error: 'Database query failed to create booking',
+                            details: err.message
+                        });
+                    }
+
+                    const bookingId = result.insertId;
+                    return handleRedeemBookingSuccess(bookingId);
+                });
+            } // end of createBookingWithGeneratedCode
         } // end of createBookingWithPrice
     } // end of createRedeemBookingLogic
 });
@@ -5753,7 +5903,22 @@ app.get('/api/getAllBookingData', (req, res) => {
             -- Prioritize voucher_type_detail from all_vouchers, then booking's voucher_type_detail, then voucher_type, then booking's voucher_type
             -- This ensures we show the actual voucher type (Weekday Morning, Flexible Weekday, Any Day Flight, etc.)
             -- instead of experience type (Shared Flight, Private Charter, etc.)
-            COALESCE(v.voucher_type_detail, ab.voucher_type_detail, v.voucher_type, ab.voucher_type) as voucher_type,
+            -- Filter out experience values: if voucher_type is 'Shared Flight' or 'Private Charter', prefer voucher_type_detail or NULL
+            CASE 
+                WHEN v.voucher_type_detail IS NOT NULL AND v.voucher_type_detail != '' 
+                    AND UPPER(v.voucher_type_detail) NOT IN ('SHARED FLIGHT', 'PRIVATE CHARTER', 'SHARED', 'PRIVATE')
+                    THEN v.voucher_type_detail
+                WHEN ab.voucher_type_detail IS NOT NULL AND ab.voucher_type_detail != '' 
+                    AND UPPER(ab.voucher_type_detail) NOT IN ('SHARED FLIGHT', 'PRIVATE CHARTER', 'SHARED', 'PRIVATE')
+                    THEN ab.voucher_type_detail
+                WHEN v.voucher_type IS NOT NULL AND v.voucher_type != '' 
+                    AND UPPER(v.voucher_type) NOT IN ('SHARED FLIGHT', 'PRIVATE CHARTER', 'SHARED', 'PRIVATE') 
+                    THEN v.voucher_type
+                WHEN ab.voucher_type IS NOT NULL AND ab.voucher_type != '' 
+                    AND UPPER(ab.voucher_type) NOT IN ('SHARED FLIGHT', 'PRIVATE CHARTER', 'SHARED', 'PRIVATE') 
+                    THEN ab.voucher_type
+                ELSE NULL
+            END as voucher_type,
             COALESCE(ab.voucher_code, vc.code, vcu_map.code, v.voucher_ref) as voucher_code,
             DATE_FORMAT(ab.created_at, '%Y-%m-%d') as created_at_display,
             DATE_FORMAT(ab.expires, '%d/%m/%Y') as expires_display,
@@ -5882,7 +6047,77 @@ app.get('/api/getAllBookingData', (req, res) => {
             }
 
             // Get voucher_type from all_vouchers (prioritize voucher's voucher_type for redeem voucher bookings)
-            let finalVoucherType = original_voucher_type || rest.voucher_type;
+            // Filter out experience values (Shared Flight, Private Charter) and prioritize actual voucher types
+            const isExperienceValue = (type) => {
+                if (!type || typeof type !== 'string') return false;
+                const lowerType = type.toLowerCase().trim();
+                return ['shared flight', 'private charter', 'shared', 'private'].includes(lowerType);
+            };
+            
+            // Helper function to extract voucher type from voucher code
+            // Format: [Prefix][Category][Year][Serial]
+            // Prefix: B (Book Flight), F (Flight Voucher), G (Gift Voucher)
+            // Category: AT (Any Day Flight), WM (Weekday Morning), WF (Weekday Flex/Flexible Weekday)
+            const getVoucherTypeFromCode = (code) => {
+                if (!code || typeof code !== 'string' || code.length < 3) return null;
+                const upperCode = code.toUpperCase();
+                const categoryMap = {
+                    'AT': 'Any Day Flight',
+                    'WM': 'Weekday Morning',
+                    'WF': 'Flexible Weekday',
+                    'WX': 'Weekday Flex'
+                };
+                // Extract category code (positions 1-2 after prefix)
+                if (upperCode.startsWith('B') && upperCode.length >= 3) {
+                    const category = upperCode.substring(1, 3);
+                    return categoryMap[category] || null;
+                }
+                return null;
+            };
+            
+            // Priority 1: voucher_type_detail (most accurate, from all_vouchers or booking)
+            let finalVoucherType = null;
+            if (rest.voucher_type_detail && !isExperienceValue(rest.voucher_type_detail)) {
+                finalVoucherType = rest.voucher_type_detail;
+            }
+            // Priority 2: voucher_type from SQL (already filtered in SQL, but double-check)
+            else if (rest.voucher_type && !isExperienceValue(rest.voucher_type)) {
+                finalVoucherType = rest.voucher_type;
+            }
+            // Priority 3: original_voucher_type from all_vouchers (if not experience value)
+            else if (original_voucher_type && !isExperienceValue(original_voucher_type)) {
+                finalVoucherType = original_voucher_type;
+            }
+            // Priority 4: Try to infer from voucher code pattern (e.g., BAT25WJD -> Any Day Flight)
+            else if (rest.voucher_code) {
+                const inferredType = getVoucherTypeFromCode(rest.voucher_code);
+                if (inferredType) {
+                    finalVoucherType = inferredType;
+                }
+            }
+            // Priority 5: voucher_book_flight (if it's a valid voucher type, not experience)
+            else if (voucher_book_flight && !isExperienceValue(voucher_book_flight)) {
+                // Check if it's a journey type (Book Flight, Flight Voucher, Gift Voucher) or actual voucher type
+                const journeyTypes = ['book flight', 'flight voucher', 'gift voucher', 'redeem voucher'];
+                const lowerBookFlight = (voucher_book_flight || '').toLowerCase();
+                if (!journeyTypes.includes(lowerBookFlight)) {
+                    finalVoucherType = voucher_book_flight;
+                }
+            }
+            // Fallback: If we still don't have a valid voucher type, try to infer from experience
+            // For Shared Flight experience, default to "Any Day Flight"
+            // For Private Charter experience, default to "Any Day Flight" (Private Charter uses same voucher types)
+            if (!finalVoucherType && (rest.experience || rest.flight_type)) {
+                const experience = (rest.experience || rest.flight_type || '').toLowerCase();
+                if (experience.includes('shared') || experience.includes('private')) {
+                    finalVoucherType = 'Any Day Flight'; // Default voucher type for both Shared Flight and Private Charter
+                }
+            }
+            
+            // Final check: don't use invalid experience values
+            if (finalVoucherType && isExperienceValue(finalVoucherType)) {
+                finalVoucherType = null;
+            }
 
             // For bookings created from redeem voucher, flight_attempts should start from 0, not 1
             // Check if this is a redeem voucher booking (has voucher_code that exists in all_vouchers)
@@ -6583,6 +6818,28 @@ app.get('/api/getBookingByVoucherCode', (req, res) => {
             }).catch(() => { });
         } catch (e) { }
         // #endregion
+
+        // If no rows found, try a best-effort heuristic link using voucher → booking relationship.
+        if (!rows || rows.length === 0) {
+            const fallbackSql = `
+                SELECT ab.*
+                FROM all_vouchers v
+                JOIN all_booking ab
+                    ON ab.name = v.name
+                WHERE v.voucher_ref = ?
+                ORDER BY ab.created_at DESC
+                LIMIT 1
+            `;
+
+            return con.query(fallbackSql, [rawCode], (fbErr, fbRows) => {
+                if (fbErr) {
+                    console.error('Error in getBookingByVoucherCode fallback:', fbErr);
+                    return res.status(500).json({ success: false, message: 'Database error', error: fbErr });
+                }
+
+                return res.json({ success: true, data: fbRows || [] });
+            });
+        }
 
         return res.json({ success: true, data: rows || [] });
     });
@@ -7308,7 +7565,8 @@ app.get('/api/getAllVoucherData', (req, res) => {
                END as additional_information_json,
                v.add_to_booking_items,
                v.voucher_passenger_details,
-               b.email as booking_email, b.phone as booking_phone, b.id as booking_id,
+               b.email as booking_email, b.phone as booking_phone,
+               b.id as booking_id,
                CASE 
                    WHEN b.additional_information_json IS NOT NULL AND b.additional_information_json != 'null' 
                    THEN b.additional_information_json 
@@ -8137,7 +8395,20 @@ app.post('/api/createBooking', (req, res) => {
     }
 
     // Extract voucher_type from req.body for use in expires calculation
-    const voucher_type = req.body.voucher_type || req.body.selectedVoucherType?.title || '';
+    // Prioritize selectedVoucherType.title (from ballooning-book section), then voucher_type, then selectedVoucherType
+    // Filter out experience values (Shared Flight, Private Charter) - these should not be used as voucher_type
+    const isExperienceValue = (type) => {
+        if (!type || typeof type !== 'string') return false;
+        const lowerType = type.toLowerCase().trim();
+        return ['shared flight', 'private charter', 'shared', 'private'].includes(lowerType);
+    };
+    
+    let voucher_type = req.body.selectedVoucherType?.title || req.body.voucher_type || '';
+    // If voucher_type is an experience value, set it to null/empty so we can infer it later
+    if (isExperienceValue(voucher_type)) {
+        voucher_type = '';
+    }
+    
     const experience = req.body.experience || chooseFlightType?.type || '';
 
     // Create bookingData object for use in expires calculation
@@ -8353,7 +8624,31 @@ app.post('/api/createBooking', (req, res) => {
             req.body.activity_id || null, // activity_id
             selectedTime || null, // time_slot
             experience || chooseFlightType.type, // experience (use from req.body if provided, otherwise use flight type)
-            (voucher_type && voucher_type.trim() !== '') ? voucher_type : (chooseFlightType.type || null), // voucher_type (use from req.body if provided and not empty, otherwise use flight type or null)
+            // voucher_type: use from req.body if provided and not empty, and not an experience value
+            // If voucher_type is empty or experience value, try to infer from voucher code or leave as null
+            // Never use chooseFlightType.type as voucher_type (it's an experience value, not a voucher type)
+            (voucher_type && voucher_type.trim() !== '' && !isExperienceValue(voucher_type)) 
+                ? voucher_type 
+                : (() => {
+                    // Try to infer voucher type from voucher code if available
+                    if (voucher_code && typeof voucher_code === 'string' && voucher_code.length >= 3) {
+                        const upperCode = voucher_code.toUpperCase();
+                        const categoryMap = {
+                            'AT': 'Any Day Flight',
+                            'WM': 'Weekday Morning',
+                            'WF': 'Flexible Weekday',
+                            'WX': 'Weekday Flex'
+                        };
+                        // Extract category code (positions 1-2 after prefix)
+                        if (upperCode.startsWith('B') && upperCode.length >= 3) {
+                            const category = upperCode.substring(1, 3);
+                            if (categoryMap[category]) {
+                                return categoryMap[category];
+                            }
+                        }
+                    }
+                    return null; // Don't use experience value as voucher_type
+                })(),
             0, // voucher_discount
             base_original_amount, // original_amount (base price excluding add-ons and weather refund)
             add_on_total_price, // add_to_booking_items_total_price
@@ -8593,6 +8888,27 @@ app.post('/api/createBooking', (req, res) => {
                     console.log('✅ [createBooking] Passengers created successfully:', result.affectedRows, 'passengers');
                     // Availability is already updated by updateSpecificAvailability function
                     // No need to call updateAvailabilityStatus() here
+
+                    // For Redeem Voucher bookings, ensure voucher_code is set
+                    if (activitySelect === 'Redeem Voucher') {
+                        if (!voucher_code || !voucher_code.trim()) {
+                            console.warn('⚠️ Warning: Redeem Voucher booking created without voucher_code. Booking ID:', bookingId);
+                        } else {
+                            // Ensure voucher_code is set in all_booking (fallback update for safety)
+                            const cleanVoucherCode = voucher_code.trim();
+                            con.query(
+                                'UPDATE all_booking SET voucher_code = ? WHERE id = ? AND (voucher_code IS NULL OR voucher_code = "")',
+                                [cleanVoucherCode, bookingId],
+                                (linkErr) => {
+                                    if (linkErr) {
+                                        console.error('Error linking booking with voucher_code:', linkErr);
+                                    } else {
+                                        console.log('✅ Voucher code linked to Redeem Voucher booking:', cleanVoucherCode);
+                                    }
+                                }
+                            );
+                        }
+                    }
 
                     // If activitySelect is 'Redeem Voucher' and voucher_code exists, mark it as redeemed
                     if (activitySelect === 'Redeem Voucher' && voucher_code) {
@@ -9450,6 +9766,23 @@ app.post('/api/createVoucher', (req, res) => {
 
             console.log('=== BOOKING CREATED FOR REDEEM VOUCHER ===');
             console.log('Booking ID:', bookingResult.insertId);
+
+            // Ensure voucher_code is set in all_booking (fallback update for safety)
+            if (voucherCode && voucherCode.trim()) {
+                con.query(
+                    'UPDATE all_booking SET voucher_code = ? WHERE id = ? AND (voucher_code IS NULL OR voucher_code = "")',
+                    [voucherCode.trim(), bookingResult.insertId],
+                    (linkErr) => {
+                        if (linkErr) {
+                            console.error('Error linking booking with voucher_code:', linkErr);
+                        } else {
+                            console.log('✅ Voucher code linked to booking:', voucherCode.trim());
+                        }
+                    }
+                );
+            } else {
+                console.warn('⚠️ Warning: voucherCode is empty or null for Redeem Voucher booking:', bookingResult.insertId);
+            }
 
             // Now mark the original voucher as redeemed in all_vouchers table
             updateVoucherRedemptionStatus(voucherCode, voucherId, bookingResult.insertId);
@@ -13973,7 +14306,11 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
             const privateSmallRemaining = ownsBalloon105
                 ? (privateSmallBookings > 0 ? 0 : BALLOON_105_CAPACITY)
                 : 0;
-            const balloon210Locked = ownsBalloon210 ? 0 : 1;
+            // Balloon 210 is locked if:
+            // 1. It's assigned to a different location, OR
+            // 2. There's a shared flight booking (shared_booked > 0) - Balloon 210 is reserved for shared flights
+            // This prevents 6-8 passenger private flights from using Balloon 210 when it's already reserved for shared flights
+            const balloon210Locked = (!ownsBalloon210 || sharedBooked > 0) ? 1 : 0;
             const balloon105Locked = ownsBalloon105 ? 0 : 1;
             const baseStatus = row.calculated_status || row.status;
             const calculatedStatus = (sharedAvailable <= 0 || balloon210Locked) ? 'Closed' : baseStatus;
@@ -14274,7 +14611,11 @@ app.get('/api/availabilities/filter', (req, res) => {
             const assignedBalloon105Location = normalizeLocationValue(row.assigned_balloon105_location);
             const ownsBalloon210 = !assignedBalloon210Location || assignedBalloon210Location === locationName;
             const ownsBalloon105 = !assignedBalloon105Location || assignedBalloon105Location === locationName;
-            const balloon210Locked = ownsBalloon210 ? 0 : 1;
+            // Balloon 210 is locked if:
+            // 1. It's assigned to a different location, OR
+            // 2. There's a shared flight booking (shared_booked > 0) - Balloon 210 is reserved for shared flights
+            // This prevents 6-8 passenger private flights from using Balloon 210 when it's already reserved for shared flights
+            const balloon210Locked = (!ownsBalloon210 || sharedBooked > 0) ? 1 : 0;
             const balloon105Locked = ownsBalloon105 ? 0 : 1;
             const sharedAvailable = ownsBalloon210 ? Math.max(0, sharedCapacity - sharedBooked) : 0;
             const privateSmallRemaining = ownsBalloon105
