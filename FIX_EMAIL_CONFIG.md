@@ -12,7 +12,7 @@ smtpTransporter: 'not configured'
 
 ### 1. EC2'ye SSH ile Bağlanın
 ```bash
-ssh -i /path/to/your-key.pem ec2-user@44.201.218.229
+ssh -i /path/to/your-key.pem ec2-user@54.174.83.100
 ```
 
 ### 2. Server Dizinine Gidin

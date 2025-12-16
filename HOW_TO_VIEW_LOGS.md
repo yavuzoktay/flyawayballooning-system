@@ -7,7 +7,7 @@ Backend loglarını görmek için EC2 instance'a SSH ile bağlanmanız gerekiyor
 ### 1. EC2'ye SSH ile Bağlanma
 
 ```bash
-ssh -i /path/to/your-key.pem ec2-user@44.201.218.229
+ssh -i /path/to/your-key.pem ec2-user@54.174.83.100
 ```
 
 ### 2. PM2 Loglarını Görüntüleme
