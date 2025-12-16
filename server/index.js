@@ -6845,6 +6845,43 @@ app.get('/api/getBookingByVoucherCode', (req, res) => {
     });
 });
 
+// Find a single booking by voucher_ref / voucher_code (used by frontend to open booking details from All Vouchers)
+app.get('/api/findBookingByVoucherRef', (req, res) => {
+    const rawCode = (req.query.voucher_ref || '').trim();
+
+    if (!rawCode) {
+        return res.status(400).json({ success: false, message: 'voucher_ref is required' });
+    }
+
+    const sql = `
+        SELECT 
+            ab.*,
+            COALESCE(ab.voucher_code, vc.code, vcu_map.code, v.voucher_ref) AS resolved_voucher_code
+        FROM all_booking ab
+        LEFT JOIN voucher_codes vc 
+            ON vc.code = ab.voucher_code
+        LEFT JOIN voucher_code_usage vcu
+            ON vcu.booking_id = ab.id
+        LEFT JOIN voucher_codes vcu_map
+            ON vcu_map.id = vcu.voucher_code_id
+        LEFT JOIN all_vouchers v
+            ON v.voucher_ref = COALESCE(ab.voucher_code, vc.code, vcu_map.code)
+        WHERE COALESCE(ab.voucher_code, vc.code, vcu_map.code, v.voucher_ref) = ?
+        ORDER BY ab.created_at DESC
+        LIMIT 1
+    `;
+
+    con.query(sql, [rawCode], (err, rows) => {
+        if (err) {
+            console.error('Error in findBookingByVoucherRef:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err });
+        }
+
+        const booking = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+        return res.json({ success: true, booking });
+    });
+});
+
 // Get Payment History for a booking
 app.get('/api/booking-payment-history/:bookingId', (req, res) => {
     const bookingId = parseInt(req.params.bookingId);

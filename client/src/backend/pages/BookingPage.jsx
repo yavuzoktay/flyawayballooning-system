@@ -1750,37 +1750,24 @@ setBookingDetail(finalVoucherDetail);
         } catch (e) { }
         // #endregion
 
+        // First try direct API to find booking by voucher_ref (handles redeem voucher linkage)
         axios
-            .get('/api/getBookingByVoucherCode', {
-                params: { voucher_code: voucherRef }
-            })
+            .get('/api/findBookingByVoucherRef', { params: { voucher_ref: voucherRef } })
             .then(async (res) => {
-                let rows = Array.isArray(res.data?.data)
-                    ? res.data.data
-                    : (Array.isArray(res.data) ? res.data : []);
+                const booking = res?.data?.booking;
+                if (booking?.id) {
+                    openBookingDetails(booking.id);
+                    return;
+                }
 
-                // #region agent log
-                try {
-                    fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            sessionId: 'debug-session',
-                            runId: 'post-fix',
-                            hypothesisId: 'H4',
-                            location: 'BookingPage.jsx:handleVoucherRefClick:afterResponse',
-                            message: 'getBookingByVoucherCode response',
-                            data: {
-                                voucherRef,
-                                rowCount: rows.length,
-                                firstRowId: rows[0]?.id || null,
-                                firstRowVoucherCode: rows[0]?.voucher_code || null
-                            },
-                            timestamp: Date.now()
-                        })
-                    }).catch(() => { });
-                } catch (e) { }
-                // #endregion
+                // Fallback to generic voucher_code lookup
+                const fallbackRes = await axios.get('/api/getBookingByVoucherCode', {
+                    params: { voucher_code: voucherRef }
+                });
+
+                let rows = Array.isArray(fallbackRes.data?.data)
+                    ? fallbackRes.data.data
+                    : (Array.isArray(fallbackRes.data) ? fallbackRes.data : []);
 
                 // If no direct match by voucher_code, do NOT guess by name/email
                 // to avoid opening wrong booking. Just inform the user.
@@ -1813,7 +1800,7 @@ setBookingDetail(finalVoucherDetail);
                             runId: 'pre-fix',
                             hypothesisId: 'H2',
                             location: 'BookingPage.jsx:handleVoucherRefClick:catch',
-                            message: 'Error from getAllBookingData',
+                            message: 'Error from booking lookup',
                             data: {
                                 voucherRef,
                                 errorMessage: err?.message || null
