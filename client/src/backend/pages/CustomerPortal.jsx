@@ -478,7 +478,9 @@ const CustomerPortal = () => {
 
                 <Paper id="scroll-target-booking" elevation={2} sx={{ p: 3, mb: 3, scrollMarginTop: '100px' }}>
                     <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
-                        Your Booking
+                        {bookingData.is_flight_voucher || bookingData.book_flight === 'Flight Voucher' 
+                            ? 'Your Booking Flight Voucher' 
+                            : 'Your Booking'}
                     </Typography>
                     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
                         <Box>
@@ -500,13 +502,15 @@ const CustomerPortal = () => {
                                     ? 'Not Scheduled'
                                     : bookingData.flight_date
                                         ? dayjs(bookingData.flight_date).format('DD/MM/YYYY HH:mm')
-                                        : 'Not Scheduled'}
+                                        : (bookingData.is_flight_voucher ? 'Date Not Scheduled' : 'Not Scheduled')}
                             </Typography>
                         </Box>
                         <Box>
                             <Typography variant="body2" color="text.secondary">Location</Typography>
                             <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                                {bookingData.location || 'TBD'}
+                                {bookingData.location 
+                                    ? bookingData.location 
+                                    : (bookingData.is_flight_voucher ? 'Date Not Scheduled' : 'TBD')}
                             </Typography>
                         </Box>
                         <Box>
@@ -844,7 +848,9 @@ const CustomerPortal = () => {
                             Passengers
                         </Typography>
                         {bookingData.passengers.map((passenger, index) => {
-                            const isEditing = editingPassenger === passenger.id;
+                            // For Flight Voucher, disable editing - only display passenger info
+                            const isFlightVoucher = bookingData.is_flight_voucher || bookingData.book_flight === 'Flight Voucher';
+                            const isEditing = !isFlightVoucher && editingPassenger === passenger.id;
                             return (
                                 <Box key={passenger.id || index} sx={{ mb: 2, p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
                                     {/* Name Section */}
@@ -871,13 +877,15 @@ const CustomerPortal = () => {
                                                 <Typography variant="body1" sx={{ fontWeight: 500, flex: 1 }}>
                                                     {passenger.first_name} {passenger.last_name}
                                                 </Typography>
-                                                <IconButton
-                                                    size="small"
-                                                    onClick={() => handleEditPassengerClick(passenger)}
-                                                    sx={{ color: '#3274b4' }}
-                                                >
-                                                    <EditIcon fontSize="small" />
-                                                </IconButton>
+                                                {!isFlightVoucher && (
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => handleEditPassengerClick(passenger)}
+                                                        sx={{ color: '#3274b4' }}
+                                                    >
+                                                        <EditIcon fontSize="small" />
+                                                    </IconButton>
+                                                )}
                                             </>
                                         )}
                                     </Box>
