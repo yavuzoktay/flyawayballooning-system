@@ -5785,25 +5785,6 @@ app.get('/api/getAllBookingData', (req, res) => {
         whereClause += ' AND (COALESCE(ab.voucher_code, vc.code, vcu_map.code, v.voucher_ref) = ? OR COALESCE(ab.voucher_code, vc.code, vcu_map.code, v.voucher_ref) = UPPER(?) OR COALESCE(ab.voucher_code, vc.code, vcu_map.code, v.voucher_ref) = LOWER(?))';
         params.push(vc, vc, vc);
 
-        // #region agent log
-        try {
-            fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    sessionId: 'debug-session',
-                    runId: 'pre-fix',
-                    hypothesisId: 'H3',
-                    location: 'server/index.js:getAllBookingData:voucherFilter',
-                    message: 'Applying voucher_code filter in getAllBookingData',
-                    data: {
-                        voucher_code: vc
-                    },
-                    timestamp: Date.now()
-                })
-            }).catch(() => { });
-        } catch (e) { }
-        // #endregion
     }
 
     // Search by name or email
@@ -5956,32 +5937,6 @@ app.get('/api/getAllBookingData', (req, res) => {
         }
 
         // If voucher_code is still null, fallback to joined usage mapping
-        // #region agent log
-        try {
-            const sample = result && result[0] ? {
-                id: result[0].id,
-                ab_voucher_code: result[0].voucher_code,
-                v_voucher_ref: result[0].v_voucher_ref,
-                v_original_voucher_type: result[0].original_voucher_type
-            } : null;
-            fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    sessionId: 'debug-session',
-                    runId: 'pre-fix',
-                    hypothesisId: 'H3',
-                    location: 'server/index.js:getAllBookingData:afterQuery',
-                    message: 'Result from getAllBookingData SQL',
-                    data: {
-                        rowCount: Array.isArray(result) ? result.length : 0,
-                        sample
-                    },
-                    timestamp: Date.now()
-                })
-            }).catch(() => { });
-        } catch (e) { }
-        // #endregion
 
         const enriched = await Promise.all(result.map(async (r) => {
             if (!r.voucher_code && r.vcu_map_code) {
@@ -6495,12 +6450,49 @@ app.get('/api/getAllBookingData', (req, res) => {
                         }
                     }
 
-                    // Strategy 4: If only one key exists, use it
+                    // Strategy 4: Match common voucher type aliases
+                    if (!voucherPricing) {
+                        const voucherTypeLower = (booking.voucher_type || '').toLowerCase();
+                        const aliasMap = {
+                            'any day flight': ['anytime', 'any day', 'any day flight', 'anyday', 'any day'],
+                            'weekday morning': ['weekday morning', 'morning', 'weekday'],
+                            'flexible weekday': ['flexible weekday', 'weekday flex', 'flexible', 'weekday flexible']
+                        };
+                        
+                        // Find matching alias
+                        for (const [canonical, aliases] of Object.entries(aliasMap)) {
+                            if (aliases.some(alias => voucherTypeLower.includes(alias) || alias.includes(voucherTypeLower))) {
+                                // Try to find pricing with any of these aliases
+                                for (const [key, value] of Object.entries(pricingData)) {
+                                    const keyNorm = normalize(key);
+                                    if (aliases.some(alias => keyNorm.includes(alias.toLowerCase()) || alias.toLowerCase().includes(keyNorm))) {
+                                        voucherPricing = value;
+                                        matchedKey = key;
+                                        console.log(`Alias match found: "${key}" for "${booking.voucher_type}"`);
+                                        break;
+                                    }
+                                }
+                                if (voucherPricing) break;
+                            }
+                        }
+                    }
+
+                    // Strategy 5: If only one key exists, use it
                     if (!voucherPricing && Object.keys(pricingData).length === 1) {
                         const onlyKey = Object.keys(pricingData)[0];
                         voucherPricing = pricingData[onlyKey];
                         matchedKey = onlyKey;
                         console.log(`Using only available pricing key: "${onlyKey}"`);
+                    }
+
+                    // Strategy 6: If still no match and voucher_type is "Any Day Flight", try to use first available pricing
+                    if (!voucherPricing && booking.voucher_type && normalize(booking.voucher_type).includes('any')) {
+                        const firstKey = Object.keys(pricingData)[0];
+                        if (firstKey) {
+                            voucherPricing = pricingData[firstKey];
+                            matchedKey = firstKey;
+                            console.log(`Fallback: Using first available pricing key "${firstKey}" for "Any Day Flight"`);
+                        }
                     }
 
                     if (!voucherPricing || typeof voucherPricing !== 'object') {
@@ -6746,24 +6738,6 @@ app.get('/api/getAllBookingData', (req, res) => {
 app.get('/api/getBookingByVoucherCode', (req, res) => {
     const rawCode = (req.query.voucher_code || '').trim();
 
-    // #region agent log
-    try {
-        fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                sessionId: 'debug-session',
-                runId: 'post-fix',
-                hypothesisId: 'H4',
-                location: 'server/index.js:getBookingByVoucherCode:entry',
-                message: 'getBookingByVoucherCode called',
-                data: { voucher_code: rawCode || null },
-                timestamp: Date.now()
-            })
-        }).catch(() => { });
-    } catch (e) { }
-    // #endregion
-
     if (!rawCode) {
         return res.status(400).json({ success: false, message: 'voucher_code is required' });
     }
@@ -6792,52 +6766,111 @@ app.get('/api/getBookingByVoucherCode', (req, res) => {
             return res.status(500).json({ success: false, message: 'Database error', error: err });
         }
 
-        // #region agent log
-        try {
-            const sample = rows && rows[0] ? {
-                id: rows[0].id,
-                voucher_code: rows[0].voucher_code,
-                resolved_voucher_code: rows[0].resolved_voucher_code
-            } : null;
-            fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    sessionId: 'debug-session',
-                    runId: 'post-fix',
-                    hypothesisId: 'H4',
-                    location: 'server/index.js:getBookingByVoucherCode:afterQuery',
-                    message: 'getBookingByVoucherCode SQL result',
-                    data: {
-                        voucher_code: rawCode,
-                        rowCount: Array.isArray(rows) ? rows.length : 0,
-                        sample
-                    },
-                    timestamp: Date.now()
-                })
-            }).catch(() => { });
-        } catch (e) { }
-        // #endregion
-
-        // If no rows found, try a best-effort heuristic link using voucher → booking relationship.
+        // If no rows found, try to find redeem voucher bookings created from this voucher_ref
         if (!rows || rows.length === 0) {
-            const fallbackSql = `
-                SELECT ab.*
+            console.log('🔍 getBookingByVoucherCode: No direct match, searching for redeem voucher bookings...');
+            
+            const redeemBookingSql = `
+                SELECT 
+                    ab.*,
+                    v.voucher_ref AS original_voucher_ref,
+                    COALESCE(ab.voucher_code, v.voucher_ref) AS resolved_voucher_code
                 FROM all_vouchers v
-                JOIN all_booking ab
-                    ON ab.name = v.name
+                INNER JOIN all_booking ab
+                    ON ab.flight_type_source = 'Redeem Voucher'
+                    AND ab.redeemed_voucher = 'Yes'
+                    AND ab.created_at >= v.created_at
+                    AND (
+                        -- Match by name (flexible matching)
+                        (ab.name = v.name 
+                         OR ab.name = v.recipient_name 
+                         OR v.name = ab.name
+                         OR ab.name LIKE CONCAT('%', SUBSTRING_INDEX(COALESCE(v.name, v.recipient_name, ''), ' ', 1), '%')
+                         OR v.name LIKE CONCAT('%', SUBSTRING_INDEX(ab.name, ' ', 1), '%'))
+                        AND (
+                            -- Match by email if available
+                            (ab.email = v.email AND v.email IS NOT NULL AND v.email != '')
+                            OR (ab.email = v.recipient_email AND v.recipient_email IS NOT NULL AND v.recipient_email != '')
+                            OR (v.email IS NULL OR v.email = '')
+                            OR (v.recipient_email IS NULL OR v.recipient_email = '')
+                        )
+                    )
                 WHERE v.voucher_ref = ?
+                    AND (v.redeemed = 'Yes' OR v.status = 'Used')
                 ORDER BY ab.created_at DESC
-                LIMIT 1
+                LIMIT 5
             `;
 
-            return con.query(fallbackSql, [rawCode], (fbErr, fbRows) => {
-                if (fbErr) {
-                    console.error('Error in getBookingByVoucherCode fallback:', fbErr);
-                    return res.status(500).json({ success: false, message: 'Database error', error: fbErr });
+            return con.query(redeemBookingSql, [rawCode], (redeemErr, redeemRows) => {
+                if (redeemErr) {
+                    console.error('Error in getBookingByVoucherCode (redeem search):', redeemErr);
+                    // Fall back to original fallback
+                    const fallbackSql = `
+                        SELECT ab.*
+                        FROM all_vouchers v
+                        JOIN all_booking ab
+                            ON ab.name = v.name
+                        WHERE v.voucher_ref = ?
+                        ORDER BY ab.created_at DESC
+                        LIMIT 5
+                    `;
+
+                    return con.query(fallbackSql, [rawCode], (fbErr, fbRows) => {
+                        if (fbErr) {
+                            console.error('Error in getBookingByVoucherCode fallback:', fbErr);
+                            return res.status(500).json({ success: false, message: 'Database error', error: fbErr });
+                        }
+
+                        return res.json({ success: true, data: fbRows || [] });
+                    });
                 }
 
-                return res.json({ success: true, data: fbRows || [] });
+                if (redeemRows && redeemRows.length > 0) {
+                    console.log('✅ getBookingByVoucherCode: Found', redeemRows.length, 'redeem voucher booking(s)');
+                    return res.json({ success: true, data: redeemRows || [] });
+                }
+
+                // Last fallback: try to find by voucher_ref in all_vouchers and match with recent bookings
+                console.log('🔍 getBookingByVoucherCode: Trying fallback search by voucher details...');
+                
+                const fallbackSql = `
+                    SELECT 
+                        ab.*,
+                        v.voucher_ref AS original_voucher_ref,
+                        COALESCE(ab.voucher_code, v.voucher_ref) AS resolved_voucher_code
+                    FROM all_vouchers v
+                    INNER JOIN all_booking ab
+                        ON ab.flight_type_source = 'Redeem Voucher'
+                        AND ab.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                        AND (
+                            -- Match by name (flexible matching)
+                            (ab.name = v.name 
+                             OR ab.name = v.recipient_name 
+                             OR v.name = ab.name
+                             OR ab.name LIKE CONCAT('%', SUBSTRING_INDEX(COALESCE(v.name, v.recipient_name, ''), ' ', 1), '%')
+                             OR v.name LIKE CONCAT('%', SUBSTRING_INDEX(ab.name, ' ', 1), '%'))
+                            AND (
+                                -- Match by email if available
+                                (ab.email = v.email AND v.email IS NOT NULL AND v.email != '')
+                                OR (ab.email = v.recipient_email AND v.recipient_email IS NOT NULL AND v.recipient_email != '')
+                                OR (v.email IS NULL OR v.email = '')
+                                OR (v.recipient_email IS NULL OR v.recipient_email = '')
+                            )
+                        )
+                    WHERE v.voucher_ref = ?
+                        AND (v.redeemed = 'Yes' OR v.status = 'Used')
+                    ORDER BY ab.created_at DESC
+                    LIMIT 5
+                `;
+
+                return con.query(fallbackSql, [rawCode], (fbErr, fbRows) => {
+                    if (fbErr) {
+                        console.error('Error in getBookingByVoucherCode fallback:', fbErr);
+                        return res.status(500).json({ success: false, message: 'Database error', error: fbErr });
+                    }
+
+                    return res.json({ success: true, data: fbRows || [] });
+                });
             });
         }
 
@@ -6853,6 +6886,9 @@ app.get('/api/findBookingByVoucherRef', (req, res) => {
         return res.status(400).json({ success: false, message: 'voucher_ref is required' });
     }
 
+    console.log('🔍 findBookingByVoucherRef: Searching for voucher_ref:', rawCode);
+
+    // First, try to find booking by direct voucher_code match
     const sql = `
         SELECT 
             ab.*,
@@ -6877,8 +6913,107 @@ app.get('/api/findBookingByVoucherRef', (req, res) => {
             return res.status(500).json({ success: false, message: 'Database error', error: err });
         }
 
-        const booking = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
-        return res.json({ success: true, booking });
+        // If found, return it
+        if (rows && rows.length > 0) {
+            console.log('✅ findBookingByVoucherRef: Found booking by direct match:', rows[0].id);
+            return res.json({ success: true, booking: rows[0] });
+        }
+
+        // If not found, try to find redeem voucher bookings created from this voucher_ref
+        // Redeem voucher bookings have flight_type_source = 'Redeem Voucher' and were created after the voucher was redeemed
+        console.log('🔍 findBookingByVoucherRef: No direct match, searching for redeem voucher bookings...');
+        
+        const redeemBookingSql = `
+            SELECT 
+                ab.*,
+                v.voucher_ref AS original_voucher_ref,
+                v.created_at AS voucher_created_at,
+                v.redeemed AS voucher_redeemed,
+                v.status AS voucher_status
+            FROM all_vouchers v
+            INNER JOIN all_booking ab
+                ON ab.flight_type_source = 'Redeem Voucher'
+                AND ab.redeemed_voucher = 'Yes'
+                AND ab.created_at >= v.created_at
+                AND (
+                    -- Match by name (flexible matching)
+                    (ab.name = v.name 
+                     OR ab.name = v.recipient_name 
+                     OR v.name = ab.name
+                     OR ab.name LIKE CONCAT('%', SUBSTRING_INDEX(COALESCE(v.name, v.recipient_name, ''), ' ', 1), '%')
+                     OR v.name LIKE CONCAT('%', SUBSTRING_INDEX(ab.name, ' ', 1), '%'))
+                    AND (
+                        -- Match by email if available
+                        (ab.email = v.email AND v.email IS NOT NULL AND v.email != '')
+                        OR (ab.email = v.recipient_email AND v.recipient_email IS NOT NULL AND v.recipient_email != '')
+                        OR (v.email IS NULL OR v.email = '')
+                        OR (v.recipient_email IS NULL OR v.recipient_email = '')
+                    )
+                )
+            WHERE v.voucher_ref = ?
+                AND (v.redeemed = 'Yes' OR v.status = 'Used')
+            ORDER BY ab.created_at DESC
+            LIMIT 1
+        `;
+
+        con.query(redeemBookingSql, [rawCode], (redeemErr, redeemRows) => {
+            if (redeemErr) {
+                console.error('Error in findBookingByVoucherRef (redeem search):', redeemErr);
+                return res.status(500).json({ success: false, message: 'Database error', error: redeemErr });
+            }
+
+            if (redeemRows && redeemRows.length > 0) {
+                console.log('✅ findBookingByVoucherRef: Found redeem voucher booking:', redeemRows[0].id);
+                return res.json({ success: true, booking: redeemRows[0] });
+            }
+
+            // Last fallback: try to find by voucher_ref in all_vouchers and match with recent bookings
+            console.log('🔍 findBookingByVoucherRef: Trying fallback search by voucher details...');
+            
+            const fallbackSql = `
+                SELECT 
+                    ab.*,
+                    v.voucher_ref AS original_voucher_ref
+                FROM all_vouchers v
+                INNER JOIN all_booking ab
+                    ON ab.flight_type_source = 'Redeem Voucher'
+                    AND ab.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                    AND (
+                        -- Match by name (flexible matching)
+                        (ab.name = v.name 
+                         OR ab.name = v.recipient_name 
+                         OR v.name = ab.name
+                         OR ab.name LIKE CONCAT('%', SUBSTRING_INDEX(COALESCE(v.name, v.recipient_name, ''), ' ', 1), '%')
+                         OR v.name LIKE CONCAT('%', SUBSTRING_INDEX(ab.name, ' ', 1), '%'))
+                        AND (
+                            -- Match by email if available
+                            (ab.email = v.email AND v.email IS NOT NULL AND v.email != '')
+                            OR (ab.email = v.recipient_email AND v.recipient_email IS NOT NULL AND v.recipient_email != '')
+                            OR (v.email IS NULL OR v.email = '')
+                            OR (v.recipient_email IS NULL OR v.recipient_email = '')
+                        )
+                    )
+                WHERE v.voucher_ref = ?
+                    AND (v.redeemed = 'Yes' OR v.status = 'Used')
+                ORDER BY ab.created_at DESC
+                LIMIT 1
+            `;
+
+            con.query(fallbackSql, [rawCode], (fallbackErr, fallbackRows) => {
+                if (fallbackErr) {
+                    console.error('Error in findBookingByVoucherRef (fallback):', fallbackErr);
+                    return res.status(500).json({ success: false, message: 'Database error', error: fallbackErr });
+                }
+
+                if (fallbackRows && fallbackRows.length > 0) {
+                    console.log('✅ findBookingByVoucherRef: Found booking by fallback search:', fallbackRows[0].id);
+                    return res.json({ success: true, booking: fallbackRows[0] });
+                }
+
+                console.log('❌ findBookingByVoucherRef: No booking found for voucher_ref:', rawCode);
+                return res.json({ success: false, message: 'No booking found for this voucher', booking: null });
+            });
+        });
     });
 });
 
@@ -12091,31 +12226,67 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         console.log('✅ Customer Portal - Booking found:', booking.id);
         console.log('📅 Customer Portal - Booking expires from DB:', booking.expires);
 
-        // Get voucher_type and voucher_type_detail from all_vouchers if booking was created from redeem voucher
-        // This matches the logic in getAllBookingData endpoint
+        // Get voucher information from all_vouchers table
+        // This is important for Flight Voucher bookings where customer info is stored in all_vouchers
+        let voucherInfo = null;
         let finalVoucherType = booking.voucher_type;
         let finalVoucherTypeDetail = booking.voucher_type_detail || null;
-        if (booking.voucher_code) {
+        let isFlightVoucher = false;
+        
+        // For synthetic voucher IDs (Flight Voucher), prioritize voucherRef from token
+        // because booking.voucher_code might be a newly generated code from redeem voucher
+        // For regular bookings, use booking.voucher_code first, then fallback to voucherRef
+        const voucherCodeToLookup = (isSyntheticVoucherId && voucherRef) 
+            ? voucherRef 
+            : (booking.voucher_code || voucherRef);
+        
+        if (voucherCodeToLookup) {
             try {
                 const [voucherRows] = await new Promise((resolve, reject) => {
-                    con.query('SELECT voucher_type, voucher_type_detail FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [booking.voucher_code], (err, rows) => {
+                    con.query(`
+                        SELECT 
+                            id, 
+                            name, 
+                            email, 
+                            phone, 
+                            mobile,
+                            purchaser_name,
+                            purchaser_email,
+                            purchaser_phone,
+                            purchaser_mobile,
+                            book_flight,
+                            voucher_type, 
+                            voucher_type_detail,
+                            expires AS voucher_expires,
+                            voucher_passenger_details,
+                            weight
+                        FROM all_vouchers 
+                        WHERE voucher_ref = ? 
+                        LIMIT 1
+                    `, [voucherCodeToLookup], (err, rows) => {
                         if (err) reject(err);
                         else resolve([rows]);
                     });
                 });
+                
                 if (voucherRows && voucherRows.length > 0) {
+                    voucherInfo = voucherRows[0];
+                    isFlightVoucher = voucherInfo.book_flight === 'Flight Voucher';
+                    
                     // Prioritize voucher_type_detail, then voucher_type
-                    if (voucherRows[0].voucher_type_detail) {
-                        finalVoucherTypeDetail = voucherRows[0].voucher_type_detail;
-                        finalVoucherType = voucherRows[0].voucher_type_detail;
+                    if (voucherInfo.voucher_type_detail) {
+                        finalVoucherTypeDetail = voucherInfo.voucher_type_detail;
+                        finalVoucherType = voucherInfo.voucher_type_detail;
                         console.log('✅ Customer Portal - Voucher type detail from all_vouchers:', finalVoucherTypeDetail);
-                    } else if (voucherRows[0].voucher_type) {
-                        finalVoucherType = voucherRows[0].voucher_type;
+                    } else if (voucherInfo.voucher_type) {
+                        finalVoucherType = voucherInfo.voucher_type;
                         console.log('✅ Customer Portal - Voucher type from all_vouchers:', finalVoucherType);
                     }
+                    
+                    console.log('✅ Customer Portal - Voucher info found, isFlightVoucher:', isFlightVoucher);
                 }
             } catch (voucherErr) {
-                console.warn('⚠️ Customer Portal - Could not fetch voucher_type from all_vouchers:', voucherErr.message);
+                console.warn('⚠️ Customer Portal - Could not fetch voucher info from all_vouchers:', voucherErr.message);
                 // Continue with booking.voucher_type as fallback
             }
         }
@@ -12126,12 +12297,55 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         }
 
         // Get passengers for this booking
-        const [passengerRows] = await new Promise((resolve, reject) => {
-            con.query('SELECT * FROM passenger WHERE booking_id = ?', [booking.id], (err, rows) => {
-                if (err) reject(err);
-                else resolve([rows]);
+        // For Flight Voucher, prioritize voucher_passenger_details from all_vouchers
+        // For other types, use passenger table
+        let finalPassengerRows = [];
+        
+        if (isFlightVoucher && voucherInfo && voucherInfo.voucher_passenger_details) {
+            // Flight Voucher: parse passenger details from voucher_passenger_details JSON
+            try {
+                const voucherPassengerList = parsePassengerList(voucherInfo.voucher_passenger_details);
+                
+                // Convert to format expected by frontend
+                // Use voucherInfo email/phone as fallback, then booking email/phone
+                const fallbackEmail = voucherInfo.purchaser_email || voucherInfo.email || booking.email || '';
+                const fallbackPhone = voucherInfo.purchaser_phone || voucherInfo.purchaser_mobile || voucherInfo.phone || voucherInfo.mobile || booking.phone || '';
+                
+                finalPassengerRows = voucherPassengerList.map((vp, index) => ({
+                    id: vp.id || null,
+                    booking_id: booking.id,
+                    first_name: vp.first_name || vp.firstName || '',
+                    last_name: vp.last_name || vp.lastName || '',
+                    email: vp.email || fallbackEmail,
+                    phone: vp.phone || fallbackPhone,
+                    weight: vp.weight || voucherInfo.weight || '',
+                    ticket_type: vp.ticket_type || null,
+                    weather_refund: vp.weather_refund || false,
+                    created_at: vp.created_at || booking.created_at
+                }));
+                
+                console.log('✅ Customer Portal - Using Flight Voucher passenger details from voucher_passenger_details:', finalPassengerRows.length, 'passengers');
+            } catch (parseErr) {
+                console.warn('⚠️ Customer Portal - Failed to parse voucher_passenger_details:', parseErr.message);
+                // Fallback to passenger table
+                const [passengerRows] = await new Promise((resolve, reject) => {
+                    con.query('SELECT * FROM passenger WHERE booking_id = ?', [booking.id], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
+                });
+                finalPassengerRows = passengerRows || [];
+            }
+        } else {
+            // For non-Flight Voucher or if voucher_passenger_details not available, use passenger table
+            const [passengerRows] = await new Promise((resolve, reject) => {
+                con.query('SELECT * FROM passenger WHERE booking_id = ?', [booking.id], (err, rows) => {
+                    if (err) reject(err);
+                    else resolve([rows]);
+                });
             });
-        });
+            finalPassengerRows = passengerRows || [];
+        }
 
         // Get flight_attempts from all_booking table (same logic as getAllBookingData)
         // Check if this is a redeem voucher booking
@@ -12176,6 +12390,59 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             ? finalFlightAttempts
             : (isRedeemVoucher ? 0 : booking.flight_attempts || 0);
 
+        // For Flight Voucher, use customer info from all_vouchers table
+        // For other types, use booking info
+        let customerName = booking.name;
+        let customerEmail = booking.email;
+        let customerPhone = booking.phone;
+        
+        if (isFlightVoucher && voucherInfo) {
+            // Flight Voucher: use name, email, phone from all_vouchers
+            // Prefer purchaser fields if available, otherwise use main fields
+            customerName = voucherInfo.purchaser_name || voucherInfo.name || booking.name;
+            customerEmail = voucherInfo.purchaser_email || voucherInfo.email || booking.email;
+            customerPhone = voucherInfo.purchaser_phone || voucherInfo.purchaser_mobile || voucherInfo.phone || voucherInfo.mobile || booking.phone;
+            
+            console.log('✅ Customer Portal - Using Flight Voucher customer info from all_vouchers:', {
+                name: customerName,
+                email: customerEmail,
+                phone: customerPhone
+            });
+        }
+
+        // For Flight Voucher, flight_date and location should only come from booking if booking exists and is scheduled
+        // AND if the booking's voucher_code matches the Flight Voucher's voucher_ref
+        // If Flight Voucher has no booking or booking is not scheduled or doesn't match, these should be null
+        let finalFlightDate = null;
+        let finalLocation = null;
+        
+        if (isFlightVoucher) {
+            // For Flight Voucher, only use flight_date and location if:
+            // 1. Booking exists
+            // 2. Booking's voucher_code matches the Flight Voucher's voucher_ref (voucherCodeToLookup)
+            // 3. Booking is scheduled (status is 'Scheduled')
+            // 4. Booking has flight_date
+            const voucherMatches = booking && (
+                booking.voucher_code === voucherRef || 
+                booking.voucher_code === voucherCodeToLookup ||
+                (voucherCodeToLookup && booking.voucher_code && booking.voucher_code.includes(voucherCodeToLookup)) ||
+                (voucherRef && booking.voucher_code && booking.voucher_code.includes(voucherRef))
+            );
+            
+            if (booking && voucherMatches && booking.flight_date && booking.status && booking.status.toLowerCase() === 'scheduled') {
+                finalFlightDate = booking.flight_date;
+                finalLocation = booking.location;
+            } else {
+                // Flight Voucher not yet scheduled or booking doesn't match - set to null so frontend shows "Date Not Scheduled"
+                finalFlightDate = null;
+                finalLocation = null;
+            }
+        } else {
+            // For non-Flight Voucher, use booking values as before
+            finalFlightDate = booking.flight_date;
+            finalLocation = booking.location;
+        }
+
         // Format the response
         const response = {
             success: true,
@@ -12183,27 +12450,29 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 id: booking.id,
                 booking_id: booking.id,
                 booking_reference: booking.id,
-                name: booking.name,
-                email: booking.email,
-                phone: booking.phone,
-                flight_date: booking.flight_date,
+                name: customerName,
+                email: customerEmail,
+                phone: customerPhone,
+                flight_date: finalFlightDate,
                 flight_type: booking.flight_type || booking.experience,
                 experience: booking.experience || booking.flight_type,
-                location: booking.location,
+                location: finalLocation,
                 status: booking.status,
                 pax: booking.pax,
-                passengers: passengerRows || [],
-                voucher_code: booking.voucher_code,
-                voucher_ref: booking.voucher_code || null,
+                passengers: finalPassengerRows,
+                voucher_code: booking.voucher_code || voucherRef,
+                voucher_ref: booking.voucher_code || voucherRef || null,
                 voucher_type: finalVoucherType || booking.voucher_type,
                 voucher_type_detail: finalVoucherTypeDetail || booking.voucher_type_detail || finalVoucherType || booking.voucher_type,
                 paid: booking.paid,
                 due: booking.due,
-                expires: booking.expires,
+                expires: booking.expires || (voucherInfo && voucherInfo.voucher_expires) || booking.expires,
                 created_at: booking.created_at,
                 additional_notes: booking.additional_notes,
                 flight_attempts: finalFlightAttempts,
-                activity_id: booking.activity_id || null
+                activity_id: booking.activity_id || null,
+                book_flight: voucherInfo ? voucherInfo.book_flight : null, // Add book_flight to identify Flight Voucher
+                is_flight_voucher: isFlightVoucher // Add flag to identify Flight Voucher
             }
         };
 
@@ -18739,6 +19008,50 @@ const runDatabaseMigrations = () => {
             console.error('Error creating passengers table:', err);
         } else {
             console.log('✅ Passengers table ready');
+        }
+    });
+
+    // Create additional_info_answers table if it doesn't exist
+    const checkAdditionalInfoAnswersTable = `
+        SELECT COUNT(*) AS cnt
+        FROM information_schema.tables
+        WHERE table_schema = DATABASE()
+          AND table_name = 'additional_info_answers'
+    `;
+
+    con.query(checkAdditionalInfoAnswersTable, (err, rows) => {
+        if (err) {
+            console.error('Error checking additional_info_answers table:', err);
+            return;
+        }
+
+        const exists = rows && rows[0] && Number(rows[0].cnt) > 0;
+
+        if (exists) {
+            console.log('✅ additional_info_answers table already exists');
+        } else {
+            const createAdditionalInfoAnswersTable = `
+                CREATE TABLE additional_info_answers (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    booking_id INT NOT NULL COMMENT 'Reference to the booking',
+                    question_id VARCHAR(50) NOT NULL COMMENT 'Question identifier (e.g., "13", "14")',
+                    answer TEXT COMMENT 'The answer provided by the user',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_booking_id (booking_id),
+                    INDEX idx_question_id (question_id),
+                    INDEX idx_booking_question (booking_id, question_id),
+                    FOREIGN KEY (booking_id) REFERENCES all_booking(id) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Stores answers to additional information questions for bookings'
+            `;
+
+            con.query(createAdditionalInfoAnswersTable, (createErr) => {
+                if (createErr) {
+                    console.error('Error creating additional_info_answers table:', createErr);
+                } else {
+                    console.log('✅ additional_info_answers table created successfully');
+                }
+            });
         }
     });
 

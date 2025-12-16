@@ -82,8 +82,8 @@ jobs:
               SSH_HOSTS="$SSH_HOST_SINGLE"
               echo "INFO: Using SSH_HOST single target: $SSH_HOSTS"
             else
-              SSH_HOSTS="44.201.218.229"
-              echo "WARNING: SSH_HOSTS and SSH_HOST are empty. Falling back to 44.201.218.229"
+              SSH_HOSTS="54.174.83.100"
+              echo "WARNING: SSH_HOSTS and SSH_HOST are empty. Falling back to 54.174.83.100"
             fi
           fi
           
