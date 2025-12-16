@@ -1783,8 +1783,8 @@ app.post('/api/createRedeemBooking', (req, res) => {
                         console.log('⚠️ Voucher info not found, using current date for expire calculation');
                     }
 
-                    // Continue with booking creation using the original voucher price and expire date
-                    createBookingWithPrice(voucherOriginalPrice, expiresDate);
+                    // Continue with booking creation using the original voucher price, expire date and voucherType
+                    createBookingWithPrice(voucherOriginalPrice, expiresDate, voucherType);
                 });
             });
 
@@ -1814,7 +1814,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
                         expiresDate = moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
                     }
 
-                    createBookingWithPrice(voucherOriginalPrice, expiresDate);
+                    createBookingWithPrice(voucherOriginalPrice, expiresDate, null);
                 });
             }
         } else {
@@ -1827,13 +1827,13 @@ app.post('/api/createRedeemBooking', (req, res) => {
             } else {
                 expiresDate = moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
             }
-            createBookingWithPrice(totalPrice || 0, expiresDate);
+            createBookingWithPrice(totalPrice || 0, expiresDate, null);
         }
 
-        function createBookingWithPrice(paidAmount, expiresDateFinal) {
+        function createBookingWithPrice(paidAmount, expiresDateFinal, resolvedVoucherType) {
             console.log('=== CREATING BOOKING WITH PAID AMOUNT:', paidAmount, 'AND EXPIRE DATE:', expiresDateFinal, '===');
 
-            // Simple SQL with only essential columns (including expires, flight_attempts, flight_type_source)
+            // Simple SQL with only essential columns (including expires, flight_attempts, flight_type_source, voucher_type)
             const bookingSql = `
         INSERT INTO all_booking (
             name,
@@ -1848,12 +1848,14 @@ app.post('/api/createRedeemBooking', (req, res) => {
             created_at,
             expires,
             email,
-                phone,
-                activity_id,
+            phone,
+            activity_id,
             redeemed_voucher,
             flight_attempts,
-            flight_type_source
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            flight_type_source,
+            voucher_type,
+            voucher_type_detail
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
             // Use actual passenger count from passengerData array
@@ -1865,6 +1867,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
             console.log('activity_id:', activity_id);
             console.log('cleanVoucherCode:', cleanVoucherCode);
             console.log('paidAmount (original voucher price):', paidAmount);
+            console.log('resolvedVoucherType:', resolvedVoucherType || null);
 
             const bookingValues = [
                 passengerName,
@@ -1883,7 +1886,9 @@ app.post('/api/createRedeemBooking', (req, res) => {
                 activity_id || null,
                 'Yes', // Redeem Voucher bookings always have redeemed_voucher = Yes
                 0, // flight_attempts (always 0 for redeem voucher bookings)
-                'Redeem Voucher' // flight_type_source (always 'Redeem Voucher' for this endpoint)
+                'Redeem Voucher', // flight_type_source (always 'Redeem Voucher' for this endpoint)
+                resolvedVoucherType || null,
+                null
             ];
 
             console.log('=== REDEEM BOOKING SQL ===');
@@ -5619,6 +5624,38 @@ app.get('/api/getAllBookingData', (req, res) => {
         params.push(req.query.location);
     }
 
+    // Voucher code filter (used when navigating from All Vouchers → related booking)
+    if (req.query.voucher_code && req.query.voucher_code.trim() !== '') {
+        const vc = req.query.voucher_code.trim();
+        // Use any of the known mappings between booking and voucher:
+        // - all_booking.voucher_code
+        // - voucher_codes.code (joined as vc.code)
+        // - voucher_code_usage → voucher_codes (joined as vcu_map.code)
+        // - all_vouchers.voucher_ref (joined as v.voucher_ref)
+        whereClause += ' AND (COALESCE(ab.voucher_code, vc.code, vcu_map.code, v.voucher_ref) = ? OR COALESCE(ab.voucher_code, vc.code, vcu_map.code, v.voucher_ref) = UPPER(?) OR COALESCE(ab.voucher_code, vc.code, vcu_map.code, v.voucher_ref) = LOWER(?))';
+        params.push(vc, vc, vc);
+
+        // #region agent log
+        try {
+            fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sessionId: 'debug-session',
+                    runId: 'pre-fix',
+                    hypothesisId: 'H3',
+                    location: 'server/index.js:getAllBookingData:voucherFilter',
+                    message: 'Applying voucher_code filter in getAllBookingData',
+                    data: {
+                        voucher_code: vc
+                    },
+                    timestamp: Date.now()
+                })
+            }).catch(() => { });
+        } catch (e) { }
+        // #endregion
+    }
+
     // Search by name or email
     if (req.query.search && req.query.search.trim() !== '') {
         whereClause += ' AND (ab.name LIKE ? OR ab.email LIKE ?)';
@@ -5754,6 +5791,33 @@ app.get('/api/getAllBookingData', (req, res) => {
         }
 
         // If voucher_code is still null, fallback to joined usage mapping
+        // #region agent log
+        try {
+            const sample = result && result[0] ? {
+                id: result[0].id,
+                ab_voucher_code: result[0].voucher_code,
+                v_voucher_ref: result[0].v_voucher_ref,
+                v_original_voucher_type: result[0].original_voucher_type
+            } : null;
+            fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sessionId: 'debug-session',
+                    runId: 'pre-fix',
+                    hypothesisId: 'H3',
+                    location: 'server/index.js:getAllBookingData:afterQuery',
+                    message: 'Result from getAllBookingData SQL',
+                    data: {
+                        rowCount: Array.isArray(result) ? result.length : 0,
+                        sample
+                    },
+                    timestamp: Date.now()
+                })
+            }).catch(() => { });
+        } catch (e) { }
+        // #endregion
+
         const enriched = await Promise.all(result.map(async (r) => {
             if (!r.voucher_code && r.vcu_map_code) {
                 r.voucher_code = r.vcu_map_code;
@@ -6440,6 +6504,87 @@ app.get('/api/getAllBookingData', (req, res) => {
         __getAllBookingDataCache.lastResponse = response;
 
         res.json(response);
+    });
+});
+
+// Lightweight endpoint: find single booking by voucher_code, using all known mappings.
+app.get('/api/getBookingByVoucherCode', (req, res) => {
+    const rawCode = (req.query.voucher_code || '').trim();
+
+    // #region agent log
+    try {
+        fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sessionId: 'debug-session',
+                runId: 'post-fix',
+                hypothesisId: 'H4',
+                location: 'server/index.js:getBookingByVoucherCode:entry',
+                message: 'getBookingByVoucherCode called',
+                data: { voucher_code: rawCode || null },
+                timestamp: Date.now()
+            })
+        }).catch(() => { });
+    } catch (e) { }
+    // #endregion
+
+    if (!rawCode) {
+        return res.status(400).json({ success: false, message: 'voucher_code is required' });
+    }
+
+    const sql = `
+        SELECT 
+            ab.*,
+            COALESCE(ab.voucher_code, vc.code, vcu_map.code, v.voucher_ref) AS resolved_voucher_code
+        FROM all_booking ab
+        LEFT JOIN voucher_codes vc 
+            ON vc.code = ab.voucher_code
+        LEFT JOIN voucher_code_usage vcu
+            ON vcu.booking_id = ab.id
+        LEFT JOIN voucher_codes vcu_map
+            ON vcu_map.id = vcu.voucher_code_id
+        LEFT JOIN all_vouchers v
+            ON v.voucher_ref = COALESCE(ab.voucher_code, vc.code, vcu_map.code)
+        WHERE COALESCE(ab.voucher_code, vc.code, vcu_map.code, v.voucher_ref) = ?
+        ORDER BY ab.created_at DESC
+        LIMIT 5
+    `;
+
+    con.query(sql, [rawCode], (err, rows) => {
+        if (err) {
+            console.error('Error in getBookingByVoucherCode:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err });
+        }
+
+        // #region agent log
+        try {
+            const sample = rows && rows[0] ? {
+                id: rows[0].id,
+                voucher_code: rows[0].voucher_code,
+                resolved_voucher_code: rows[0].resolved_voucher_code
+            } : null;
+            fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sessionId: 'debug-session',
+                    runId: 'post-fix',
+                    hypothesisId: 'H4',
+                    location: 'server/index.js:getBookingByVoucherCode:afterQuery',
+                    message: 'getBookingByVoucherCode SQL result',
+                    data: {
+                        voucher_code: rawCode,
+                        rowCount: Array.isArray(rows) ? rows.length : 0,
+                        sample
+                    },
+                    timestamp: Date.now()
+                })
+            }).catch(() => { });
+        } catch (e) { }
+        // #endregion
+
+        return res.json({ success: true, data: rows || [] });
     });
 });
 
