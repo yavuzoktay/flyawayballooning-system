@@ -1127,6 +1127,85 @@ const BookingPage = () => {
         }
     };
 
+    // Helper: Enrich booking rows with voucher_type coming from vouchers (for redeemed vouchers)
+    const enrichBookingsWithVoucherInfo = (bookings) => {
+        if (!Array.isArray(bookings) || bookings.length === 0) return bookings;
+        if (!Array.isArray(voucher) || voucher.length === 0) return bookings;
+
+        // Build maps:
+        // 1) booking_id -> voucher_type
+        // 2) voucher_code/ref -> voucher_type
+        const voucherTypeByBookingId = new Map();
+        const voucherTypeByCode = new Map();
+
+        voucher.forEach((v) => {
+            const src = v._original || v;
+            const bookingId = src?.booking_id || v.booking_id;
+
+            const codeRaw =
+                v.voucher_ref ||
+                src?.voucher_ref ||
+                src?.vc_code ||
+                src?.voucher_code ||
+                '';
+            const code = typeof codeRaw === 'string' ? codeRaw.trim().toUpperCase() : String(codeRaw || '').trim().toUpperCase();
+
+            // Prefer the concrete voucher type ("Weekday Morning", "Any Day Flight", etc.)
+            const typeFromDetail =
+                v.actual_voucher_type ||
+                src?.actual_voucher_type ||
+                src?.voucher_type_detail;
+            const fallbackType =
+                v.voucher_type ||
+                src?.voucher_type ||
+                v.book_flight ||
+                src?.book_flight ||
+                null;
+            const finalType = (typeFromDetail || fallbackType || '').toString().trim();
+
+            if (!finalType) return;
+
+            if (bookingId && !voucherTypeByBookingId.has(bookingId)) {
+                voucherTypeByBookingId.set(bookingId, finalType);
+            }
+            if (code && !voucherTypeByCode.has(code)) {
+                voucherTypeByCode.set(code, finalType);
+            }
+        });
+
+        if (voucherTypeByBookingId.size === 0 && voucherTypeByCode.size === 0) {
+            return bookings;
+        }
+
+        return bookings.map((b) => {
+            if (!b) return b;
+
+            // If booking already has a voucher_type, keep it
+            if (b.voucher_type && String(b.voucher_type).trim() !== '') {
+                return b;
+            }
+
+            const bookingId = b.id;
+            const bookingCodeRaw = b.voucher_code || '';
+            const bookingCode =
+                typeof bookingCodeRaw === 'string'
+                    ? bookingCodeRaw.trim().toUpperCase()
+                    : String(bookingCodeRaw || '').trim().toUpperCase();
+
+            let typeFromVoucher = bookingId ? voucherTypeByBookingId.get(bookingId) : null;
+            if (!typeFromVoucher && bookingCode) {
+                typeFromVoucher = voucherTypeByCode.get(bookingCode);
+            }
+
+            if (!typeFromVoucher) return b;
+
+            return {
+                ...b,
+                voucher_type: typeFromVoucher
+            };
+        });
+    };
+
     // Handle Filter Change
     const handleFilterChange = (field, value) => {
         setFilters((prev) => ({
@@ -1274,14 +1353,18 @@ const BookingPage = () => {
                 try {
                     const response = await axios.get(`/api/getAllBookingData`, { params: filters });
                     const bookingData = response.data.data || [];
-                    setBooking(bookingData);
+
+                    // Enrich bookings with voucher_type information from vouchers (for redeemed vouchers)
+                    const enrichedBookings = enrichBookingsWithVoucherInfo(bookingData);
+
+                    setBooking(enrichedBookings);
                     
                     // filteredBookingData'yı güncelle
-                    setFilteredBookingData(bookingData);
+                    setFilteredBookingData(enrichedBookings);
                     
                     // Eğer şu anda bookings tab'ındaysa, filteredData'yı da güncelle
                     if (activeTab === "bookings") {
-                        setFilteredData(bookingData);
+                        setFilteredData(enrichedBookings);
                     }
                 } catch (err) {
                     console.error('Error fetching booking data:', err);
@@ -1304,7 +1387,7 @@ const BookingPage = () => {
                 clearTimeout(filterDebounceTimer);
             }
         };
-    }, [filters, activeTab]);
+    }, [filters, activeTab, voucher]);
 
     // filteredData'yı voucher tablosu için backend key'lerine göre map'le
     useEffect(() => {
@@ -1576,20 +1659,209 @@ setBookingDetail(finalVoucherDetail);
 
     const handleVoucherRefClick = (voucherRow) => {
         const source = voucherRow?._original || voucherRow;
-        const bookingId = source?.booking_id || source?.bookingId || null;
-        if (!bookingId) {
+        let bookingId = source?.booking_id || source?.bookingId || null;
+
+        // #region agent log
+        try {
+            fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sessionId: 'debug-session',
+                    runId: 'pre-fix',
+                    hypothesisId: 'H1',
+                    location: 'BookingPage.jsx:handleVoucherRefClick:entry',
+                    message: 'handleVoucherRefClick called',
+                    data: {
+                        hasOriginal: !!voucherRow?._original,
+                        booking_id: source?.booking_id || null,
+                        bookingId: source?.bookingId || null,
+                        voucher_ref: source?.voucher_ref || null,
+                        voucher_code: source?.voucher_code || null,
+                        vc_code: source?.vc_code || null
+                    },
+                    timestamp: Date.now()
+                })
+            }).catch(() => { });
+        } catch (e) { }
+        // #endregion
+
+        const openBookingDetails = (id) => {
+            if (activeTab !== 'bookings') {
+                handleTabChange('bookings');
+            }
+            setDetailError(null);
+            setBookingDetail(null);
+            setSelectedBookingId(id);
+            setDetailDialogOpen(true);
+        };
+
+        if (bookingId) {
+            openBookingDetails(bookingId);
+            return;
+        }
+
+        // Fallback: try to locate booking by voucher_code using getAllBookingData
+        const voucherRef =
+            source?.voucher_ref ||
+            source?.voucher_code ||
+            source?.vc_code ||
+            null;
+
+        if (!voucherRef) {
+            // #region agent log
+            try {
+                fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sessionId: 'debug-session',
+                        runId: 'pre-fix',
+                        hypothesisId: 'H1',
+                        location: 'BookingPage.jsx:handleVoucherRefClick:noVoucherRef',
+                        message: 'No voucherRef on voucherRow',
+                        data: {},
+                        timestamp: Date.now()
+                    })
+                }).catch(() => { });
+            } catch (e) { }
+            // #endregion
             alert('No related booking found for this voucher yet.');
             return;
         }
 
-        if (activeTab !== 'bookings') {
-            handleTabChange('bookings');
-        }
+        console.log('🔍 handleVoucherRefClick fallback search for voucher_ref:', voucherRef);
 
-        setDetailError(null);
-        setBookingDetail(null);
-        setSelectedBookingId(bookingId);
-        setDetailDialogOpen(true);
+        // #region agent log
+        try {
+            fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sessionId: 'debug-session',
+                    runId: 'pre-fix',
+                    hypothesisId: 'H2',
+                    location: 'BookingPage.jsx:handleVoucherRefClick:beforeRequest',
+                    message: 'Calling getAllBookingData with voucher_code',
+                    data: { voucherRef },
+                    timestamp: Date.now()
+                })
+            }).catch(() => { });
+        } catch (e) { }
+        // #endregion
+
+        axios
+            .get('/api/getBookingByVoucherCode', {
+                params: { voucher_code: voucherRef }
+            })
+            .then(async (res) => {
+                let rows = Array.isArray(res.data?.data)
+                    ? res.data.data
+                    : (Array.isArray(res.data) ? res.data : []);
+
+                // #region agent log
+                try {
+                    fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            sessionId: 'debug-session',
+                            runId: 'post-fix',
+                            hypothesisId: 'H4',
+                            location: 'BookingPage.jsx:handleVoucherRefClick:afterResponse',
+                            message: 'getBookingByVoucherCode response',
+                            data: {
+                                voucherRef,
+                                rowCount: rows.length,
+                                firstRowId: rows[0]?.id || null,
+                                firstRowVoucherCode: rows[0]?.voucher_code || null
+                            },
+                            timestamp: Date.now()
+                        })
+                    }).catch(() => { });
+                } catch (e) { }
+                // #endregion
+
+                // If no direct match by voucher_code, try heuristic search in bookings
+                if (!rows || rows.length === 0) {
+                    const searchKey =
+                        (source?.email || source?.purchaser_email || '').toString().trim() ||
+                        (source?.name || source?.purchaser_name || '').toString().trim();
+
+                    if (searchKey) {
+                        try {
+                            const fallbackRes = await axios.get('/api/getAllBookingData', {
+                                params: { search: searchKey }
+                            });
+                            const bookingRows = Array.isArray(fallbackRes.data?.data) ? fallbackRes.data.data : [];
+
+                            // #region agent log
+                            try {
+                                fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        sessionId: 'debug-session',
+                                        runId: 'post-fix',
+                                        hypothesisId: 'H4',
+                                        location: 'BookingPage.jsx:handleVoucherRefClick:fallbackSearch',
+                                        message: 'Fallback search in getAllBookingData',
+                                        data: {
+                                            voucherRef,
+                                            searchKey,
+                                            rowCount: bookingRows.length,
+                                            firstRowId: bookingRows[0]?.id || null
+                                        },
+                                        timestamp: Date.now()
+                                    })
+                                }).catch(() => { });
+                            } catch (e) { }
+                            // #endregion
+
+                            if (bookingRows.length > 0 && bookingRows[0]?.id) {
+                                openBookingDetails(bookingRows[0].id);
+                                return;
+                            }
+                        } catch (e) {
+                            // ignore and fall through to alert
+                        }
+                    }
+
+                    alert('No related booking found for this voucher yet.');
+                    return;
+                }
+
+                const found = rows[0];
+                if (!found?.id) {
+                    alert('No related booking found for this voucher yet.');
+                    return;
+                }
+                openBookingDetails(found.id);
+            })
+            .catch((err) => {
+                console.error('Error searching booking by voucher_code:', err);
+                // #region agent log
+                try {
+                    fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            sessionId: 'debug-session',
+                            runId: 'pre-fix',
+                            hypothesisId: 'H2',
+                            location: 'BookingPage.jsx:handleVoucherRefClick:catch',
+                            message: 'Error from getAllBookingData',
+                            data: {
+                                voucherRef,
+                                errorMessage: err?.message || null
+                            },
+                            timestamp: Date.now()
+                        })
+                    }).catch(() => { });
+                } catch (e) { }
+                // #endregion
+                alert('No related booking found for this voucher yet.');
+            });
     };
 
     useEffect(() => {

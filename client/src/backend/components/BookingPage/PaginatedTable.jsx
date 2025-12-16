@@ -594,8 +594,12 @@ const PaginatedTable = ({
                                             ) : id === 'voucher_ref' ? (
                                                 (() => {
                                                     if (!item[id]) return '';
-                                                    const hasBooking = Boolean(getVoucherBookingId(item));
-                                                    const isClickable = context === 'vouchers' && hasBooking && isVoucherRedeemed(item) && typeof onVoucherRefClick === 'function';
+                                                    // Make voucher ref clickable when voucher is marked as redeemed.
+                                                    // Booking lookup will be resolved in handleVoucherRefClick.
+                                                    const isClickable =
+                                                        context === 'vouchers' &&
+                                                        isVoucherRedeemed(item) &&
+                                                        typeof onVoucherRefClick === 'function';
                                                     if (!isClickable) {
                                                         return item[id];
                                                     }
