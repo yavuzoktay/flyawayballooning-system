@@ -5881,10 +5881,9 @@ app.get('/api/getAllBookingData', (req, res) => {
         SELECT 
             ab.*, 
             ab.name as passenger_name,
-            -- Prioritize voucher_type_detail from all_vouchers, then booking's voucher_type_detail, then voucher_type, then booking's voucher_type
-            -- This ensures we show the actual voucher type (Weekday Morning, Flexible Weekday, Any Day Flight, etc.)
-            -- instead of experience type (Shared Flight, Private Charter, etc.)
-            -- Filter out experience values: if voucher_type is 'Shared Flight' or 'Private Charter', prefer voucher_type_detail or NULL
+            -- NOTE: We keep ab.voucher_type intact (as stored on booking) to match getBookingDetail behaviour.
+            -- We also compute a filtered voucher type for legacy logic, but we do NOT use it for the public 'voucher_type'
+            -- field returned by getAllBookingData anymore (see JS enrichment logic below).
             CASE 
                 WHEN v.voucher_type_detail IS NOT NULL AND v.voucher_type_detail != '' 
                     AND UPPER(v.voucher_type_detail) NOT IN ('SHARED FLIGHT', 'PRIVATE CHARTER', 'SHARED', 'PRIVATE')
@@ -5899,7 +5898,7 @@ app.get('/api/getAllBookingData', (req, res) => {
                     AND UPPER(ab.voucher_type) NOT IN ('SHARED FLIGHT', 'PRIVATE CHARTER', 'SHARED', 'PRIVATE') 
                     THEN ab.voucher_type
                 ELSE NULL
-            END as voucher_type,
+            END as voucher_type_filtered,
             COALESCE(ab.voucher_code, vc.code, vcu_map.code, v.voucher_ref) as voucher_code,
             DATE_FORMAT(ab.created_at, '%Y-%m-%d') as created_at_display,
             DATE_FORMAT(ab.expires, '%d/%m/%Y') as expires_display,
@@ -6001,77 +6000,19 @@ app.get('/api/getAllBookingData', (req, res) => {
                 expiresDisplay = voucher_expires_display;
             }
 
-            // Get voucher_type from all_vouchers (prioritize voucher's voucher_type for redeem voucher bookings)
-            // Filter out experience values (Shared Flight, Private Charter) and prioritize actual voucher types
-            const isExperienceValue = (type) => {
-                if (!type || typeof type !== 'string') return false;
-                const lowerType = type.toLowerCase().trim();
-                return ['shared flight', 'private charter', 'shared', 'private'].includes(lowerType);
+            // Match getBookingDetail behaviour for voucher_type:
+            // - If booking.voucher_type exists, keep it
+            // - Else, if all_vouchers.voucher_type exists, use it
+            // No experience filtering or Any Day Flight fallback here.
+            const nonEmptyStringOrNull = (val) => {
+                if (val === null || val === undefined) return null;
+                const s = String(val).trim();
+                return s ? s : null;
             };
-            
-            // Helper function to extract voucher type from voucher code
-            // Format: [Prefix][Category][Year][Serial]
-            // Prefix: B (Book Flight), F (Flight Voucher), G (Gift Voucher)
-            // Category: AT (Any Day Flight), WM (Weekday Morning), WF (Weekday Flex/Flexible Weekday)
-            const getVoucherTypeFromCode = (code) => {
-                if (!code || typeof code !== 'string' || code.length < 3) return null;
-                const upperCode = code.toUpperCase();
-                const categoryMap = {
-                    'AT': 'Any Day Flight',
-                    'WM': 'Weekday Morning',
-                    'WF': 'Flexible Weekday',
-                    'WX': 'Weekday Flex'
-                };
-                // Extract category code (positions 1-2 after prefix)
-                if (upperCode.startsWith('B') && upperCode.length >= 3) {
-                    const category = upperCode.substring(1, 3);
-                    return categoryMap[category] || null;
-                }
-                return null;
-            };
-            
-            // Priority 1: voucher_type_detail (most accurate, from all_vouchers or booking)
-            let finalVoucherType = null;
-            if (rest.voucher_type_detail && !isExperienceValue(rest.voucher_type_detail)) {
-                finalVoucherType = rest.voucher_type_detail;
-            }
-            // Priority 2: voucher_type from SQL (already filtered in SQL, but double-check)
-            else if (rest.voucher_type && !isExperienceValue(rest.voucher_type)) {
-                finalVoucherType = rest.voucher_type;
-            }
-            // Priority 3: original_voucher_type from all_vouchers (if not experience value)
-            else if (original_voucher_type && !isExperienceValue(original_voucher_type)) {
-                finalVoucherType = original_voucher_type;
-            }
-            // Priority 4: Try to infer from voucher code pattern (e.g., BAT25WJD -> Any Day Flight)
-            else if (rest.voucher_code) {
-                const inferredType = getVoucherTypeFromCode(rest.voucher_code);
-                if (inferredType) {
-                    finalVoucherType = inferredType;
-                }
-            }
-            // Priority 5: voucher_book_flight (if it's a valid voucher type, not experience)
-            else if (voucher_book_flight && !isExperienceValue(voucher_book_flight)) {
-                // Check if it's a journey type (Book Flight, Flight Voucher, Gift Voucher) or actual voucher type
-                const journeyTypes = ['book flight', 'flight voucher', 'gift voucher', 'redeem voucher'];
-                const lowerBookFlight = (voucher_book_flight || '').toLowerCase();
-                if (!journeyTypes.includes(lowerBookFlight)) {
-                    finalVoucherType = voucher_book_flight;
-                }
-            }
-            // Fallback: If we still don't have a valid voucher type, try to infer from experience
-            // For Shared Flight experience, default to "Any Day Flight"
-            // For Private Charter experience, default to "Any Day Flight" (Private Charter uses same voucher types)
-            if (!finalVoucherType && (rest.experience || rest.flight_type)) {
-                const experience = (rest.experience || rest.flight_type || '').toLowerCase();
-                if (experience.includes('shared') || experience.includes('private')) {
-                    finalVoucherType = 'Any Day Flight'; // Default voucher type for both Shared Flight and Private Charter
-                }
-            }
-            
-            // Final check: don't use invalid experience values
-            if (finalVoucherType && isExperienceValue(finalVoucherType)) {
-                finalVoucherType = null;
+
+            let finalVoucherType = nonEmptyStringOrNull(rest.voucher_type);
+            if (!finalVoucherType) {
+                finalVoucherType = nonEmptyStringOrNull(original_voucher_type);
             }
 
             // For bookings created from redeem voucher, flight_attempts should start from 0, not 1
@@ -6919,10 +6860,12 @@ app.get('/api/findBookingByVoucherRef', (req, res) => {
             return res.json({ success: true, booking: rows[0] });
         }
 
-        // If not found, try to find redeem voucher bookings created from this voucher_ref
-        // Redeem voucher bookings have flight_type_source = 'Redeem Voucher' and were created after the voucher was redeemed
-        console.log('🔍 findBookingByVoucherRef: No direct match, searching for redeem voucher bookings...');
-        
+        // If not found, try to find the booking created by redeeming this voucher_ref.
+        // IMPORTANT: In our redeem flow, the booking gets a NEW generated voucher_code (BAT...),
+        // so we cannot rely on direct voucher_code match with the original voucher_ref (GAT...).
+        // We therefore match using voucher metadata (email/phone/name/paid) + time window.
+        console.log('🔍 findBookingByVoucherRef: No direct match, searching for redeem voucher booking (metadata match)...');
+
         const redeemBookingSql = `
             SELECT 
                 ab.*,
@@ -6935,24 +6878,47 @@ app.get('/api/findBookingByVoucherRef', (req, res) => {
                 ON ab.flight_type_source = 'Redeem Voucher'
                 AND ab.redeemed_voucher = 'Yes'
                 AND ab.created_at >= v.created_at
-                AND (
-                    -- Match by name (flexible matching)
-                    (ab.name = v.name 
-                     OR ab.name = v.recipient_name 
-                     OR v.name = ab.name
-                     OR ab.name LIKE CONCAT('%', SUBSTRING_INDEX(COALESCE(v.name, v.recipient_name, ''), ' ', 1), '%')
-                     OR v.name LIKE CONCAT('%', SUBSTRING_INDEX(ab.name, ' ', 1), '%'))
-                    AND (
-                        -- Match by email if available
-                        (ab.email = v.email AND v.email IS NOT NULL AND v.email != '')
-                        OR (ab.email = v.recipient_email AND v.recipient_email IS NOT NULL AND v.recipient_email != '')
-                        OR (v.email IS NULL OR v.email = '')
-                        OR (v.recipient_email IS NULL OR v.recipient_email = '')
-                    )
-                )
             WHERE v.voucher_ref = ?
                 AND (v.redeemed = 'Yes' OR v.status = 'Used')
-            ORDER BY ab.created_at DESC
+                AND (
+                    -- Prefer deterministic matches first
+                    (ab.email IS NOT NULL AND ab.email != '' AND (
+                        UPPER(ab.email) = UPPER(v.email)
+                        OR UPPER(ab.email) = UPPER(v.recipient_email)
+                        OR UPPER(ab.email) = UPPER(v.purchaser_email)
+                    ))
+                    OR (ab.phone IS NOT NULL AND ab.phone != '' AND (
+                        ab.phone = v.phone
+                        OR ab.phone = v.recipient_phone
+                        OR ab.phone = v.purchaser_phone
+                        OR ab.phone = v.mobile
+                        OR ab.phone = v.purchaser_mobile
+                    ))
+                    OR (COALESCE(NULLIF(TRIM(ab.name), ''), '') != '' AND (
+                        UPPER(TRIM(ab.name)) = UPPER(TRIM(COALESCE(v.name, '')))
+                        OR UPPER(TRIM(ab.name)) = UPPER(TRIM(COALESCE(v.recipient_name, '')))
+                        OR UPPER(TRIM(ab.name)) = UPPER(TRIM(COALESCE(v.purchaser_name, '')))
+                    ))
+                    OR (v.paid IS NOT NULL AND v.paid != '' AND ab.paid IS NOT NULL AND ab.paid != '' AND CAST(ab.paid AS DECIMAL(10,2)) = CAST(v.paid AS DECIMAL(10,2)))
+                    -- Last resort: within a tight time window after voucher creation (redeem is usually immediate)
+                    OR (ab.created_at >= v.created_at AND ab.created_at <= DATE_ADD(v.created_at, INTERVAL 7 DAY))
+                )
+            ORDER BY 
+                -- Prefer exact email matches, then phone, then paid match, then recency
+                (ab.email IS NOT NULL AND ab.email != '' AND (
+                    UPPER(ab.email) = UPPER(v.email)
+                    OR UPPER(ab.email) = UPPER(v.recipient_email)
+                    OR UPPER(ab.email) = UPPER(v.purchaser_email)
+                )) DESC,
+                (ab.phone IS NOT NULL AND ab.phone != '' AND (
+                    ab.phone = v.phone
+                    OR ab.phone = v.recipient_phone
+                    OR ab.phone = v.purchaser_phone
+                    OR ab.phone = v.mobile
+                    OR ab.phone = v.purchaser_mobile
+                )) DESC,
+                (v.paid IS NOT NULL AND v.paid != '' AND ab.paid IS NOT NULL AND ab.paid != '' AND CAST(ab.paid AS DECIMAL(10,2)) = CAST(v.paid AS DECIMAL(10,2))) DESC,
+                ab.created_at DESC
             LIMIT 1
         `;
 
@@ -6967,9 +6933,10 @@ app.get('/api/findBookingByVoucherRef', (req, res) => {
                 return res.json({ success: true, booking: redeemRows[0] });
             }
 
-            // Last fallback: try to find by voucher_ref in all_vouchers and match with recent bookings
-            console.log('🔍 findBookingByVoucherRef: Trying fallback search by voucher details...');
-            
+            // Last fallback: if metadata match still fails, pick the most recent Redeem Voucher booking
+            // created after this voucher's created_at (within 30 days).
+            console.log('🔍 findBookingByVoucherRef: Fallback to most recent redeem booking after voucher created_at...');
+
             const fallbackSql = `
                 SELECT 
                     ab.*,
@@ -6977,22 +6944,9 @@ app.get('/api/findBookingByVoucherRef', (req, res) => {
                 FROM all_vouchers v
                 INNER JOIN all_booking ab
                     ON ab.flight_type_source = 'Redeem Voucher'
-                    AND ab.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-                    AND (
-                        -- Match by name (flexible matching)
-                        (ab.name = v.name 
-                         OR ab.name = v.recipient_name 
-                         OR v.name = ab.name
-                         OR ab.name LIKE CONCAT('%', SUBSTRING_INDEX(COALESCE(v.name, v.recipient_name, ''), ' ', 1), '%')
-                         OR v.name LIKE CONCAT('%', SUBSTRING_INDEX(ab.name, ' ', 1), '%'))
-                        AND (
-                            -- Match by email if available
-                            (ab.email = v.email AND v.email IS NOT NULL AND v.email != '')
-                            OR (ab.email = v.recipient_email AND v.recipient_email IS NOT NULL AND v.recipient_email != '')
-                            OR (v.email IS NULL OR v.email = '')
-                            OR (v.recipient_email IS NULL OR v.recipient_email = '')
-                        )
-                    )
+                    AND ab.redeemed_voucher = 'Yes'
+                    AND ab.created_at >= v.created_at
+                    AND ab.created_at <= DATE_ADD(v.created_at, INTERVAL 30 DAY)
                 WHERE v.voucher_ref = ?
                     AND (v.redeemed = 'Yes' OR v.status = 'Used')
                 ORDER BY ab.created_at DESC
@@ -14474,6 +14428,8 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
             COALESCE(booking_counts.shared_consumed_pax, 0) as shared_consumed_pax,
             COALESCE(booking_counts.private_small_bookings, 0) as private_charter_small_bookings,
             COALESCE(booking_counts.private_small_passengers, 0) as private_charter_small_passengers,
+            COALESCE(booking_counts.shared_booked_for_balloon210, 0) as shared_booked_for_balloon210,
+            COALESCE(booking_counts.private_large_booked_for_balloon210, 0) as private_large_booked_for_balloon210,
             LEAST(aa.capacity, 8) as shared_capacity,
             CASE 
                 WHEN COALESCE(booking_counts.shared_consumed_pax, 0) >= LEAST(aa.capacity, 8) THEN 'Closed'
@@ -14518,7 +14474,21 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
                              AND COALESCE(ab.pax, 0) <= 4 THEN COALESCE(ab.pax, 0)
                         ELSE 0
                     END
-                ), 0) as private_small_passengers
+                ), 0) as private_small_passengers,
+                COALESCE(SUM(
+                    CASE 
+                        WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%shared%')
+                        THEN COALESCE(ab.pax, 0)
+                        ELSE 0
+                    END
+                ), 0) as shared_booked_for_balloon210,
+                COALESCE(SUM(
+                    CASE 
+                        WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%')
+                             AND COALESCE(ab.pax, 0) > 4 THEN 1
+                        ELSE 0
+                    END
+                ), 0) as private_large_booked_for_balloon210
             FROM all_booking ab 
             WHERE DATE(ab.flight_date) >= CURDATE() - INTERVAL 30 DAY
             AND (ab.status IS NULL OR TRIM(LOWER(ab.status)) NOT IN ('cancelled'))
@@ -14526,7 +14496,10 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
             GROUP BY DATE(ab.flight_date), TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i')
         ) as booking_counts 
             ON DATE(aa.date) = booking_counts.flight_date 
-            AND TIME_FORMAT(TIME(aa.time), '%H:%i') = booking_counts.flight_time_min
+            AND COALESCE(
+                TIME_FORMAT(TIME(aa.time), '%H:%i'),
+                TIME_FORMAT(STR_TO_DATE(aa.time, '%h:%i %p'), '%H:%i')
+            ) = booking_counts.flight_time_min
         LEFT JOIN (
             SELECT 
                 flight_date,
@@ -14573,7 +14546,10 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
             GROUP BY flight_date, flight_time_min
         ) as resource_assignments
             ON DATE(aa.date) = resource_assignments.flight_date
-            AND TIME_FORMAT(TIME(aa.time), '%H:%i') = resource_assignments.flight_time_min
+            AND COALESCE(
+                TIME_FORMAT(TIME(aa.time), '%H:%i'),
+                TIME_FORMAT(STR_TO_DATE(aa.time, '%h:%i %p'), '%H:%i')
+            ) = resource_assignments.flight_time_min
         WHERE aa.activity_id = ? 
         ORDER BY aa.date, aa.time
 `;
@@ -14614,12 +14590,15 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
                 : 0;
             // Balloon 210 is locked if:
             // 1. It's assigned to a different location, OR
-            // 2. There's a shared flight booking (shared_booked > 0) - Balloon 210 is reserved for shared flights
-            // This prevents 6-8 passenger private flights from using Balloon 210 when it's already reserved for shared flights
-            const balloon210Locked = (!ownsBalloon210 || sharedBooked > 0) ? 1 : 0;
+            // 2. There's a large private flight booking (6-8 pax) - Balloon 210 is exclusively reserved for large private flights
+            // Shared flights can share Balloon 210, so shared_booked > 0 does NOT lock it
+            const privateLargeBooked = Number(row.private_large_booked_for_balloon210 || 0);
+            const balloon210Locked = (!ownsBalloon210 || privateLargeBooked > 0) ? 1 : 0;
             const balloon105Locked = ownsBalloon105 ? 0 : 1;
             const baseStatus = row.calculated_status || row.status;
-            const calculatedStatus = (sharedAvailable <= 0 || balloon210Locked) ? 'Closed' : baseStatus;
+            // For shared flights, balloon210Locked should not close the slot if it's only due to shared bookings
+            // Only close if balloon is assigned to different location or large private flight exists
+            const calculatedStatus = (sharedAvailable <= 0 || (!ownsBalloon210 || privateLargeBooked > 0)) ? 'Closed' : baseStatus;
             const needsUpdate = calculatedStatus !== row.status || sharedAvailable !== row.available;
 
             if (needsUpdate) {
@@ -14714,6 +14693,8 @@ app.get('/api/availabilities/filter', (req, res) => {
             COALESCE(booking_counts.shared_consumed_pax, 0) as shared_consumed_pax,
             COALESCE(booking_counts.private_small_bookings, 0) as private_charter_small_bookings,
             COALESCE(booking_counts.private_small_passengers, 0) as private_charter_small_passengers,
+            COALESCE(booking_counts.shared_booked_for_balloon210, 0) as shared_booked_for_balloon210,
+            COALESCE(booking_counts.private_large_booked_for_balloon210, 0) as private_large_booked_for_balloon210,
             LEAST(aa.capacity, 8) as shared_capacity,
             CASE 
                 WHEN COALESCE(booking_counts.shared_consumed_pax, 0) >= LEAST(aa.capacity, 8) THEN 'Closed'
@@ -14758,7 +14739,21 @@ app.get('/api/availabilities/filter', (req, res) => {
                              AND COALESCE(ab.pax, 0) <= 4 THEN COALESCE(ab.pax, 0)
                         ELSE 0
                     END
-                ), 0) as private_small_passengers
+                ), 0) as private_small_passengers,
+                COALESCE(SUM(
+                    CASE 
+                        WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%shared%')
+                        THEN COALESCE(ab.pax, 0)
+                        ELSE 0
+                    END
+                ), 0) as shared_booked_for_balloon210,
+                COALESCE(SUM(
+                    CASE 
+                        WHEN (LOWER(COALESCE(ab.experience, ab.flight_type)) LIKE '%private%')
+                             AND COALESCE(ab.pax, 0) > 4 THEN 1
+                        ELSE 0
+                    END
+                ), 0) as private_large_booked_for_balloon210
             FROM all_booking ab 
             WHERE DATE(ab.flight_date) >= CURDATE() - INTERVAL 30 DAY
             AND (ab.status IS NULL OR TRIM(LOWER(ab.status)) NOT IN ('cancelled'))
@@ -14766,7 +14761,10 @@ app.get('/api/availabilities/filter', (req, res) => {
             GROUP BY DATE(ab.flight_date), TIME_FORMAT(TIME(COALESCE(ab.time_slot, ab.flight_date)), '%H:%i')
         ) as booking_counts 
             ON DATE(aa.date) = booking_counts.flight_date 
-            AND TIME_FORMAT(TIME(aa.time), '%H:%i') = booking_counts.flight_time_min
+            AND COALESCE(
+                TIME_FORMAT(TIME(aa.time), '%H:%i'),
+                TIME_FORMAT(STR_TO_DATE(aa.time, '%h:%i %p'), '%H:%i')
+            ) = booking_counts.flight_time_min
         LEFT JOIN (
             SELECT 
                 flight_date,
@@ -14813,7 +14811,10 @@ app.get('/api/availabilities/filter', (req, res) => {
             GROUP BY flight_date, flight_time_min
         ) as resource_assignments
             ON DATE(aa.date) = resource_assignments.flight_date
-            AND TIME_FORMAT(TIME(aa.time), '%H:%i') = resource_assignments.flight_time_min
+            AND COALESCE(
+                TIME_FORMAT(TIME(aa.time), '%H:%i'),
+                TIME_FORMAT(STR_TO_DATE(aa.time, '%h:%i %p'), '%H:%i')
+            ) = resource_assignments.flight_time_min
         WHERE ${activityId ? 'aa.activity_id = ?' : 'a.location = ?'} AND a.status = 'Live'
     `;
 
@@ -14919,9 +14920,10 @@ app.get('/api/availabilities/filter', (req, res) => {
             const ownsBalloon105 = !assignedBalloon105Location || assignedBalloon105Location === locationName;
             // Balloon 210 is locked if:
             // 1. It's assigned to a different location, OR
-            // 2. There's a shared flight booking (shared_booked > 0) - Balloon 210 is reserved for shared flights
-            // This prevents 6-8 passenger private flights from using Balloon 210 when it's already reserved for shared flights
-            const balloon210Locked = (!ownsBalloon210 || sharedBooked > 0) ? 1 : 0;
+            // 2. There's a large private flight booking (6-8 pax) - Balloon 210 is exclusively reserved for large private flights
+            // Shared flights can share Balloon 210, so shared_booked > 0 does NOT lock it
+            const privateLargeBooked = Number(row.private_large_booked_for_balloon210 || 0);
+            const balloon210Locked = (!ownsBalloon210 || privateLargeBooked > 0) ? 1 : 0;
             const balloon105Locked = ownsBalloon105 ? 0 : 1;
             const sharedAvailable = ownsBalloon210 ? Math.max(0, sharedCapacity - sharedBooked) : 0;
             const privateSmallRemaining = ownsBalloon105
