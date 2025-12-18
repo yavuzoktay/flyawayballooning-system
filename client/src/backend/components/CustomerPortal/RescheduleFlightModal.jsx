@@ -645,7 +645,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                                         }
                                                     }}
                                                 >
-                                                    {slot.time} ({slot.available || slot.calculated_available || 0}/{slot.capacity})
+                                                    {slot.time} ({getAvailableSeatsForSelection(slot)} Spaces)
                                                     </Button>
                                             );
                                         })
