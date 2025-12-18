@@ -69,6 +69,39 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
     // Calendar state (Live Availability style)
     const [currentMonth, setCurrentMonth] = useState(dayjs().startOf('month'));
 
+    // Activity details cache (to get fields not present in activitiesForRebook, e.g. private_charter_voucher_types)
+    const [activityDetailsById, setActivityDetailsById] = useState({});
+    const [privateCharterVoucherTypes, setPrivateCharterVoucherTypes] = useState([]);
+    const [privateCharterVoucherTypesLoading, setPrivateCharterVoucherTypesLoading] = useState(false);
+
+    const normalizeList = (value) => {
+        if (!value) return [];
+        if (Array.isArray(value)) return value.map(v => String(v).trim()).filter(Boolean);
+        const raw = String(value).trim();
+        if (!raw) return [];
+
+        // Handle JSON-serialized arrays (common when stored as JSON in DB)
+        if ((raw.startsWith('[') && raw.endsWith(']')) || (raw.startsWith('"[') && raw.endsWith(']"'))) {
+            try {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                    return parsed.map(v => String(v).trim()).filter(Boolean);
+                }
+            } catch (e) {
+                // fall through to CSV parsing
+            }
+        }
+
+        // CSV fallback
+        return raw
+            .split(',')
+            .map(v => v.trim())
+            .filter(Boolean);
+    };
+
+    const normalizeVoucherKey = (value) => String(value || '').trim().toLowerCase();
+    const isNumericId = (value) => /^\d+$/.test(String(value || '').trim());
+
     // Load activities and locations on modal open
     useEffect(() => {
         if (open) {
@@ -124,6 +157,23 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                     }
                 })
                 .finally(() => setLoadingActivities(false));
+
+            // Load Private Charter Voucher Types (same source as Settings / Activity popup)
+            setPrivateCharterVoucherTypesLoading(true);
+            axios.get('/api/private-charter-voucher-types')
+                .then(res => {
+                    if (res.data?.success && Array.isArray(res.data.data)) {
+                        setPrivateCharterVoucherTypes(res.data.data);
+                        // #region agent log
+                        try{fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'rebook-private-vt',hypothesisId:'H2',location:'RebookAvailabilityModal.jsx:pcvtLoaded',message:'Loaded private charter voucher types',data:{count:res.data.data.length, sample:res.data.data.slice(0,3).map(v=>({id:v.id,title:v.title}))},timestamp:Date.now()})}).catch(()=>{});}catch(e){}
+                        // #endregion
+                    }
+                })
+                .catch(err => {
+                    console.warn('Could not load private charter voucher types list:', err?.message || err);
+                    setPrivateCharterVoucherTypes([]);
+                })
+                .finally(() => setPrivateCharterVoucherTypesLoading(false));
         } else {
             setAvailabilities([]);
             setSelectedDate(null);
@@ -142,6 +192,8 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
             setPurchaserMobile('');
             setPurchaserEmail('');
             setPassengerData([]);
+            setPrivateCharterVoucherTypes([]);
+            setPrivateCharterVoucherTypesLoading(false);
         }
     }, [open, location, bookingDetail]);
     
@@ -395,6 +447,107 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
             }
         }
     }, [selectedActivity, selectedLocation, activities]);
+
+    // Ensure we have full activity details (especially private_charter_voucher_types) like Activity popup
+    useEffect(() => {
+        if (!open) return;
+        if (!activityId) return;
+        if (activityDetailsById[activityId]) return;
+
+        axios.get(`/api/activity/${activityId}`)
+            .then(res => {
+                if (res.data?.success && res.data?.data) {
+                    setActivityDetailsById(prev => ({ ...prev, [activityId]: res.data.data }));
+                }
+            })
+            .catch(err => {
+                console.warn('Could not load activity details for rebook voucher types:', err?.message || err);
+            });
+    }, [open, activityId, activityDetailsById]);
+
+    // Determine private voucher type options from selected activity (same source as Activity popup "Private Charter Voucher Types")
+    const selectedActivityRecord = useMemo(() => {
+        if (!selectedActivity || !selectedLocation) return null;
+        return activities.find(a => a.activity_name === selectedActivity && a.location === selectedLocation) || null;
+    }, [activities, selectedActivity, selectedLocation]);
+
+    const privateVoucherTypeRawValues = useMemo(() => {
+        // Activity payload may contain `private_charter_voucher_types` as CSV string or array of titles.
+        // Example titles: "Private Charter", "Proposal Flight"
+        const detailed = activityId ? activityDetailsById[activityId] : null;
+        const raw =
+            selectedActivityRecord?.private_charter_voucher_types ??
+            detailed?.private_charter_voucher_types ??
+            detailed?.privateCharterVoucherTypes ??
+            null;
+        return normalizeList(raw).filter(v => v && String(v).toLowerCase() !== 'null');
+    }, [selectedActivityRecord, activityId, activityDetailsById]);
+
+    const privateVoucherTypeOptions = useMemo(() => {
+        const values = privateVoucherTypeRawValues;
+
+        // If activity stores IDs (common), map them to titles using /api/private-charter-voucher-types
+        if (values.length > 0 && values.every(isNumericId) && privateCharterVoucherTypes.length > 0) {
+            const byId = new Map(privateCharterVoucherTypes.map(vt => [String(vt.id), vt.title]));
+            const mapped = values
+                .map(id => byId.get(String(id)) || null)
+                .filter(Boolean);
+            // If we have raw IDs but none map (schema mismatch / unexpected ids),
+            // fall back to showing all private voucher type titles we fetched so UI isn't empty.
+            if (mapped.length === 0) {
+                return privateCharterVoucherTypes.map(vt => vt.title).filter(Boolean);
+            }
+            return mapped;
+        }
+
+        // Otherwise assume activity already stores titles
+        if (values.length > 0) return values;
+
+        // Fallback (more robust): infer from availabilities voucher types when activity config is missing.
+        // Availability records include voucher_types / voucher_types_array (titles).
+        if (privateCharterVoucherTypes.length > 0 && Array.isArray(availabilities) && availabilities.length > 0) {
+            const privateTitles = new Set(privateCharterVoucherTypes.map(vt => normalizeVoucherKey(vt.title)));
+            const inferred = new Set();
+            availabilities.forEach(a => {
+                const rawTypes = Array.isArray(a?.voucher_types_array)
+                    ? a.voucher_types_array
+                    : normalizeList(a?.voucher_types);
+                rawTypes.forEach(t => {
+                    const key = normalizeVoucherKey(t);
+                    if (privateTitles.has(key)) {
+                        inferred.add(String(t).trim());
+                    }
+                });
+            });
+            return Array.from(inferred);
+        }
+
+        return [];
+    }, [privateVoucherTypeRawValues, privateCharterVoucherTypes]);
+
+
+    const sharedVoucherTypeOptions = useMemo(() => ([
+        { key: 'weekday morning', label: 'Weekday Morning' },
+        { key: 'flexible weekday', label: 'Flexible Weekday' },
+        { key: 'any day flight', label: 'Any Day Flight' }
+    ]), []);
+
+    // When switching to private selection, default-select all private voucher types for this activity if none are selected yet.
+    useEffect(() => {
+        if (!open) return;
+        if (!selectedFlightTypes.includes('private')) return;
+        if (!privateVoucherTypeOptions || privateVoucherTypeOptions.length === 0) return;
+
+        const selectedKeys = new Set(selectedVoucherTypes.map(normalizeVoucherKey));
+        const privateKeys = privateVoucherTypeOptions.map(normalizeVoucherKey);
+        const hasAnyPrivateSelected = privateKeys.some(k => selectedKeys.has(k));
+        if (!hasAnyPrivateSelected) {
+            setSelectedVoucherTypes(prev => Array.from(new Set([
+                ...prev,
+                ...privateVoucherTypeOptions
+            ])));
+        }
+    }, [open, selectedFlightTypes, privateVoucherTypeOptions, selectedVoucherTypes]);
 
     // Flight type değişince sadece filtrele
     useEffect(() => {
@@ -822,7 +975,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                                     }
                                                                 }}
                                                             >
-                                                                {timeDisplay} ({slot.available}/{slot.capacity})
+                                                                {timeDisplay} ({(Number(slot.available) || Number(slot.calculated_available) || 0)} Spaces)
                                                             </Button>
                                                         );
                                                     })}
@@ -988,53 +1141,71 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                 {!isFlightVoucherDetails && !isGiftVoucherDetails && (
                                 <Box sx={{ mb: 3 }}>
                                     <Typography variant="h6" sx={{ mb: 2 }}>Voucher Type:</Typography>
-                                    <FormGroup row>
-                                        <FormControlLabel
-                                            control={
-                                                <Checkbox
-                                                    checked={selectedVoucherTypes.includes('weekday morning')}
-                                                    onChange={(e) => {
-                                                        if (e.target.checked) {
-                                                            setSelectedVoucherTypes(prev => [...prev, 'weekday morning']);
-                                                        } else {
-                                                            setSelectedVoucherTypes(prev => prev.filter(t => t !== 'weekday morning'));
-                                                        }
-                                                    }}
+                                    {/* Shared voucher types (only relevant when Shared flight is selected) */}
+                                    {selectedFlightTypes.includes('shared') && (
+                                        <FormGroup row>
+                                            {sharedVoucherTypeOptions.map(opt => (
+                                                <FormControlLabel
+                                                    key={opt.key}
+                                                    control={
+                                                        <Checkbox
+                                                            checked={selectedVoucherTypes.map(normalizeVoucherKey).includes(opt.key)}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setSelectedVoucherTypes(prev => Array.from(new Set([...prev, opt.key])));
+                                                                } else {
+                                                                    setSelectedVoucherTypes(prev => prev.filter(t => normalizeVoucherKey(t) !== opt.key));
+                                                                }
+                                                            }}
+                                                        />
+                                                    }
+                                                    label={opt.label}
                                                 />
-                                            }
-                                            label="Weekday Morning"
-                                        />
-                                        <FormControlLabel
-                                            control={
-                                                <Checkbox
-                                                    checked={selectedVoucherTypes.includes('flexible weekday')}
-                                                    onChange={(e) => {
-                                                        if (e.target.checked) {
-                                                            setSelectedVoucherTypes(prev => [...prev, 'flexible weekday']);
-                                                        } else {
-                                                            setSelectedVoucherTypes(prev => prev.filter(t => t !== 'flexible weekday'));
-                                                        }
-                                                    }}
-                                                />
-                                            }
-                                            label="Flexible Weekday"
-                                        />
-                                        <FormControlLabel
-                                            control={
-                                                <Checkbox
-                                                    checked={selectedVoucherTypes.includes('any day flight')}
-                                                    onChange={(e) => {
-                                                        if (e.target.checked) {
-                                                            setSelectedVoucherTypes(prev => [...prev, 'any day flight']);
-                                                        } else {
-                                                            setSelectedVoucherTypes(prev => prev.filter(t => t !== 'any day flight'));
-                                                        }
-                                                    }}
-                                                />
-                                            }
-                                            label="Any Day Flight"
-                                        />
-                                    </FormGroup>
+                                            ))}
+                                        </FormGroup>
+                                    )}
+
+                                    {/* Private voucher types (from Activity popup "Private Charter Voucher Types") */}
+                                    {selectedFlightTypes.includes('private') && (
+                                        <>
+                                            <Typography variant="body2" sx={{ mt: 1.5, mb: 1, color: 'text.secondary' }}>
+                                                Private Charter Voucher Types:
+                                            </Typography>
+                                            {privateVoucherTypeOptions.length === 0 && privateVoucherTypeRawValues.length > 0 && privateCharterVoucherTypesLoading ? (
+                                                <Typography variant="body2" color="text.secondary">
+                                                    Loading private voucher types...
+                                                </Typography>
+                                            ) : privateVoucherTypeOptions.length === 0 ? (
+                                                <Typography variant="body2" color="text.secondary">
+                                                    No private voucher types configured for this activity.
+                                                </Typography>
+                                            ) : (
+                                                <FormGroup row>
+                                                    {privateVoucherTypeOptions.map(title => {
+                                                        const key = normalizeVoucherKey(title);
+                                                        return (
+                                                            <FormControlLabel
+                                                                key={key}
+                                                                control={
+                                                                    <Checkbox
+                                                                        checked={selectedVoucherTypes.map(normalizeVoucherKey).includes(key)}
+                                                                        onChange={(e) => {
+                                                                            if (e.target.checked) {
+                                                                                setSelectedVoucherTypes(prev => Array.from(new Set([...prev, title])));
+                                                                            } else {
+                                                                                setSelectedVoucherTypes(prev => prev.filter(t => normalizeVoucherKey(t) !== key));
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                }
+                                                                label={title}
+                                                            />
+                                                        );
+                                                    })}
+                                                </FormGroup>
+                                            )}
+                                        </>
+                                    )}
                                 </Box>
                                 )}
                                 {loading ? (
@@ -1125,7 +1296,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                                     }
                                                                 }}
                                                             >
-                                                                {slot.time} ({slot.available}/{slot.capacity})
+                                                                {slot.time} ({(Number(slot.available) || Number(slot.calculated_available) || 0)} Spaces)
                                                             </Button>
                                                         );
                                                     })}
