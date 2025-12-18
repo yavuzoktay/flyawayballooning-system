@@ -24,12 +24,15 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
     const [error, setError] = useState(null);
     const [currentMonth, setCurrentMonth] = useState(dayjs().startOf('month'));
     const [submitting, setSubmitting] = useState(false);
+    const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+    const [successPayload, setSuccessPayload] = useState(null);
 
     // Get activity ID, location, and voucher type from booking data
     const activityId = bookingData?.activity_id || bookingData?.activityId;
     const location = bookingData?.location;
     const voucherType = bookingData?.voucher_type || bookingData?.voucher_type_detail;
     const experience = bookingData?.experience || bookingData?.flight_type || bookingData?.flight_type_source;
+    const pax = Number(bookingData?.pax || bookingData?.passengers?.length || 0);
     
     // Debug logging
     console.log('RescheduleFlightModal - Booking Data:', {
@@ -55,54 +58,176 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         return hour < 12; // Morning is before 12:00 PM
     };
 
-    // Filter availabilities based on voucher type
-    const filterByVoucherType = (availability) => {
-        if (!voucherType) return true; // No filtering if no voucher type
+    // ---- LiveAvailabilitySection-compatible helpers (adapted for Customer Portal) ----
+    const normalizeVoucherName = (value = '') => {
+        if (typeof value !== 'string') return '';
+        return value.replace(/\([^)]*\)/g, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toLowerCase();
+    };
 
-        const voucherTypeLower = voucherType.toLowerCase();
-        
-        // Parse availability date safely
+    const parseNumber = (value, fallback = 0) => {
+        const num = Number(value);
+        return Number.isFinite(num) ? num : fallback;
+    };
+
+    const getSlotStatus = (slot) => (slot?.calculated_status || slot?.status || '').toLowerCase();
+
+    const isPrivateSelection = (experience || '').toLowerCase().includes('private');
+    const requiredSeats = Math.max(1, pax || (isPrivateSelection ? 8 : 1));
+
+    const getRemainingSeats = (slot) => {
+        if (!slot) return 0;
+        if (slot.calculated_available !== undefined && slot.calculated_available !== null) {
+            return Math.max(0, parseNumber(slot.calculated_available, 0));
+        }
+        if (typeof slot.actualAvailable === 'number') {
+            return Math.max(0, slot.actualAvailable);
+        }
+        if (typeof slot.available === 'number') {
+            return Math.max(0, slot.available);
+        }
+        if (typeof slot.shared_capacity === 'number' && typeof slot.shared_booked === 'number') {
+            return Math.max(0, slot.shared_capacity - slot.shared_booked);
+        }
+        if (typeof slot.shared_capacity === 'number') {
+            return Math.max(0, slot.shared_capacity);
+        }
+        return 0;
+    };
+
+    const getAvailableSeatsForSelection = (slot) => {
+        if (!slot) return 0;
+
+        const baseAvailable = getRemainingSeats(slot);
+        const balloon210Locked = Number(slot.balloon210_locked || slot.shared_slots_used || 0) > 0;
+        const sharedBooked = Number(slot.shared_booked || slot.shared_consumed_pax || 0);
+        const isSmallPrivateSelection = isPrivateSelection && requiredSeats > 0 && requiredSeats <= 4;
+
+        // SHARED FLOW (uses Balloon 210)
+        if (!isPrivateSelection) {
+            if (balloon210Locked) return 0;
+            return baseAvailable;
+        }
+
+        // PRIVATE FLOW (1–4 pax uses Balloon 105)
+        if (isSmallPrivateSelection) {
+            const remaining105 = (typeof slot.private_charter_small_remaining === 'number')
+                ? slot.private_charter_small_remaining
+                : (Number(slot.private_charter_small_bookings || 0) > 0 ? 0 : 4);
+
+            if (remaining105 <= 0) return 0;
+            return remaining105 >= requiredSeats ? remaining105 : 0;
+        }
+
+        // Large private charter (5–8 pax) uses Balloon 210 exclusively
+        if (balloon210Locked || sharedBooked > 0) return 0;
+        return baseAvailable >= requiredSeats ? baseAvailable : 0;
+    };
+
+    const getVoucherTypesForAvailability = (availability) => {
+        if (!availability) return [];
+        const fromArray = (value) => value.map(item => (typeof item === 'string' ? item.trim() : item)).filter(Boolean);
+
+        if (Array.isArray(availability.voucher_types_array) && availability.voucher_types_array.length > 0) {
+            return fromArray(availability.voucher_types_array);
+        }
+        if (Array.isArray(availability.voucher_types) && availability.voucher_types.length > 0) {
+            return fromArray(availability.voucher_types);
+        }
+        const parseString = (str) => {
+            if (!str || typeof str !== 'string') return [];
+            return str.split(',').map(s => s.trim()).filter(Boolean);
+        };
+        if (typeof availability.voucher_types === 'string' && availability.voucher_types.trim() !== '') {
+            return parseString(availability.voucher_types);
+        }
+        if (typeof availability.activity_voucher_types === 'string' && availability.activity_voucher_types.trim() !== '') {
+            return parseString(availability.activity_voucher_types);
+        }
+        return [];
+    };
+
+    const matchesExperience = (availability) => {
+        const selectedType = (experience || '').toLowerCase().trim();
+        if (!selectedType) return true;
+
+        if (!Array.isArray(availability?.flight_types_array) || availability.flight_types_array.length === 0) {
+            if (availability?.flight_types) {
+                const flightTypesStr = String(availability.flight_types).toLowerCase();
+                if (selectedType.includes('shared') && flightTypesStr.includes('shared')) return true;
+                if (selectedType.includes('private') && flightTypesStr.includes('private')) return true;
+            }
+            return true;
+        }
+
+        const normalize = (value = '') => value.toLowerCase().trim();
+        const selectedKeywords = {
+            shared: selectedType.includes('shared'),
+            private: selectedType.includes('private'),
+            charter: selectedType.includes('charter'),
+        };
+
+        return availability.flight_types_array.some(type => {
+            const normalizedType = normalize(type);
+            if (!normalizedType) return false;
+            if (normalizedType === selectedType) return true;
+            if (normalizedType.includes(selectedType) || selectedType.includes(normalizedType)) return true;
+
+            const typeKeywords = {
+                shared: normalizedType.includes('shared'),
+                private: normalizedType.includes('private'),
+                charter: normalizedType.includes('charter'),
+            };
+
+            if (selectedKeywords.shared && typeKeywords.shared) return true;
+            if (selectedKeywords.private && typeKeywords.private) return true;
+            if (selectedKeywords.charter && typeKeywords.charter) return true;
+            return false;
+        });
+    };
+
+    // Voucher-type date/time filtering (mirrors LiveAvailabilitySection)
+    const filterByVoucherType = (availability) => {
+        if (!voucherType) return true;
+
+        // Only apply weekday/morning filtering for shared voucher types.
+        // Private voucher types (Private Charter, Proposal Flight) don't need date/time filtering.
+        const sharedVoucherTypes = ['weekday morning', 'weekday morning flight', 'flexible weekday', 'flexible weekday flight', 'any day flight', 'anytime', 'any day'];
+        const vtLower = String(voucherType).toLowerCase().trim();
+        if (!sharedVoucherTypes.includes(vtLower)) return true;
+
         let availabilityDate = null;
         if (availability.date) {
             try {
-                // Handle different date formats
-                if (typeof availability.date === 'string') {
-                    // If date includes time, extract just the date part
-                    const datePart = availability.date.split(' ')[0];
-                    availabilityDate = new Date(datePart + 'T00:00:00'); // Add time to avoid timezone issues
-                } else {
-                    availabilityDate = new Date(availability.date);
-                }
-                
-                // Check if date is valid
-                if (isNaN(availabilityDate.getTime())) {
-                    return true; // Invalid date, don't filter
-                }
+                const datePart = typeof availability.date === 'string'
+                    ? availability.date.split(' ')[0]
+                    : availability.date;
+                availabilityDate = new Date(String(datePart).includes('T') ? datePart : `${datePart}T00:00:00`);
+                if (isNaN(availabilityDate.getTime())) return true;
             } catch (e) {
-                console.warn('Error parsing availability date:', availability.date, e);
-                return true; // Error parsing, don't filter
+                return true;
             }
         }
+        if (!availabilityDate) return true;
         
-        if (!availabilityDate) return true; // If no date, don't filter
-
-        // Weekday Morning voucher → Show weekday mornings only
-        if (voucherTypeLower.includes('weekday morning')) {
+        if (vtLower === 'weekday morning' || vtLower === 'weekday morning flight') {
             return isWeekday(availabilityDate) && isMorning(availability.time);
         }
-        
-        // Flexible Weekday voucher → Show all weekdays (any time)
-        if (voucherTypeLower.includes('flexible weekday')) {
+        if (vtLower === 'flexible weekday' || vtLower === 'flexible weekday flight') {
             return isWeekday(availabilityDate);
         }
-        
-        // Anytime voucher (Any Day Flight) → Show all available schedules
-        if (voucherTypeLower.includes('any day') || voucherTypeLower.includes('anytime')) {
-            return true; // Show all dates
-        }
-
-        // Default: show all if voucher type doesn't match known types
         return true;
+    };
+
+    const voucherWildcardTerms = ['any voucher', 'any vouchers', 'all voucher types', 'all vouchers', 'any', 'all', 'any voucher type', 'any voucher types', 'any voucher option'];
+
+    const getLocalDateStr = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
     };
 
     // Fetch availabilities when modal opens
@@ -113,6 +238,8 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             setSelectedDate(null);
             setSelectedTime(null);
             setCurrentMonth(dayjs().startOf('month'));
+            setSuccessDialogOpen(false);
+            setSuccessPayload(null);
 
             // First, get activity ID from location if not available in bookingData
             const fetchAvailabilities = async () => {
@@ -145,36 +272,9 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                     if (availResponse.data?.success) {
                         const data = Array.isArray(availResponse.data.data) ? availResponse.data.data : [];
                         
-                        // Filter based on voucher type and flight type (same logic as Change Flight Location)
-                        const bookingFlightType = experience || bookingData?.flight_type || bookingData?.experience || 'Shared Flight';
-                        const bookingVoucherType = voucherType || bookingData?.voucher_type || bookingData?.voucher_type_detail || 'Any Day Flight';
-
-                        // Normalize flight type
-                        const normalizedFlightType = bookingFlightType.toLowerCase().includes('private') ? 'private' : 'shared';
-
-                        // Filter availabilities
-                        const filtered = data.filter(slot => {
-                            const status = slot.status || slot.calculated_status || '';
-                            const available = Number(slot.available) || Number(slot.calculated_available) || 0;
-                            const slotDateTime = dayjs(`${slot.date} ${slot.time}`);
-
-                            // Check if slot is in the future
-                            if (!slotDateTime.isAfter(dayjs())) return false;
-
-                            // Check status and availability
-                            if (status.toLowerCase() !== 'open' && available <= 0) return false;
-
-                            // Filter by flight type if specified
-                            if (slot.flight_types && slot.flight_types.toLowerCase() !== 'all') {
-                                const slotTypes = slot.flight_types.split(',').map(t => t.trim().toLowerCase());
-                                if (!slotTypes.includes(normalizedFlightType)) return false;
-                            }
-
-                            return true;
-                        });
-
-                        console.log('RescheduleFlightModal - Loaded availabilities:', filtered.length, 'for location:', location, 'voucher type:', bookingVoucherType, 'activityId:', finalActivityId);
-                        setAvailabilities(filtered);
+                        // Store raw availabilities; filtering is applied with LiveAvailabilitySection-compatible logic below
+                        console.log('RescheduleFlightModal - Loaded availabilities:', data.length, 'for location:', location, 'activityId:', finalActivityId);
+                        setAvailabilities(data);
                     } else {
                         setAvailabilities([]);
                     }
@@ -196,25 +296,83 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         }
     }, [open, activityId, location, voucherType, experience, bookingData]);
 
+    // Final filtered availabilities - match LiveAvailabilitySection behaviour as closely as possible
+    const finalFilteredAvailabilities = availabilities.filter(a => {
+        // Location is fixed in Customer Portal, but keep safe checks
+        const matchesLoc = !location || !a?.location || a.location === location;
+        const matchesExp = matchesExperience(a);
+
+        const slotStatus = getSlotStatus(a);
+        const availableForSelection = getAvailableSeatsForSelection(a);
+        const isOpen = slotStatus === 'open' || availableForSelection > 0;
+        const hasCapacity = availableForSelection > 0 || (a.capacity && Number(a.capacity) > 0);
+
+        // Keep only future slots
+        const slotDateTime = dayjs(`${a.date} ${a.time}`);
+        const isFuture = slotDateTime.isAfter(dayjs());
+
+        // Voucher matching (if backend provides voucher_types on each availability)
+        const availabilityVoucherTypes = getVoucherTypesForAvailability(a);
+        const normalizedAvailabilityTypes = availabilityVoucherTypes.map(normalizeVoucherName);
+        const normalizedSelectedVoucher = normalizeVoucherName(String(voucherType || ''));
+        const isWildcardVoucher = normalizedAvailabilityTypes.length === 0 ||
+            normalizedAvailabilityTypes.some(type => voucherWildcardTerms.includes(type));
+
+        let matchesVoucher = true;
+        if (normalizedSelectedVoucher && !isWildcardVoucher) {
+            matchesVoucher = normalizedAvailabilityTypes.some(type => {
+                const t = String(type || '').trim();
+                return t === normalizedSelectedVoucher || t === normalizedSelectedVoucher.trim() || t.includes(normalizedSelectedVoucher);
+            });
+        }
+
+        const matchesVoucherTypeFilter = filterByVoucherType(a);
+
+        return isFuture && isOpen && hasCapacity && matchesLoc && matchesExp && matchesVoucher && matchesVoucherTypeFilter;
+    });
+
     const getTimesForDate = (date) => {
         if (!date) return [];
-        const dateStr = dayjs(date).format('YYYY-MM-DD');
-        let matchingSlots = availabilities.filter(a => {
-            if (!a.date) return false;
-            const slotDate = a.date.includes('T') ? a.date.split('T')[0] : a.date;
+        const dateStr = getLocalDateStr(date);
+
+        // IMPORTANT: return ALL slots for the popup (including 0 available) so users can see Sold Out times
+        let matchingSlots = finalFilteredAvailabilities.filter(a => {
+            const slotDate = a.date?.includes('T') ? a.date.split('T')[0] : a.date;
             return slotDate === dateStr;
         });
         
         // Apply additional voucher type filtering for Weekday Morning (must be morning times)
-        if (voucherType) {
-            const voucherTypeLower = voucherType.toLowerCase();
-            if (voucherTypeLower.includes('weekday morning')) {
-                // Filter to only show morning times (before 12:00 PM)
+        const vtLower = String(voucherType || '').toLowerCase().trim();
+        if (vtLower === 'weekday morning' || vtLower === 'weekday morning flight') {
                 matchingSlots = matchingSlots.filter(a => isMorning(a.time));
-            }
         }
-        
-        return matchingSlots.sort((a, b) => a.time.localeCompare(b.time));
+
+        return matchingSlots.sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')));
+    };
+
+    const getSpacesForDate = (date) => {
+        const dateStr = getLocalDateStr(date);
+        const allSlotsForDate = finalFilteredAvailabilities.filter(a => {
+            const slotDate = a.date?.includes('T') ? a.date.split('T')[0] : a.date;
+            return slotDate === dateStr;
+        });
+
+        const total = allSlotsForDate.reduce((sum, s) => sum + getAvailableSeatsForSelection(s), 0);
+        const sharedTotal = allSlotsForDate.reduce((sum, s) => sum + getRemainingSeats(s), 0);
+
+        const hasOpenSlots = allSlotsForDate.some(slot => getSlotStatus(slot) === 'open' || getRemainingSeats(slot) > 0);
+        const allSlotsClosed = allSlotsForDate.length > 0 && allSlotsForDate.every(slot => getSlotStatus(slot) === 'closed' && getRemainingSeats(slot) <= 0);
+        const selectionHasAvailability = allSlotsForDate.some(slot => getAvailableSeatsForSelection(slot) > 0);
+        const sharedSoldOut = (allSlotsForDate.length > 0 && sharedTotal === 0 && !hasOpenSlots) || allSlotsClosed;
+        const selectionSoldOut = allSlotsForDate.length === 0 || !selectionHasAvailability;
+
+        return {
+            total,
+            sharedTotal,
+            sharedSoldOut,
+            soldOut: selectionSoldOut,
+            slots: allSlotsForDate
+        };
     };
 
     const buildDayCells = () => {
@@ -236,51 +394,9 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             const isPast = d.isBefore(dayjs(), 'day');
             const isSelected = selectedDate && dayjs(selectedDate).isSame(d, 'day');
             
-            // Aggregate availability for this date
-            // Handle both date formats: "2025-11-14" or "2025-11-14T00:00:00.000Z"
-            const dateStr = d.format('YYYY-MM-DD');
-            const slots = availabilities.filter(a => {
-                if (!a.date) return false;
-                const slotDate = a.date.includes('T') ? a.date.split('T')[0] : a.date;
-                return slotDate === dateStr;
-            });
-            const totalAvailable = slots.reduce((acc, s) => acc + (Number(s.available) || Number(s.calculated_available) || 0), 0);
-            const soldOut = slots.length > 0 && totalAvailable <= 0;
-            
-            // Apply voucher type filtering for calendar display
-            let shouldShowDate = true;
-            const voucherTypeLower = (voucherType || '').toLowerCase();
-            
-            // If no voucher type or "Any Day Flight", show all dates
-            if (!voucherType || voucherTypeLower.includes('any day') || voucherTypeLower.includes('anytime')) {
-                shouldShowDate = true;
-            } else if (slots.length > 0) {
-                const dateObj = d.toDate();
-                
-                // Weekday Morning voucher → Show weekday mornings only
-                if (voucherTypeLower.includes('weekday morning')) {
-                    // Must be weekday AND have morning slots available
-                    const isWeekdayDate = isWeekday(dateObj);
-                    if (isWeekdayDate) {
-                        // Check if there are any morning slots for this date
-                        const hasMorningSlots = slots.some(slot => isMorning(slot.time));
-                        shouldShowDate = hasMorningSlots;
-                    } else {
-                        shouldShowDate = false;
-                    }
-                }
-                // Flexible Weekday voucher → Show all weekdays (any time)
-                else if (voucherTypeLower.includes('flexible weekday')) {
-                    shouldShowDate = isWeekday(dateObj);
-                }
-            }
-            
-            // Only show date if it has available slots and matches voucher type filter
-            // Use same logic as Change Flight Location modal - check if slots exist and not sold out
-            const hasAvailableSlots = slots.length > 0 && !soldOut;
-            // If voucher type filtering says we shouldn't show this date, mark it as not selectable
-            // But still show it if it has slots (just make it non-selectable)
-            const isSelectable = inCurrentMonth && !isPast && shouldShowDate && hasAvailableSlots;
+            const { total, soldOut, slots } = getSpacesForDate(d.toDate());
+            const hasAnySlots = slots.length > 0;
+            const isSelectable = inCurrentMonth && !isPast && hasAnySlots;
             
             cells.push(
                 <div
@@ -312,7 +428,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                 ? '#f0f0f0'
                                 : soldOut
                                     ? '#888'
-                                    : hasAvailableSlots
+                                    : hasAnySlots
                                         ? '#22c55e'  // Green for available dates
                                         : '#f0f0f0',  // Light grey for dates with no slots
                         color: isSelected
@@ -321,7 +437,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                 ? '#999'
                                 : soldOut
                                     ? '#fff'
-                                    : hasAvailableSlots
+                                    : hasAnySlots
                                         ? '#fff'
                                         : '#999',
                         display: 'flex',
@@ -343,7 +459,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 >
                     <div style={{ fontSize: 13, lineHeight: 1.2 }}>{d.date()}</div>
                     <div style={{ fontSize: 9, fontWeight: 600, lineHeight: 1.2 }}>
-                        {slots.length === 0 ? '' : (soldOut ? 'Sold Out' : `${totalAvailable} Spaces`)}
+                        {slots.length === 0 ? '' : (soldOut ? 'Sold Out' : `${total} Spaces`)}
                     </div>
                 </div>
             );
@@ -361,6 +477,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             // Format the selected date and time
             const formattedDate = dayjs(selectedDate).format('YYYY-MM-DD');
             const selectedDateTime = `${formattedDate} ${selectedTime}`;
+            const previousFlightDateTime = bookingData?.flight_date || null;
 
             // Call reschedule API
             const response = await axios.patch(`/api/customer-portal-reschedule/${bookingData.id}`, {
@@ -373,7 +490,14 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 if (onRescheduleSuccess) {
                     onRescheduleSuccess(response.data.data);
                 }
-                onClose();
+                // Show a confirmation popup summarizing the action AFTER confirm succeeds
+                setSuccessPayload({
+                    bookingId: bookingData?.booking_reference || bookingData?.id,
+                    location: bookingData?.location,
+                    previousFlightDateTime,
+                    newFlightDateTime: selectedDateTime
+                });
+                setSuccessDialogOpen(true);
             } else {
                 setError(response.data.message || 'Failed to reschedule flight. Please try again.');
             }
@@ -386,6 +510,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
     };
 
     return (
+        <>
         <Dialog
             open={open}
             onClose={onClose}
@@ -521,7 +646,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                                     }}
                                                 >
                                                     {slot.time} ({slot.available || slot.calculated_available || 0}/{slot.capacity})
-                                                </Button>
+                                                    </Button>
                                             );
                                         })
                                     )}
@@ -553,6 +678,77 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 </Button>
             </DialogActions>
         </Dialog>
+
+            {/* Success summary popup shown after confirm */}
+            <Dialog
+                open={successDialogOpen}
+                onClose={() => {
+                    setSuccessDialogOpen(false);
+                    setSuccessPayload(null);
+                    onClose();
+                }}
+                maxWidth="xs"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        borderRadius: 3
+                    }
+                }}
+            >
+                <DialogTitle sx={{ fontWeight: 800, fontSize: 18 }}>
+                    Flight Rescheduled
+                </DialogTitle>
+                <DialogContent>
+                    <Alert severity="success" sx={{ mb: 2 }}>
+                        Your flight date has been updated successfully.
+                    </Alert>
+
+                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 1 }}>
+                        <Box>
+                            <Typography variant="body2" color="text.secondary">Booking</Typography>
+                            <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                                {successPayload?.bookingId || 'N/A'}
+                            </Typography>
+                        </Box>
+                        <Box>
+                            <Typography variant="body2" color="text.secondary">Location</Typography>
+                            <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                                {successPayload?.location || 'N/A'}
+                            </Typography>
+                        </Box>
+                        <Box>
+                            <Typography variant="body2" color="text.secondary">Previous Flight Date</Typography>
+                            <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                                {successPayload?.previousFlightDateTime
+                                    ? dayjs(successPayload.previousFlightDateTime).format('DD/MM/YYYY HH:mm')
+                                    : 'Not Scheduled'}
+                            </Typography>
+                        </Box>
+                        <Box>
+                            <Typography variant="body2" color="text.secondary">New Flight Date</Typography>
+                            <Typography variant="body1" sx={{ fontWeight: 800, color: '#16a34a' }}>
+                                {successPayload?.newFlightDateTime
+                                    ? dayjs(successPayload.newFlightDateTime).format('DD/MM/YYYY HH:mm')
+                                    : 'N/A'}
+                            </Typography>
+                        </Box>
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ p: 2.5 }}>
+                    <Button
+                        variant="contained"
+                        onClick={() => {
+                            setSuccessDialogOpen(false);
+                            setSuccessPayload(null);
+                            onClose();
+                        }}
+                        sx={{ fontWeight: 700 }}
+                    >
+                        Done
+                    </Button>
+                </DialogActions>
+            </Dialog>
+        </>
     );
 };
 

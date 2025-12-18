@@ -1661,31 +1661,6 @@ setBookingDetail(finalVoucherDetail);
         const source = voucherRow?._original || voucherRow;
         let bookingId = source?.booking_id || source?.bookingId || null;
 
-        // #region agent log
-        try {
-            fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    sessionId: 'debug-session',
-                    runId: 'pre-fix',
-                    hypothesisId: 'H1',
-                    location: 'BookingPage.jsx:handleVoucherRefClick:entry',
-                    message: 'handleVoucherRefClick called',
-                    data: {
-                        hasOriginal: !!voucherRow?._original,
-                        booking_id: source?.booking_id || null,
-                        bookingId: source?.bookingId || null,
-                        voucher_ref: source?.voucher_ref || null,
-                        voucher_code: source?.voucher_code || null,
-                        vc_code: source?.vc_code || null
-                    },
-                    timestamp: Date.now()
-                })
-            }).catch(() => { });
-        } catch (e) { }
-        // #endregion
-
         const openBookingDetails = (id) => {
             if (activeTab !== 'bookings') {
                 handleTabChange('bookings');
@@ -1709,46 +1684,11 @@ setBookingDetail(finalVoucherDetail);
             null;
 
         if (!voucherRef) {
-            // #region agent log
-            try {
-                fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        sessionId: 'debug-session',
-                        runId: 'pre-fix',
-                        hypothesisId: 'H1',
-                        location: 'BookingPage.jsx:handleVoucherRefClick:noVoucherRef',
-                        message: 'No voucherRef on voucherRow',
-                        data: {},
-                        timestamp: Date.now()
-                    })
-                }).catch(() => { });
-            } catch (e) { }
-            // #endregion
             alert('No related booking found for this voucher yet.');
             return;
         }
 
         console.log('🔍 handleVoucherRefClick fallback search for voucher_ref:', voucherRef);
-
-        // #region agent log
-        try {
-            fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    sessionId: 'debug-session',
-                    runId: 'pre-fix',
-                    hypothesisId: 'H2',
-                    location: 'BookingPage.jsx:handleVoucherRefClick:beforeRequest',
-                    message: 'Calling getAllBookingData with voucher_code',
-                    data: { voucherRef },
-                    timestamp: Date.now()
-                })
-            }).catch(() => { });
-        } catch (e) { }
-        // #endregion
 
         // First try direct API to find booking by voucher_ref (handles redeem voucher linkage)
         axios
@@ -1790,26 +1730,6 @@ setBookingDetail(finalVoucherDetail);
             })
             .catch((err) => {
                 console.error('Error searching booking by voucher_code:', err);
-                // #region agent log
-                try {
-                    fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            sessionId: 'debug-session',
-                            runId: 'pre-fix',
-                            hypothesisId: 'H2',
-                            location: 'BookingPage.jsx:handleVoucherRefClick:catch',
-                            message: 'Error from booking lookup',
-                            data: {
-                                voucherRef,
-                                errorMessage: err?.message || null
-                            },
-                            timestamp: Date.now()
-                        })
-                    }).catch(() => { });
-                } catch (e) { }
-                // #endregion
                 alert('No related booking found for this voucher yet.');
             });
     };
