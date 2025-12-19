@@ -48,11 +48,26 @@ const buildCustomerPortalToken = (booking = {}) => {
         booking.portal_link_token;
     if (explicitToken) return explicitToken;
 
+    // For Flight Voucher, use purchaser_email instead of email
+    // For Gift Voucher, use recipient_email
+    // For other types, use email
+    const isFlightVoucher = booking.book_flight === 'Flight Voucher' || booking.is_flight_voucher;
+    const isGiftVoucher = booking.book_flight === 'Gift Voucher';
+    
+    let emailToUse = '';
+    if (isFlightVoucher) {
+        emailToUse = booking.purchaser_email || booking.email || booking.customer_email || '';
+    } else if (isGiftVoucher) {
+        emailToUse = booking.recipient_email || booking.email || booking.customer_email || '';
+    } else {
+        emailToUse = booking.email || booking.customer_email || '';
+    }
+
     const sourceParts = [
         booking.id ?? booking.booking_id ?? booking.bookingId ?? '',
         booking.booking_reference ?? booking.bookingReference ?? '',
         booking.voucher_code ?? booking.voucherCode ?? '',
-        booking.email ?? booking.customer_email ?? '',
+        emailToUse,
         booking.created_at ?? booking.created ?? '',
     ].map((part) => (part == null ? '' : String(part).trim()))
      .filter((part) => part !== '');
