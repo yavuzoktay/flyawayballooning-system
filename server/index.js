@@ -1697,9 +1697,9 @@ app.post('/api/createRedeemBooking', (req, res) => {
 
         // Get voucher information (created_at, voucher_type, experience_type) and price
         if (cleanVoucherCode) {
-            // First, get voucher info from all_vouchers table
+            // First, get voucher info from all_vouchers table (including paid amount)
             const getVoucherInfoSql = `
-            SELECT created_at, voucher_type, experience_type, book_flight
+            SELECT created_at, voucher_type, experience_type, book_flight, paid
             FROM all_vouchers 
             WHERE UPPER(voucher_ref) = UPPER(?)
             LIMIT 1
@@ -1716,19 +1716,22 @@ app.post('/api/createRedeemBooking', (req, res) => {
                 let voucherCreatedAt = null;
                 let voucherType = null;
                 let experienceType = null;
+                let voucherPaidFromAllVouchers = null;
 
                 if (voucherInfoResult.length > 0) {
                     voucherCreatedAt = voucherInfoResult[0].created_at;
                     voucherType = voucherInfoResult[0].voucher_type;
                     experienceType = voucherInfoResult[0].experience_type;
+                    voucherPaidFromAllVouchers = voucherInfoResult[0].paid;
                     console.log('✅ Voucher info found:', {
                         created_at: voucherCreatedAt,
                         voucher_type: voucherType,
-                        experience_type: experienceType
+                        experience_type: experienceType,
+                        paid: voucherPaidFromAllVouchers
                     });
                 }
 
-                // Now get price from voucher_codes table
+                // Now get price from voucher_codes table (fallback if not in all_vouchers)
                 const getVoucherPriceSql = `
             SELECT paid_amount 
             FROM voucher_codes 
@@ -1737,11 +1740,15 @@ app.post('/api/createRedeemBooking', (req, res) => {
         `;
 
                 con.query(getVoucherPriceSql, [cleanVoucherCode], (priceErr, priceResult) => {
+                    // Priority: 1. all_vouchers.paid, 2. voucher_codes.paid_amount, 3. totalPrice
                     let voucherOriginalPrice = totalPrice || 0;
 
-                    if (!priceErr && priceResult.length > 0 && priceResult[0].paid_amount) {
-                        voucherOriginalPrice = priceResult[0].paid_amount;
-                        console.log('✅ Found original voucher price:', voucherOriginalPrice);
+                    if (voucherPaidFromAllVouchers != null && voucherPaidFromAllVouchers > 0) {
+                        voucherOriginalPrice = parseFloat(voucherPaidFromAllVouchers) || 0;
+                        console.log('✅ Found original voucher price from all_vouchers.paid:', voucherOriginalPrice);
+                    } else if (!priceErr && priceResult.length > 0 && priceResult[0].paid_amount) {
+                        voucherOriginalPrice = parseFloat(priceResult[0].paid_amount) || 0;
+                        console.log('✅ Found original voucher price from voucher_codes.paid_amount:', voucherOriginalPrice);
                     } else {
                         console.log('⚠️ Could not find voucher price, using totalPrice:', voucherOriginalPrice);
                     }
@@ -1790,18 +1797,51 @@ app.post('/api/createRedeemBooking', (req, res) => {
 
             // Fallback function to get only price if voucher info query fails
             function getVoucherPriceOnly() {
-                const getVoucherPriceSql = `
-                SELECT paid_amount 
-                FROM voucher_codes 
-                WHERE UPPER(code) = UPPER(?)
-                LIMIT 1
-            `;
+                // First try all_vouchers table for paid amount
+                const getVoucherPaidSql = `
+                    SELECT paid 
+                    FROM all_vouchers 
+                    WHERE UPPER(voucher_ref) = UPPER(?)
+                    LIMIT 1
+                `;
 
-                con.query(getVoucherPriceSql, [cleanVoucherCode], (priceErr, priceResult) => {
+                con.query(getVoucherPaidSql, [cleanVoucherCode], (voucherPaidErr, voucherPaidResult) => {
                     let voucherOriginalPrice = totalPrice || 0;
 
-                    if (!priceErr && priceResult.length > 0 && priceResult[0].paid_amount) {
-                        voucherOriginalPrice = priceResult[0].paid_amount;
+                    // Priority: 1. all_vouchers.paid, 2. voucher_codes.paid_amount, 3. totalPrice
+                    if (!voucherPaidErr && voucherPaidResult.length > 0 && voucherPaidResult[0].paid != null && voucherPaidResult[0].paid > 0) {
+                        voucherOriginalPrice = parseFloat(voucherPaidResult[0].paid) || 0;
+                        console.log('✅ Found original voucher price from all_vouchers.paid (fallback):', voucherOriginalPrice);
+                    } else {
+                        // Fallback to voucher_codes table
+                        const getVoucherPriceSql = `
+                            SELECT paid_amount 
+                            FROM voucher_codes 
+                            WHERE UPPER(code) = UPPER(?)
+                            LIMIT 1
+                        `;
+
+                        con.query(getVoucherPriceSql, [cleanVoucherCode], (priceErr, priceResult) => {
+                            if (!priceErr && priceResult.length > 0 && priceResult[0].paid_amount) {
+                                voucherOriginalPrice = parseFloat(priceResult[0].paid_amount) || 0;
+                                console.log('✅ Found original voucher price from voucher_codes.paid_amount (fallback):', voucherOriginalPrice);
+                            } else {
+                                console.log('⚠️ Could not find voucher price, using totalPrice (fallback):', voucherOriginalPrice);
+                            }
+
+                            // Voucher bilgisi yoksa, bugünden itibaren hesapla
+                            let expiresDate = null;
+                            if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
+                                expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
+                            } else if (chooseFlightType && chooseFlightType.type === 'Shared Flight') {
+                                expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
+                            } else {
+                                expiresDate = moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+                            }
+
+                            createBookingWithPrice(voucherOriginalPrice, expiresDate, null);
+                        });
+                        return;
                     }
 
                     // Voucher bilgisi yoksa, bugünden itibaren hesapla
@@ -8720,6 +8760,45 @@ app.post('/api/createBooking', (req, res) => {
         // Determine status: use from req.body if provided (for rebook operations), otherwise default to 'Confirmed'
         const bookingStatus = req.body.status || 'Confirmed';
 
+        // For Redeem Voucher, get original voucher price from all_vouchers table
+        // This ensures we use the correct original price, not a doubled amount
+        let finalPaidAmount = paid || totalPrice;
+        if (activitySelect === 'Redeem Voucher' && voucher_code) {
+            // Get original voucher price from all_vouchers table
+            const getVoucherPaidSql = `
+                SELECT paid 
+                FROM all_vouchers 
+                WHERE UPPER(voucher_ref) = UPPER(?)
+                LIMIT 1
+            `;
+            
+            // Use synchronous query with Promise to get voucher paid amount
+            const getVoucherPaid = () => {
+                return new Promise((resolve) => {
+                    con.query(getVoucherPaidSql, [voucher_code.trim()], (err, result) => {
+                        if (!err && result.length > 0 && result[0].paid != null && result[0].paid > 0) {
+                            finalPaidAmount = parseFloat(result[0].paid) || 0;
+                            console.log('✅ [createBooking] Found original voucher price from all_vouchers.paid:', finalPaidAmount);
+                            resolve(finalPaidAmount);
+                        } else {
+                            console.log('⚠️ [createBooking] Could not find voucher price from all_vouchers, using provided paid/totalPrice:', finalPaidAmount);
+                            resolve(finalPaidAmount);
+                        }
+                    });
+                });
+            };
+            
+            // Wait for voucher paid amount before proceeding
+            getVoucherPaid().then(() => {
+                insertBookingWithFinalPaid();
+            });
+            return; // Exit early, will continue in callback
+        }
+        
+        // If not Redeem Voucher, proceed directly
+        insertBookingWithFinalPaid();
+        
+        function insertBookingWithFinalPaid() {
         const bookingValues = [
             passengerName,
             chooseFlightType.type,
@@ -8727,7 +8806,7 @@ app.post('/api/createBooking', (req, res) => {
             actualPaxCount, // Use actual passenger count instead of chooseFlightType.passengerCount
             chooseLocation,
             bookingStatus, // Use status from request body or default to 'Confirmed'
-            paid || totalPrice, // Use paid amount from Gift Voucher Details if provided, otherwise use totalPrice
+            finalPaidAmount, // Use original voucher price for Redeem Voucher, otherwise use paid/totalPrice
             0,
             voucher_code || null,
             nowDate,
@@ -9121,7 +9200,8 @@ app.post('/api/createBooking', (req, res) => {
                 insertPassengers();
             }
         });
-    }
+        } // End of insertBookingWithFinalPaid function
+    } // End of insertBookingAndPassengers function
 
     // expires hesaplama akışı
     if (voucher_code) {
