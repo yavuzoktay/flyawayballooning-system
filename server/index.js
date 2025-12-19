@@ -12284,15 +12284,15 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 
                 // If still not found, try normal email/date search
                 if (!booking) {
-                    const [emailRowsExact] = await new Promise((resolve, reject) => {
-                        con.query('SELECT * FROM all_booking WHERE email = ? AND DATE(created_at) = DATE(?) ORDER BY created_at DESC LIMIT 1', [email, createdAt], (err, rows) => {
-                            if (err) reject(err);
-                            else resolve([rows]);
-                        });
-                    });
-                    console.log('🔍 Customer Portal - Search by email/date (exact):', email, createdAt, 'Found:', emailRowsExact?.length || 0);
+            const [emailRowsExact] = await new Promise((resolve, reject) => {
+                con.query('SELECT * FROM all_booking WHERE email = ? AND DATE(created_at) = DATE(?) ORDER BY created_at DESC LIMIT 1', [email, createdAt], (err, rows) => {
+                    if (err) reject(err);
+                    else resolve([rows]);
+                });
+            });
+            console.log('🔍 Customer Portal - Search by email/date (exact):', email, createdAt, 'Found:', emailRowsExact?.length || 0);
 
-                    if (emailRowsExact && emailRowsExact.length > 0) {
+            if (emailRowsExact && emailRowsExact.length > 0) {
                         // Validate: If effectiveVoucherRef exists in token, booking must have matching voucher_code
                         if (effectiveVoucherRef && emailRowsExact[0].voucher_code !== effectiveVoucherRef) {
                             console.log('⚠️ Customer Portal - Email match found but voucher_code mismatch:', {
@@ -12301,8 +12301,8 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                             });
                             // Don't use this booking if effectiveVoucherRef doesn't match
                         } else {
-                            booking = emailRowsExact[0];
-                            console.log('✅ Customer Portal - Booking found by email/date:', booking.id);
+                booking = emailRowsExact[0];
+                console.log('✅ Customer Portal - Booking found by email/date:', booking.id);
                         }
                     }
                 }
@@ -12392,14 +12392,74 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         // Use voucherInfoForLookup if available (from earlier lookup), otherwise will be set later
         let isFlightVoucher = voucherInfoForLookup ? (voucherInfoForLookup.book_flight === 'Flight Voucher') : false;
         
-        // For synthetic voucher IDs (Flight Voucher), prioritize effectiveVoucherRef from token
-        // because booking.voucher_code might be a newly generated code from redeem voucher
-        // For regular bookings, use booking.voucher_code first, then fallback to effectiveVoucherRef
-        const voucherCodeToLookup = (isSyntheticVoucherId && effectiveVoucherRef) 
-            ? effectiveVoucherRef 
-            : (booking.voucher_code || effectiveVoucherRef);
+        // IMPORTANT: If booking was found by ID and effectiveVoucherRef exists in token,
+        // prioritize effectiveVoucherRef to lookup voucher info (booking.voucher_code might be different)
+        // This ensures we get the correct Flight Voucher customer info even if booking was found by ID
+        const voucherCodeToLookup = effectiveVoucherRef || booking.voucher_code;
         
-        if (voucherCodeToLookup) {
+        // If booking was found by ID and effectiveVoucherRef exists, check if it's a Flight Voucher
+        // This is critical for Flight Voucher bookings where customer info is in all_vouchers
+        if (booking && effectiveVoucherRef && !voucherInfoForLookup) {
+            try {
+                const [voucherCheckRows] = await new Promise((resolve, reject) => {
+                    con.query(`
+                        SELECT 
+                            id, 
+                            name, 
+                            email, 
+                            phone, 
+                            mobile,
+                            purchaser_name,
+                            purchaser_email,
+                            purchaser_phone,
+                            purchaser_mobile,
+                            book_flight,
+                            voucher_type, 
+                            voucher_type_detail,
+                            expires AS voucher_expires,
+                            voucher_passenger_details,
+                            weight
+                        FROM all_vouchers 
+                        WHERE voucher_ref = ? 
+                        LIMIT 1
+                    `, [effectiveVoucherRef], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
+                });
+                
+                if (voucherCheckRows && voucherCheckRows.length > 0) {
+                    voucherInfoForLookup = voucherCheckRows[0];
+                    isFlightVoucher = voucherInfoForLookup.book_flight === 'Flight Voucher';
+                    console.log('✅ Customer Portal - Found voucher info by effectiveVoucherRef (after booking found):', {
+                        book_flight: voucherInfoForLookup.book_flight,
+                        isFlightVoucher: isFlightVoucher,
+                        purchaser_email: voucherInfoForLookup.purchaser_email
+                    });
+                }
+            } catch (voucherCheckErr) {
+                console.warn('⚠️ Customer Portal - Could not check voucher info by effectiveVoucherRef:', voucherCheckErr.message);
+            }
+        }
+        
+        // Use voucherInfoForLookup if already fetched, otherwise fetch from voucherCodeToLookup
+        if (voucherInfoForLookup) {
+            // Use the voucher info we already fetched
+            voucherInfo = voucherInfoForLookup;
+            isFlightVoucher = voucherInfo.book_flight === 'Flight Voucher';
+            
+            // Prioritize voucher_type_detail, then voucher_type
+            if (voucherInfo.voucher_type_detail) {
+                finalVoucherTypeDetail = voucherInfo.voucher_type_detail;
+                finalVoucherType = voucherInfo.voucher_type_detail;
+                console.log('✅ Customer Portal - Voucher type detail from voucherInfoForLookup:', finalVoucherTypeDetail);
+            } else if (voucherInfo.voucher_type) {
+                finalVoucherType = voucherInfo.voucher_type;
+                console.log('✅ Customer Portal - Voucher type from voucherInfoForLookup:', finalVoucherType);
+            }
+            
+            console.log('✅ Customer Portal - Using voucherInfoForLookup, isFlightVoucher:', isFlightVoucher);
+        } else if (voucherCodeToLookup) {
             try {
                 const [voucherRows] = await new Promise((resolve, reject) => {
                     con.query(`
@@ -12643,8 +12703,8 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 status: booking.status,
                 pax: booking.pax,
                 passengers: finalPassengerRows,
-                voucher_code: booking.voucher_code || voucherRef,
-                voucher_ref: booking.voucher_code || voucherRef || null,
+                voucher_code: booking.voucher_code || effectiveVoucherRef || voucherRef,
+                voucher_ref: effectiveVoucherRef || booking.voucher_code || voucherRef || null,
                 voucher_type: finalVoucherType || booking.voucher_type,
                 voucher_type_detail: finalVoucherTypeDetail || booking.voucher_type_detail || finalVoucherType || booking.voucher_type,
                 paid: booking.paid,
