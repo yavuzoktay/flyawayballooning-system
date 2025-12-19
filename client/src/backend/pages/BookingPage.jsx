@@ -1420,24 +1420,24 @@ const BookingPage = () => {
                 }
                 
                         // For Flight Voucher, use purchaser_name and purchaser_email
-                        // For Gift Voucher, use recipient_name and recipient_email
+                        // For Gift Voucher, use purchaser_name and purchaser_email (purchaser is who bought the voucher)
                         // For other types, use name and email
                         const isFlightVoucher = item.book_flight === 'Flight Voucher';
                         const isGiftVoucher = item.book_flight === 'Gift Voucher';
                         const displayName = isFlightVoucher 
                             ? (item.purchaser_name || item.name || '')
                             : (isGiftVoucher 
-                                ? (item.recipient_name || item.name || '')
+                                ? (item.purchaser_name || item.name || '')
                                 : (item.name || ''));
                         const displayEmail = isFlightVoucher 
                             ? (item.purchaser_email || item.email || '')
                             : (isGiftVoucher 
-                                ? (item.recipient_email || item.email || '')
+                                ? (item.purchaser_email || item.email || '')
                                 : (item.email || ''));
                         const displayPhone = isFlightVoucher 
                             ? (item.purchaser_phone || item.purchaser_mobile || item.phone || item.mobile || '')
                             : (isGiftVoucher 
-                                ? (item.recipient_phone || item.phone || '')
+                                ? (item.purchaser_phone || item.purchaser_mobile || item.phone || item.mobile || '')
                                 : (item.phone || item.mobile || ''));
                         
                         return {
