@@ -1419,14 +1419,35 @@ const BookingPage = () => {
                     }
                 }
                 
+                        // For Flight Voucher, use purchaser_name and purchaser_email
+                        // For Gift Voucher, use recipient_name and recipient_email
+                        // For other types, use name and email
+                        const isFlightVoucher = item.book_flight === 'Flight Voucher';
+                        const isGiftVoucher = item.book_flight === 'Gift Voucher';
+                        const displayName = isFlightVoucher 
+                            ? (item.purchaser_name || item.name || '')
+                            : (isGiftVoucher 
+                                ? (item.recipient_name || item.name || '')
+                                : (item.name || ''));
+                        const displayEmail = isFlightVoucher 
+                            ? (item.purchaser_email || item.email || '')
+                            : (isGiftVoucher 
+                                ? (item.recipient_email || item.email || '')
+                                : (item.email || ''));
+                        const displayPhone = isFlightVoucher 
+                            ? (item.purchaser_phone || item.purchaser_mobile || item.phone || item.mobile || '')
+                            : (isGiftVoucher 
+                                ? (item.recipient_phone || item.phone || '')
+                                : (item.phone || item.mobile || ''));
+                        
                         return {
                     created: formattedDate,
-                    name: item.name || '',
+                    name: displayName,
                     flight_type: item.experience_type || '', // Updated field name
                     voucher_type: item.book_flight || '', // Updated field name
                     actual_voucher_type: item.voucher_type || '', // New field for actual voucher type
-                    email: item.email || '',
-                    phone: item.phone || '',
+                    email: displayEmail,
+                    phone: displayPhone,
                     expires: item.expires || '',
                     redeemed: item.redeemed || '',
                     paid: item.paid || '',
@@ -4601,21 +4622,58 @@ setBookingDetail(finalVoucherDetail);
                                     onNameClick={handleNameClick}
                                     onVoucherRefClick={handleVoucherRefClick}
                                     onEmailClick={(voucher) => {
-                                        const faux = { id: voucher.id, name: voucher.name, email: voucher.email, flight_type: voucher.flight_type };
+                                        // For Flight Voucher, use purchaser_name and purchaser_email
+                                        // For Gift Voucher, use recipient_name and recipient_email
+                                        // For other types, use name and email
+                                        const originalVoucher = voucher._original || voucher;
+                                        const isFlightVoucher = originalVoucher.book_flight === 'Flight Voucher';
+                                        const isGiftVoucher = originalVoucher.book_flight === 'Gift Voucher';
+                                        const displayName = isFlightVoucher 
+                                            ? (originalVoucher.purchaser_name || voucher.name || '')
+                                            : (isGiftVoucher 
+                                                ? (originalVoucher.recipient_name || voucher.name || '')
+                                                : (voucher.name || ''));
+                                        const displayEmail = isFlightVoucher 
+                                            ? (originalVoucher.purchaser_email || voucher.email || '')
+                                            : (isGiftVoucher 
+                                                ? (originalVoucher.recipient_email || voucher.email || '')
+                                                : (voucher.email || ''));
+                                        const faux = { 
+                                            id: voucher.id, 
+                                            name: displayName, 
+                                            email: displayEmail, 
+                                            flight_type: voucher.flight_type 
+                                        };
                                         handleEmailClick(faux);
                                         (async () => {
                                             try {
-                                                const resp = await axios.get(`/api/recipientEmails`, { params: { email: voucher.email } });
+                                                const resp = await axios.get(`/api/recipientEmails`, { params: { email: displayEmail } });
                                                 setEmailLogs(resp.data?.data || []);
                                             } catch {}
                                         })();
                                     }}
                                     onSmsClick={(voucher) => {
-                                        const faux = { id: voucher.id, name: voucher.name, phone: voucher.phone };
+                                        // For Flight Voucher, use purchaser_name and purchaser_phone
+                                        // For Gift Voucher, use recipient_name and recipient_phone
+                                        // For other types, use name and phone
+                                        const originalVoucher = voucher._original || voucher;
+                                        const isFlightVoucher = originalVoucher.book_flight === 'Flight Voucher';
+                                        const isGiftVoucher = originalVoucher.book_flight === 'Gift Voucher';
+                                        const displayName = isFlightVoucher 
+                                            ? (originalVoucher.purchaser_name || voucher.name || '')
+                                            : (isGiftVoucher 
+                                                ? (originalVoucher.recipient_name || voucher.name || '')
+                                                : (voucher.name || ''));
+                                        const displayPhone = isFlightVoucher 
+                                            ? (originalVoucher.purchaser_phone || originalVoucher.purchaser_mobile || voucher.phone || '')
+                                            : (isGiftVoucher 
+                                                ? (originalVoucher.recipient_phone || voucher.phone || '')
+                                                : (voucher.phone || ''));
+                                        const faux = { id: voucher.id, name: displayName, phone: displayPhone };
                                         handleSmsClick(faux);
                                         (async () => {
                                             try {
-                                                const resp = await axios.get(`/api/recipientSms`, { params: { to: voucher.phone } });
+                                                const resp = await axios.get(`/api/recipientSms`, { params: { to: displayPhone } });
                                                 setSmsLogs(resp.data?.data || []);
                                             } catch {}
                                         })();
