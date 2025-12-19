@@ -12095,21 +12095,50 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         }
 
         // If still not found, try email and created_at (more flexible date matching)
+        // IMPORTANT: Only use email search if voucherRef is not available or if we need to validate
         if (!booking && email && createdAt) {
-            // Try exact match first
-            const [emailRowsExact] = await new Promise((resolve, reject) => {
-                con.query('SELECT * FROM all_booking WHERE email = ? AND DATE(created_at) = DATE(?) ORDER BY created_at DESC LIMIT 1', [email, createdAt], (err, rows) => {
-                    if (err) reject(err);
-                    else resolve([rows]);
+            // If voucherRef exists, prioritize voucherRef + email combination
+            if (voucherRef) {
+                const [voucherEmailRows] = await new Promise((resolve, reject) => {
+                    con.query('SELECT * FROM all_booking WHERE voucher_code = ? AND email = ? ORDER BY created_at DESC LIMIT 1', [voucherRef, email], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
                 });
-            });
-            console.log('🔍 Customer Portal - Search by email/date (exact):', email, createdAt, 'Found:', emailRowsExact?.length || 0);
+                console.log('🔍 Customer Portal - Search by voucher code + email:', voucherRef, email, 'Found:', voucherEmailRows?.length || 0);
+                if (voucherEmailRows && voucherEmailRows.length > 0) {
+                    booking = voucherEmailRows[0];
+                    console.log('✅ Customer Portal - Booking found by voucher code + email:', booking.id);
+                }
+            }
+            
+            // If still not found, try exact match first
+            if (!booking) {
+                const [emailRowsExact] = await new Promise((resolve, reject) => {
+                    con.query('SELECT * FROM all_booking WHERE email = ? AND DATE(created_at) = DATE(?) ORDER BY created_at DESC LIMIT 1', [email, createdAt], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
+                });
+                console.log('🔍 Customer Portal - Search by email/date (exact):', email, createdAt, 'Found:', emailRowsExact?.length || 0);
 
-            if (emailRowsExact && emailRowsExact.length > 0) {
-                booking = emailRowsExact[0];
-                console.log('✅ Customer Portal - Booking found by email/date:', booking.id);
-            } else {
-                // Try just email if exact date match fails
+                if (emailRowsExact && emailRowsExact.length > 0) {
+                    // Validate: If voucherRef exists in token, booking must have matching voucher_code
+                    if (voucherRef && emailRowsExact[0].voucher_code !== voucherRef) {
+                        console.log('⚠️ Customer Portal - Email match found but voucher_code mismatch:', {
+                            tokenVoucherRef: voucherRef,
+                            bookingVoucherCode: emailRowsExact[0].voucher_code
+                        });
+                        // Don't use this booking if voucherRef doesn't match
+                    } else {
+                        booking = emailRowsExact[0];
+                        console.log('✅ Customer Portal - Booking found by email/date:', booking.id);
+                    }
+                }
+            }
+            
+            // If still not found and no voucherRef, try just email (fallback only)
+            if (!booking && !voucherRef) {
                 const [emailRows] = await new Promise((resolve, reject) => {
                     con.query('SELECT * FROM all_booking WHERE email = ? ORDER BY created_at DESC LIMIT 1', [email], (err, rows) => {
                         if (err) reject(err);
@@ -12397,6 +12426,29 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             finalLocation = booking.location;
         }
 
+        // Ensure book_flight is set correctly even if voucherInfo is null
+        // Try to get book_flight from all_vouchers table if voucherInfo is null but voucher_code exists
+        let finalBookFlight = voucherInfo ? voucherInfo.book_flight : null;
+        if (!finalBookFlight && booking.voucher_code) {
+            try {
+                const [voucherBookFlightRows] = await new Promise((resolve, reject) => {
+                    con.query('SELECT book_flight FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [booking.voucher_code], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
+                });
+                if (voucherBookFlightRows && voucherBookFlightRows.length > 0 && voucherBookFlightRows[0].book_flight) {
+                    finalBookFlight = voucherBookFlightRows[0].book_flight;
+                    // Update isFlightVoucher flag if book_flight is 'Flight Voucher'
+                    if (finalBookFlight === 'Flight Voucher') {
+                        isFlightVoucher = true;
+                    }
+                }
+            } catch (voucherBookFlightErr) {
+                console.warn('⚠️ Customer Portal - Could not fetch book_flight from all_vouchers:', voucherBookFlightErr.message);
+            }
+        }
+
         // Format the response
         const response = {
             success: true,
@@ -12425,7 +12477,7 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 additional_notes: booking.additional_notes,
                 flight_attempts: finalFlightAttempts,
                 activity_id: booking.activity_id || null,
-                book_flight: voucherInfo ? voucherInfo.book_flight : null, // Add book_flight to identify Flight Voucher
+                book_flight: finalBookFlight, // Add book_flight to identify Flight Voucher
                 is_flight_voucher: isFlightVoucher // Add flag to identify Flight Voucher
             }
         };
