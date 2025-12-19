@@ -12056,7 +12056,29 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         if (voucherIdFromToken) {
             try {
                 const [voucherByIdRows] = await new Promise((resolve, reject) => {
-                    con.query('SELECT id, book_flight, purchaser_email, purchaser_name, email, name, voucher_ref, created_at FROM all_vouchers WHERE id = ? LIMIT 1', [voucherIdFromToken], (err, rows) => {
+                    con.query(`
+                        SELECT 
+                            id, 
+                            name, 
+                            email, 
+                            phone, 
+                            mobile,
+                            purchaser_name,
+                            purchaser_email,
+                            purchaser_phone,
+                            purchaser_mobile,
+                            book_flight,
+                            voucher_type, 
+                            voucher_type_detail,
+                            expires AS voucher_expires,
+                            voucher_passenger_details,
+                            weight,
+                            voucher_ref, 
+                            created_at
+                        FROM all_vouchers 
+                        WHERE id = ? 
+                        LIMIT 1
+                    `, [voucherIdFromToken], (err, rows) => {
                         if (err) reject(err);
                         else resolve([rows]);
                     });
@@ -12351,6 +12373,37 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             } catch (voucherErr) {
                 console.error('Error searching via voucher table:', voucherErr);
             }
+        }
+
+        // If booking not found but we have Flight Voucher info, create a synthetic booking from voucher
+        // This allows Flight Voucher to be displayed even if not yet redeemed
+        if (!booking && voucherInfoForLookup && voucherInfoForLookup.book_flight === 'Flight Voucher') {
+            console.log('ℹ️ Customer Portal - Booking not found, but Flight Voucher exists. Creating synthetic booking from voucher.');
+            // Create a synthetic booking object from voucher info
+            booking = {
+                id: voucherInfoForLookup.id || voucherIdFromToken || null,
+                booking_id: null,
+                voucher_code: voucherInfoForLookup.voucher_ref || effectiveVoucherRef,
+                voucher_type: voucherInfoForLookup.voucher_type || 'Flight Voucher',
+                voucher_type_detail: voucherInfoForLookup.voucher_type_detail || voucherInfoForLookup.voucher_type || 'Flight Voucher',
+                name: voucherInfoForLookup.purchaser_name || voucherInfoForLookup.name || '',
+                email: voucherInfoForLookup.purchaser_email || voucherInfoForLookup.email || '',
+                phone: voucherInfoForLookup.purchaser_phone || voucherInfoForLookup.purchaser_mobile || voucherInfoForLookup.phone || voucherInfoForLookup.mobile || '',
+                flight_date: null, // Flight Voucher not yet scheduled
+                location: null,
+                status: 'Not Scheduled',
+                pax: 0,
+                paid: 0,
+                due: 0,
+                expires: voucherInfoForLookup.voucher_expires || null,
+                created_at: voucherInfoForLookup.created_at || createdAt || null,
+                flight_attempts: 0,
+                experience: null,
+                flight_type: null,
+                activity_id: null,
+                additional_notes: null
+            };
+            console.log('✅ Customer Portal - Created synthetic booking from Flight Voucher:', booking.id);
         }
 
         if (!booking) {
