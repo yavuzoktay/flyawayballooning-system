@@ -375,37 +375,53 @@ const PaginatedTable = ({
                     {columns.map((col) => {
                         const id = getColId(col);
                         return (
-                            <col key={id} style={{ 
-                                width: id === 'email' ? '240px' : 
-                                       id === 'name' ? '180px' : 
-                                       id === 'voucher_code' ? '120px' :
-                                       id === 'status' ? '120px' : 
-                                       id === 'voucher_type' ? (context === 'vouchers' ? '220px' : '180px') :
-                                       id === 'voucher_ref' ? '160px' :
-                                       id === 'passenger_info' ? '200px' :
-                                       id === 'created_at' || id === 'created' ? '120px' :
-                                       id === 'flight_date' ? '200px' :
-                                       id === 'flight_attempts' ? '150px' :
-                                       id === 'expires' ? '140px' :
-                                       id === 'location' ? '140px' :
-                                       id === 'redeemed' ? '120px' :
-                                       'auto', 
-                                minWidth: id === 'email' ? '240px' : 
-                                         id === 'name' ? '180px' : 
-                                         id === 'voucher_code' ? '120px' :
-                                         id === 'status' ? '120px' : 
-                                         id === 'voucher_type' ? (context === 'vouchers' ? '220px' : '180px') :
-                                         id === 'voucher_ref' ? '160px' :
-                                         id === 'passenger_info' ? '200px' :
-                                         id === 'created_at' || id === 'created' ? '120px' :
-                                         id === 'flight_date' ? '200px' :
-                                         id === 'flight_attempts' ? '150px' :
-                                         id === 'expires' ? '140px' :
-                                         id === 'location' ? '140px' :
-                                         id === 'redeemed' ? '120px' :
-                                         '80px', 
-                                maxWidth: id === 'email' ? '240px' : undefined 
-                            }} />
+                            <col
+                                key={id}
+                                style={{
+                                    // NOTE: Safari has issues with table-layout: fixed + colgroup
+                                    // when some columns only use "auto" width. To ensure that
+                                    // critical numeric columns like Pax and Paid are always
+                                    // visible across browsers (especially Safari), give them
+                                    // explicit pixel widths here.
+                                    width:
+                                        id === 'email' ? '240px' :
+                                        id === 'name' ? '180px' :
+                                        id === 'voucher_code' ? '120px' :
+                                        id === 'status' ? '120px' :
+                                        id === 'voucher_type'
+                                            ? (context === 'vouchers' ? '220px' : '180px') :
+                                        id === 'voucher_ref' ? '160px' :
+                                        id === 'passenger_info' ? '200px' :
+                                        id === 'created_at' || id === 'created' ? '120px' :
+                                        id === 'flight_date' ? '200px' :
+                                        id === 'pax' ? '80px' :
+                                        id === 'paid' ? '120px' :
+                                        id === 'flight_attempts' ? '150px' :
+                                        id === 'expires' ? '140px' :
+                                        id === 'location' ? '140px' :
+                                        id === 'redeemed' ? '120px' :
+                                        'auto',
+                                    minWidth:
+                                        id === 'email' ? '240px' :
+                                        id === 'name' ? '180px' :
+                                        id === 'voucher_code' ? '120px' :
+                                        id === 'status' ? '120px' :
+                                        id === 'voucher_type'
+                                            ? (context === 'vouchers' ? '220px' : '180px') :
+                                        id === 'voucher_ref' ? '160px' :
+                                        id === 'passenger_info' ? '200px' :
+                                        id === 'created_at' || id === 'created' ? '120px' :
+                                        id === 'flight_date' ? '200px' :
+                                        id === 'pax' ? '80px' :
+                                        id === 'paid' ? '120px' :
+                                        id === 'flight_attempts' ? '150px' :
+                                        id === 'expires' ? '140px' :
+                                        id === 'location' ? '140px' :
+                                        id === 'redeemed' ? '120px' :
+                                        '80px',
+                                    maxWidth: id === 'email' ? '240px' : undefined
+                                }}
+                            />
                         );
                     })}
                     {/* Actions column for bookings/vouchers */}
