@@ -478,9 +478,14 @@ const CustomerPortal = () => {
 
                 <Paper id="scroll-target-booking" elevation={2} sx={{ p: 3, mb: 3, scrollMarginTop: '100px' }}>
                     <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
-                        {bookingData.is_flight_voucher || bookingData.book_flight === 'Flight Voucher' 
-                            ? 'Your Booking Flight Voucher' 
-                            : 'Your Booking'}
+                        {(() => {
+                            const bookFlight = (bookingData.book_flight || '').toString().trim().toLowerCase();
+                            const voucherType = (bookingData.voucher_type || '').toString().trim().toLowerCase();
+                            const isFlightVoucher = bookingData.is_flight_voucher || 
+                                bookFlight === 'flight voucher' || 
+                                voucherType === 'flight voucher';
+                            return isFlightVoucher ? 'Your Booking Flight Voucher' : 'Your Booking';
+                        })()}
                     </Typography>
                     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
                         <Box>
