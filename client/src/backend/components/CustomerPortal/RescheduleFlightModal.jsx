@@ -97,6 +97,33 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         return 0;
     };
 
+    // Balloon 210 is a global resource across locations for a given date+time.
+    // If any shared booking has consumed Balloon 210 at that date+time, large Private Charter (5–8 pax)
+    // must NOT be selectable in ANY location at that same date+time.
+    const normalizeSlotDate = (value) => {
+        if (!value) return '';
+        return String(value).split('T')[0].split(' ')[0].trim();
+    };
+    const normalizeSlotTime = (value) => {
+        if (!value) return '';
+        return String(value).trim();
+    };
+    const balloon210InUseByDateTime = React.useMemo(() => {
+        const map = new Map();
+        (availabilities || []).forEach(s => {
+            const dateKey = normalizeSlotDate(s?.date);
+            const timeKey = normalizeSlotTime(s?.time);
+            if (!dateKey || !timeKey) return;
+            const key = `${dateKey}|${timeKey}`;
+            const balloon210LockedAny = Number(s?.balloon210_locked || s?.shared_slots_used || 0) > 0;
+            const sharedBookedAny = Number(s?.shared_booked || s?.shared_consumed_pax || 0);
+            if (balloon210LockedAny || sharedBookedAny > 0) {
+                map.set(key, true);
+            }
+        });
+        return map;
+    }, [availabilities]);
+
     const getAvailableSeatsForSelection = (slot) => {
         if (!slot) return 0;
 
@@ -107,7 +134,11 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
 
         // SHARED FLOW (uses Balloon 210)
         if (!isPrivateSelection) {
-            if (balloon210Locked) return 0;
+            // If Balloon 210 is assigned to a different location, no shared seats are available for this location
+            // Shared flights can share Balloon 210 within the same location, but not across different locations
+            if (balloon210Locked) {
+                return 0;
+            }
             return baseAvailable;
         }
 
@@ -122,7 +153,18 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         }
 
         // Large private charter (5–8 pax) uses Balloon 210 exclusively
-        if (balloon210Locked || sharedBooked > 0) return 0;
+        const slotDateKey = normalizeSlotDate(slot?.date);
+        const slotTimeKey = normalizeSlotTime(slot?.time);
+        const balloon210InUseGlobally = slotDateKey && slotTimeKey
+            ? Boolean(balloon210InUseByDateTime.get(`${slotDateKey}|${slotTimeKey}`))
+            : false;
+
+        // If Balloon 210 is already consumed by shared at this date+time (any location), block large private.
+        // Also block if this specific slot indicates Balloon 210 is locked or shared booked.
+        if (balloon210Locked || sharedBooked > 0 || balloon210InUseGlobally) {
+            return 0;
+        }
+
         return baseAvailable >= requiredSeats ? baseAvailable : 0;
     };
 
@@ -596,7 +638,10 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                         </Box>
                                     ) : (
                                         getTimesForDate(selectedDate).map(slot => {
-                                            const isAvailable = (Number(slot.available) || Number(slot.calculated_available) || 0) > 0;
+                                            // Use the same availability logic as calendar totals:
+                                            // this accounts for shared/private resource constraints (Balloon 210 / 105) and global locks.
+                                            const availableForSelection = getAvailableSeatsForSelection(slot);
+                                            const isAvailable = availableForSelection > 0;
                                             const isSelected = selectedTime === slot.time;
                                             const slotDateTime = dayjs(`${dayjs(selectedDate).format('YYYY-MM-DD')} ${slot.time}`);
                                             const isPastTime = slotDateTime.isBefore(dayjs());
@@ -645,7 +690,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                                         }
                                                     }}
                                                 >
-                                                    {slot.time} ({getAvailableSeatsForSelection(slot)} Spaces)
+                                                    {slot.time} {isAvailable ? `(${availableForSelection} Spaces)` : '(Not Available)'}
                                                     </Button>
                                             );
                                         })
