@@ -12045,11 +12045,47 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         console.log('🔑 Customer Portal - Parsed values:', { bookingId, voucherRef, email, createdAt });
 
         // If the first part comes from a synthetic "voucher-<id>" identifier (used for Buy Flight Voucher),
-        // do NOT treat it as a booking ID – the real booking is looked up via voucherRef/email.
+        // Extract voucher ID and lookup from all_vouchers table first
         const isSyntheticVoucherId = bookingId && bookingId.startsWith('voucher-');
+        const voucherIdFromToken = isSyntheticVoucherId ? bookingId.replace('voucher-', '') : null;
 
         // Store voucher info for later use (to determine isFlightVoucher flag)
         let voucherInfoForLookup = null;
+        
+        // If voucher ID is provided, fetch voucher info from all_vouchers table first
+        if (voucherIdFromToken) {
+            try {
+                const [voucherByIdRows] = await new Promise((resolve, reject) => {
+                    con.query('SELECT id, book_flight, purchaser_email, purchaser_name, email, name, voucher_ref, created_at FROM all_vouchers WHERE id = ? LIMIT 1', [voucherIdFromToken], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
+                });
+                if (voucherByIdRows && voucherByIdRows.length > 0) {
+                    voucherInfoForLookup = voucherByIdRows[0];
+                    console.log('✅ Customer Portal - Found voucher by ID:', voucherIdFromToken, {
+                        book_flight: voucherInfoForLookup.book_flight,
+                        voucher_ref: voucherInfoForLookup.voucher_ref,
+                        purchaser_email: voucherInfoForLookup.purchaser_email
+                    });
+                    // Update voucherRef from voucher if not provided in token
+                    if (!voucherRef && voucherInfoForLookup.voucher_ref) {
+                        const updatedVoucherRef = voucherInfoForLookup.voucher_ref;
+                        console.log('🔍 Customer Portal - Using voucher_ref from voucher:', updatedVoucherRef);
+                    }
+                }
+            } catch (voucherByIdErr) {
+                console.warn('⚠️ Customer Portal - Could not fetch voucher by ID:', voucherByIdErr.message);
+            }
+        }
+
+        // If voucher ID was found, use its voucher_ref to find booking
+        // This ensures we use the correct voucher_ref from the voucher record
+        let effectiveVoucherRef = voucherRef;
+        if (voucherInfoForLookup && voucherInfoForLookup.voucher_ref) {
+            effectiveVoucherRef = voucherInfoForLookup.voucher_ref;
+            console.log('🔍 Customer Portal - Using voucher_ref from voucher ID:', effectiveVoucherRef);
+        }
 
         // Try to find booking by ID first (only when it's not a synthetic voucher id)
         let booking = null;
@@ -12082,21 +12118,37 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             }
         }
 
+        // If voucher ID was provided, use voucher_ref from voucher to find booking
+        if (!booking && voucherInfoForLookup && effectiveVoucherRef) {
+            const [voucherRefRows] = await new Promise((resolve, reject) => {
+                con.query('SELECT * FROM all_booking WHERE voucher_code = ? ORDER BY created_at DESC LIMIT 1', [effectiveVoucherRef], (err, rows) => {
+                    if (err) reject(err);
+                    else resolve([rows]);
+                });
+            });
+            console.log('🔍 Customer Portal - Search by voucher_ref from voucher ID:', effectiveVoucherRef, 'Found:', voucherRefRows?.length || 0);
+            if (voucherRefRows && voucherRefRows.length > 0) {
+                booking = voucherRefRows[0];
+                console.log('✅ Customer Portal - Booking found by voucher_ref from voucher ID:', booking.id);
+            }
+        }
+
         // If not found by ID, try voucher_code
         // IMPORTANT: For Flight Voucher, first check all_vouchers table to get purchaser_email
         // Then search booking with voucher_code AND purchaser_email to avoid wrong customer data
-        if (!booking && voucherRef) {
+        // Only do this if voucherInfoForLookup was not already fetched by voucher ID
+        if (!booking && effectiveVoucherRef && !voucherInfoForLookup) {
             // First, check if this is a Flight Voucher in all_vouchers table
             try {
                 const [voucherInfoRows] = await new Promise((resolve, reject) => {
-                    con.query('SELECT book_flight, purchaser_email, purchaser_name, email, name FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [voucherRef], (err, rows) => {
+                    con.query('SELECT book_flight, purchaser_email, purchaser_name, email, name FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [effectiveVoucherRef], (err, rows) => {
                         if (err) reject(err);
                         else resolve([rows]);
                     });
                 });
                 if (voucherInfoRows && voucherInfoRows.length > 0) {
                     voucherInfoForLookup = voucherInfoRows[0];
-                    console.log('🔍 Customer Portal - Found voucher info:', {
+                    console.log('🔍 Customer Portal - Found voucher info by voucher_ref:', {
                         book_flight: voucherInfoForLookup.book_flight,
                         purchaser_email: voucherInfoForLookup.purchaser_email,
                         email: voucherInfoForLookup.email
@@ -12105,85 +12157,85 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             } catch (voucherInfoErr) {
                 console.warn('⚠️ Customer Portal - Could not fetch voucher info for lookup:', voucherInfoErr.message);
             }
-            
-            // If Flight Voucher and purchaser_email exists, search with both voucher_code and purchaser_email
-            if (voucherInfoForLookup && voucherInfoForLookup.book_flight === 'Flight Voucher' && voucherInfoForLookup.purchaser_email) {
-                const [voucherRows] = await new Promise((resolve, reject) => {
-                    con.query('SELECT * FROM all_booking WHERE voucher_code = ? AND email = ? ORDER BY created_at DESC LIMIT 1', [voucherRef, voucherInfoForLookup.purchaser_email], (err, rows) => {
-                        if (err) reject(err);
-                        else resolve([rows]);
-                    });
-                });
-                console.log('🔍 Customer Portal - Search by voucher code + purchaser_email:', voucherRef, voucherInfoForLookup.purchaser_email, 'Found:', voucherRows?.length || 0);
-                if (voucherRows && voucherRows.length > 0) {
-                    booking = voucherRows[0];
-                    console.log('✅ Customer Portal - Booking found by voucher code + purchaser_email:', booking.id);
-                }
-            }
-            
-            // If still not found, try just voucher_code (fallback)
-            if (!booking) {
+        }
+        
+        // If Flight Voucher and purchaser_email exists, search with both voucher_code and purchaser_email
+        if (!booking && voucherInfoForLookup && voucherInfoForLookup.book_flight === 'Flight Voucher' && voucherInfoForLookup.purchaser_email && effectiveVoucherRef) {
             const [voucherRows] = await new Promise((resolve, reject) => {
-                con.query('SELECT * FROM all_booking WHERE voucher_code = ? ORDER BY created_at DESC LIMIT 1', [voucherRef], (err, rows) => {
+                con.query('SELECT * FROM all_booking WHERE voucher_code = ? AND email = ? ORDER BY created_at DESC LIMIT 1', [effectiveVoucherRef, voucherInfoForLookup.purchaser_email], (err, rows) => {
                     if (err) reject(err);
                     else resolve([rows]);
                 });
             });
-                console.log('🔍 Customer Portal - Search by voucher code (fallback):', voucherRef, 'Found:', voucherRows?.length || 0);
+            console.log('🔍 Customer Portal - Search by voucher code + purchaser_email:', effectiveVoucherRef, voucherInfoForLookup.purchaser_email, 'Found:', voucherRows?.length || 0);
+            if (voucherRows && voucherRows.length > 0) {
+                booking = voucherRows[0];
+                console.log('✅ Customer Portal - Booking found by voucher code + purchaser_email:', booking.id);
+            }
+        }
+        
+        // If still not found, try just voucher_code (fallback)
+        if (!booking && effectiveVoucherRef) {
+            const [voucherRows] = await new Promise((resolve, reject) => {
+                con.query('SELECT * FROM all_booking WHERE voucher_code = ? ORDER BY created_at DESC LIMIT 1', [effectiveVoucherRef], (err, rows) => {
+                    if (err) reject(err);
+                    else resolve([rows]);
+                });
+            });
+            console.log('🔍 Customer Portal - Search by voucher code (fallback):', effectiveVoucherRef, 'Found:', voucherRows?.length || 0);
             if (voucherRows && voucherRows.length > 0) {
                 booking = voucherRows[0];
                 console.log('✅ Customer Portal - Booking found by voucher code:', booking.id);
-                }
             }
         }
 
         // If still not found, try email and created_at (more flexible date matching)
-        // IMPORTANT: Only use email search if voucherRef is not available or if we need to validate
+        // IMPORTANT: Only use email search if effectiveVoucherRef is not available or if we need to validate
         // For Flight Voucher, token email is purchaser_email, so we need to check all_vouchers first
         if (!booking && email && createdAt) {
-            // If voucherRef exists, prioritize voucherRef + email combination
-            if (voucherRef) {
+            // If effectiveVoucherRef exists, prioritize effectiveVoucherRef + email combination
+            if (effectiveVoucherRef) {
                 // For Flight Voucher, check if email matches purchaser_email in all_vouchers
-                // If so, use voucherRef to find booking (email in all_booking might not match purchaser_email)
+                // If so, use effectiveVoucherRef to find booking (email in all_booking might not match purchaser_email)
                 if (voucherInfoForLookup && voucherInfoForLookup.book_flight === 'Flight Voucher') {
                     // Check if token email matches purchaser_email
                     if (voucherInfoForLookup.purchaser_email && voucherInfoForLookup.purchaser_email.toLowerCase() === email.toLowerCase()) {
                         // Token email is purchaser_email, so search booking by voucher_code only
                         // (email in all_booking might be different, e.g., redeem voucher email)
                         const [voucherRefRows] = await new Promise((resolve, reject) => {
-                            con.query('SELECT * FROM all_booking WHERE voucher_code = ? ORDER BY created_at DESC LIMIT 1', [voucherRef], (err, rows) => {
+                            con.query('SELECT * FROM all_booking WHERE voucher_code = ? ORDER BY created_at DESC LIMIT 1', [effectiveVoucherRef], (err, rows) => {
                                 if (err) reject(err);
                                 else resolve([rows]);
                             });
                         });
-                        console.log('🔍 Customer Portal - Search by voucher code (Flight Voucher, purchaser_email match):', voucherRef, 'Found:', voucherRefRows?.length || 0);
+                        console.log('🔍 Customer Portal - Search by voucher code (Flight Voucher, purchaser_email match):', effectiveVoucherRef, 'Found:', voucherRefRows?.length || 0);
                         if (voucherRefRows && voucherRefRows.length > 0) {
                             booking = voucherRefRows[0];
                             console.log('✅ Customer Portal - Booking found by voucher code (Flight Voucher):', booking.id);
                         }
                     } else {
-                        // Try normal voucherRef + email search
+                        // Try normal effectiveVoucherRef + email search
                         const [voucherEmailRows] = await new Promise((resolve, reject) => {
-                            con.query('SELECT * FROM all_booking WHERE voucher_code = ? AND email = ? ORDER BY created_at DESC LIMIT 1', [voucherRef, email], (err, rows) => {
+                            con.query('SELECT * FROM all_booking WHERE voucher_code = ? AND email = ? ORDER BY created_at DESC LIMIT 1', [effectiveVoucherRef, email], (err, rows) => {
                                 if (err) reject(err);
                                 else resolve([rows]);
                             });
                         });
-                        console.log('🔍 Customer Portal - Search by voucher code + email:', voucherRef, email, 'Found:', voucherEmailRows?.length || 0);
+                        console.log('🔍 Customer Portal - Search by voucher code + email:', effectiveVoucherRef, email, 'Found:', voucherEmailRows?.length || 0);
                         if (voucherEmailRows && voucherEmailRows.length > 0) {
                             booking = voucherEmailRows[0];
                             console.log('✅ Customer Portal - Booking found by voucher code + email:', booking.id);
                         }
                     }
                 } else {
-                    // For non-Flight Voucher, use normal voucherRef + email search
+                    // For non-Flight Voucher, use normal effectiveVoucherRef + email search
                     const [voucherEmailRows] = await new Promise((resolve, reject) => {
-                        con.query('SELECT * FROM all_booking WHERE voucher_code = ? AND email = ? ORDER BY created_at DESC LIMIT 1', [voucherRef, email], (err, rows) => {
+                        con.query('SELECT * FROM all_booking WHERE voucher_code = ? AND email = ? ORDER BY created_at DESC LIMIT 1', [effectiveVoucherRef, email], (err, rows) => {
                             if (err) reject(err);
                             else resolve([rows]);
                         });
                     });
-                    console.log('🔍 Customer Portal - Search by voucher code + email:', voucherRef, email, 'Found:', voucherEmailRows?.length || 0);
+                    console.log('🔍 Customer Portal - Search by voucher code + email:', effectiveVoucherRef, email, 'Found:', voucherEmailRows?.length || 0);
                     if (voucherEmailRows && voucherEmailRows.length > 0) {
                         booking = voucherEmailRows[0];
                         console.log('✅ Customer Portal - Booking found by voucher code + email:', booking.id);
@@ -12195,11 +12247,11 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             // For Flight Voucher, check if email is purchaser_email in all_vouchers
             if (!booking) {
                 // First, check if email matches purchaser_email in all_vouchers (Flight Voucher case)
-                if (!voucherInfoForLookup && voucherRef) {
+                if (!voucherInfoForLookup && effectiveVoucherRef) {
                     // Try to get voucher info if not already fetched
                     try {
                         const [voucherInfoRows] = await new Promise((resolve, reject) => {
-                            con.query('SELECT book_flight, purchaser_email, voucher_ref FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [voucherRef], (err, rows) => {
+                            con.query('SELECT book_flight, purchaser_email, voucher_ref FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [effectiveVoucherRef], (err, rows) => {
                                 if (err) reject(err);
                                 else resolve([rows]);
                             });
@@ -12212,17 +12264,17 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                     }
                 }
                 
-                // If Flight Voucher and email matches purchaser_email, search by voucherRef only
-                if (voucherInfoForLookup && voucherInfoForLookup.book_flight === 'Flight Voucher' && voucherRef) {
+                // If Flight Voucher and email matches purchaser_email, search by effectiveVoucherRef only
+                if (voucherInfoForLookup && voucherInfoForLookup.book_flight === 'Flight Voucher' && effectiveVoucherRef) {
                     if (voucherInfoForLookup.purchaser_email && voucherInfoForLookup.purchaser_email.toLowerCase() === email.toLowerCase()) {
-                        // Token email is purchaser_email, search by voucherRef only
+                        // Token email is purchaser_email, search by effectiveVoucherRef only
                         const [voucherRefOnlyRows] = await new Promise((resolve, reject) => {
-                            con.query('SELECT * FROM all_booking WHERE voucher_code = ? ORDER BY created_at DESC LIMIT 1', [voucherRef], (err, rows) => {
+                            con.query('SELECT * FROM all_booking WHERE voucher_code = ? ORDER BY created_at DESC LIMIT 1', [effectiveVoucherRef], (err, rows) => {
                                 if (err) reject(err);
                                 else resolve([rows]);
                             });
                         });
-                        console.log('🔍 Customer Portal - Search by voucher code only (Flight Voucher, purchaser_email):', voucherRef, 'Found:', voucherRefOnlyRows?.length || 0);
+                        console.log('🔍 Customer Portal - Search by voucher code only (Flight Voucher, purchaser_email):', effectiveVoucherRef, 'Found:', voucherRefOnlyRows?.length || 0);
                         if (voucherRefOnlyRows && voucherRefOnlyRows.length > 0) {
                             booking = voucherRefOnlyRows[0];
                             console.log('✅ Customer Portal - Booking found by voucher code (Flight Voucher, purchaser_email):', booking.id);
@@ -12232,32 +12284,32 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 
                 // If still not found, try normal email/date search
                 if (!booking) {
-            const [emailRowsExact] = await new Promise((resolve, reject) => {
-                con.query('SELECT * FROM all_booking WHERE email = ? AND DATE(created_at) = DATE(?) ORDER BY created_at DESC LIMIT 1', [email, createdAt], (err, rows) => {
-                    if (err) reject(err);
-                    else resolve([rows]);
-                });
-            });
-            console.log('🔍 Customer Portal - Search by email/date (exact):', email, createdAt, 'Found:', emailRowsExact?.length || 0);
+                    const [emailRowsExact] = await new Promise((resolve, reject) => {
+                        con.query('SELECT * FROM all_booking WHERE email = ? AND DATE(created_at) = DATE(?) ORDER BY created_at DESC LIMIT 1', [email, createdAt], (err, rows) => {
+                            if (err) reject(err);
+                            else resolve([rows]);
+                        });
+                    });
+                    console.log('🔍 Customer Portal - Search by email/date (exact):', email, createdAt, 'Found:', emailRowsExact?.length || 0);
 
-            if (emailRowsExact && emailRowsExact.length > 0) {
-                        // Validate: If voucherRef exists in token, booking must have matching voucher_code
-                        if (voucherRef && emailRowsExact[0].voucher_code !== voucherRef) {
+                    if (emailRowsExact && emailRowsExact.length > 0) {
+                        // Validate: If effectiveVoucherRef exists in token, booking must have matching voucher_code
+                        if (effectiveVoucherRef && emailRowsExact[0].voucher_code !== effectiveVoucherRef) {
                             console.log('⚠️ Customer Portal - Email match found but voucher_code mismatch:', {
-                                tokenVoucherRef: voucherRef,
+                                tokenVoucherRef: effectiveVoucherRef,
                                 bookingVoucherCode: emailRowsExact[0].voucher_code
                             });
-                            // Don't use this booking if voucherRef doesn't match
+                            // Don't use this booking if effectiveVoucherRef doesn't match
                         } else {
-                booking = emailRowsExact[0];
-                console.log('✅ Customer Portal - Booking found by email/date:', booking.id);
+                            booking = emailRowsExact[0];
+                            console.log('✅ Customer Portal - Booking found by email/date:', booking.id);
                         }
                     }
                 }
             }
             
-            // If still not found and no voucherRef, try just email (fallback only)
-            if (!booking && !voucherRef) {
+            // If still not found and no effectiveVoucherRef, try just email (fallback only)
+            if (!booking && !effectiveVoucherRef) {
                 const [emailRows] = await new Promise((resolve, reject) => {
                     con.query('SELECT * FROM all_booking WHERE email = ? ORDER BY created_at DESC LIMIT 1', [email], (err, rows) => {
                         if (err) reject(err);
@@ -12273,18 +12325,20 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         }
 
         // If still not found, try to find by voucher code from all_vouchers table and then find booking
-        if (!booking && voucherRef) {
+        // This is a fallback if voucher ID lookup didn't work
+        if (!booking && effectiveVoucherRef && !voucherInfoForLookup) {
             try {
                 const [voucherRows] = await new Promise((resolve, reject) => {
-                    con.query('SELECT id FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [voucherRef], (err, rows) => {
+                    con.query('SELECT id, voucher_ref FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [effectiveVoucherRef], (err, rows) => {
                         if (err) reject(err);
                         else resolve([rows]);
                     });
                 });
                 if (voucherRows && voucherRows.length > 0) {
+                    voucherInfoForLookup = voucherRows[0];
                     // Found voucher, now try to find booking by voucher_code
                     const [bookingByVoucher] = await new Promise((resolve, reject) => {
-                        con.query('SELECT * FROM all_booking WHERE voucher_code = ? ORDER BY created_at DESC LIMIT 1', [voucherRef], (err, rows) => {
+                        con.query('SELECT * FROM all_booking WHERE voucher_code = ? ORDER BY created_at DESC LIMIT 1', [effectiveVoucherRef], (err, rows) => {
                             if (err) reject(err);
                             else resolve([rows]);
                         });
@@ -12300,7 +12354,7 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         }
 
         if (!booking) {
-            console.log('❌ Customer Portal - Booking not found for:', { bookingId, voucherRef, email, createdAt });
+            console.log('❌ Customer Portal - Booking not found for:', { bookingId, voucherRef, effectiveVoucherRef, email, createdAt, voucherIdFromToken });
             // Try to find any booking with this email to help debug
             if (email) {
                 const [anyBooking] = await new Promise((resolve, reject) => {
@@ -12317,7 +12371,9 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 debug: {
                     searchedBy: {
                         bookingId: bookingId || null,
+                        voucherIdFromToken: voucherIdFromToken || null,
                         voucherRef: voucherRef || null,
+                        effectiveVoucherRef: effectiveVoucherRef || null,
                         email: email || null,
                         createdAt: createdAt || null
                     }
@@ -12336,12 +12392,12 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         // Use voucherInfoForLookup if available (from earlier lookup), otherwise will be set later
         let isFlightVoucher = voucherInfoForLookup ? (voucherInfoForLookup.book_flight === 'Flight Voucher') : false;
         
-        // For synthetic voucher IDs (Flight Voucher), prioritize voucherRef from token
+        // For synthetic voucher IDs (Flight Voucher), prioritize effectiveVoucherRef from token
         // because booking.voucher_code might be a newly generated code from redeem voucher
-        // For regular bookings, use booking.voucher_code first, then fallback to voucherRef
-        const voucherCodeToLookup = (isSyntheticVoucherId && voucherRef) 
-            ? voucherRef 
-            : (booking.voucher_code || voucherRef);
+        // For regular bookings, use booking.voucher_code first, then fallback to effectiveVoucherRef
+        const voucherCodeToLookup = (isSyntheticVoucherId && effectiveVoucherRef) 
+            ? effectiveVoucherRef 
+            : (booking.voucher_code || effectiveVoucherRef);
         
         if (voucherCodeToLookup) {
             try {
@@ -12526,10 +12582,10 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             // 3. Booking is scheduled (status is 'Scheduled')
             // 4. Booking has flight_date
             const voucherMatches = booking && (
-                booking.voucher_code === voucherRef || 
+                booking.voucher_code === effectiveVoucherRef || 
                 booking.voucher_code === voucherCodeToLookup ||
                 (voucherCodeToLookup && booking.voucher_code && booking.voucher_code.includes(voucherCodeToLookup)) ||
-                (voucherRef && booking.voucher_code && booking.voucher_code.includes(voucherRef))
+                (effectiveVoucherRef && booking.voucher_code && booking.voucher_code.includes(effectiveVoucherRef))
             );
             
             if (booking && voucherMatches && booking.flight_date && booking.status && booking.status.toLowerCase() === 'scheduled') {

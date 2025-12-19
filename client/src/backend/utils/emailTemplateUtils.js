@@ -48,25 +48,48 @@ const buildCustomerPortalToken = (booking = {}) => {
         booking.portal_link_token;
     if (explicitToken) return explicitToken;
 
-    // For Flight Voucher, use purchaser_email instead of email
-    // For Gift Voucher, use recipient_email
-    // For other types, use email
+    // For Flight Voucher, use voucher ID instead of booking ID
+    // For Gift Voucher, use voucher ID
+    // For other types, use booking ID
     const isFlightVoucher = booking.book_flight === 'Flight Voucher' || booking.is_flight_voucher;
     const isGiftVoucher = booking.book_flight === 'Gift Voucher';
     
+    // Get voucher ID from _original if available, or from booking.voucher_id
+    const voucherId = booking._original?.id || booking.voucher_id || null;
+    
+    // Determine ID to use: voucher ID for Flight/Gift Voucher, booking ID for others
+    let idToUse = '';
+    if (isFlightVoucher || isGiftVoucher) {
+        // Use voucher ID with prefix for Flight/Gift Voucher
+        if (voucherId) {
+            idToUse = `voucher-${voucherId}`;
+        } else if (booking.id && String(booking.id).startsWith('voucher-')) {
+            // Already in voucher- format
+            idToUse = String(booking.id);
+        } else {
+            // Fallback: use booking ID if voucher ID not available
+            idToUse = booking.id ?? booking.booking_id ?? booking.bookingId ?? '';
+        }
+    } else {
+        // For regular bookings, use booking ID
+        idToUse = booking.id ?? booking.booking_id ?? booking.bookingId ?? '';
+    }
+    
+    // For Flight Voucher, use purchaser_email instead of email
+    // For Gift Voucher, use recipient_email
+    // For other types, use email
     let emailToUse = '';
     if (isFlightVoucher) {
-        emailToUse = booking.purchaser_email || booking.email || booking.customer_email || '';
+        emailToUse = booking.purchaser_email || booking._original?.purchaser_email || booking.email || booking.customer_email || '';
     } else if (isGiftVoucher) {
-        emailToUse = booking.recipient_email || booking.email || booking.customer_email || '';
+        emailToUse = booking.recipient_email || booking._original?.recipient_email || booking.email || booking.customer_email || '';
     } else {
         emailToUse = booking.email || booking.customer_email || '';
     }
 
     const sourceParts = [
-        booking.id ?? booking.booking_id ?? booking.bookingId ?? '',
-        booking.booking_reference ?? booking.bookingReference ?? '',
-        booking.voucher_code ?? booking.voucherCode ?? '',
+        idToUse,
+        booking.voucher_code ?? booking.voucherCode ?? booking.voucher_ref ?? '',
         emailToUse,
         booking.created_at ?? booking.created ?? '',
     ].map((part) => (part == null ? '' : String(part).trim()))
