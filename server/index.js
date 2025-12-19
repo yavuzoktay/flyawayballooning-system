@@ -12048,6 +12048,9 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         // do NOT treat it as a booking ID – the real booking is looked up via voucherRef/email.
         const isSyntheticVoucherId = bookingId && bookingId.startsWith('voucher-');
 
+        // Store voucher info for later use (to determine isFlightVoucher flag)
+        let voucherInfoForLookup = null;
+
         // Try to find booking by ID first (only when it's not a synthetic voucher id)
         let booking = null;
         if (bookingId && !isSyntheticVoucherId) {
@@ -12080,17 +12083,57 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         }
 
         // If not found by ID, try voucher_code
+        // IMPORTANT: For Flight Voucher, first check all_vouchers table to get purchaser_email
+        // Then search booking with voucher_code AND purchaser_email to avoid wrong customer data
         if (!booking && voucherRef) {
-            const [voucherRows] = await new Promise((resolve, reject) => {
-                con.query('SELECT * FROM all_booking WHERE voucher_code = ? ORDER BY created_at DESC LIMIT 1', [voucherRef], (err, rows) => {
-                    if (err) reject(err);
-                    else resolve([rows]);
+            // First, check if this is a Flight Voucher in all_vouchers table
+            try {
+                const [voucherInfoRows] = await new Promise((resolve, reject) => {
+                    con.query('SELECT book_flight, purchaser_email, purchaser_name, email, name FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [voucherRef], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
                 });
-            });
-            console.log('🔍 Customer Portal - Search by voucher code:', voucherRef, 'Found:', voucherRows?.length || 0);
-            if (voucherRows && voucherRows.length > 0) {
-                booking = voucherRows[0];
-                console.log('✅ Customer Portal - Booking found by voucher code:', booking.id);
+                if (voucherInfoRows && voucherInfoRows.length > 0) {
+                    voucherInfoForLookup = voucherInfoRows[0];
+                    console.log('🔍 Customer Portal - Found voucher info:', {
+                        book_flight: voucherInfoForLookup.book_flight,
+                        purchaser_email: voucherInfoForLookup.purchaser_email,
+                        email: voucherInfoForLookup.email
+                    });
+                }
+            } catch (voucherInfoErr) {
+                console.warn('⚠️ Customer Portal - Could not fetch voucher info for lookup:', voucherInfoErr.message);
+            }
+            
+            // If Flight Voucher and purchaser_email exists, search with both voucher_code and purchaser_email
+            if (voucherInfoForLookup && voucherInfoForLookup.book_flight === 'Flight Voucher' && voucherInfoForLookup.purchaser_email) {
+                const [voucherRows] = await new Promise((resolve, reject) => {
+                    con.query('SELECT * FROM all_booking WHERE voucher_code = ? AND email = ? ORDER BY created_at DESC LIMIT 1', [voucherRef, voucherInfoForLookup.purchaser_email], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
+                });
+                console.log('🔍 Customer Portal - Search by voucher code + purchaser_email:', voucherRef, voucherInfoForLookup.purchaser_email, 'Found:', voucherRows?.length || 0);
+                if (voucherRows && voucherRows.length > 0) {
+                    booking = voucherRows[0];
+                    console.log('✅ Customer Portal - Booking found by voucher code + purchaser_email:', booking.id);
+                }
+            }
+            
+            // If still not found, try just voucher_code (fallback)
+            if (!booking) {
+                const [voucherRows] = await new Promise((resolve, reject) => {
+                    con.query('SELECT * FROM all_booking WHERE voucher_code = ? ORDER BY created_at DESC LIMIT 1', [voucherRef], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
+                });
+                console.log('🔍 Customer Portal - Search by voucher code (fallback):', voucherRef, 'Found:', voucherRows?.length || 0);
+                if (voucherRows && voucherRows.length > 0) {
+                    booking = voucherRows[0];
+                    console.log('✅ Customer Portal - Booking found by voucher code:', booking.id);
+                }
             }
         }
 
@@ -12214,7 +12257,8 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         let voucherInfo = null;
         let finalVoucherType = booking.voucher_type;
         let finalVoucherTypeDetail = booking.voucher_type_detail || null;
-        let isFlightVoucher = false;
+        // Use voucherInfoForLookup if available (from earlier lookup), otherwise will be set later
+        let isFlightVoucher = voucherInfoForLookup ? (voucherInfoForLookup.book_flight === 'Flight Voucher') : false;
         
         // For synthetic voucher IDs (Flight Voucher), prioritize voucherRef from token
         // because booking.voucher_code might be a newly generated code from redeem voucher
@@ -12428,7 +12472,8 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
 
         // Ensure book_flight is set correctly even if voucherInfo is null
         // Try to get book_flight from all_vouchers table if voucherInfo is null but voucher_code exists
-        let finalBookFlight = voucherInfo ? voucherInfo.book_flight : null;
+        // Also use voucherInfoForLookup if available (from earlier lookup)
+        let finalBookFlight = voucherInfo ? voucherInfo.book_flight : (voucherInfoForLookup ? voucherInfoForLookup.book_flight : null);
         if (!finalBookFlight && booking.voucher_code) {
             try {
                 const [voucherBookFlightRows] = await new Promise((resolve, reject) => {
