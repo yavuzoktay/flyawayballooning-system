@@ -8,12 +8,12 @@ const getApiBaseUrl = () => {
   return 'https://flyawayballooning-system.com';
 };
 
-// Use the complete publishable key from the same account as the secret key
-const TEST_PK = 'pk_live_51HjVLCHwUKMuFjtpYqU29dM4gqkLTiwG2zsgCtSfRe2Ehj44Ewpd3UpRAb3lc8PiOsKwGsIcOSD7XR6FmaVaoHHK00AcQ8TPsF';
+// Stripe publishable key - Live mode key
+const LIVE_PK = 'pk_live_51HjVLCHwUKMuFjtpYqU29dM4gqkLTiwG2zsgCtSfRe2Ehj44Ewpd3UpRAb3lc8PiOsKwGsIcOSD7XR6FmaVaoHHK00AcQ8TPsF';
 
 const config = {
   API_BASE_URL: getApiBaseUrl(),
-  STRIPE_PUBLIC_KEY: TEST_PK
+  STRIPE_PUBLIC_KEY: LIVE_PK
 };
 
 export default config;
