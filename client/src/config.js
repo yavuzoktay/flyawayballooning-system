@@ -16,4 +16,4 @@ const config = {
   STRIPE_PUBLIC_KEY: TEST_PK
 };
 
-export default config; 
+export default config;
