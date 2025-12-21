@@ -582,7 +582,11 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
 
             // Voucher / experience info
             const voucher = bookingData?.voucher || bookingData || {};
-            const voucherCode = voucher.voucher_ref || voucher.voucher_code || voucher.vc_code || bookingData?.voucher_code || '';
+            const rawVoucherCode = voucher.voucher_ref || voucher.voucher_code || voucher.vc_code || bookingData?.voucher_code || '';
+            // Avoid sending an invalid voucher_code that breaks FK constraint. Use only if looks like a real code.
+            const voucherCode = rawVoucherCode && !String(rawVoucherCode).toLowerCase().startsWith('voucher-')
+                ? rawVoucherCode
+                : null;
             const experienceValue = voucher.experience_type || voucher.experience || bookingData?.experience || bookingData?.flight_type || 'Shared Flight';
             const voucherTypeValue = voucher.voucher_type || voucher.actual_voucher_type || bookingData?.voucher_type || bookingData?.voucher_type_detail || 'Any Day Flight';
             const flightType = experienceValue === 'Private Charter' ? 'Private Charter' : 'Shared Flight';
@@ -653,7 +657,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 selectedTime: selectedTime,
                 totalPrice: totalPrice,
                 paid: paidAmount,
-                voucher_code: voucherCode,
+                ...(voucherCode ? { voucher_code: voucherCode } : {}),
                 flight_attempts: 0,
                 additionalInfo: {},
                 choose_add_on: [],
