@@ -3439,7 +3439,10 @@ setBookingDetail(finalVoucherDetail);
                     console.log('Flight Voucher Booking Payload:', bookingPayloadBase);
                     
                     const tryCreateFlight = async (payload, skipVoucherCode) => {
-                        const finalPayload = skipVoucherCode ? { ...payload, voucher_code: undefined } : payload;
+                        const finalPayload = { ...payload };
+                        if (skipVoucherCode) {
+                            delete finalPayload.voucher_code;
+                        }
                         return axios.post('/api/createBooking', finalPayload);
                     };
 
