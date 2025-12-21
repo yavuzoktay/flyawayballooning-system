@@ -9,7 +9,10 @@ import {
     CircularProgress,
     Box,
     IconButton,
-    Alert
+    Alert,
+    Checkbox,
+    FormControlLabel,
+    FormGroup
 } from '@mui/material';
 import dayjs from 'dayjs';
 import axios from 'axios';
@@ -26,6 +29,11 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
     const [submitting, setSubmitting] = useState(false);
     const [successDialogOpen, setSuccessDialogOpen] = useState(false);
     const [successPayload, setSuccessPayload] = useState(null);
+
+    // Locations (Flight Voucher style)
+    const [activities, setActivities] = useState([]);
+    const [availableLocations, setAvailableLocations] = useState([]);
+    const [selectedLocations, setSelectedLocations] = useState([]);
 
     // Get activity ID, location, and voucher type from booking data
     const activityId = bookingData?.activity_id || bookingData?.activityId;
@@ -272,9 +280,54 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         return `${year}-${month}-${day}`;
     };
 
-    // Fetch availabilities when modal opens
+    // Fetch activities / locations when modal opens (Flight Voucher style)
     useEffect(() => {
-        if (open && location) {
+        if (!open) {
+            setAvailableLocations([]);
+            setSelectedLocations([]);
+            setActivities([]);
+            return;
+        }
+
+        const loadActivities = async () => {
+            try {
+                const resp = await axios.get('/api/activities');
+                if (resp.data?.success) {
+                    const acts = Array.isArray(resp.data.data) ? resp.data.data : [];
+                    const liveActs = acts.filter(a => a.status === 'Live');
+                    setActivities(liveActs);
+
+                    const locs = Array.from(new Set(liveActs.map(a => a.location).filter(Boolean)));
+                    setAvailableLocations(locs);
+
+                    if (selectedLocations.length === 0) {
+                        // Default: booking location if exists, otherwise all
+                        const defaultLocs = bookingData?.location && locs.includes(bookingData.location)
+                            ? [bookingData.location]
+                            : locs;
+                        setSelectedLocations(defaultLocs);
+                    }
+                }
+            } catch (err) {
+                console.error('RescheduleFlightModal - Error loading activities:', err);
+            }
+        };
+
+        loadActivities();
+    }, [open, bookingData?.location, selectedLocations.length]);
+
+    // Fetch availabilities when modal opens or selected locations change
+    useEffect(() => {
+        if (!open) {
+            setAvailabilities([]);
+            setSelectedDate(null);
+            setSelectedTime(null);
+            setError(null);
+            return;
+        }
+
+        const fetchAvailabilitiesForLocations = async () => {
+            if (selectedLocations.length === 0) return;
             setLoading(true);
             setError(null);
             setSelectedDate(null);
@@ -283,65 +336,52 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             setSuccessDialogOpen(false);
             setSuccessPayload(null);
 
-            // First, get activity ID from location if not available in bookingData
-            const fetchAvailabilities = async () => {
-                try {
+            try {
+                const collected = [];
+
+                for (const loc of selectedLocations) {
+                    // Resolve activity id for location
                     let finalActivityId = activityId;
-                    
-                    // If activityId is not available, fetch it from location
-                    if (!finalActivityId && location) {
-                        const activitiesResponse = await axios.get('/api/activities');
-                        if (activitiesResponse.data?.success) {
-                            const activities = Array.isArray(activitiesResponse.data.data) ? activitiesResponse.data.data : [];
-                            const activityForLocation = activities.find(a => a.location === location && a.status === 'Live');
-                            if (activityForLocation) {
-                                finalActivityId = activityForLocation.id;
-                                console.log('RescheduleFlightModal - Found activity ID from location:', finalActivityId);
-                            }
-                        }
+                    if (!finalActivityId) {
+                        const act = activities.find(a => a.location === loc && a.status === 'Live');
+                        if (act) finalActivityId = act.id;
                     }
 
                     if (!finalActivityId) {
-                        console.error('RescheduleFlightModal - No activity ID found for location:', location);
-                        setError('Could not find activity for this location. Please try again later.');
-                        setAvailabilities([]);
-                        setLoading(false);
-                        return;
+                        console.warn('RescheduleFlightModal - No activity ID for location:', loc);
+                        continue;
                     }
 
-                    // Use the same endpoint as Change Flight Location modal for consistency
                     const availResponse = await axios.get(`/api/activity/${finalActivityId}/availabilities`);
                     if (availResponse.data?.success) {
                         const data = Array.isArray(availResponse.data.data) ? availResponse.data.data : [];
-                        
-                        // Store raw availabilities; filtering is applied with LiveAvailabilitySection-compatible logic below
-                        console.log('RescheduleFlightModal - Loaded availabilities:', data.length, 'for location:', location, 'activityId:', finalActivityId);
-                        setAvailabilities(data);
-                    } else {
-                        setAvailabilities([]);
+                        // Preserve location on slots (fallback to loc)
+                        const withLoc = data.map(d => ({
+                            ...d,
+                            location: d.location || loc
+                        }));
+                        collected.push(...withLoc);
+                        console.log('RescheduleFlightModal - Loaded availabilities:', data.length, 'for location:', loc, 'activityId:', finalActivityId);
                     }
-                } catch (err) {
-                    console.error('Error loading availabilities:', err);
-                    setError('Could not fetch availabilities. Please try again later.');
-                    setAvailabilities([]);
-                } finally {
-                    setLoading(false);
                 }
-            };
 
-            fetchAvailabilities();
-        } else if (!open) {
-            setAvailabilities([]);
-            setSelectedDate(null);
-            setSelectedTime(null);
-            setError(null);
-        }
-    }, [open, activityId, location, voucherType, experience, bookingData]);
+                setAvailabilities(collected);
+            } catch (err) {
+                console.error('Error loading availabilities:', err);
+                setError('Could not fetch availabilities. Please try again later.');
+                setAvailabilities([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchAvailabilitiesForLocations();
+    }, [open, selectedLocations, activities, activityId, voucherType, experience, bookingData]);
 
     // Final filtered availabilities - match LiveAvailabilitySection behaviour as closely as possible
     const finalFilteredAvailabilities = availabilities.filter(a => {
-        // Location is fixed in Customer Portal, but keep safe checks
-        const matchesLoc = !location || !a?.location || a.location === location;
+        // Location filter (selected checkboxes). If none selected, allow all.
+        const matchesLoc = selectedLocations.length === 0 || !a?.location || selectedLocations.includes(a.location);
         const matchesExp = matchesExperience(a);
 
         const slotStatus = getSlotStatus(a);
@@ -581,6 +621,39 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                     </Box>
                 ) : (
                     <>
+                        {/* Locations (Flight Voucher style) */}
+                        {availableLocations.length > 0 && (
+                            <Box sx={{ mb: 3 }}>
+                                <Typography variant="h6" sx={{ mb: 2, fontSize: 16, fontWeight: 700 }}>
+                                    Locations:
+                                </Typography>
+                                <FormGroup row>
+                                    {availableLocations.map((loc) => (
+                                        <FormControlLabel
+                                            key={loc}
+                                            control={
+                                                <Checkbox
+                                                    checked={selectedLocations.includes(loc)}
+                                                    onChange={(e) => {
+                                                        const isChecked = e.target.checked;
+                                                        setSelectedLocations((prev) => {
+                                                            if (isChecked) {
+                                                                return [...prev, loc];
+                                                            }
+                                                            // Prevent empty selection (keep at least one)
+                                                            if (prev.length <= 1) return prev;
+                                                            return prev.filter((l) => l !== loc);
+                                                        });
+                                                    }}
+                                                />
+                                            }
+                                            label={loc}
+                                        />
+                                    ))}
+                                </FormGroup>
+                            </Box>
+                        )}
+
                         {/* Calendar */}
                         <Box sx={{ mb: 3, maxWidth: '500px', mx: 'auto' }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
