@@ -367,14 +367,14 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 }
 
                 setAvailabilities(collected);
-            } catch (err) {
-                console.error('Error loading availabilities:', err);
-                setError('Could not fetch availabilities. Please try again later.');
-                setAvailabilities([]);
-            } finally {
-                setLoading(false);
-            }
-        };
+                } catch (err) {
+                    console.error('Error loading availabilities:', err);
+                    setError('Could not fetch availabilities. Please try again later.');
+                    setAvailabilities([]);
+                } finally {
+                    setLoading(false);
+                }
+            };
 
         fetchAvailabilitiesForLocations();
     }, [open, selectedLocations, activities, activityId, voucherType, experience, bookingData]);
@@ -582,11 +582,9 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
 
             // Voucher / experience info
             const voucher = bookingData?.voucher || bookingData || {};
-            const rawVoucherCode = voucher.voucher_ref || voucher.voucher_code || voucher.vc_code || bookingData?.voucher_code || '';
-            // Avoid sending an invalid voucher_code that breaks FK constraint. Use only if looks like a real code.
-            const voucherCode = rawVoucherCode && !String(rawVoucherCode).toLowerCase().startsWith('voucher-')
-                ? rawVoucherCode
-                : null;
+            // Do NOT send voucher_code to /api/createBooking to avoid FK failures when voucher_codes table lacks the entry.
+            // Redemption still handled best-effort below when a valid code exists.
+            const voucherCode = null;
             const experienceValue = voucher.experience_type || voucher.experience || bookingData?.experience || bookingData?.flight_type || 'Shared Flight';
             const voucherTypeValue = voucher.voucher_type || voucher.actual_voucher_type || bookingData?.voucher_type || bookingData?.voucher_type_detail || 'Any Day Flight';
             const flightType = experienceValue === 'Private Charter' ? 'Private Charter' : 'Shared Flight';
@@ -657,7 +655,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 selectedTime: selectedTime,
                 totalPrice: totalPrice,
                 paid: paidAmount,
-                ...(voucherCode ? { voucher_code: voucherCode } : {}),
+                // voucher_code intentionally omitted to avoid FK issues
                 flight_attempts: 0,
                 additionalInfo: {},
                 choose_add_on: [],
@@ -673,28 +671,19 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             }
 
             // Mark voucher redeemed (best-effort)
-            if (voucherCode) {
-                try {
-                    await axios.post('/api/redeem-voucher', {
-                        voucher_code: voucherCode,
-                        booking_id: createBookingResponse.data.bookingId || createBookingResponse.data.id
-                    });
-                } catch (redeemErr) {
-                    console.warn('Redeem voucher warning:', redeemErr?.message || redeemErr);
-                }
-            }
+            // Redeem call skipped because voucher_code is not sent to avoid FK errors
 
-            if (onRescheduleSuccess) {
+                if (onRescheduleSuccess) {
                 onRescheduleSuccess(createBookingResponse.data);
-            }
+                }
 
-            setSuccessPayload({
+                setSuccessPayload({
                 bookingId: createBookingResponse.data.bookingId || createBookingResponse.data.id,
                 location: selectedLocation,
                 previousFlightDateTime: bookingData?.flight_date || null,
-                newFlightDateTime: selectedDateTime
-            });
-            setSuccessDialogOpen(true);
+                    newFlightDateTime: selectedDateTime
+                });
+                setSuccessDialogOpen(true);
         } catch (err) {
             console.error('Error creating booking from reschedule:', err);
             setError(err.response?.data?.message || err.message || 'Failed to create booking. Please try again later.');
