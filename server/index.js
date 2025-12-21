@@ -2635,6 +2635,59 @@ app.put('/api/experiences/:id', experiencesUpload.single('experience_image'), (r
         });
     });
 });
+// Delete experience image only
+app.delete('/api/experiences/:id/image', (req, res) => {
+    const { id } = req.params;
+    
+    // First, get the current image_url to delete the file
+    const selectSql = 'SELECT image_url FROM experiences WHERE id = ?';
+    
+    con.query(selectSql, [id], (err, results) => {
+        if (err) {
+            console.error('Error fetching experience:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+        }
+        
+        if (results.length === 0) {
+            return res.status(404).json({ success: false, message: 'Experience not found' });
+        }
+        
+        const experience = results[0];
+        const oldImageUrl = experience.image_url;
+        
+        // Update database to remove image_url
+        const updateSql = 'UPDATE experiences SET image_url = NULL WHERE id = ?';
+        
+        con.query(updateSql, [id], (updateErr, updateResult) => {
+            if (updateErr) {
+                console.error('Error updating experience:', updateErr);
+                return res.status(500).json({ success: false, message: 'Database error', error: updateErr.message });
+            }
+            
+            // If there was an image file, try to delete it from the filesystem
+            if (oldImageUrl && oldImageUrl.startsWith('/uploads/')) {
+                const fs = require('fs');
+                const path = require('path');
+                const filePath = path.join(__dirname, '..', 'client', 'public', oldImageUrl);
+                
+                fs.unlink(filePath, (fsErr) => {
+                    if (fsErr) {
+                        console.error('Error deleting image file:', fsErr);
+                        // Don't fail the request if file deletion fails - file might not exist
+                    } else {
+                        console.log('Successfully deleted image file:', filePath);
+                    }
+                });
+            }
+            
+            res.json({
+                success: true,
+                message: 'Experience image deleted successfully'
+            });
+        });
+    });
+});
+
 // Delete experience
 app.delete('/api/experiences/:id', (req, res) => {
     const { id } = req.params;
