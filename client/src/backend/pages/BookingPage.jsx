@@ -3175,7 +3175,7 @@ setBookingDetail(finalVoucherDetail);
                     const recipientEmail = voucher.recipient_email || '';
                     
                     // Prepare booking payload
-                    const bookingPayload = {
+                    const bookingPayloadBase = {
                         activitySelect: 'Redeem Voucher',
                         chooseLocation: selectedLocationForBooking,
                         chooseFlightType: {
@@ -3205,10 +3205,27 @@ setBookingDetail(finalVoucherDetail);
                         selectedVoucherType: { title: voucherType } // Add selectedVoucherType for backend compatibility
                     };
                     
-                    console.log('Gift Voucher Booking Payload:', bookingPayload);
+                    console.log('Gift Voucher Booking Payload:', bookingPayloadBase);
                     
-                    // Create booking
-                    const createBookingResponse = await axios.post('/api/createBooking', bookingPayload);
+                    const tryCreateGift = async (payload, skipVoucherCode) => {
+                        const finalPayload = skipVoucherCode ? { ...payload, voucher_code: undefined } : payload;
+                        return axios.post('/api/createBooking', finalPayload);
+                    };
+
+                    let createBookingResponse;
+                    let usedVoucherCode = !!voucherCode;
+                    try {
+                        createBookingResponse = await tryCreateGift(bookingPayloadBase, false);
+                    } catch (errCreate) {
+                        const fkError = errCreate?.response?.data?.error || errCreate?.response?.data?.message || '';
+                        if (fkError.toLowerCase().includes('foreign key constraint') || fkError.toLowerCase().includes('voucher_codes')) {
+                            console.warn('Retrying createBooking without voucher_code due to FK error (Gift Voucher)');
+                            createBookingResponse = await tryCreateGift(bookingPayloadBase, true);
+                            usedVoucherCode = false;
+                        } else {
+                            throw errCreate;
+                        }
+                    }
                     
                     if (!createBookingResponse.data.success) {
                         throw new Error(createBookingResponse.data.message || 'Failed to create booking');
@@ -3219,7 +3236,7 @@ setBookingDetail(finalVoucherDetail);
                     // Note: Voucher is already marked as redeemed by /api/createBooking endpoint
                     // when activitySelect === 'Redeem Voucher' and voucher_code exists
                     // But we'll also call /api/redeem-voucher as a backup to ensure it's marked
-                    if (voucherCode) {
+                    if (usedVoucherCode && voucherCode) {
                         try {
                             const redeemResponse = await axios.post('/api/redeem-voucher', {
                                 voucher_code: voucherCode,
@@ -3397,7 +3414,7 @@ setBookingDetail(finalVoucherDetail);
                     }
                     
                     // Prepare booking payload
-                    const bookingPayload = {
+                    const bookingPayloadBase = {
                         activitySelect: 'Redeem Voucher',
                         chooseLocation: selectedLocationForBooking,
                         chooseFlightType: {
@@ -3419,10 +3436,27 @@ setBookingDetail(finalVoucherDetail);
                         selectedVoucherType: { title: voucherType } // Add selectedVoucherType for backend compatibility
                     };
                     
-                    console.log('Flight Voucher Booking Payload:', bookingPayload);
+                    console.log('Flight Voucher Booking Payload:', bookingPayloadBase);
                     
-                    // Create booking
-                    const createBookingResponse = await axios.post('/api/createBooking', bookingPayload);
+                    const tryCreateFlight = async (payload, skipVoucherCode) => {
+                        const finalPayload = skipVoucherCode ? { ...payload, voucher_code: undefined } : payload;
+                        return axios.post('/api/createBooking', finalPayload);
+                    };
+
+                    let createBookingResponse;
+                    let usedVoucherCode = !!voucherCode;
+                    try {
+                        createBookingResponse = await tryCreateFlight(bookingPayloadBase, false);
+                    } catch (errCreate) {
+                        const fkError = errCreate?.response?.data?.error || errCreate?.response?.data?.message || '';
+                        if (fkError.toLowerCase().includes('foreign key constraint') || fkError.toLowerCase().includes('voucher_codes')) {
+                            console.warn('Retrying createBooking without voucher_code due to FK error (Flight Voucher)');
+                            createBookingResponse = await tryCreateFlight(bookingPayloadBase, true);
+                            usedVoucherCode = false;
+                        } else {
+                            throw errCreate;
+                        }
+                    }
                     
                     if (!createBookingResponse.data.success) {
                         throw new Error(createBookingResponse.data.message || 'Failed to create booking');
@@ -3433,7 +3467,7 @@ setBookingDetail(finalVoucherDetail);
                     // Note: Voucher is already marked as redeemed by /api/createBooking endpoint
                     // when activitySelect === 'Redeem Voucher' and voucher_code exists
                     // But we'll also call /api/redeem-voucher as a backup to ensure it's marked
-                    if (voucherCode) {
+                    if (usedVoucherCode && voucherCode) {
                         try {
                             const redeemResponse = await axios.post('/api/redeem-voucher', {
                                 voucher_code: voucherCode,
