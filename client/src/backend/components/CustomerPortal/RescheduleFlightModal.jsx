@@ -300,13 +300,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                     const locs = Array.from(new Set(liveActs.map(a => a.location).filter(Boolean)));
                     setAvailableLocations(locs);
 
-                    if (selectedLocations.length === 0) {
-                        // Default: booking location if exists, otherwise all
-                        const defaultLocs = bookingData?.location && locs.includes(bookingData.location)
-                            ? [bookingData.location]
-                            : locs;
-                        setSelectedLocations(defaultLocs);
-                    }
+                    // Do not preselect locations; user must choose.
                 }
             } catch (err) {
                 console.error('RescheduleFlightModal - Error loading activities:', err);
