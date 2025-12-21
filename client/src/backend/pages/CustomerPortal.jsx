@@ -493,6 +493,19 @@ const CustomerPortal = () => {
                             <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
                                 {bookingData.booking_reference || bookingData.id || 'N/A'}
                             </Typography>
+                            {bookingData.voucher_ref && (
+                                <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>
+                                    <span style={{ color: '#555' }}>Voucher Ref: </span>
+                                    <a
+                                        href={`/booking?voucher=${encodeURIComponent(bookingData.voucher_ref)}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        style={{ color: '#3b82f6', textDecoration: 'underline' }}
+                                    >
+                                        {bookingData.voucher_ref}
+                                    </a>
+                                </Typography>
+                            )}
                         </Box>
                         <Box>
                             <Typography variant="body2" color="text.secondary">Status</Typography>
