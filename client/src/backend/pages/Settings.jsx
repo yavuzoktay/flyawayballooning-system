@@ -5517,7 +5517,7 @@ const Settings = () => {
                             
                             <div className="form-group">
                                 <label>Experience Image</label>
-                                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                                     <input
                                         type="file"
                                         accept="image/*"
@@ -5527,12 +5527,45 @@ const Settings = () => {
                                                 setExperienceFormData({...experienceFormData, image_file: file});
                                             }
                                         }}
-                                        style={{ flex: 1 }}
+                                        style={{ flex: 1, minWidth: '200px' }}
                                     />
                                     {experienceFormData.image_url && (
-                                        <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                                            Current: {experienceFormData.image_url}
-                                        </div>
+                                        <>
+                                            <div style={{ fontSize: '12px', color: '#6b7280', flex: '1', minWidth: '200px' }}>
+                                                Current: {experienceFormData.image_url}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    if (window.confirm('Are you sure you want to delete this image? This action cannot be undone.')) {
+                                                        try {
+                                                            await axios.delete(`/api/experiences/${selectedExperience.id}/image`);
+                                                            setExperienceFormData({...experienceFormData, image_url: '', image_file: null});
+                                                            alert('Image deleted successfully');
+                                                            fetchExperiences();
+                                                        } catch (error) {
+                                                            console.error('Error deleting image:', error);
+                                                            alert(error.response?.data?.message || 'Error deleting image');
+                                                        }
+                                                    }
+                                                }}
+                                                style={{
+                                                    padding: '8px 16px',
+                                                    backgroundColor: '#dc2626',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    cursor: 'pointer',
+                                                    fontSize: '14px',
+                                                    fontWeight: '500',
+                                                    transition: 'background-color 0.2s'
+                                                }}
+                                                onMouseOver={(e) => e.target.style.backgroundColor = '#b91c1c'}
+                                                onMouseOut={(e) => e.target.style.backgroundColor = '#dc2626'}
+                                            >
+                                                Delete Image
+                                            </button>
+                                        </>
                                     )}
                                 </div>
                             </div>
