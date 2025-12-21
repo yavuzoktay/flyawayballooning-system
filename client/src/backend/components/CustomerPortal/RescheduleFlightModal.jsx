@@ -576,9 +576,10 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
 
             // Voucher / experience info
             const voucher = bookingData?.voucher || bookingData || {};
-            // Do NOT send voucher_code to /api/createBooking to avoid FK failures when voucher_codes table lacks the entry.
-            // Redemption still handled best-effort below when a valid code exists.
-            const voucherCode = null;
+            const rawVoucherCode = voucher.voucher_ref || voucher.voucher_code || voucher.vc_code || bookingData?.voucher_code || '';
+            const voucherCode = rawVoucherCode && !String(rawVoucherCode).toLowerCase().startsWith('voucher-')
+                ? rawVoucherCode
+                : null;
             const experienceValue = voucher.experience_type || voucher.experience || bookingData?.experience || bookingData?.flight_type || 'Shared Flight';
             const voucherTypeValue = voucher.voucher_type || voucher.actual_voucher_type || bookingData?.voucher_type || bookingData?.voucher_type_detail || 'Any Day Flight';
             const flightType = experienceValue === 'Private Charter' ? 'Private Charter' : 'Shared Flight';
@@ -637,7 +638,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             }
 
             // Booking payload (mirror Rebook flow)
-            const bookingPayload = {
+            const bookingPayloadBase = {
                 activitySelect: 'Redeem Voucher',
                 chooseLocation: selectedLocation,
                 chooseFlightType: {
@@ -649,7 +650,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 selectedTime: selectedTime,
                 totalPrice: totalPrice,
                 paid: paidAmount,
-                // voucher_code intentionally omitted to avoid FK issues
+                ...(voucherCode ? { voucher_code: voucherCode } : {}),
                 flight_attempts: 0,
                 additionalInfo: {},
                 choose_add_on: [],
@@ -659,13 +660,41 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 selectedVoucherType: { title: voucherTypeValue }
             };
 
-            const createBookingResponse = await axios.post('/api/createBooking', bookingPayload);
+            const tryCreate = async (payload, skipVoucherCode) => {
+                const finalPayload = skipVoucherCode ? { ...payload, voucher_code: undefined } : payload;
+                return axios.post('/api/createBooking', finalPayload);
+            };
+
+            let createBookingResponse;
+            let usedVoucherCode = !!voucherCode;
+            try {
+                createBookingResponse = await tryCreate(bookingPayloadBase, false);
+            } catch (errCreate) {
+                const fkError = errCreate?.response?.data?.error || errCreate?.response?.data?.message || '';
+                if (fkError.toLowerCase().includes('foreign key constraint') || fkError.toLowerCase().includes('voucher_codes')) {
+                    console.warn('Retrying createBooking without voucher_code due to FK error');
+                    createBookingResponse = await tryCreate(bookingPayloadBase, true);
+                    usedVoucherCode = false;
+                } else {
+                    throw errCreate;
+                }
+            }
+
             if (!createBookingResponse.data?.success) {
                 throw new Error(createBookingResponse.data?.message || 'Failed to create booking');
             }
 
-            // Mark voucher redeemed (best-effort)
-            // Redeem call skipped because voucher_code is not sent to avoid FK errors
+            // Mark voucher redeemed (best-effort) only if voucher_code successfully used
+            if (usedVoucherCode && voucherCode) {
+                try {
+                    await axios.post('/api/redeem-voucher', {
+                        voucher_code: voucherCode,
+                        booking_id: createBookingResponse.data.bookingId || createBookingResponse.data.id
+                    });
+                } catch (redeemErr) {
+                    console.warn('Redeem voucher warning:', redeemErr?.message || redeemErr);
+                }
+            }
 
                 if (onRescheduleSuccess) {
                 onRescheduleSuccess(createBookingResponse.data);
