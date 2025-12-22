@@ -66,7 +66,7 @@ const BookingPage = () => {
             set.add(normalized);
         });
         // Remove undesired statuses
-        ['Confirmed', 'Flown', 'No show', 'Open'].forEach(s => set.delete(s));
+        ['Confirmed', 'Flown', 'No show', 'Open', 'Waiting'].forEach(s => set.delete(s));
         return Array.from(set).sort();
     }, [booking]);
 
