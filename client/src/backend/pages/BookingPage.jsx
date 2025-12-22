@@ -65,6 +65,8 @@ const BookingPage = () => {
             const normalized = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
             set.add(normalized);
         });
+        // Remove undesired statuses
+        ['Confirmed', 'Flown', 'No show', 'Open'].forEach(s => set.delete(s));
         return Array.from(set).sort();
     }, [booking]);
 
