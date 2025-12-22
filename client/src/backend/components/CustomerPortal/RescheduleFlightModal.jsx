@@ -639,7 +639,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 // fallback: keep current totalPrice
             }
 
-            // Booking payload (mirror Rebook flow)
+            // Booking payload (mirror Rebook flow) - do NOT send voucher_code to avoid FK issues
             const bookingPayloadBase = {
                 activitySelect: 'Redeem Voucher',
                 chooseLocation: selectedLocation,
@@ -652,7 +652,6 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 selectedTime: selectedTime,
                 totalPrice: totalPrice,
                 paid: paidAmount,
-                ...(voucherCode ? { voucher_code: voucherCode } : {}),
                 flight_attempts: 0,
                 additionalInfo: {},
                 choose_add_on: [],
@@ -664,28 +663,38 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
 
             const tryCreate = async (payload, skipVoucherCode) => {
                 const finalPayload = { ...payload };
-                if (skipVoucherCode) {
-                    delete finalPayload.voucher_code;
-                }
+                if (skipVoucherCode) delete finalPayload.voucher_code;
                 return axios.post('/api/createBooking', finalPayload);
             };
 
             let createBookingResponse;
-            let usedVoucherCode = !!voucherCode;
+            let usedVoucherCode = false;
             try {
+                // #region agent log
+                fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'reschedule-pre',hypothesisId:'H1',location:'RescheduleFlightModal.jsx:handleConfirm',message:'before createBooking',data:{activityId:finalActivityId,selectedLocation,selectedDate:selectedDateTime,selectedTime,flightType,voucherType:voucherTypeValue,voucherCodeUsed:false},timestamp:Date.now()})}).catch(()=>{});
+                // #endregion
                 createBookingResponse = await tryCreate(bookingPayloadBase, false);
             } catch (errCreate) {
                 const fkError = errCreate?.response?.data?.error || errCreate?.response?.data?.message || '';
                 if (fkError.toLowerCase().includes('foreign key constraint') || fkError.toLowerCase().includes('voucher_codes')) {
                     console.warn('Retrying createBooking without voucher_code due to FK error');
+                    // #region agent log
+                    fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'reschedule-pre',hypothesisId:'H2',location:'RescheduleFlightModal.jsx:handleConfirm',message:'FK retry without voucher_code',data:{error:fkError || 'n/a'},timestamp:Date.now()})}).catch(()=>{});
+                    // #endregion
                     createBookingResponse = await tryCreate(bookingPayloadBase, true);
                     usedVoucherCode = false;
                 } else {
+                    // #region agent log
+                    fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'reschedule-pre',hypothesisId:'H3',location:'RescheduleFlightModal.jsx:handleConfirm',message:'non-FK error createBooking',data:{error:fkError || errCreate?.message || 'n/a',status:errCreate?.response?.status},timestamp:Date.now()})}).catch(()=>{});
+                    // #endregion
                     throw errCreate;
                 }
             }
 
             if (!createBookingResponse.data?.success) {
+                // #region agent log
+                fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'reschedule-pre',hypothesisId:'H4',location:'RescheduleFlightModal.jsx:handleConfirm',message:'createBooking not success',data:{resp:createBookingResponse.data},timestamp:Date.now()})}).catch(()=>{});
+                // #endregion
                 throw new Error(createBookingResponse.data?.message || 'Failed to create booking');
             }
 
@@ -698,6 +707,9 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                     });
                 } catch (redeemErr) {
                     console.warn('Redeem voucher warning:', redeemErr?.message || redeemErr);
+                    // #region agent log
+                    fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'reschedule-pre',hypothesisId:'H5',location:'RescheduleFlightModal.jsx:handleConfirm',message:'redeem warning',data:{error:redeemErr?.message || 'n/a'},timestamp:Date.now()})}).catch(()=>{});
+                    // #endregion
                 }
             }
 
@@ -715,6 +727,9 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         } catch (err) {
             console.error('Error creating booking from reschedule:', err);
             setError(err.response?.data?.message || err.message || 'Failed to create booking. Please try again later.');
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'reschedule-pre',hypothesisId:'H6',location:'RescheduleFlightModal.jsx:handleConfirm',message:'catch error',data:{error:err?.message || 'n/a',status:err?.response?.status},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
         } finally {
             setSubmitting(false);
         }
