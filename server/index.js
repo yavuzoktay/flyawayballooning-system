@@ -23331,15 +23331,19 @@ async function generateGiftVoucherPDF(voucher) {
             const leftPadding = 40;
             const leftContentX = leftPadding;
             
-            // Hot air balloon logo (simple outline - using text/unicode as placeholder)
-            // In production, you might want to use an actual image file
+            // Logo (use actual brand logo if available, fallback to text)
+            const logoPath = path.join(__dirname, '..', 'client', 'public', 'FAB_Logo_DarkBlue.png');
             const balloonY = 80;
-            doc.fontSize(60)
-               .fillColor('#333333')
-               .text('🎈', leftContentX, balloonY);
+            if (fs.existsSync(logoPath)) {
+                doc.image(logoPath, leftContentX, balloonY, { width: 140, height: 140, fit: [140, 140] });
+            } else {
+                doc.fontSize(60)
+                   .fillColor('#333333')
+                   .text('🎈', leftContentX, balloonY);
+            }
             
             // Company name
-            const companyNameY = balloonY + 80;
+            const companyNameY = balloonY + 160;
             doc.fontSize(24)
                .fillColor('#1a1a1a')
                .font('Helvetica-Bold')
