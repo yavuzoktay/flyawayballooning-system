@@ -35,6 +35,12 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
     const [availableLocations, setAvailableLocations] = useState([]);
     const [selectedLocations, setSelectedLocations] = useState([]);
 
+    const bookFlightLower = (bookingData?.book_flight || '').toString().toLowerCase();
+    const voucherTypeLower = (bookingData?.voucher_type || '').toString().toLowerCase();
+    const isFlightVoucher = bookingData?.is_flight_voucher ||
+        bookFlightLower === 'flight voucher' ||
+        voucherTypeLower === 'flight voucher';
+
     // Get activity ID, location, and voucher type from booking data
     const activityId = bookingData?.activity_id || bookingData?.activityId;
     const location = bookingData?.location;
@@ -289,6 +295,15 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             return;
         }
 
+        // For non-flight voucher, use existing booking location and skip loading locations list
+        if (!isFlightVoucher) {
+            const loc = bookingData?.location ? [bookingData.location] : [];
+            setAvailableLocations([]);
+            setSelectedLocations(loc);
+            setActivities([]);
+            return;
+        }
+
         const loadActivities = async () => {
             try {
                 const resp = await axios.get('/api/activities');
@@ -308,7 +323,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         };
 
         loadActivities();
-    }, [open, bookingData?.location, selectedLocations.length]);
+    }, [open, bookingData?.location, selectedLocations.length, isFlightVoucher]);
 
     // Fetch availabilities when modal opens or selected locations change
     useEffect(() => {
@@ -321,7 +336,8 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         }
 
         const fetchAvailabilitiesForLocations = async () => {
-            if (selectedLocations.length === 0) return;
+            const targetLocations = isFlightVoucher ? selectedLocations : (bookingData?.location ? [bookingData.location] : []);
+            if (targetLocations.length === 0) return;
             setLoading(true);
             setError(null);
             setSelectedDate(null);
@@ -333,7 +349,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             try {
                 const collected = [];
 
-                for (const loc of selectedLocations) {
+                for (const loc of targetLocations) {
                     // Resolve activity id for location
                     let finalActivityId = activityId;
                     if (!finalActivityId) {
@@ -371,7 +387,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             };
 
         fetchAvailabilitiesForLocations();
-    }, [open, selectedLocations, activities, activityId, voucherType, experience, bookingData]);
+    }, [open, selectedLocations, activities, activityId, voucherType, experience, bookingData, isFlightVoucher]);
 
     // Final filtered availabilities - match LiveAvailabilitySection behaviour as closely as possible
     const finalFilteredAvailabilities = availabilities.filter(a => {
