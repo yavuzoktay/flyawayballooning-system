@@ -726,7 +726,7 @@ const CustomerPortal = () => {
                                                 }
                                             }}
                                         >
-                                            Change Flight Location
+                                            Change
                                         </Button>
                                     </span>
                                 </Tooltip>
