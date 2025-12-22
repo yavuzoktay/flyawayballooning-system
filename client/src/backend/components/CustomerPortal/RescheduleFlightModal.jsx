@@ -576,8 +576,12 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
 
             // Voucher / experience info
             const voucher = bookingData?.voucher || bookingData || {};
-            // Do not send voucher_code to avoid FK errors; treat as new booking
-            const voucherCode = null;
+            // Prefer voucher_ref / voucher_code from voucher data; fallback to bookingData.voucher_code
+            const voucherCodeCandidate = voucher.voucher_ref || voucher.voucher_code || voucher.vc_code || bookingData?.voucher_code || '';
+            // If it looks like an auto token (voucher-...), skip using it
+            const voucherCode = voucherCodeCandidate && !String(voucherCodeCandidate).toLowerCase().startsWith('voucher-')
+                ? voucherCodeCandidate
+                : null;
             const experienceValue = voucher.experience_type || voucher.experience || bookingData?.experience || bookingData?.flight_type || 'Shared Flight';
             const voucherTypeValue = voucher.voucher_type || voucher.actual_voucher_type || bookingData?.voucher_type || bookingData?.voucher_type_detail || 'Any Day Flight';
             const flightType = experienceValue === 'Private Charter' ? 'Private Charter' : 'Shared Flight';
@@ -648,7 +652,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 selectedTime: selectedTime,
                 totalPrice: totalPrice,
                 paid: paidAmount,
-                // voucher_code intentionally omitted
+                ...(voucherCode ? { voucher_code: voucherCode } : {}),
                 flight_attempts: 0,
                 additionalInfo: {},
                 choose_add_on: [],
@@ -667,7 +671,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             };
 
             let createBookingResponse;
-            let usedVoucherCode = false;
+            let usedVoucherCode = !!voucherCode;
             try {
                 createBookingResponse = await tryCreate(bookingPayloadBase, false);
             } catch (errCreate) {
@@ -685,8 +689,8 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 throw new Error(createBookingResponse.data?.message || 'Failed to create booking');
             }
 
-            // Mark voucher redeemed (best-effort) only if voucher_code successfully used
-            if (usedVoucherCode && voucherCode) {
+            // Mark voucher redeemed (best-effort) using voucherCodeCandidate if available
+            if (voucherCode) {
                 try {
                     await axios.post('/api/redeem-voucher', {
                         voucher_code: voucherCode,
