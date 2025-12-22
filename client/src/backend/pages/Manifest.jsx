@@ -3732,7 +3732,6 @@ const Manifest = () => {
                                             >
                                                 <MenuItem onClick={() => handleGlobalMenuAction('cancelAllGuests')}>Cancel All Guests</MenuItem>
                                                 <MenuItem onClick={() => handleGlobalMenuAction('sendMessageAllGuests')}>Send Message to All Guests</MenuItem>
-                                                                  <MenuItem onClick={() => handleGlobalMenuAction('bookCustomerOntoFlight')}>Book Customer onto Flight</MenuItem>
                                             </Menu>
                                         </Box>
                                         <Divider sx={{ marginY: 2 }} />
