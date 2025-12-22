@@ -3105,8 +3105,10 @@ setBookingDetail(finalVoucherDetail);
                     console.log('Gift Voucher Redemption - Creating booking and marking as redeemed');
                     
                     const voucher = bookingDetail.voucher;
-                    // Do NOT send voucher_code to avoid FK issues; treat this rebook as new booking
-                    const voucherCode = null;
+                    const voucherCodeCandidate = voucher.voucher_ref || voucher.voucher_code || voucher.vc_code;
+                    const voucherCode = voucherCodeCandidate && !String(voucherCodeCandidate).toLowerCase().startsWith('voucher-')
+                        ? voucherCodeCandidate
+                        : null;
                     
                     // Get selected location from purchaserInfo
                     const selectedLocationForBooking = purchaserInfo?.selectedLocations?.[0] || '';
@@ -3424,7 +3426,7 @@ setBookingDetail(finalVoucherDetail);
                         selectedTime: time,
                         totalPrice: totalPrice,
                         paid: paidAmount, // Add paid amount from Flight Voucher Details
-                        // voucher_code intentionally omitted to avoid FK constraint issues
+                        ...(voucherCode ? { voucher_code: voucherCode } : {}),
                         flight_attempts: 0,
                         additionalInfo: {},
                         choose_add_on: [],
@@ -3445,7 +3447,7 @@ setBookingDetail(finalVoucherDetail);
                     };
 
                     let createBookingResponse;
-                    let usedVoucherCode = false;
+                    let usedVoucherCode = !!voucherCode;
                     try {
                         createBookingResponse = await tryCreateFlight(bookingPayloadBase, false);
                     } catch (errCreate) {
@@ -3468,7 +3470,23 @@ setBookingDetail(finalVoucherDetail);
                     // Note: Voucher is already marked as redeemed by /api/createBooking endpoint
                     // when activitySelect === 'Redeem Voucher' and voucher_code exists
                     // But we'll also call /api/redeem-voucher as a backup to ensure it's marked
-                    // Redeem skipped (voucher_code not sent)
+                    // Redeem best-effort if voucherCode exists (even if booking created without it)
+                    if (voucherCode) {
+                        try {
+                            const redeemResponse = await axios.post('/api/redeem-voucher', {
+                                voucher_code: voucherCode,
+                                booking_id: createBookingResponse.data.bookingId || createBookingResponse.data.id
+                            });
+                            
+                            if (!redeemResponse.data.success) {
+                                console.warn('Warning: Could not mark voucher as redeemed via redeem-voucher endpoint:', redeemResponse.data.message);
+                            } else {
+                                console.log('Voucher marked as redeemed successfully via redeem-voucher endpoint');
+                            }
+                        } catch (redeemErr) {
+                            console.warn('Warning: Error calling redeem-voucher endpoint (voucher may already be marked):', redeemErr.message);
+                        }
+                    }
                 
                 setRebookModalOpen(false);
                 setDetailDialogOpen(false);
