@@ -578,8 +578,8 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             const voucher = bookingData?.voucher || bookingData || {};
             // Prefer voucher_ref / voucher_code from voucher data; fallback to bookingData.voucher_code
             const voucherCodeCandidate = voucher.voucher_ref || voucher.voucher_code || voucher.vc_code || bookingData?.voucher_code || '';
-            // If it looks like an auto token (voucher-...), skip using it
-            const voucherCode = voucherCodeCandidate && !String(voucherCodeCandidate).toLowerCase().startsWith('voucher-')
+            // If it looks like an auto token (voucher-...), skip using it for createBooking (FK). Use only for redeem.
+            const voucherCodeForRedeem = voucherCodeCandidate && !String(voucherCodeCandidate).toLowerCase().startsWith('voucher-')
                 ? voucherCodeCandidate
                 : null;
             const experienceValue = voucher.experience_type || voucher.experience || bookingData?.experience || bookingData?.flight_type || 'Shared Flight';
@@ -686,10 +686,10 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             }
 
             // Mark voucher redeemed (best-effort) using voucherCodeCandidate if available
-            if (voucherCode) {
+            if (voucherCodeForRedeem) {
                 try {
                     await axios.post('/api/redeem-voucher', {
-                        voucher_code: voucherCode,
+                        voucher_code: voucherCodeForRedeem,
                         booking_id: createBookingResponse.data.bookingId || createBookingResponse.data.id
                     });
                 } catch (redeemErr) {
