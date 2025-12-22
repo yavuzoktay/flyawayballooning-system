@@ -851,7 +851,7 @@ const CustomerPortal = () => {
                                                 }
                                             }}
                                         >
-                                            {extendingVoucher ? <CircularProgress size={20} /> : 'Extend Voucher 12 Months – £50 per passenger'}
+                                            {extendingVoucher ? <CircularProgress size={20} /> : 'Extend'}
                                         </Button>
                                     </span>
                                 </Tooltip>
