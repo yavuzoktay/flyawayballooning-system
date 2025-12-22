@@ -668,7 +668,6 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             };
 
             let createBookingResponse;
-            let createBookingResponse;
             try {
                 createBookingResponse = await tryCreate(bookingPayloadBase, false);
             } catch (errCreate) {
