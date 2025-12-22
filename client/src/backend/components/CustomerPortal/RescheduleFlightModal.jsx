@@ -664,6 +664,9 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             const tryCreate = async (payload, skipVoucherCode) => {
                 const finalPayload = { ...payload };
                 if (skipVoucherCode) delete finalPayload.voucher_code;
+                // #region agent log
+                fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'reschedule-pre',hypothesisId:'H0',location:'RescheduleFlightModal.jsx:tryCreate',message:'payload before createBooking',data:{skipVoucherCode,hasVoucherCode:Boolean(finalPayload.voucher_code),keys:Object.keys(finalPayload)},timestamp:Date.now()})}).catch(()=>{});
+                // #endregion
                 return axios.post('/api/createBooking', finalPayload);
             };
 
