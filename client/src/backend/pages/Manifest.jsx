@@ -3004,26 +3004,6 @@ const Manifest = () => {
                 // Don't fail the crew assignment if email fails
             }
             
-            // Show success notification
-            const crewName = getCrewMemberName(crewId);
-            let notificationMessage = '';
-            if (emailSent) {
-                notificationMessage = `Crew member ${crewName} assigned successfully! Email sent.`;
-            } else if (emailErrorMsg) {
-                notificationMessage = `Crew member ${crewName} assigned successfully! (Email: ${emailErrorMsg})`;
-            } else {
-                notificationMessage = `Crew member ${crewName} assigned successfully!`;
-            }
-            
-            setCrewNotification({
-                show: true,
-                message: notificationMessage,
-                type: 'success'
-            });
-            
-            // Hide notification after 3 seconds
-            setTimeout(() => setCrewNotification({ show: false, message: '', type: 'success' }), 3000);
-            
             // Also refresh from server to ensure consistency
             await refreshCrewAssignments(date);
             
@@ -3081,20 +3061,6 @@ const Manifest = () => {
                 console.log('Updated pilot assignments:', updated);
                 return updated;
             });
-            
-            // Show success message
-            console.log('Pilot assignment saved successfully!');
-            
-            // Show success notification
-            const pilotName = getPilotName(pilotId);
-            setPilotNotification({
-                show: true,
-                message: `Pilot ${pilotName} assigned successfully!`,
-                type: 'success'
-            });
-            
-            // Hide notification after 3 seconds
-            setTimeout(() => setPilotNotification({ show: false, message: '', type: 'success' }), 3000);
             
             // Also refresh from server to ensure consistency
             await refreshPilotAssignments(date);
