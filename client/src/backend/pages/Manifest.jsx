@@ -3013,12 +3013,6 @@ const Manifest = () => {
             }, 100);
         } catch (e) {
             console.error('Failed to save crew selection:', e);
-            setCrewNotification({
-                show: true,
-                message: 'Failed to save crew selection: ' + (e.response?.data?.message || e.message),
-                type: 'error'
-            });
-            setTimeout(() => setCrewNotification({ show: false, message: '', type: 'error' }), 5000);
         }
     };
 
@@ -3071,12 +3065,6 @@ const Manifest = () => {
             }, 100);
         } catch (e) {
             console.error('Failed to save pilot selection:', e);
-            setPilotNotification({
-                show: true,
-                message: 'Failed to save pilot selection: ' + (e.response?.data?.message || e.message),
-                type: 'error'
-            });
-            setTimeout(() => setPilotNotification({ show: false, message: '', type: 'error' }), 5000);
         }
     };
 
