@@ -578,11 +578,29 @@ const CustomerPortal = () => {
                         </Box>
                         <Box>
                             <Typography variant="body2" color="text.secondary">Voucher / Booking Expiry Date</Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                                {bookingData.expires
-                                    ? dayjs(bookingData.expires).format('DD/MM/YYYY')
-                                    : 'No expiry date'}
-                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                                <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                                    {bookingData.expires
+                                        ? dayjs(bookingData.expires).format('DD/MM/YYYY')
+                                        : 'No expiry date'}
+                                </Typography>
+                                <Typography
+                                    component="span"
+                                    onClick={extendingVoucher ? undefined : handleExtendVoucher}
+                                    sx={{
+                                        color: extendingVoucher ? '#9ca3af' : '#1d4ed8',
+                                        fontWeight: 600,
+                                        fontSize: '0.9rem',
+                                        cursor: extendingVoucher ? 'default' : 'pointer',
+                                        textDecoration: 'underline',
+                                        '&:hover': extendingVoucher ? {} : {
+                                            color: '#1e40af'
+                                        }
+                                    }}
+                                >
+                                    {extendingVoucher ? 'Processing...' : 'Extend'}
+                                </Typography>
+                            </Box>
                         </Box>
                     </Box>
 
@@ -817,44 +835,6 @@ const CustomerPortal = () => {
                                     </span>
                                 </Tooltip>
 
-                                {/* Extend Voucher Button */}
-                                <Tooltip
-                                    title={isExpired ? "Voucher / Booking has expired" : ""}
-                                    arrow
-                                >
-                                    <span style={{ display: 'block', width: '100%' }}>
-                                        <Button
-                                            variant="outlined"
-                                            color="primary"
-                                            fullWidth
-                                            onClick={handleExtendVoucher}
-                                            disabled={!canExtendVoucher}
-                                            sx={{
-                                                mt: 1.5,
-                                                py: 1.25,
-                                                fontSize: '1rem',
-                                                fontWeight: 600,
-                                                textTransform: 'none',
-                                                borderRadius: 2,
-                                                borderColor: canExtendVoucher ? '#1d4ed8' : '#d1d5db',
-                                                color: canExtendVoucher ? '#1d4ed8' : '#9ca3af',
-                                                '&:hover': canExtendVoucher ? {
-                                                    backgroundColor: '#eff6ff',
-                                                    borderColor: '#1d4ed8'
-                                                } : {
-                                                    backgroundColor: '#f3f4f6',
-                                                    borderColor: '#d1d5db'
-                                                },
-                                                '&.Mui-disabled': {
-                                                    borderColor: '#d1d5db',
-                                                    color: '#9ca3af'
-                                                }
-                                            }}
-                                        >
-                                            {extendingVoucher ? <CircularProgress size={20} /> : 'Extend'}
-                                        </Button>
-                                    </span>
-                                </Tooltip>
                             </Box>
                         );
                     })()}
@@ -870,7 +850,7 @@ const CustomerPortal = () => {
                             const isFlightVoucher = bookingData.is_flight_voucher || bookingData.book_flight === 'Flight Voucher';
                             const isEditing = !isFlightVoucher && editingPassenger === passenger.id;
                             return (
-                                <Box key={passenger.id || index} sx={{ mb: 2, p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+                                <Box key={passenger.id || index} sx={{ mb: 2, p: 2, borderRadius: 1 }}>
                                     {/* Name Section */}
                                     <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
                                         {isEditing ? (
