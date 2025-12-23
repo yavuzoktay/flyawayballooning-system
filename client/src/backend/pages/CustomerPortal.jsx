@@ -892,14 +892,14 @@ const CustomerPortal = () => {
                                             </Box>
                                         ) : (
                                             <>
-                                                <Typography variant="body1" sx={{ fontWeight: 500, flex: 1 }}>
+                                                <Typography variant="body1" sx={{ fontWeight: 500 }}>
                                                     {passenger.first_name} {passenger.last_name}
                                                 </Typography>
                                                 {!isFlightVoucher && (
                                                     <IconButton
                                                         size="small"
                                                         onClick={() => handleEditPassengerClick(passenger)}
-                                                        sx={{ color: '#3274b4' }}
+                                                        sx={{ color: '#3274b4', ml: 0.5 }}
                                                     >
                                                         <EditIcon fontSize="small" />
                                                     </IconButton>
