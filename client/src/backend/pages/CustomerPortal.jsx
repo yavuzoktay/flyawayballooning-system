@@ -525,11 +525,32 @@ const CustomerPortal = () => {
                         </Box>
                         <Box>
                             <Typography variant="body2" color="text.secondary">Location</Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                                {bookingData.location 
-                                    ? bookingData.location 
-                                    : (bookingData.is_flight_voucher ? 'Date Not Scheduled' : 'TBD')}
-                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                                <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                                    {bookingData.location 
+                                        ? bookingData.location 
+                                        : (bookingData.is_flight_voucher ? 'Date Not Scheduled' : 'TBD')}
+                                </Typography>
+                                <Typography
+                                    component="span"
+                                    onClick={changingLocation ? undefined : () => {
+                                        setSelectedNewLocation(bookingData.location || '');
+                                        setChangeLocationModalOpen(true);
+                                    }}
+                                    sx={{
+                                        color: changingLocation ? '#9ca3af' : '#1d4ed8',
+                                        fontWeight: 600,
+                                        fontSize: '0.9rem',
+                                        cursor: changingLocation ? 'default' : 'pointer',
+                                        textDecoration: 'underline',
+                                        '&:hover': changingLocation ? {} : {
+                                            color: '#1e40af'
+                                        }
+                                    }}
+                                >
+                                    {changingLocation ? 'Processing...' : 'Change'}
+                                </Typography>
+                            </Box>
                         </Box>
                         <Box>
                             <Typography variant="body2" color="text.secondary">Booking Created Date</Typography>
@@ -699,55 +720,6 @@ const CustomerPortal = () => {
                                     </span>
                                 </Tooltip>
 
-                                {/* Change Flight Location Button - Disabled if cancelled or less than 120 hours */}
-                                <Tooltip 
-                                    title={
-                                        isExpired
-                                            ? "Voucher / Booking has expired"
-                                            : (!canChangeLocation ? "Less than 120 hours remaining until your flight" : "")
-                                    }
-                                    arrow
-                                >
-                                    <span style={{ display: 'block', width: '100%' }}>
-                                        <Button
-                                            variant="outlined"
-                                            color="primary"
-                                            fullWidth
-                                            disabled={!canChangeLocation}
-                                            onClick={() => canChangeLocation && (() => {
-                                                setSelectedNewLocation(bookingData.location || '');
-                                                setChangeLocationModalOpen(true);
-                                            })()}
-                                            sx={{
-                                                mt: 1.5,
-                                                py: 1.5,
-                                                fontSize: '1rem',
-                                                fontWeight: 600,
-                                                textTransform: 'none',
-                                                borderRadius: 2,
-                                                borderWidth: 2,
-                                                borderColor: canChangeLocation ? undefined : '#d1d5db',
-                                                color: canChangeLocation ? undefined : '#9ca3af',
-                                                backgroundColor: canChangeLocation ? 'transparent' : '#f3f4f6',
-                                                cursor: canChangeLocation ? 'pointer' : 'not-allowed',
-                                                '&:hover': canChangeLocation ? {
-                                                    borderWidth: 2,
-                                                } : {
-                                                    borderWidth: 2,
-                                                    borderColor: '#d1d5db',
-                                                    backgroundColor: '#f3f4f6',
-                                                },
-                                                '&.Mui-disabled': {
-                                                    borderColor: '#d1d5db',
-                                                    color: '#9ca3af',
-                                                    backgroundColor: '#f3f4f6',
-                                                }
-                                            }}
-                                        >
-                                            Change
-                                        </Button>
-                                    </span>
-                                </Tooltip>
 
                                 {/* Cancel Flight Button - Always visible, but disabled if cancelled or less than 120 hours */}
                                 <Tooltip
