@@ -3577,34 +3577,6 @@ const Manifest = () => {
                                         </Box>
                                     </Box>
                                     
-                                    {/* Show selected crew member name */}
-                                    {currentCrewId && (
-                                        <Box sx={{ 
-                                            fontSize: '12px', 
-                                            color: '#10b981', 
-                                            fontWeight: '500',
-                                            ml: 1,
-                                            p: 0.5,
-                                            bgcolor: '#f0fdf4',
-                                            borderRadius: 1,
-                                            border: '1px solid #bbf7d0',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 1
-                                        }}>
-                                            <span>Crew: {getCrewMemberName(currentCrewId)}</span>
-                                            <IconButton 
-                                                size="small" 
-                                                onClick={() => clearCrewAssignment(first.activity_id, first.flight_date)}
-                                                sx={{ p: 0, minWidth: 'auto', color: '#dc2626' }}
-                                                title="Clear crew assignment"
-                                            >
-                                                ×
-                                            </IconButton>
-                                        </Box>
-                                    )}
-                                    
-                                    {/* Crew info line removed for production */}
                                 </>
                             );
                         })()}
@@ -3654,32 +3626,6 @@ const Manifest = () => {
                                         </Box>
                                     </Box>
                                     
-                                    {/* Show selected pilot name */}
-                                    {currentPilotId && (
-                                        <Box sx={{ 
-                                            fontSize: '12px', 
-                                            color: '#10b981', 
-                                            fontWeight: '500',
-                                            ml: 1,
-                                            p: 0.5,
-                                            bgcolor: '#f0fdf4',
-                                            borderRadius: 1,
-                                            border: '1px solid #bbf7d0',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 1
-                                        }}>
-                                            <span>Pilot: {getPilotName(currentPilotId)}</span>
-                                            <IconButton 
-                                                size="small" 
-                                                onClick={() => clearPilotAssignment(first.activity_id, first.flight_date)}
-                                                sx={{ p: 0, minWidth: 'auto', color: '#dc2626' }}
-                                                title="Clear pilot assignment"
-                                            >
-                                                ×
-                                            </IconButton>
-                                        </Box>
-                                    )}
                                 </>
                             );
                         })()}
