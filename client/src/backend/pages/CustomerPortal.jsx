@@ -260,29 +260,6 @@ const CustomerPortal = () => {
         };
 
         fetchLocations();
-
-        // Refresh booking data when page becomes visible (user switches back to tab)
-        const handleVisibilityChange = () => {
-            if (!document.hidden && token) {
-                console.log('🔄 Customer Portal - Page visible, refreshing booking data');
-                fetchBookingData();
-            }
-        };
-
-        // Refresh booking data periodically (every 30 seconds) to get latest updates
-        const refreshInterval = setInterval(() => {
-            if (token && !document.hidden) {
-                console.log('🔄 Customer Portal - Periodic refresh of booking data');
-                fetchBookingData();
-            }
-        }, 30000); // 30 seconds
-
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-
-        return () => {
-            clearInterval(refreshInterval);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
     }, [token]);
 
     const handleResendConfirmation = async () => {
