@@ -772,40 +772,6 @@ const CustomerPortal = () => {
                                     </span>
                                 </Tooltip>
 
-                                {/* Resend Confirmation Button */}
-                                <Tooltip
-                                    title={isExpired ? "Voucher / Booking has expired" : ""}
-                                    arrow
-                                >
-                                    <span style={{ display: 'block', width: '100%' }}>
-                                        <Button
-                                            variant="text"
-                                            color="primary"
-                                            fullWidth
-                                            onClick={handleResendConfirmation}
-                                            disabled={!canResendConfirmation}
-                                            sx={{
-                                                mt: 1.5,
-                                                py: 1.25,
-                                                fontSize: '1rem',
-                                                fontWeight: 600,
-                                                textTransform: 'none',
-                                                borderRadius: 2,
-                                                color: canResendConfirmation ? '#1d4ed8' : '#9ca3af',
-                                                '&:hover': canResendConfirmation ? {
-                                                    backgroundColor: '#eff6ff'
-                                                } : {
-                                                    backgroundColor: 'transparent'
-                                                },
-                                                '&.Mui-disabled': {
-                                                    color: '#9ca3af'
-                                                }
-                                            }}
-                                        >
-                                            {resendingConfirmation ? <CircularProgress size={20} /> : 'Resend Confirmation'}
-                                        </Button>
-                                    </span>
-                                </Tooltip>
 
                             </Box>
                         );
@@ -855,6 +821,26 @@ const CustomerPortal = () => {
                                                     >
                                                         <EditIcon fontSize="small" />
                                                     </IconButton>
+                                                )}
+                                                {/* Resend Confirmation - only for first passenger */}
+                                                {index === 0 && (
+                                                    <Typography
+                                                        component="span"
+                                                        onClick={resendingConfirmation ? undefined : handleResendConfirmation}
+                                                        sx={{
+                                                            color: resendingConfirmation ? '#9ca3af' : '#1d4ed8',
+                                                            fontWeight: 600,
+                                                            fontSize: '0.85rem',
+                                                            cursor: resendingConfirmation ? 'default' : 'pointer',
+                                                            textDecoration: 'underline',
+                                                            ml: 1.5,
+                                                            '&:hover': resendingConfirmation ? {} : {
+                                                                color: '#1e40af'
+                                                            }
+                                                        }}
+                                                    >
+                                                        {resendingConfirmation ? 'Sending...' : 'Resend Confirmation'}
+                                                    </Typography>
                                                 )}
                                             </>
                                         )}
