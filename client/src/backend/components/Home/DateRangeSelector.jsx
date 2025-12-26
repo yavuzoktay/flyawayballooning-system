@@ -126,7 +126,7 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
 
     return (
         <div style={{ padding: "20px", background: "#f9f9f9", borderRadius: "20px" }}>
-            <h2 style={{ fontFamily: "Gilroy Semi Bold" }}>Date Range Selector 2</h2>
+            <h2 style={{ fontFamily: "Gilroy Semi Bold" }}>Date Range Selector</h2>
 
             {/* Date Inputs */}
             <div>

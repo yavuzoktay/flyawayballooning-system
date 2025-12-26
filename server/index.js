@@ -4699,7 +4699,7 @@ async function savePaymentHistory(session, bookingId, voucherId) {
                             }
                         );
                     } else {
-                        console.error('Error saving payment history:', err);
+                    console.error('Error saving payment history:', err);
                     }
                 } else {
                     console.log('✅ Payment history saved successfully, ID:', result.insertId);
@@ -15773,6 +15773,55 @@ app.patch('/api/availability/:id/status', (req, res) => {
             success: true,
             message: `Availability status updated to ${status}`,
             data: { id, status }
+        });
+    });
+});
+
+// Update availability flight types and voucher types
+app.patch('/api/availability/:id/flight-types', (req, res) => {
+    const { id } = req.params;
+    const { flight_types, voucher_types } = req.body;
+
+    if (!id) {
+        return res.status(400).json({ success: false, message: 'Missing availability id' });
+    }
+
+    // Build update query dynamically based on provided fields
+    const updates = [];
+    const values = [];
+
+    if (flight_types !== undefined) {
+        updates.push('flight_types = ?');
+        values.push(flight_types);
+    }
+
+    if (voucher_types !== undefined) {
+        updates.push('voucher_types = ?');
+        values.push(voucher_types || null);
+    }
+
+    if (updates.length === 0) {
+        return res.status(400).json({ success: false, message: 'No fields to update' });
+    }
+
+    values.push(id);
+
+    const sql = `UPDATE activity_availability SET ${updates.join(', ')} WHERE id = ?`;
+    
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error updating availability flight types:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err });
+        }
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Availability not found' });
+        }
+
+        res.json({
+            success: true,
+            message: 'Availability flight types updated successfully',
+            data: { id, flight_types, voucher_types }
         });
     });
 });
