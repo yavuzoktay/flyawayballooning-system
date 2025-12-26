@@ -1548,6 +1548,8 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
     finalVoucherDetail.voucher.numberOfVouchers = voucherItem.numberOfVouchers || finalVoucherDetail.voucher.numberOfVouchers || voucherItem.numberOfPassengers || finalVoucherDetail.voucher.numberOfPassengers;
     // Use paid information from getAllVoucherData instead of voucher detail API
     finalVoucherDetail.voucher.paid = voucherItem.paid || finalVoucherDetail.voucher.paid;
+    // Copy booking_id from getAllVoucherData (linked booking for payment history)
+    finalVoucherDetail.voucher.booking_id = voucherItem.booking_id || finalVoucherDetail.voucher.booking_id;
     
     // Copy additional information data from getAllVoucherData
     if (voucherItem.additional_information) {
@@ -5365,12 +5367,14 @@ setBookingDetail(finalVoucherDetail);
                                                         color="info"
                                                         sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d', mt: 1 }}
                                                         onClick={() => {
-                                                            if (bookingDetail?.booking?.id) {
+                                                            // For vouchers, use linked booking_id; for bookings, use booking.id
+                                                            const linkedBookingId = bookingDetail?.voucher?.booking_id || bookingDetail?.booking?.id;
+                                                            if (linkedBookingId) {
                                                                 setPaymentHistoryModalOpen(true);
-                                                                fetchPaymentHistory(bookingDetail.booking.id);
+                                                                fetchPaymentHistory(linkedBookingId);
                                                             }
                                                         }}
-                                                        disabled={!bookingDetail?.booking}
+                                                        disabled={!bookingDetail?.booking?.id && !bookingDetail?.voucher?.booking_id}
                                                     >
                                                         Payment History
                                                     </Button>
@@ -5379,12 +5383,14 @@ setBookingDetail(finalVoucherDetail);
                                                         color="info"
                                                         sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d', mt: 1 }}
                                                         onClick={() => {
-                                                            if (bookingDetail?.booking?.id) {
+                                                            // For vouchers, use linked booking_id; for bookings, use booking.id
+                                                            const linkedBookingId = bookingDetail?.voucher?.booking_id || bookingDetail?.booking?.id;
+                                                            if (linkedBookingId) {
                                                                 setUserSessionModalOpen(true);
-                                                                fetchUserSession(bookingDetail.booking.id);
+                                                                fetchUserSession(linkedBookingId);
                                                             }
                                                         }}
-                                                        disabled={!bookingDetail?.booking}
+                                                        disabled={!bookingDetail?.booking?.id && !bookingDetail?.voucher?.booking_id}
                                                     >
                                                         More
                                                     </Button>
