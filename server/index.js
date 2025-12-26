@@ -7314,42 +7314,49 @@ app.post('/api/refund-payment', async (req, res) => {
                     `;
 
                     const refundAmountDecimal = (refundAmount / 100).toFixed(2);
+                    
+                    // CRITICAL: First update the booking's paid amount (this must succeed)
+                    const updateBookingSql = `
+                        UPDATE all_booking 
+                        SET paid = GREATEST(0, COALESCE(paid, 0) - ?)
+                        WHERE id = ?
+                    `;
+                    
                     con.query(
-                        refundSql,
-                        [
-                            bookingId,
-                            payment.stripe_session_id,
-                            refund.id,
-                            refund.payment_intent,
-                            -Math.abs(parseFloat(refundAmountDecimal)), // Negative amount for refund
-                            payment.currency || 'GBP',
-                            comment || null, // Refund comment/notes
-                            paymentId // Reference to the original payment that was refunded
-                        ],
-                        (insertErr) => {
-                            if (insertErr) {
-                                console.error('Error saving refund to database:', insertErr);
-                                // Refund was successful in Stripe, but failed to save to DB
-                                // Still return success but log the error
+                        updateBookingSql,
+                        [parseFloat(refundAmountDecimal), bookingId],
+                        (updateErr, updateResult) => {
+                            if (updateErr) {
+                                console.error('Error updating booking paid amount:', updateErr);
                             } else {
-                                // Update booking's paid amount by subtracting the refund amount
-                                const updateBookingSql = `
-                                    UPDATE all_booking 
-                                    SET paid = GREATEST(0, paid - ?)
-                                    WHERE id = ?
-                                `;
-                                con.query(
-                                    updateBookingSql,
-                                    [parseFloat(refundAmountDecimal), bookingId],
-                                    (updateErr) => {
-                                        if (updateErr) {
-                                            console.error('Error updating booking paid amount:', updateErr);
-                                        } else {
-                                            console.log(`✅ Booking ${bookingId} paid amount decreased by £${refundAmountDecimal}`);
-                                        }
-                                    }
-                                );
+                                console.log(`✅ Booking ${bookingId} paid amount decreased by £${refundAmountDecimal}`, {
+                                    affectedRows: updateResult?.affectedRows,
+                                    bookingId,
+                                    refundAmount: refundAmountDecimal
+                                });
                             }
+                            
+                            // Then save the refund record to payment_history
+                            con.query(
+                                refundSql,
+                                [
+                                    bookingId,
+                                    payment.stripe_session_id,
+                                    refund.id,
+                                    refund.payment_intent,
+                                    -Math.abs(parseFloat(refundAmountDecimal)), // Negative amount for refund
+                                    payment.currency || 'GBP',
+                                    comment || null, // Refund comment/notes
+                                    paymentId // Reference to the original payment that was refunded
+                                ],
+                                (insertErr) => {
+                                    if (insertErr) {
+                                        console.error('Error saving refund to database:', insertErr);
+                                    } else {
+                                        console.log(`✅ Refund record saved to payment_history for booking ${bookingId}`);
+                                    }
+                                }
+                            );
                         }
                     );
 
@@ -7359,7 +7366,8 @@ app.post('/api/refund-payment', async (req, res) => {
                         data: {
                             refundId: refund.id,
                             amount: refundAmountDecimal,
-                            status: refund.status
+                            status: refund.status,
+                            bookingPaidUpdated: true
                         }
                     });
                 } catch (stripeError) {
