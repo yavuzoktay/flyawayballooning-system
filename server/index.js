@@ -1814,33 +1814,33 @@ app.post('/api/createRedeemBooking', (req, res) => {
                         console.log('✅ Found original voucher price from all_vouchers.paid (fallback):', voucherOriginalPrice);
                     } else {
                         // Fallback to voucher_codes table
-                        const getVoucherPriceSql = `
-                            SELECT paid_amount 
-                            FROM voucher_codes 
-                            WHERE UPPER(code) = UPPER(?)
-                            LIMIT 1
-                        `;
+                const getVoucherPriceSql = `
+                SELECT paid_amount 
+                FROM voucher_codes 
+                WHERE UPPER(code) = UPPER(?)
+                LIMIT 1
+            `;
 
-                        con.query(getVoucherPriceSql, [cleanVoucherCode], (priceErr, priceResult) => {
-                            if (!priceErr && priceResult.length > 0 && priceResult[0].paid_amount) {
+                con.query(getVoucherPriceSql, [cleanVoucherCode], (priceErr, priceResult) => {
+                    if (!priceErr && priceResult.length > 0 && priceResult[0].paid_amount) {
                                 voucherOriginalPrice = parseFloat(priceResult[0].paid_amount) || 0;
                                 console.log('✅ Found original voucher price from voucher_codes.paid_amount (fallback):', voucherOriginalPrice);
                             } else {
                                 console.log('⚠️ Could not find voucher price, using totalPrice (fallback):', voucherOriginalPrice);
-                            }
+                    }
 
-                            // Voucher bilgisi yoksa, bugünden itibaren hesapla
-                            let expiresDate = null;
-                            if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
-                                expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
-                            } else if (chooseFlightType && chooseFlightType.type === 'Shared Flight') {
-                                expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
-                            } else {
-                                expiresDate = moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
-                            }
+                    // Voucher bilgisi yoksa, bugünden itibaren hesapla
+                    let expiresDate = null;
+                    if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
+                        expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
+                    } else if (chooseFlightType && chooseFlightType.type === 'Shared Flight') {
+                        expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
+                    } else {
+                        expiresDate = moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+                    }
 
-                            createBookingWithPrice(voucherOriginalPrice, expiresDate, null);
-                        });
+                    createBookingWithPrice(voucherOriginalPrice, expiresDate, null);
+                });
                         return;
                     }
 
@@ -4626,8 +4626,16 @@ async function savePaymentHistory(session, bookingId, voucherId) {
             }
         }
 
-        // Insert payment history
-        const insertPaymentHistory = `
+        // Insert payment history (try with voucher_id first, fall back without if column doesn't exist)
+        const insertPaymentHistoryWithVoucher = `
+            INSERT INTO payment_history (
+                booking_id, voucher_id, stripe_session_id, stripe_charge_id, stripe_payment_intent_id,
+                amount, currency, card_last4, card_brand, wallet_type, transaction_id,
+                payout_id, payment_status, fingerprint, origin, card_present, arriving_on
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+        
+        const insertPaymentHistoryWithoutVoucher = `
             INSERT INTO payment_history (
                 booking_id, stripe_session_id, stripe_charge_id, stripe_payment_intent_id,
                 amount, currency, card_last4, card_brand, wallet_type, transaction_id,
@@ -4635,10 +4643,12 @@ async function savePaymentHistory(session, bookingId, voucherId) {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
+        // Try inserting with voucher_id first
         con.query(
-            insertPaymentHistory,
+            insertPaymentHistoryWithVoucher,
             [
                 bookingId || null,
+                voucherId || null,
                 sessionId,
                 chargeId,
                 paymentIntentId,
@@ -4657,7 +4667,40 @@ async function savePaymentHistory(session, bookingId, voucherId) {
             ],
             (err, result) => {
                 if (err) {
-                    console.error('Error saving payment history:', err);
+                    // If voucher_id column doesn't exist, try without it
+                    if (err.code === 'ER_BAD_FIELD_ERROR') {
+                        console.log('ℹ️ voucher_id column not found in payment_history, inserting without it');
+                        con.query(
+                            insertPaymentHistoryWithoutVoucher,
+                            [
+                                bookingId || null,
+                                sessionId,
+                                chargeId,
+                                paymentIntentId,
+                                amountTotal,
+                                currency,
+                                cardLast4,
+                                cardBrand,
+                                walletType,
+                                chargeId, // transaction_id
+                                payoutId,
+                                paymentStatus,
+                                fingerprint,
+                                origin,
+                                cardPresent ? 1 : 0,
+                                arrivingOn
+                            ],
+                            (err2, result2) => {
+                                if (err2) {
+                                    console.error('Error saving payment history (fallback):', err2);
+                                } else {
+                                    console.log('✅ Payment history saved successfully (without voucher_id), ID:', result2.insertId);
+                                }
+                            }
+                        );
+                    } else {
+                        console.error('Error saving payment history:', err);
+                    }
                 } else {
                     console.log('✅ Payment history saved successfully, ID:', result.insertId);
                 }
@@ -4942,6 +4985,28 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                         } catch (emailErr) {
                             console.error('Error sending Gift Voucher Confirmation email from webhook:', emailErr?.message || emailErr);
                         }
+                    }
+
+                    // Save payment history for voucher purchase
+                    // Use voucher ID as the reference since there's no booking yet
+                    try {
+                        console.log('💳 [WEBHOOK] Saving payment history for voucher purchase, voucher ID:', voucherId);
+                        await savePaymentHistory(session, null, voucherId);
+                        
+                        // Also update all_vouchers with stripe_session_id for payment tracking
+                        const updateVoucherSession = `UPDATE all_vouchers SET stripe_session_id = ? WHERE id = ?`;
+                        con.query(updateVoucherSession, [session.id, voucherId], (err) => {
+                            if (err) {
+                                // Column might not exist, that's OK
+                                if (err.code !== 'ER_BAD_FIELD_ERROR') {
+                                    console.error('Error updating voucher with stripe_session_id:', err);
+                                }
+                            } else {
+                                console.log('✅ Voucher updated with stripe_session_id:', session.id);
+                            }
+                        });
+                    } catch (paymentHistoryError) {
+                        console.error('❌ Error saving payment history for voucher:', paymentHistoryError);
                     }
 
                     // Mark session as processed to prevent duplicate calls
@@ -7125,6 +7190,142 @@ app.get('/api/booking-payment-history/:bookingId', (req, res) => {
     });
 });
 
+// Get Payment History for a voucher (by voucher ID or voucher_ref)
+app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
+    const voucherIdentifier = req.params.voucherIdentifier;
+    
+    if (!voucherIdentifier) {
+        return res.status(400).json({
+            success: false,
+            message: 'Voucher identifier required'
+        });
+    }
+
+    console.log('📋 Fetching payment history for voucher:', voucherIdentifier);
+
+    try {
+        // First, get voucher info to find stripe_session_id and linked booking
+        let voucherQuery;
+        let voucherParams;
+        
+        if (!isNaN(parseInt(voucherIdentifier))) {
+            // It's a numeric ID
+            voucherQuery = `SELECT id, voucher_ref, stripe_session_id FROM all_vouchers WHERE id = ?`;
+            voucherParams = [parseInt(voucherIdentifier)];
+        } else {
+            // It's a voucher_ref
+            voucherQuery = `SELECT id, voucher_ref, stripe_session_id FROM all_vouchers WHERE voucher_ref = ?`;
+            voucherParams = [voucherIdentifier];
+        }
+
+        const [voucherRows] = await con.promise().query(voucherQuery, voucherParams);
+        
+        if (!voucherRows || voucherRows.length === 0) {
+            console.log('❌ Voucher not found:', voucherIdentifier);
+            return res.json({ success: true, data: [] });
+        }
+
+        const voucher = voucherRows[0];
+        console.log('📋 Found voucher:', { id: voucher.id, voucher_ref: voucher.voucher_ref, stripe_session_id: voucher.stripe_session_id });
+
+        // Try multiple methods to find payment history
+        let paymentHistory = [];
+
+        // Method 1: Try to find by voucher_id (if column exists)
+        try {
+            const [voucherIdResults] = await con.promise().query(
+                `SELECT * FROM payment_history WHERE voucher_id = ? ORDER BY created_at DESC`,
+                [voucher.id]
+            );
+            if (voucherIdResults && voucherIdResults.length > 0) {
+                console.log('✅ Found payment history by voucher_id:', voucherIdResults.length, 'records');
+                paymentHistory = voucherIdResults;
+            }
+        } catch (err) {
+            // voucher_id column might not exist
+            if (err.code !== 'ER_BAD_FIELD_ERROR') {
+                console.error('Error querying by voucher_id:', err);
+            }
+        }
+
+        // Method 2: If not found, try by stripe_session_id from voucher
+        if (paymentHistory.length === 0 && voucher.stripe_session_id) {
+            const [sessionResults] = await con.promise().query(
+                `SELECT * FROM payment_history WHERE stripe_session_id = ? ORDER BY created_at DESC`,
+                [voucher.stripe_session_id]
+            );
+            if (sessionResults && sessionResults.length > 0) {
+                console.log('✅ Found payment history by stripe_session_id:', sessionResults.length, 'records');
+                paymentHistory = sessionResults;
+            }
+        }
+
+        // Method 3: If not found, try by linked booking (booking that used this voucher code)
+        if (paymentHistory.length === 0) {
+            const [bookingResults] = await con.promise().query(
+                `SELECT b.id as booking_id, b.stripe_session_id as booking_stripe_session
+                 FROM all_booking b 
+                 WHERE b.voucher_code = ?`,
+                [voucher.voucher_ref]
+            );
+            
+            if (bookingResults && bookingResults.length > 0) {
+                const linkedBooking = bookingResults[0];
+                console.log('📋 Found linked booking:', linkedBooking.booking_id);
+                
+                // Get payment history for linked booking
+                const [linkedPayments] = await con.promise().query(
+                    `SELECT * FROM payment_history WHERE booking_id = ? ORDER BY created_at DESC`,
+                    [linkedBooking.booking_id]
+                );
+                if (linkedPayments && linkedPayments.length > 0) {
+                    console.log('✅ Found payment history by linked booking:', linkedPayments.length, 'records');
+                    paymentHistory = linkedPayments;
+                }
+            }
+        }
+
+        // Method 4: Try by voucher_ref in booking's stripe metadata (original purchase)
+        if (paymentHistory.length === 0) {
+            // Find the original booking where this voucher was purchased
+            // This would be a booking with type 'voucher' or no voucher_code but matching paid amount
+            const [originalBookingResults] = await con.promise().query(
+                `SELECT b.id, b.stripe_session_id, ph.*
+                 FROM all_booking b
+                 LEFT JOIN payment_history ph ON ph.booking_id = b.id
+                 WHERE b.stripe_session_id IS NOT NULL
+                 AND ph.id IS NOT NULL
+                 AND (
+                     b.voucher_code IS NULL OR b.voucher_code = ''
+                 )
+                 ORDER BY b.created_at DESC
+                 LIMIT 50`,
+                []
+            );
+            // This is a fallback - in production, vouchers should be linked properly
+        }
+
+        console.log('📋 Final payment history count:', paymentHistory.length);
+        
+        res.json({
+            success: true,
+            data: paymentHistory,
+            voucher: {
+                id: voucher.id,
+                voucher_ref: voucher.voucher_ref
+            }
+        });
+
+    } catch (error) {
+        console.error('Error fetching voucher payment history:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching voucher payment history',
+            error: error.message
+        });
+    }
+});
+
 // Sync payment history from Stripe for existing booking
 app.post('/api/sync-payment-history/:bookingId', async (req, res) => {
     const bookingId = parseInt(req.params.bookingId);
@@ -7343,22 +7544,22 @@ app.post('/api/refund-payment', async (req, res) => {
                             }
                             
                             // Then save the refund record to payment_history
-                            con.query(
-                                refundSql,
-                                [
-                                    bookingId,
-                                    payment.stripe_session_id,
-                                    refund.id,
-                                    refund.payment_intent,
-                                    -Math.abs(parseFloat(refundAmountDecimal)), // Negative amount for refund
-                                    payment.currency || 'GBP',
-                                    comment || null, // Refund comment/notes
-                                    paymentId // Reference to the original payment that was refunded
-                                ],
-                                (insertErr) => {
-                                    if (insertErr) {
-                                        console.error('Error saving refund to database:', insertErr);
-                                    } else {
+                    con.query(
+                        refundSql,
+                        [
+                            bookingId,
+                            payment.stripe_session_id,
+                            refund.id,
+                            refund.payment_intent,
+                            -Math.abs(parseFloat(refundAmountDecimal)), // Negative amount for refund
+                            payment.currency || 'GBP',
+                            comment || null, // Refund comment/notes
+                            paymentId // Reference to the original payment that was refunded
+                        ],
+                        (insertErr) => {
+                            if (insertErr) {
+                                console.error('Error saving refund to database:', insertErr);
+                            } else {
                                         console.log(`✅ Refund record saved to payment_history for booking ${bookingId}`);
                                     }
                                 }
@@ -23357,9 +23558,9 @@ async function generateGiftVoucherPDF(voucher) {
             if (fs.existsSync(logoPath)) {
                 doc.image(logoPath, leftContentX, balloonY, { width: 140, height: 140, fit: [140, 140] });
             } else {
-                doc.fontSize(60)
-                   .fillColor('#333333')
-                   .text('🎈', leftContentX, balloonY);
+            doc.fontSize(60)
+               .fillColor('#333333')
+               .text('🎈', leftContentX, balloonY);
             }
             
             // Company name

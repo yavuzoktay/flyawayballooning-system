@@ -588,34 +588,48 @@ const BookingPage = () => {
         }));
     };
 
-    const fetchPaymentHistory = async (bookingId) => {
-        if (!bookingId) return;
+    const fetchPaymentHistory = async (bookingId, voucherIdOrRef = null) => {
         setPaymentHistoryLoading(true);
         try {
-            // First, try to fetch existing payment history from database
-            const response = await axios.get(`/api/booking-payment-history/${bookingId}`);
-            const paymentData = response.data?.data || [];
+            let paymentData = [];
             
-            // If no payment history found, try to sync from Stripe
-            // This will work even if stripe_session_id is not in the current bookingDetail state
-            if (paymentData.length === 0) {
-                try {
-                    console.log(`[PaymentHistory] No records found for booking ${bookingId}, attempting sync...`);
-                    await axios.post(`/api/sync-payment-history/${bookingId}`);
-                    // Fetch again after sync
-                    const syncResponse = await axios.get(`/api/booking-payment-history/${bookingId}`);
-                    const syncedData = syncResponse.data?.data || [];
-                    console.log(`[PaymentHistory] After sync, found ${syncedData.length} records`);
-                    setPaymentHistory(syncedData);
-                } catch (syncError) {
-                    // Sync failed (maybe no stripe_session_id), just show empty
-                    console.log('[PaymentHistory] Sync failed or no stripe_session_id:', syncError?.response?.data?.message || syncError.message);
-                    setPaymentHistory([]);
+            // If we have a bookingId, try booking-based payment history first
+            if (bookingId) {
+                const response = await axios.get(`/api/booking-payment-history/${bookingId}`);
+                paymentData = response.data?.data || [];
+                
+                // If no payment history found via booking, try to sync from Stripe
+                if (paymentData.length === 0) {
+                    try {
+                        console.log(`[PaymentHistory] No records found for booking ${bookingId}, attempting sync...`);
+                        await axios.post(`/api/sync-payment-history/${bookingId}`);
+                        const syncResponse = await axios.get(`/api/booking-payment-history/${bookingId}`);
+                        paymentData = syncResponse.data?.data || [];
+                        console.log(`[PaymentHistory] After sync, found ${paymentData.length} records`);
+                    } catch (syncError) {
+                        console.log('[PaymentHistory] Sync failed:', syncError?.response?.data?.message || syncError.message);
+                    }
+                } else {
+                    console.log(`[PaymentHistory] Found ${paymentData.length} records for booking ${bookingId}`);
                 }
-            } else {
-                console.log(`[PaymentHistory] Found ${paymentData.length} records for booking ${bookingId}`);
-                setPaymentHistory(paymentData);
             }
+            
+            // If still no payment history and we have voucher info, try voucher-based payment history
+            if (paymentData.length === 0 && voucherIdOrRef) {
+                try {
+                    console.log(`[PaymentHistory] Trying voucher payment history for: ${voucherIdOrRef}`);
+                    const voucherResponse = await axios.get(`/api/voucher-payment-history/${voucherIdOrRef}`);
+                    const voucherPaymentData = voucherResponse.data?.data || [];
+                    if (voucherPaymentData.length > 0) {
+                        console.log(`[PaymentHistory] Found ${voucherPaymentData.length} records via voucher endpoint`);
+                        paymentData = voucherPaymentData;
+                    }
+                } catch (voucherError) {
+                    console.log('[PaymentHistory] Voucher payment history fetch failed:', voucherError?.message);
+                }
+            }
+            
+            setPaymentHistory(paymentData);
         } catch (error) {
             console.error('Error fetching payment history:', error);
             setPaymentHistory([]);
@@ -664,10 +678,14 @@ const BookingPage = () => {
                 setRefundAmount('');
                 setRefundComment('');
                 // Refresh payment history
-                if (bookingDetail?.booking?.id) {
-                    fetchPaymentHistory(bookingDetail.booking.id);
+                const refreshBookingId = bookingDetail?.voucher?.booking_id || bookingDetail?.booking?.id;
+                const refreshVoucherRef = bookingDetail?.voucher?.voucher_ref || bookingDetail?.voucher?.id;
+                if (refreshBookingId || refreshVoucherRef) {
+                    fetchPaymentHistory(refreshBookingId, refreshVoucherRef);
                     // Refresh booking detail to update paid amount
-                    fetchPassengers(bookingDetail.booking.id);
+                    if (refreshBookingId) {
+                        fetchPassengers(refreshBookingId);
+                    }
                 }
             } else {
                 alert(response.data.message || 'Failed to process refund');
@@ -5369,12 +5387,12 @@ setBookingDetail(finalVoucherDetail);
                                                         onClick={() => {
                                                             // For vouchers, use linked booking_id; for bookings, use booking.id
                                                             const linkedBookingId = bookingDetail?.voucher?.booking_id || bookingDetail?.booking?.id;
-                                                            if (linkedBookingId) {
-                                                                setPaymentHistoryModalOpen(true);
-                                                                fetchPaymentHistory(linkedBookingId);
-                                                            }
+                                                            // Get voucher ref for fallback payment history lookup
+                                                            const voucherRef = bookingDetail?.voucher?.voucher_ref || bookingDetail?.voucher?.id;
+                                                            setPaymentHistoryModalOpen(true);
+                                                            fetchPaymentHistory(linkedBookingId, voucherRef);
                                                         }}
-                                                        disabled={!bookingDetail?.booking?.id && !bookingDetail?.voucher?.booking_id}
+                                                        disabled={!bookingDetail?.booking?.id && !bookingDetail?.voucher?.booking_id && !bookingDetail?.voucher?.voucher_ref && !bookingDetail?.voucher?.id}
                                                     >
                                                         Payment History
                                                     </Button>
