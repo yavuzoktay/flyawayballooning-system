@@ -5974,6 +5974,12 @@ app.get('/api/getAllBookingData', (req, res) => {
         SELECT 
             ab.*, 
             ab.name as passenger_name,
+            -- Calculate actual paid amount from payment_history (includes promo codes and refunds)
+            -- Only override if there are payment records; otherwise use the stored paid value
+            COALESCE(
+                (SELECT SUM(ph.amount) FROM payment_history ph WHERE ph.booking_id = ab.id),
+                ab.paid
+            ) as paid,
             -- NOTE: We keep ab.voucher_type intact (as stored on booking) to match getBookingDetail behaviour.
             -- We also compute a filtered voucher type for legacy logic, but we do NOT use it for the public 'voucher_type'
             -- field returned by getAllBookingData anymore (see JS enrichment logic below).
@@ -7767,6 +7773,12 @@ app.get('/api/getAllVoucherData', (req, res) => {
     // For multiple vouchers (Buy Gift), we need to group by purchaser and show all voucher codes
     const voucher = `
         SELECT v.*, v.experience_type,
+               -- Calculate actual paid amount from payment_history (includes promo codes and refunds)
+               -- Try linked booking first, then fall back to stored paid value
+               COALESCE(
+                   (SELECT SUM(ph.amount) FROM payment_history ph WHERE ph.booking_id = b.id),
+                   v.paid
+               ) as paid,
                -- Normalize book_flight: prioritize recipient signals (Gift Voucher) vs purchaser-only (Flight Voucher)
                CASE
                    -- If recipient fields are present, this is definitely a Gift Voucher
