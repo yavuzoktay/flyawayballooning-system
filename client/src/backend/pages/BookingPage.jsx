@@ -4387,7 +4387,6 @@ setBookingDetail(finalVoucherDetail);
                                                         <em>Select</em>
                                                     </MenuItem>
                                                     <MenuItem value="Scheduled">Scheduled</MenuItem>
-                                                    <MenuItem value="Waiting">Waiting</MenuItem>
                                                     <MenuItem value="Expired">Expired</MenuItem>
                                                     <MenuItem value="Flown">Flown</MenuItem>
                                                     <MenuItem value="No Show">No Show</MenuItem>
