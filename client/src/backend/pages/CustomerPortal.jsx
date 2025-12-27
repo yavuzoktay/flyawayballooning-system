@@ -951,9 +951,11 @@ const CustomerPortal = () => {
                 open={rescheduleModalOpen}
                 onClose={() => setRescheduleModalOpen(false)}
                 bookingData={bookingData}
-                onRescheduleSuccess={(updatedData) => {
-                    setBookingData(updatedData);
+                onRescheduleSuccess={async (updatedData) => {
+                    // Close the modal first
                     setRescheduleModalOpen(false);
+                    // Fetch fresh booking data from backend to ensure we have the latest flight_date
+                    await fetchBookingData();
                 }}
             />
 
