@@ -508,25 +508,35 @@ const CustomerPortal = () => {
                                         ? bookingData.location 
                                         : (bookingData.is_flight_voucher ? 'Date Not Scheduled' : 'TBD')}
                                 </Typography>
-                                <Typography
-                                    component="span"
-                                    onClick={changingLocation ? undefined : () => {
-                                        setSelectedNewLocation(bookingData.location || '');
-                                        setChangeLocationModalOpen(true);
-                                    }}
-                                    sx={{
-                                        color: changingLocation ? '#9ca3af' : '#1d4ed8',
-                                        fontWeight: 600,
-                                        fontSize: '0.9rem',
-                                        cursor: changingLocation ? 'default' : 'pointer',
-                                        textDecoration: 'underline',
-                                        '&:hover': changingLocation ? {} : {
-                                            color: '#1e40af'
-                                        }
-                                    }}
-                                >
-                                    {changingLocation ? 'Processing...' : 'Change'}
-                                </Typography>
+                                {(() => {
+                                    const hasFlightDate = Boolean(bookingData.flight_date);
+                                    const flightDate = hasFlightDate ? dayjs(bookingData.flight_date) : null;
+                                    const now = dayjs();
+                                    const isFlightDatePassed = flightDate ? flightDate.isBefore(now, 'day') : false;
+                                    const isDisabled = changingLocation || isFlightDatePassed;
+                                    
+                                    return (
+                                        <Typography
+                                            component="span"
+                                            onClick={isDisabled ? undefined : () => {
+                                                setSelectedNewLocation(bookingData.location || '');
+                                                setChangeLocationModalOpen(true);
+                                            }}
+                                            sx={{
+                                                color: isDisabled ? '#9ca3af' : '#1d4ed8',
+                                                fontWeight: 600,
+                                                fontSize: '0.9rem',
+                                                cursor: isDisabled ? 'default' : 'pointer',
+                                                textDecoration: 'underline',
+                                                '&:hover': isDisabled ? {} : {
+                                                    color: '#1e40af'
+                                                }
+                                            }}
+                                        >
+                                            {changingLocation ? 'Processing...' : 'Change'}
+                                        </Typography>
+                                    );
+                                })()}
                             </Box>
                         </Box>
                         <Box>
@@ -582,22 +592,32 @@ const CustomerPortal = () => {
                                         ? dayjs(bookingData.expires).format('DD/MM/YYYY')
                                         : 'No expiry date'}
                                 </Typography>
-                                <Typography
-                                    component="span"
-                                    onClick={extendingVoucher ? undefined : handleExtendVoucher}
-                                    sx={{
-                                        color: extendingVoucher ? '#9ca3af' : '#1d4ed8',
-                                        fontWeight: 600,
-                                        fontSize: '0.9rem',
-                                        cursor: extendingVoucher ? 'default' : 'pointer',
-                                        textDecoration: 'underline',
-                                        '&:hover': extendingVoucher ? {} : {
-                                            color: '#1e40af'
-                                        }
-                                    }}
-                                >
-                                    {extendingVoucher ? 'Processing...' : 'Extend'}
-                                </Typography>
+                                {(() => {
+                                    const hasFlightDate = Boolean(bookingData.flight_date);
+                                    const flightDate = hasFlightDate ? dayjs(bookingData.flight_date) : null;
+                                    const now = dayjs();
+                                    const isFlightDatePassed = flightDate ? flightDate.isBefore(now, 'day') : false;
+                                    const isDisabled = extendingVoucher || isFlightDatePassed;
+                                    
+                                    return (
+                                        <Typography
+                                            component="span"
+                                            onClick={isDisabled ? undefined : handleExtendVoucher}
+                                            sx={{
+                                                color: isDisabled ? '#9ca3af' : '#1d4ed8',
+                                                fontWeight: 600,
+                                                fontSize: '0.9rem',
+                                                cursor: isDisabled ? 'default' : 'pointer',
+                                                textDecoration: 'underline',
+                                                '&:hover': isDisabled ? {} : {
+                                                    color: '#1e40af'
+                                                }
+                                            }}
+                                        >
+                                            {extendingVoucher ? 'Processing...' : 'Extend'}
+                                        </Typography>
+                                    );
+                                })()}
                             </Box>
                         </Box>
                     </Box>
@@ -608,6 +628,9 @@ const CustomerPortal = () => {
                         const flightDate = hasFlightDate ? dayjs(bookingData.flight_date) : null;
                         const now = dayjs();
                         const isCancelled = bookingData.status && bookingData.status.toLowerCase() === 'cancelled';
+
+                        // Check if flight date has passed (compare by day to avoid time-of-day edge cases)
+                        const isFlightDatePassed = flightDate ? flightDate.isBefore(now, 'day') : false;
 
                         // If cancelled (admin side), allow customer to pick a new date/location immediately
                         // by treating hoursUntilFlight as "far in future" when no upcoming flight is set.
@@ -631,8 +654,15 @@ const CustomerPortal = () => {
                             canCancel = false;
                             canResendConfirmation = false;
                             canExtendVoucher = false;
+                        } else if (isFlightDatePassed) {
+                            // If flight date has passed, disable Change Location and Extend Voucher
+                            canReschedule = isCancelled || hoursUntilFlight > 120;
+                            canChangeLocation = false; // Disabled if flight date passed
+                            canCancel = false; // Can't cancel past flights
+                            canResendConfirmation = !resendingConfirmation;
+                            canExtendVoucher = false; // Disabled if flight date passed
                         } else {
-                            // Normal (non-expired) behaviour:
+                            // Normal (non-expired and flight date not passed) behaviour:
                             // Reschedule disabled within 120 hours; cancelled overrides the window check
                             canReschedule = isCancelled || hoursUntilFlight > 120;
 

@@ -1605,16 +1605,45 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     console.log('Status:', voucher.status);
                     console.log('Name:', voucher.name);
 
-                    // Check if already redeemed
-                    if (voucher.redeemed === 'Yes' || voucher.status === 'Used') {
-                        return res.status(400).json({
-                            success: false,
-                            error: 'This voucher has already been redeemed and cannot be used again'
-                        });
-                    }
+                    // Check if already redeemed by checking all_booking table
+                    // Don't rely solely on all_vouchers.redeemed field as it might be incorrectly set
+                    // Instead, check if there's a booking with redeemed_voucher = 'Yes' for this voucher
+                    const checkRedeemedBookingSql = `
+                        SELECT id, redeemed_voucher
+                        FROM all_booking 
+                        WHERE UPPER(voucher_code) = UPPER(?)
+                        AND (redeemed_voucher = 'Yes' OR redeemed_voucher = 1)
+                        LIMIT 1
+                    `;
+                    
+                    con.query(checkRedeemedBookingSql, [cleanVoucherCode], (redeemedCheckErr, redeemedCheckResult) => {
+                        if (redeemedCheckErr) {
+                            console.warn('Warning: Could not check all_booking for redeemed status:', redeemedCheckErr.message);
+                            // If we can't check, only block if status is explicitly 'Used'
+                            if (voucher.status === 'Used') {
+                                return res.status(400).json({
+                                    success: false,
+                                    error: 'This voucher has already been redeemed and cannot be used again'
+                                });
+                            }
+                            // Otherwise, proceed with booking
+                            createRedeemBookingLogic();
+                            return;
+                        }
 
-                    // Voucher is valid, proceed
-                    createRedeemBookingLogic();
+                        // If there's a booking with redeemed_voucher = 'Yes', block it
+                        if (redeemedCheckResult.length > 0) {
+                            console.log('Voucher already redeemed - found booking with redeemed_voucher = Yes');
+                            return res.status(400).json({
+                                success: false,
+                                error: 'This voucher has already been redeemed and cannot be used again'
+                            });
+                        }
+
+                        // No redeemed booking found, voucher is valid
+                        console.log('Voucher is valid - no redeemed booking found');
+                        createRedeemBookingLogic();
+                    });
                 } else {
                     // Not found in either table - check all_booking for voucher_code
                     console.log('Voucher not found in all_vouchers, checking all_booking...');
@@ -1648,13 +1677,50 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     console.log('Used on:', booking.created_at);
                     console.log('Redeemed Voucher Status:', booking.redeemed_voucher);
 
-                    // If this voucher code exists in all_booking, it means it was already used for a booking
-                    // Regardless of redeemed_voucher status, we should not allow it to be used again
-                    // because each voucher code should only create ONE booking
-                    return res.status(400).json({
-                        success: false,
-                        error: 'This voucher code has already been used for a booking and cannot be redeemed again'
+                    // Only block if this booking was created by redeeming a voucher (redeemed_voucher = 'Yes')
+                    // If redeemed_voucher is 'No' or NULL, it means this is a regular booking that happened to use
+                    // the same voucher_code (which shouldn't happen, but we allow it to avoid false positives)
+                    // The key check is: if redeemed_voucher = 'Yes', then this voucher was already redeemed
+                    if (booking.redeemed_voucher === 'Yes' || booking.redeemed_voucher === 1) {
+                        return res.status(400).json({
+                            success: false,
+                            error: 'This voucher has already been redeemed and cannot be used again'
+                        });
+                    }
+
+                    // If redeemed_voucher is not 'Yes', this might be a regular booking with the same code
+                    // Check all_vouchers table to see if the voucher itself is redeemed
+                    const checkVoucherRedeemedSql = `
+                        SELECT redeemed, status
+                        FROM all_vouchers 
+                        WHERE UPPER(voucher_ref) = UPPER(?)
+                        LIMIT 1
+                    `;
+                    
+                    con.query(checkVoucherRedeemedSql, [cleanVoucherCode], (voucherCheckErr, voucherCheckResult) => {
+                        if (voucherCheckErr) {
+                            console.warn('Warning: Could not check all_vouchers for redeemed status:', voucherCheckErr.message);
+                            // If we can't check, allow the booking to proceed
+                            createRedeemBookingLogic();
+                            return;
+                        }
+
+                        if (voucherCheckResult.length > 0) {
+                            const voucher = voucherCheckResult[0];
+                            // Only block if voucher is explicitly marked as redeemed
+                            if (voucher.redeemed === 'Yes' || voucher.status === 'Used') {
+                                return res.status(400).json({
+                                    success: false,
+                                    error: 'This voucher has already been redeemed and cannot be used again'
+                                });
+                            }
+                        }
+
+                        // Voucher not redeemed, proceed with booking
+                        console.log('Voucher code found in all_booking but not redeemed, proceeding with new booking');
+                        createRedeemBookingLogic();
                     });
+                    return;
                 }
 
                 // Voucher code not found anywhere, proceed with booking

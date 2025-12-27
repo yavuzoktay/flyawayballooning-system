@@ -538,7 +538,18 @@ const getBookingConfirmationReceiptHtml = (booking = {}) => {
             }
         }
     }
-    const location = escapeHtml(booking?.location || 'Bath');
+    // For Flight Voucher, location should be "-" instead of actual location
+    // Check multiple ways to identify Flight Voucher:
+    // 1. book_flight === 'Flight Voucher'
+    // 2. is_flight_voucher === true
+    // 3. contextType === 'voucher' and not Gift Voucher
+    // 4. location is already "-" (set from frontend)
+    const isFlightVoucher = 
+        booking?.book_flight === 'Flight Voucher' || 
+        booking?.is_flight_voucher === true ||
+        (booking?.contextType === 'voucher' && booking?.book_flight !== 'Gift Voucher') ||
+        booking?.location === '-';
+    const location = isFlightVoucher ? '-' : escapeHtml(booking?.location || 'Bath');
     const experience = escapeHtml(booking?.flight_type || 'Flight Experience');
     const guestCount = receiptItems.length;
     

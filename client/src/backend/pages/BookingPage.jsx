@@ -557,6 +557,10 @@ const BookingPage = () => {
             ? (voucher.recipient_email || voucher.email || '')
             : (voucher.email || voucher.recipient_email || '');
         
+        const isFlightVoucher = !isGiftVoucher && 
+            (voucher?.book_flight === 'Flight Voucher' ||
+            (voucher?.voucher_type && typeof voucher.voucher_type === 'string' && voucher.voucher_type.toLowerCase().includes('flight')));
+        
         const fauxBooking = {
             id: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`,
             name: voucher.name || (isGiftVoucher ? voucher.recipient_name : voucher.purchaser_name) || 'Voucher Recipient',
@@ -567,9 +571,11 @@ const BookingPage = () => {
             voucher_type: voucher.voucher_type || '',
             voucher_code: voucher.voucher_ref || voucher.voucher_code || '',
             flight_type: voucher.flight_type || voucher.voucher_type || '',
-            location: voucher.location || voucher.preferred_location || '',
+            location: isFlightVoucher ? '-' : (voucher.location || voucher.preferred_location || ''), // Flight Voucher için "-"
             contextType: 'voucher',
-            contextId: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`
+            contextId: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`,
+            is_flight_voucher: isFlightVoucher, // Flight Voucher işareti
+            book_flight: isFlightVoucher ? 'Flight Voucher' : voucher.book_flight || '' // Flight Voucher işareti
         };
 
         setSelectedBookingForEmail(fauxBooking);
@@ -3067,7 +3073,7 @@ setBookingDetail(finalVoucherDetail);
             email,
             phone: voucher.phone || bookingDetail?.booking?.phone || '',
             flight_type: voucher.flight_type || voucher.voucher_type || '',
-            location: voucher.location || voucher.preferred_location || '',
+            location: '-',
             voucher_type: voucher.voucher_type || '',
             voucher_code: voucher.voucher_ref || voucher.voucher_code || '',
             paid: paidAmount,
@@ -3086,7 +3092,9 @@ setBookingDetail(finalVoucherDetail);
             customerPortalToken: voucher.customerPortalToken || voucher.customer_portal_token || voucher.portal_token || '',
             flight_attempts: bookingDetail?.booking?.flight_attempts ?? voucherFlightAttempts,
             contextType: 'voucher',
-            contextId: syntheticId
+            contextId: syntheticId,
+            is_flight_voucher: true, // Flight Voucher işareti
+            book_flight: 'Flight Voucher' // Flight Voucher işareti
         };
 
         openEmailModalForBooking(fauxBooking, {
