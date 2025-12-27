@@ -13538,6 +13538,140 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
             });
         });
 
+        // Generate new voucher code for rescheduled booking
+        let newVoucherCode = null;
+        try {
+            console.log('🔄 Generating new voucher code for rescheduled booking...');
+            
+            // Get voucher type and category from booking
+            const voucherType = booking.voucher_type || 'Any Day Flight';
+            const flightCategory = voucherType;
+            
+            // Map flight categories to codes
+            const categoryMap = {
+                'Weekday Morning': 'WM',
+                'Weekday Flex': 'WF',
+                'Anytime': 'AT',
+                'Any Day Flight': 'AT'
+            };
+            
+            const year = new Date().getFullYear().toString().slice(-2);
+            const categoryCode = categoryMap[flightCategory] || 'AT';
+            
+            // Determine prefix based on voucher type
+            let prefix = 'B'; // Default for Book Flight
+            if (voucherType && (voucherType.toLowerCase().includes('gift') || voucherType.toLowerCase().includes('flight voucher'))) {
+                prefix = 'F';
+            }
+            
+            // Generate unique serial (3 characters)
+            const generateSerial = () => {
+                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                let result = '';
+                for (let i = 0; i < 3; i++) {
+                    result += chars.charAt(Math.floor(Math.random() * chars.length));
+                }
+                return result;
+            };
+            
+            // Generate unique voucher code
+            let isUnique = false;
+            let attempts = 0;
+            const maxAttempts = 10;
+            
+            while (!isUnique && attempts < maxAttempts) {
+                const serial = generateSerial();
+                newVoucherCode = `${prefix}${categoryCode}${year}${serial}`;
+                
+                // Check if code already exists in all relevant tables
+                const [codeCheckRows] = await new Promise((resolve, reject) => {
+                    const checkSql = `
+                        SELECT id FROM all_vouchers WHERE voucher_ref = ?
+                        UNION
+                        SELECT id FROM all_booking WHERE voucher_code = ?
+                        UNION
+                        SELECT id FROM voucher_codes WHERE code = ?
+                    `;
+                    con.query(checkSql, [newVoucherCode, newVoucherCode, newVoucherCode], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
+                });
+                
+                if (codeCheckRows && codeCheckRows.length === 0) {
+                    isUnique = true;
+                    break;
+                }
+                
+                attempts++;
+            }
+            
+            if (isUnique && newVoucherCode) {
+                console.log('✅ Generated new voucher code:', newVoucherCode);
+                
+                // IMPORTANT: First insert into voucher_codes table (required by foreign key constraint)
+                const title = `${booking.name || 'Customer'} - ${flightCategory} - ${location || booking.location || 'Rescheduled'}`;
+                const defaultExpiryDate = booking.expires || moment().add(24, 'months').format('YYYY-MM-DD');
+                
+                await new Promise((resolve, reject) => {
+                    const insertVoucherCodeSql = `
+                        INSERT INTO voucher_codes (
+                            code, title, valid_from, valid_until, max_uses, current_uses,
+                            applicable_locations, applicable_experiences, applicable_voucher_types,
+                            is_active, created_at, updated_at, source_type, customer_email, paid_amount
+                        ) VALUES (?, ?, NOW(), ?, 1, 0, ?, ?, ?, 1, NOW(), NOW(), 'user_generated', ?, ?)
+                        ON DUPLICATE KEY UPDATE 
+                            source_type = VALUES(source_type),
+                            title = VALUES(title),
+                            valid_until = VALUES(valid_until),
+                            applicable_locations = VALUES(applicable_locations),
+                            applicable_experiences = VALUES(applicable_experiences),
+                            applicable_voucher_types = VALUES(applicable_voucher_types),
+                            updated_at = NOW()
+                    `;
+                    
+                    const insertVals = [
+                        newVoucherCode,
+                        title,
+                        defaultExpiryDate,
+                        location || booking.location || null,
+                        booking.experience || booking.flight_type || null,
+                        voucherType || null,
+                        booking.email || null,
+                        booking.paid || 0
+                    ];
+                    
+                    con.query(insertVoucherCodeSql, insertVals, (insErr) => {
+                        if (insErr) {
+                            console.error('❌ Error inserting voucher code into voucher_codes table:', insErr);
+                            reject(insErr);
+                        } else {
+                            console.log('✅ Inserted new voucher code into voucher_codes table');
+                            resolve();
+                        }
+                    });
+                });
+                
+                // Then update booking with new voucher code (after voucher_codes entry exists)
+                await new Promise((resolve, reject) => {
+                    con.query('UPDATE all_booking SET voucher_code = ? WHERE id = ?', [newVoucherCode, bookingId], (err, result) => {
+                        if (err) {
+                            console.error('❌ Error updating booking with new voucher code:', err);
+                            reject(err);
+                        } else {
+                            console.log('✅ Updated booking with new voucher code');
+                            resolve(result);
+                        }
+                    });
+                });
+            } else {
+                console.warn('⚠️ Warning: Could not generate unique voucher code after', maxAttempts, 'attempts');
+            }
+        } catch (voucherCodeErr) {
+            console.error('❌ Error generating new voucher code:', voucherCodeErr);
+            // Don't fail the request if voucher code generation fails
+        }
+
         // Fetch updated booking data
         const [updatedBookingRows] = await new Promise((resolve, reject) => {
             con.query('SELECT * FROM all_booking WHERE id = ?', [bookingId], (err, rows) => {

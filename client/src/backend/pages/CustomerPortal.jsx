@@ -467,22 +467,35 @@ const CustomerPortal = () => {
                     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
                         <Box>
                             <Typography variant="body2" color="text.secondary">Booking ID or Voucher Reference</Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                                {bookingData.booking_reference || bookingData.id || 'N/A'}
-                            </Typography>
-                            {bookingData.voucher_ref && (
-                                <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>
-                                    <span style={{ color: '#555' }}>Voucher Ref: </span>
-                                    <a
-                                        href={`/booking?voucher=${encodeURIComponent(bookingData.voucher_ref)}`}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        style={{ color: '#3b82f6', textDecoration: 'underline' }}
-                                    >
-                                        {bookingData.voucher_ref}
-                                    </a>
-                                </Typography>
-                            )}
+                            {(() => {
+                                const bookFlight = (bookingData.book_flight || '').toString().trim().toLowerCase();
+                                const voucherType = (bookingData.voucher_type || '').toString().trim().toLowerCase();
+                                const isFlightVoucher = bookingData.is_flight_voucher || 
+                                    bookFlight === 'flight voucher' || 
+                                    voucherType === 'flight voucher';
+                                
+                                // For Flight Vouchers (Your Booking Flight Voucher section), show both Booking ID and Voucher Ref (non-clickable)
+                                // For regular bookings (Your Booking section), show only Booking ID - NO Voucher Ref
+                                if (isFlightVoucher && bookingData.voucher_ref) {
+                                    return (
+                                        <Box sx={{ mb: 2 }}>
+                                            <Typography variant="body1" sx={{ fontWeight: 500, mb: 0.5 }}>
+                                                {bookingData.booking_reference || bookingData.id || 'N/A'}
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#555' }}>
+                                                Voucher Ref: {bookingData.voucher_ref}
+                                            </Typography>
+                                        </Box>
+                                    );
+                                }
+                                
+                                // For regular bookings (Your Booking section), show only Booking ID - Voucher Ref is NOT shown
+                                return (
+                                    <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                                        {bookingData.booking_reference || bookingData.id || 'N/A'}
+                                    </Typography>
+                                );
+                            })()}
                         </Box>
                         <Box>
                             <Typography variant="body2" color="text.secondary">Status</Typography>
