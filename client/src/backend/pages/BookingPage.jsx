@@ -599,31 +599,11 @@ const BookingPage = () => {
         try {
             let paymentData = [];
             
-            // If we have a bookingId, try booking-based payment history first
-            if (bookingId) {
-                const response = await axios.get(`/api/booking-payment-history/${bookingId}`);
-                paymentData = response.data?.data || [];
-                
-                // If no payment history found via booking, try to sync from Stripe
-                if (paymentData.length === 0) {
-                    try {
-                        console.log(`[PaymentHistory] No records found for booking ${bookingId}, attempting sync...`);
-                        await axios.post(`/api/sync-payment-history/${bookingId}`);
-                        const syncResponse = await axios.get(`/api/booking-payment-history/${bookingId}`);
-                        paymentData = syncResponse.data?.data || [];
-                        console.log(`[PaymentHistory] After sync, found ${paymentData.length} records`);
-                    } catch (syncError) {
-                        console.log('[PaymentHistory] Sync failed:', syncError?.response?.data?.message || syncError.message);
-                    }
-                } else {
-                    console.log(`[PaymentHistory] Found ${paymentData.length} records for booking ${bookingId}`);
-                }
-            }
-            
-            // If still no payment history and we have voucher info, try voucher-based payment history
-            if (paymentData.length === 0 && voucherIdOrRef) {
+            // For vouchers, prioritize voucher-based payment history first
+            // This ensures we get the voucher's own payment info (all_vouchers.paid)
+            if (voucherIdOrRef && !bookingId) {
                 try {
-                    console.log(`[PaymentHistory] Trying voucher payment history for: ${voucherIdOrRef}`);
+                    console.log(`[PaymentHistory] Fetching voucher payment history first for: ${voucherIdOrRef}`);
                     const voucherResponse = await axios.get(`/api/voucher-payment-history/${voucherIdOrRef}`);
                     const voucherPaymentData = voucherResponse.data?.data || [];
                     if (voucherPaymentData.length > 0) {
@@ -634,6 +614,64 @@ const BookingPage = () => {
                     console.log('[PaymentHistory] Voucher payment history fetch failed:', voucherError?.message);
                 }
             }
+            
+            // If we have a bookingId, try booking-based payment history
+            if (bookingId) {
+                try {
+                    const response = await axios.get(`/api/booking-payment-history/${bookingId}`);
+                    const bookingPaymentData = response.data?.data || [];
+                    
+                    // Merge voucher and booking payment data (avoid duplicates)
+                    if (bookingPaymentData.length > 0) {
+                        const existingIds = new Set(paymentData.map(p => p.id));
+                        const newPayments = bookingPaymentData.filter(p => !existingIds.has(p.id));
+                        paymentData = [...paymentData, ...newPayments];
+                        console.log(`[PaymentHistory] Found ${bookingPaymentData.length} records for booking ${bookingId}, total: ${paymentData.length}`);
+                    }
+                    
+                    // If no payment history found via booking, try to sync from Stripe
+                    if (bookingPaymentData.length === 0) {
+                        try {
+                            console.log(`[PaymentHistory] No records found for booking ${bookingId}, attempting sync...`);
+                            await axios.post(`/api/sync-payment-history/${bookingId}`);
+                            const syncResponse = await axios.get(`/api/booking-payment-history/${bookingId}`);
+                            const syncedData = syncResponse.data?.data || [];
+                            if (syncedData.length > 0) {
+                                const existingIds = new Set(paymentData.map(p => p.id));
+                                const newPayments = syncedData.filter(p => !existingIds.has(p.id));
+                                paymentData = [...paymentData, ...newPayments];
+                                console.log(`[PaymentHistory] After sync, found ${syncedData.length} records, total: ${paymentData.length}`);
+                            }
+                        } catch (syncError) {
+                            console.log('[PaymentHistory] Sync failed:', syncError?.response?.data?.message || syncError.message);
+                        }
+                    }
+                } catch (bookingError) {
+                    console.log('[PaymentHistory] Booking payment history fetch failed:', bookingError?.message);
+                }
+            }
+            
+            // If still no payment history and we have voucher info, try voucher-based payment history as fallback
+            if (paymentData.length === 0 && voucherIdOrRef && bookingId) {
+                try {
+                    console.log(`[PaymentHistory] Trying voucher payment history as fallback for: ${voucherIdOrRef}`);
+                    const voucherResponse = await axios.get(`/api/voucher-payment-history/${voucherIdOrRef}`);
+                    const voucherPaymentData = voucherResponse.data?.data || [];
+                    if (voucherPaymentData.length > 0) {
+                        console.log(`[PaymentHistory] Found ${voucherPaymentData.length} records via voucher endpoint (fallback)`);
+                        paymentData = voucherPaymentData;
+                    }
+                } catch (voucherError) {
+                    console.log('[PaymentHistory] Voucher payment history fetch failed:', voucherError?.message);
+                }
+            }
+            
+            // Sort by created_at descending
+            paymentData.sort((a, b) => {
+                const dateA = new Date(a.created_at || 0);
+                const dateB = new Date(b.created_at || 0);
+                return dateB - dateA;
+            });
             
             setPaymentHistory(paymentData);
         } catch (error) {
@@ -3165,8 +3203,24 @@ setBookingDetail(finalVoucherDetail);
                     // Experience: from experience_type field (e.g., "Shared Flight", "Private Charter")
                     const experience = voucher.experience_type || voucher.experience || 'Shared Flight';
                     
-                    // Voucher Type: from voucher_type or actual_voucher_type field (e.g., "Any Day Flight", "Weekday Morning", "Flexible Weekday")
-                    const voucherType = voucher.voucher_type || voucher.actual_voucher_type || 'Any Day Flight';
+                    // Voucher Type: prioritize selectedVoucherTypes from Rebook popup, then fallback to voucher data
+                    let voucherType = 'Any Day Flight';
+                    if (selectedVoucherTypes && selectedVoucherTypes.length > 0) {
+                        // Use the first selected voucher type (since only one can be selected)
+                        // Convert key to proper format: 'weekday morning' -> 'Weekday Morning', 'any day flight' -> 'Any Day Flight'
+                        const selected = selectedVoucherTypes[0];
+                        // If it's a key (lowercase with spaces), convert to title case
+                        if (selected && typeof selected === 'string') {
+                            voucherType = selected.split(' ').map(word => 
+                                word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                            ).join(' ');
+                        } else {
+                            voucherType = selected;
+                        }
+                    } else {
+                        // Fallback to voucher data
+                        voucherType = voucher.voucher_type || voucher.actual_voucher_type || 'Any Day Flight';
+                    }
                     
                     // Determine flight type from experience
                     let flightType = experience;
@@ -3361,20 +3415,41 @@ setBookingDetail(finalVoucherDetail);
                     // Experience: from experience_type field (e.g., "Shared Flight", "Private Charter")
                     const experience = voucher.experience_type || voucher.experience || 'Shared Flight';
                     
-                    // Voucher Type: from voucher_type, actual_voucher_type, or book_flight field
-                    // Priority: voucher_type > actual_voucher_type > book_flight (if it's not "Flight Voucher" or "Gift Voucher")
-                    // For Flight Voucher, book_flight is "Flight Voucher", so we need voucher_type field
-                    let voucherType = voucher.voucher_type || voucher.actual_voucher_type || '';
-                    // If voucher_type is still empty and book_flight exists and is not "Flight Voucher" or "Gift Voucher", use it
-                    if (!voucherType && voucher.book_flight && 
-                        voucher.book_flight !== 'Flight Voucher' && 
-                        voucher.book_flight !== 'Gift Voucher' &&
-                        !voucher.book_flight.toLowerCase().includes('gift')) {
-                        voucherType = voucher.book_flight;
-                    }
-                    // Final fallback
-                    if (!voucherType) {
-                        voucherType = 'Any Day Flight';
+                    // Voucher Type: prioritize selectedVoucherTypes from Rebook popup, then fallback to voucher data
+                    let voucherType = '';
+                    if (selectedVoucherTypes && selectedVoucherTypes.length > 0) {
+                        // Use the first selected voucher type (since only one can be selected)
+                        // For private voucher types, it's already a title (e.g., 'Private Charter', 'Proposal Flight')
+                        // For shared voucher types, it's a key (e.g., 'weekday morning', 'any day flight') - convert to title case
+                        const selected = selectedVoucherTypes[0];
+                        if (selected && typeof selected === 'string') {
+                            // Check if it's a key (lowercase) or already a title (has capital letters)
+                            if (selected === selected.toLowerCase() && selected.includes(' ')) {
+                                // It's a key, convert to title case
+                                voucherType = selected.split(' ').map(word => 
+                                    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                                ).join(' ');
+                            } else {
+                                // It's already a title, use as is
+                                voucherType = selected;
+                            }
+                        } else {
+                            voucherType = selected;
+                        }
+                    } else {
+                        // Fallback to voucher data
+                        voucherType = voucher.voucher_type || voucher.actual_voucher_type || '';
+                        // If voucher_type is still empty and book_flight exists and is not "Flight Voucher" or "Gift Voucher", use it
+                        if (!voucherType && voucher.book_flight && 
+                            voucher.book_flight !== 'Flight Voucher' && 
+                            voucher.book_flight !== 'Gift Voucher' &&
+                            !voucher.book_flight.toLowerCase().includes('gift')) {
+                            voucherType = voucher.book_flight;
+                        }
+                        // Final fallback
+                        if (!voucherType) {
+                            voucherType = 'Any Day Flight';
+                        }
                     }
                     
                     // Determine flight type from experience
@@ -3663,6 +3738,41 @@ setBookingDetail(finalVoucherDetail);
             };
             const historyEntriesPayload = buildHistoryEntriesPayload();
 
+            // Get voucher type from selectedVoucherTypes or existing booking
+            let voucherType = bookingDetail.booking.voucher_type || '';
+            if (selectedVoucherTypes && selectedVoucherTypes.length > 0) {
+                // Use the first selected voucher type (since only one can be selected)
+                // For private voucher types, it's already a title (e.g., 'Private Charter', 'Proposal Flight')
+                // For shared voucher types, it's a key (e.g., 'weekday morning', 'any day flight') - convert to title case
+                const selected = selectedVoucherTypes[0];
+                console.log('🔄 Rebook - Selected voucher types:', selectedVoucherTypes);
+                console.log('🔄 Rebook - First selected:', selected);
+                if (selected && typeof selected === 'string') {
+                    // Check if it's a key (lowercase) or already a title (has capital letters)
+                    if (selected === selected.toLowerCase() && selected.includes(' ')) {
+                        // It's a key, convert to title case
+                        voucherType = selected.split(' ').map(word => 
+                            word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                        ).join(' ');
+                        console.log('🔄 Rebook - Converted key to title case:', voucherType);
+                    } else {
+                        // It's already a title, use as is
+                        voucherType = selected;
+                        console.log('🔄 Rebook - Using title as is:', voucherType);
+                    }
+                } else {
+                    voucherType = selected;
+                    console.log('🔄 Rebook - Using selected as is (non-string):', voucherType);
+                }
+            } else if (!voucherType) {
+                // Fallback to default if no selection and no existing voucher type
+                voucherType = 'Any Day Flight';
+                console.log('🔄 Rebook - Using fallback voucher type:', voucherType);
+            } else {
+                console.log('🔄 Rebook - Using existing booking voucher type:', voucherType);
+            }
+            console.log('🔄 Rebook - Final voucher type:', voucherType);
+
             const payload = {
                 activitySelect: flightType,
                 chooseLocation: selectedLocation || bookingDetail.booking.location,
@@ -3677,7 +3787,9 @@ setBookingDetail(finalVoucherDetail);
                 status: 'Scheduled', // Set status to Scheduled for rebook operations
                 email_template_override: 'Booking Rescheduled',
                 email_template_type_override: 'booking_rescheduled_automatic',
-                history_entries: historyEntriesPayload
+                history_entries: historyEntriesPayload,
+                voucher_type: voucherType, // Add voucher_type from Rebook popup selection
+                selectedVoucherType: { title: voucherType } // Add selectedVoucherType for backend compatibility
             };
 
             // First delete the old booking
@@ -5392,12 +5504,19 @@ setBookingDetail(finalVoucherDetail);
                                                         color="info"
                                                         sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d', mt: 1 }}
                                                         onClick={() => {
-                                                            // For vouchers, use linked booking_id; for bookings, use booking.id
+                                                            // For vouchers, prioritize voucher ID/ref for payment history
+                                                            // Voucher payment history includes voucher's own payment (all_vouchers.paid)
+                                                            const voucherId = bookingDetail?.voucher?.id;
+                                                            const voucherRef = bookingDetail?.voucher?.voucher_ref;
+                                                            const voucherIdOrRef = voucherId || voucherRef;
+                                                            
+                                                            // For linked bookings, also check booking payment history
                                                             const linkedBookingId = bookingDetail?.voucher?.booking_id || bookingDetail?.booking?.id;
-                                                            // Get voucher ref for fallback payment history lookup
-                                                            const voucherRef = bookingDetail?.voucher?.voucher_ref || bookingDetail?.voucher?.id;
+                                                            
                                                             setPaymentHistoryModalOpen(true);
-                                                            fetchPaymentHistory(linkedBookingId, voucherRef);
+                                                            // Pass voucher ID/ref first, then booking ID
+                                                            // This ensures voucher's own payment is fetched first
+                                                            fetchPaymentHistory(linkedBookingId || null, voucherIdOrRef || null);
                                                         }}
                                                         disabled={!bookingDetail?.booking?.id && !bookingDetail?.voucher?.booking_id && !bookingDetail?.voucher?.voucher_ref && !bookingDetail?.voucher?.id}
                                                     >

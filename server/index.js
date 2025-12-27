@@ -7294,6 +7294,16 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
         const voucher = voucherRows[0];
         console.log('📋 Found voucher:', { id: voucher.id, voucher_ref: voucher.voucher_ref, stripe_session_id: voucher.stripe_session_id });
 
+        // Get full voucher info including paid amount
+        const [fullVoucherRows] = await con.promise().query(
+            `SELECT id, voucher_ref, stripe_session_id, paid, created_at, name, email 
+             FROM all_vouchers 
+             WHERE id = ? OR voucher_ref = ? 
+             LIMIT 1`,
+            [voucher.id, voucher.voucher_ref]
+        );
+        const fullVoucher = fullVoucherRows && fullVoucherRows.length > 0 ? fullVoucherRows[0] : voucher;
+
         // Try multiple methods to find payment history
         let paymentHistory = [];
 
@@ -7315,10 +7325,10 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
         }
 
         // Method 2: If not found, try by stripe_session_id from voucher
-        if (paymentHistory.length === 0 && voucher.stripe_session_id) {
+        if (paymentHistory.length === 0 && fullVoucher.stripe_session_id) {
             const [sessionResults] = await con.promise().query(
                 `SELECT * FROM payment_history WHERE stripe_session_id = ? ORDER BY created_at DESC`,
-                [voucher.stripe_session_id]
+                [fullVoucher.stripe_session_id]
             );
             if (sessionResults && sessionResults.length > 0) {
                 console.log('✅ Found payment history by stripe_session_id:', sessionResults.length, 'records');
@@ -7326,12 +7336,40 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
             }
         }
 
-        // Method 3: If not found, try by linked booking (booking that used this voucher code)
-        if (paymentHistory.length === 0) {
+        // Method 3: If voucher has paid amount, always include it in payment history
+        // Check if we already have a payment entry for this voucher amount
+        const voucherPaidAmount = fullVoucher.paid ? parseFloat(fullVoucher.paid) : 0;
+        const hasVoucherPayment = paymentHistory.some(p => 
+            Math.abs(parseFloat(p.amount || 0) - voucherPaidAmount) < 0.01 &&
+            (p.voucher_id === fullVoucher.id || p.origin === 'voucher_purchase')
+        );
+        
+        if (voucherPaidAmount > 0 && !hasVoucherPayment) {
+            console.log('📋 Voucher has paid amount, adding to payment history');
+            // Create a synthetic payment history entry from voucher data
+            const voucherPaymentEntry = {
+                id: `voucher_${fullVoucher.id}`,
+                booking_id: null,
+                voucher_id: fullVoucher.id,
+                stripe_session_id: fullVoucher.stripe_session_id || null,
+                amount: voucherPaidAmount,
+                currency: 'GBP',
+                payment_status: 'succeeded',
+                created_at: fullVoucher.created_at || new Date(),
+                origin: 'voucher_purchase'
+            };
+            paymentHistory.push(voucherPaymentEntry);
+            console.log('✅ Added voucher payment entry to payment history');
+        }
+
+        // Method 4: If not found, try by linked booking (booking that used this voucher code)
+        if (paymentHistory.length === 0 || paymentHistory.every(p => p.origin === 'voucher_purchase')) {
             const [bookingResults] = await con.promise().query(
                 `SELECT b.id as booking_id, b.stripe_session_id as booking_stripe_session
                  FROM all_booking b 
-                 WHERE b.voucher_code = ?`,
+                 WHERE b.voucher_code = ?
+                 ORDER BY b.created_at DESC
+                 LIMIT 1`,
                 [voucher.voucher_ref]
             );
             
@@ -7347,6 +7385,43 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
                 if (linkedPayments && linkedPayments.length > 0) {
                     console.log('✅ Found payment history by linked booking:', linkedPayments.length, 'records');
                     paymentHistory = linkedPayments;
+                }
+            }
+        }
+
+        // Method 5: Try to find original purchase booking (where voucher was bought)
+        if (paymentHistory.length === 0) {
+            // Find booking where this voucher was originally purchased
+            // Look for bookings with matching email/name and paid amount, created around voucher creation time
+            const [originalPurchaseResults] = await con.promise().query(
+                `SELECT b.id, b.stripe_session_id, ph.*
+                 FROM all_booking b
+                 LEFT JOIN payment_history ph ON ph.booking_id = b.id
+                 WHERE b.email = ? 
+                 AND ABS(TIMESTAMPDIFF(HOUR, b.created_at, ?)) <= 2
+                 AND (b.paid = ? OR ph.amount = ?)
+                 AND ph.id IS NOT NULL
+                 ORDER BY b.created_at DESC
+                 LIMIT 5`,
+                [fullVoucher.email || '', fullVoucher.created_at || new Date(), fullVoucher.paid || 0, fullVoucher.paid || 0]
+            );
+            
+            if (originalPurchaseResults && originalPurchaseResults.length > 0) {
+                const originalPayments = originalPurchaseResults
+                    .filter(r => r.id) // Only entries with payment history
+                    .map(r => ({
+                        id: r.id,
+                        booking_id: r.id,
+                        stripe_session_id: r.stripe_session_id,
+                        amount: r.amount,
+                        currency: r.currency || 'GBP',
+                        payment_status: r.payment_status || 'succeeded',
+                        created_at: r.created_at,
+                        origin: 'voucher_original_purchase'
+                    }));
+                if (originalPayments.length > 0) {
+                    console.log('✅ Found payment history by original purchase:', originalPayments.length, 'records');
+                    paymentHistory = originalPayments;
                 }
             }
         }
@@ -8902,16 +8977,21 @@ app.post('/api/createBooking', (req, res) => {
 
     // Extract voucher_type from req.body for use in expires calculation
     // Prioritize selectedVoucherType.title (from ballooning-book section), then voucher_type, then selectedVoucherType
-    // Filter out experience values (Shared Flight, Private Charter) - these should not be used as voucher_type
-    const isExperienceValue = (type) => {
+    // Note: "Private Charter" and "Shared Flight" can be both experience values AND voucher types
+    // If explicitly set as voucher_type (e.g., from Rebook popup), always use it
+    // Only filter out generic single-word experience values like "shared" or "private"
+    const isGenericExperienceValue = (type) => {
         if (!type || typeof type !== 'string') return false;
         const lowerType = type.toLowerCase().trim();
-        return ['shared flight', 'private charter', 'shared', 'private'].includes(lowerType);
+        // Only filter out generic single-word values, not specific voucher types
+        // "Private Charter", "Shared Flight", "Proposal Flight" etc. are valid voucher types
+        return ['shared', 'private'].includes(lowerType);
     };
     
     let voucher_type = req.body.selectedVoucherType?.title || req.body.voucher_type || '';
-    // If voucher_type is an experience value, set it to null/empty so we can infer it later
-    if (isExperienceValue(voucher_type)) {
+    // Only filter out generic experience values (just "shared" or "private" without modifiers)
+    // Keep specific voucher types like "Private Charter", "Shared Flight", "Proposal Flight", etc.
+    if (isGenericExperienceValue(voucher_type)) {
         voucher_type = '';
     }
     
@@ -9172,7 +9252,7 @@ app.post('/api/createBooking', (req, res) => {
             // voucher_type: use from req.body if provided and not empty, and not an experience value
             // If voucher_type is empty or experience value, try to infer from voucher code or leave as null
             // Never use chooseFlightType.type as voucher_type (it's an experience value, not a voucher type)
-            (voucher_type && voucher_type.trim() !== '' && !isExperienceValue(voucher_type)) 
+            (voucher_type && voucher_type.trim() !== '' && !isGenericExperienceValue(voucher_type)) 
                 ? voucher_type 
                 : (() => {
                     // Try to infer voucher type from voucher code if available
@@ -13403,15 +13483,21 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
         const booking = bookingRows[0];
 
         // Check if flight date is more than 120 hours away
-        const newFlightDate = dayjs(flight_date);
-        const now = dayjs();
-        const hoursUntilFlight = newFlightDate.diff(now, 'hour');
+        // Skip this check if booking is cancelled or has no flight_date (Not Scheduled)
+        const isCancelled = booking.status && booking.status.toLowerCase() === 'cancelled';
+        const hasNoFlightDate = !booking.flight_date || booking.flight_date === null;
+        
+        if (!isCancelled && !hasNoFlightDate) {
+            const newFlightDate = dayjs(flight_date);
+            const now = dayjs();
+            const hoursUntilFlight = newFlightDate.diff(now, 'hour');
 
-        if (hoursUntilFlight <= 120) {
-            return res.status(400).json({
-                success: false,
-                message: 'Flight must be rescheduled at least 120 hours (5 days) in advance'
-            });
+            if (hoursUntilFlight <= 120) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Flight must be rescheduled at least 120 hours (5 days) in advance'
+                });
+            }
         }
 
         // Update booking

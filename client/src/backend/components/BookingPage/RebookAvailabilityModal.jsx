@@ -532,7 +532,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         { key: 'any day flight', label: 'Any Day Flight' }
     ]), []);
 
-    // When switching to private selection, default-select all private voucher types for this activity if none are selected yet.
+    // When switching to private selection, default-select the first private voucher type for this activity if none are selected yet.
     useEffect(() => {
         if (!open) return;
         if (!selectedFlightTypes.includes('private')) return;
@@ -542,14 +542,12 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         const privateKeys = privateVoucherTypeOptions.map(normalizeVoucherKey);
         const hasAnyPrivateSelected = privateKeys.some(k => selectedKeys.has(k));
         if (!hasAnyPrivateSelected) {
-            setSelectedVoucherTypes(prev => Array.from(new Set([
-                ...prev,
-                ...privateVoucherTypeOptions
-            ])));
+            // Select only the first private voucher type (single selection)
+            setSelectedVoucherTypes([privateVoucherTypeOptions[0]]);
         }
     }, [open, selectedFlightTypes, privateVoucherTypeOptions, selectedVoucherTypes]);
 
-    // Flight type değişince sadece filtrele
+    // Flight type değişince sadece filtrele ve voucher types'ı temizle
     useEffect(() => {
         // If no flight types selected, clear
         if (selectedFlightTypes.length === 0) {
@@ -557,11 +555,28 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
             setAvailableDates([]);
             setSelectedDate(null);
             setSelectedTime(null);
+            setSelectedVoucherTypes([]);
             return;
         }
 
+        // When flight type changes, clear voucher types that don't match the new flight type
         const normalizeType = t => t.replace(' Flight', '').trim().toLowerCase();
         const selectedTypes = selectedFlightTypes.map(t => normalizeType(t));
+        
+        // Clear voucher types that don't match current flight type
+        if (selectedFlightTypes.includes('shared')) {
+            // If shared is selected, remove all private voucher types
+            setSelectedVoucherTypes(prev => prev.filter(vt => {
+                const key = normalizeVoucherKey(vt);
+                return sharedVoucherTypeOptions.some(opt => opt.key === key);
+            }));
+        } else if (selectedFlightTypes.includes('private')) {
+            // If private is selected, remove all shared voucher types
+            setSelectedVoucherTypes(prev => prev.filter(vt => {
+                const key = normalizeVoucherKey(vt);
+                return !sharedVoucherTypeOptions.some(opt => opt.key === key);
+            }));
+        }
  
         const filtered = availabilities.filter(a => {
             if (a.status && a.status.toLowerCase() !== 'open') return false;
@@ -578,7 +593,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         // setSelectedDate(null);
         // setSelectedTime(null);
         setAvailableDates(Array.from(new Set(filtered.map(a => a.date))).filter(date => date));
-    }, [selectedFlightTypes, availabilities]);
+    }, [selectedFlightTypes, availabilities, sharedVoucherTypeOptions]);
 
     // Flight type değişince selectedDate ve selectedTime sıfırlansın (mevcut booking tarihini koru)
     useEffect(() => {
@@ -1109,8 +1124,10 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                     checked={selectedFlightTypes.includes('private')}
                                                     onChange={(e) => {
                                                         if (e.target.checked) {
-                                                            setSelectedFlightTypes(prev => [...prev, 'private']);
+                                                            // If private is selected, remove shared and set only private
+                                                            setSelectedFlightTypes(['private']);
                                                         } else {
+                                                            // If unchecking, remove private
                                                             setSelectedFlightTypes(prev => prev.filter(t => t !== 'private'));
                                                         }
                                                     }}
@@ -1124,8 +1141,10 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                     checked={selectedFlightTypes.includes('shared')}
                                                     onChange={(e) => {
                                                         if (e.target.checked) {
-                                                            setSelectedFlightTypes(prev => [...prev, 'shared']);
+                                                            // If shared is selected, remove private and set only shared
+                                                            setSelectedFlightTypes(['shared']);
                                                         } else {
+                                                            // If unchecking, remove shared
                                                             setSelectedFlightTypes(prev => prev.filter(t => t !== 'shared'));
                                                         }
                                                     }}
@@ -1152,8 +1171,10 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                             checked={selectedVoucherTypes.map(normalizeVoucherKey).includes(opt.key)}
                                                             onChange={(e) => {
                                                                 if (e.target.checked) {
-                                                                    setSelectedVoucherTypes(prev => Array.from(new Set([...prev, opt.key])));
+                                                                    // If this shared voucher type is selected, remove all other voucher types and set only this one
+                                                                    setSelectedVoucherTypes([opt.key]);
                                                                 } else {
+                                                                    // If unchecking, remove this voucher type
                                                                     setSelectedVoucherTypes(prev => prev.filter(t => normalizeVoucherKey(t) !== opt.key));
                                                                 }
                                                             }}
@@ -1191,8 +1212,10 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                                         checked={selectedVoucherTypes.map(normalizeVoucherKey).includes(key)}
                                                                         onChange={(e) => {
                                                                             if (e.target.checked) {
-                                                                                setSelectedVoucherTypes(prev => Array.from(new Set([...prev, title])));
+                                                                                // If this private voucher type is selected, remove all other voucher types and set only this one
+                                                                                setSelectedVoucherTypes([title]);
                                                                             } else {
+                                                                                // If unchecking, remove this voucher type
                                                                                 setSelectedVoucherTypes(prev => prev.filter(t => normalizeVoucherKey(t) !== key));
                                                                             }
                                                                         }}
