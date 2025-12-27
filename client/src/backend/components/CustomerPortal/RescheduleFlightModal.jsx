@@ -29,6 +29,8 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
     const [submitting, setSubmitting] = useState(false);
     const [successDialogOpen, setSuccessDialogOpen] = useState(false);
     const [successPayload, setSuccessPayload] = useState(null);
+    const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+    const [pendingRescheduleData, setPendingRescheduleData] = useState(null);
 
     // Locations (Flight Voucher style)
     const [activities, setActivities] = useState([]);
@@ -562,47 +564,59 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
 
     const monthLabel = currentMonth.format('MMMM YYYY');
 
-    const handleConfirm = async () => {
+    const handleConfirm = () => {
         if (!selectedDate || !selectedTime) return;
 
+        const formattedDate = dayjs(selectedDate).format('YYYY-MM-DD');
+        const selectedDateTime = `${formattedDate} ${selectedTime}`;
+
+        // Determine location/activity from selection
+        const selectedLocation = selectedLocations[0] || bookingData?.location || '';
+        if (!selectedLocation) {
+            setError('Please select a location.');
+            return;
+        }
+
+        // Find matching availability to get activity_id
+        const slotMatch = availabilities.find(a => {
+            const aDate = dayjs(a.date).format('YYYY-MM-DD');
+            return aDate === formattedDate && a.time === selectedTime && (a.location === selectedLocation);
+        });
+        const finalActivityId = slotMatch?.activity_id || activityId;
+        if (!finalActivityId) {
+            setError('Activity ID not found for selected location.');
+            return;
+        }
+
+        // Get booking ID from bookingData
+        const bookingId = bookingData?.id || bookingData?.booking_id || bookingData?.booking_reference;
+        if (!bookingId) {
+            setError('Booking ID not found. Cannot reschedule.');
+            return;
+        }
+
+        // Store pending reschedule data and show confirmation dialog
+        setPendingRescheduleData({
+            bookingId,
+            selectedDateTime,
+            selectedLocation,
+            finalActivityId,
+            formattedDate
+        });
+        setConfirmDialogOpen(true);
+    };
+
+    const handleConfirmReschedule = async () => {
+        if (!pendingRescheduleData) return;
+
+        setConfirmDialogOpen(false);
         setSubmitting(true);
         try {
-            const formattedDate = dayjs(selectedDate).format('YYYY-MM-DD');
-            const selectedDateTime = `${formattedDate} ${selectedTime}`;
-
-            // Determine location/activity from selection
-            const selectedLocation = selectedLocations[0] || bookingData?.location || '';
-            if (!selectedLocation) {
-                setError('Please select a location.');
-                setSubmitting(false);
-                return;
-            }
-
-            // Find matching availability to get activity_id
-            const slotMatch = availabilities.find(a => {
-                const aDate = dayjs(a.date).format('YYYY-MM-DD');
-                return aDate === formattedDate && a.time === selectedTime && (a.location === selectedLocation);
-            });
-            const finalActivityId = slotMatch?.activity_id || activityId;
-            if (!finalActivityId) {
-                setError('Activity ID not found for selected location.');
-                setSubmitting(false);
-                return;
-            }
-
-            // Get booking ID from bookingData
-            const bookingId = bookingData?.id || bookingData?.booking_id || bookingData?.booking_reference;
-            if (!bookingId) {
-                setError('Booking ID not found. Cannot reschedule.');
-                setSubmitting(false);
-                return;
-            }
-
             // Use the reschedule endpoint to update existing booking
-            const rescheduleResponse = await axios.patch(`/api/customer-portal-reschedule/${bookingId}`, {
-                flight_date: selectedDateTime,
-                location: selectedLocation,
-                activity_id: finalActivityId
+            const rescheduleResponse = await axios.patch(`/api/customer-portal-reschedule/${pendingRescheduleData.bookingId}`, {
+                flight_date: pendingRescheduleData.selectedDateTime,
+                location: pendingRescheduleData.selectedLocation,
+                activity_id: pendingRescheduleData.finalActivityId
             });
 
             if (!rescheduleResponse.data?.success) {
@@ -616,12 +630,13 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             }
 
             setSuccessPayload({
-                bookingId: updatedBooking?.id || bookingId,
-                location: selectedLocation,
+                bookingId: updatedBooking?.id || pendingRescheduleData.bookingId,
+                location: pendingRescheduleData.selectedLocation,
                 previousFlightDateTime: bookingData?.flight_date || null,
-                newFlightDateTime: selectedDateTime
+                newFlightDateTime: pendingRescheduleData.selectedDateTime
             });
             setSuccessDialogOpen(true);
+            setPendingRescheduleData(null);
         } catch (err) {
             console.error('Error rescheduling flight:', err);
             setError(err.response?.data?.message || err.message || 'Failed to reschedule flight. Please try again later.');
@@ -835,6 +850,83 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 </Button>
             </DialogActions>
         </Dialog>
+
+            {/* Confirmation dialog before rescheduling */}
+            <Dialog
+                open={confirmDialogOpen}
+                onClose={() => {
+                    setConfirmDialogOpen(false);
+                    setPendingRescheduleData(null);
+                }}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        borderRadius: 3
+                    }
+                }}
+            >
+                <DialogTitle sx={{ fontWeight: 700, fontSize: 20, pb: 1.5 }}>
+                    Confirm Reschedule
+                </DialogTitle>
+                <DialogContent>
+                    <Typography variant="body1" sx={{ mb: 2 }}>
+                        Are you sure you want to reschedule your flight?
+                    </Typography>
+                    {pendingRescheduleData && (
+                        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 1.5, mt: 2 }}>
+                            <Box>
+                                <Typography variant="body2" color="text.secondary">Location</Typography>
+                                <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                                    {pendingRescheduleData.selectedLocation}
+                                </Typography>
+                            </Box>
+                            <Box>
+                                <Typography variant="body2" color="text.secondary">New Flight Date & Time</Typography>
+                                <Typography variant="body1" sx={{ fontWeight: 600, color: '#16a34a' }}>
+                                    {pendingRescheduleData.selectedDateTime
+                                        ? dayjs(pendingRescheduleData.selectedDateTime).format('DD/MM/YYYY HH:mm')
+                                        : 'N/A'}
+                                </Typography>
+                            </Box>
+                            {bookingData?.flight_date && (
+                                <Box>
+                                    <Typography variant="body2" color="text.secondary">Previous Flight Date</Typography>
+                                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                                        {dayjs(bookingData.flight_date).format('DD/MM/YYYY HH:mm')}
+                                    </Typography>
+                                </Box>
+                            )}
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ p: 2.5, gap: 1 }}>
+                    <Button
+                        variant="outlined"
+                        onClick={() => {
+                            setConfirmDialogOpen(false);
+                            setPendingRescheduleData(null);
+                        }}
+                        sx={{ fontWeight: 600 }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleConfirmReschedule}
+                        disabled={submitting}
+                        sx={{
+                            backgroundColor: '#22c55e',
+                            '&:hover': {
+                                backgroundColor: '#16a34a'
+                            },
+                            fontWeight: 600
+                        }}
+                    >
+                        {submitting ? <CircularProgress size={20} color="inherit" /> : 'Confirm Reschedule'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             {/* Success summary popup shown after confirm */}
             <Dialog
