@@ -572,16 +572,19 @@ const CustomerPortal = () => {
                                     const flightDate = hasFlightDate ? dayjs(bookingData.flight_date) : null;
                                     const now = dayjs();
                                     const isFlightDatePassed = flightDate ? flightDate.isBefore(now, 'day') : false;
-                                    const isDisabled = changingLocation || isFlightDatePassed || isFullyRefunded;
+                                    const isVoucherRedeemed = bookingData.is_voucher_redeemed === true || bookingData.is_voucher_redeemed === 1;
+                                    const isDisabled = changingLocation || isFlightDatePassed || isFullyRefunded || isVoucherRedeemed;
                                     
                                     return (
                                         <Tooltip
                                             title={
-                                                isFullyRefunded
-                                                    ? "Full refund has been processed. Location cannot be changed."
-                                                    : isFlightDatePassed
-                                                        ? "Flight date has passed. Location cannot be changed."
-                                                        : ""
+                                                isVoucherRedeemed
+                                                    ? "Voucher has been redeemed. Location cannot be changed."
+                                                    : isFullyRefunded
+                                                        ? "Full refund has been processed. Location cannot be changed."
+                                                        : isFlightDatePassed
+                                                            ? "Flight date has passed. Location cannot be changed."
+                                                            : ""
                                             }
                                             arrow
                                         >
@@ -667,18 +670,21 @@ const CustomerPortal = () => {
                                     const flightDate = hasFlightDate ? dayjs(bookingData.flight_date) : null;
                                     const now = dayjs();
                                     const isFlightDatePassed = flightDate ? flightDate.isBefore(now, 'day') : false;
+                                    const isVoucherRedeemed = bookingData.is_voucher_redeemed === true || bookingData.is_voucher_redeemed === 1;
                                     const isDisabled = extendingVoucher || isFlightDatePassed;
                                     
-                                    const isExtendDisabled = isDisabled || isFullyRefunded;
+                                    const isExtendDisabled = isDisabled || isFullyRefunded || isVoucherRedeemed;
                                     
                                     return (
                                         <Tooltip
                                             title={
-                                                isFullyRefunded
-                                                    ? "Full refund has been processed. Voucher cannot be extended."
-                                                    : isDisabled
-                                                        ? "Voucher cannot be extended"
-                                                        : ""
+                                                isVoucherRedeemed
+                                                    ? "Voucher has been redeemed. Voucher cannot be extended."
+                                                    : isFullyRefunded
+                                                        ? "Full refund has been processed. Voucher cannot be extended."
+                                                        : isDisabled
+                                                            ? "Voucher cannot be extended"
+                                                            : ""
                                             }
                                             arrow
                                         >
@@ -751,13 +757,13 @@ const CustomerPortal = () => {
                             // Resend Confirmation can still be available
                             canResendConfirmation = !resendingConfirmation;
                         } else if (isVoucherRedeemed) {
-                            // If voucher is redeemed, disable Reschedule and Cancel buttons
+                            // If voucher is redeemed, disable Reschedule, Cancel, Change Location, and Extend buttons
                             canReschedule = false;
                             canCancel = false;
-                            // Other actions can still be available
-                            canChangeLocation = isCancelled || hoursUntilFlight > 120;
+                            canChangeLocation = false;
+                            canExtendVoucher = false;
+                            // Resend Confirmation can still be available
                             canResendConfirmation = !resendingConfirmation;
-                            canExtendVoucher = !extendingVoucher;
                         } else if (isFlightDatePassed) {
                             // If flight date has passed, disable Change Location and Extend Voucher
                             canReschedule = isCancelled || hoursUntilFlight > 120;
@@ -1337,7 +1343,11 @@ const CustomerPortal = () => {
                                                         return slotDate === dateStr;
                                                     });
                                                     const totalAvailable = slots.reduce((acc, s) => acc + (Number(s.available) || Number(s.calculated_available) || 0), 0);
-                                                    const soldOut = slots.length > 0 && totalAvailable <= 0;
+                                                    // Get passenger count from booking data
+                                                    const passengerCount = bookingData?.passengers?.length || bookingData?.pax || 1;
+                                                    // Check if there's enough space for all passengers
+                                                    const hasEnoughSpace = totalAvailable >= passengerCount;
+                                                    const soldOut = slots.length > 0 && (totalAvailable <= 0 || !hasEnoughSpace);
                                                     
                                                     // Apply voucher type filtering for calendar display
                                                     const bookingVoucherType = bookingData?.voucher_type || bookingData?.voucher_type_detail || 'Any Day Flight';
@@ -1378,7 +1388,8 @@ const CustomerPortal = () => {
                                                         // Anytime voucher → Show all available schedules (no filtering)
                                                     }
                                                     
-                                                    const isSelectable = inCurrentMonth && !isPast && shouldShowDate && slots.length > 0 && !soldOut;
+                                                    // Date is selectable only if there's enough space for all passengers
+                                                    const isSelectable = inCurrentMonth && !isPast && shouldShowDate && slots.length > 0 && !soldOut && hasEnoughSpace;
 
                                                     cells.push(
                                                         <div
@@ -1492,12 +1503,18 @@ const CustomerPortal = () => {
                                                         );
                                                     }
 
+                                                    // Get passenger count from booking data
+                                                    const passengerCount = bookingData?.passengers?.length || bookingData?.pax || 1;
+                                                    
                                                     return times.map(slot => {
-                                                        const isAvailable = (Number(slot.available) || Number(slot.calculated_available) || 0) > 0;
+                                                        const availableSpaces = Number(slot.available) || Number(slot.calculated_available) || 0;
+                                                        const isAvailable = availableSpaces > 0;
+                                                        // Check if there's enough space for all passengers
+                                                        const hasEnoughSpace = availableSpaces >= passengerCount;
                                                         const isSelected = selectedTime === slot.time;
                                                         const slotDateTime = dayjs(`${dayjs(selectedDate).format('YYYY-MM-DD')} ${slot.time}`);
                                                         const isPastTime = slotDateTime.isBefore(dayjs());
-                                                        const isDisabled = !isAvailable || isPastTime;
+                                                        const isDisabled = !isAvailable || isPastTime || !hasEnoughSpace;
 
                                                         return (
                                                             <Button
@@ -1543,6 +1560,7 @@ const CustomerPortal = () => {
                                                                 }}
                                                             >
                                                                 {slot.time} ({slot.available || slot.calculated_available || 0}/{slot.capacity})
+                                                                {!hasEnoughSpace && ` - Insufficient space for ${passengerCount} passenger${passengerCount > 1 ? 's' : ''}`}
                                                             </Button>
                                                         );
                                                     });
@@ -1585,6 +1603,23 @@ const CustomerPortal = () => {
                                 if (!selectedActivityId) {
                                     setError('Activity ID not found for selected location. Please try selecting the location again.');
                                     return;
+                                }
+
+                                // Validate passenger count vs available spaces
+                                const passengerCount = bookingData?.passengers?.length || bookingData?.pax || 1;
+                                const dateStr = dayjs(selectedDate).format('YYYY-MM-DD');
+                                const selectedSlot = locationAvailabilities.find(a => {
+                                    if (!a.date) return false;
+                                    const slotDate = a.date.includes('T') ? a.date.split('T')[0] : a.date;
+                                    return slotDate === dateStr && a.time === selectedTime;
+                                });
+
+                                if (selectedSlot) {
+                                    const availableSpaces = Number(selectedSlot.available) || Number(selectedSlot.calculated_available) || 0;
+                                    if (availableSpaces < passengerCount) {
+                                        setError(`Insufficient space: This time slot has only ${availableSpaces} space${availableSpaces !== 1 ? 's' : ''} available, but you have ${passengerCount} passenger${passengerCount !== 1 ? 's' : ''}. Please select a different time slot with enough space.`);
+                                        return;
+                                    }
                                 }
 
                                 setChangingLocation(true);

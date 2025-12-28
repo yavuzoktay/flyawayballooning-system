@@ -7487,12 +7487,12 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
             const voucherPaidAmount = fullVoucher.paid ? parseFloat(fullVoucher.paid) : 0;
             
             if (searchEmail || searchName) {
-                // Find booking where this voucher was originally purchased
-                // Look for bookings with matching email/name and paid amount, created around voucher creation time
-                const [originalPurchaseResults] = await con.promise().query(
+            // Find booking where this voucher was originally purchased
+            // Look for bookings with matching email/name and paid amount, created around voucher creation time
+            const [originalPurchaseResults] = await con.promise().query(
                     `SELECT b.id, b.stripe_session_id, b.email, b.name, ph.*
-                     FROM all_booking b
-                     LEFT JOIN payment_history ph ON ph.booking_id = b.id
+                 FROM all_booking b
+                 LEFT JOIN payment_history ph ON ph.booking_id = b.id
                      WHERE (
                          (b.email = ? AND ? != '')
                          OR (b.name = ? AND ? != '')
@@ -7515,9 +7515,9 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
                         voucherPaidAmount, voucherPaidAmount,
                         fullVoucher.created_at || new Date()
                     ]
-                );
-                
-                if (originalPurchaseResults && originalPurchaseResults.length > 0) {
+            );
+            
+            if (originalPurchaseResults && originalPurchaseResults.length > 0) {
                     // Filter and map results
                     const originalPayments = [];
                     for (const row of originalPurchaseResults) {
@@ -7532,7 +7532,7 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
                                     currency: row.currency || 'GBP',
                                     payment_status: row.payment_status || 'succeeded',
                                     created_at: row.created_at,
-                                    origin: 'voucher_original_purchase'
+                        origin: 'voucher_original_purchase'
                                 });
                             } else {
                                 // If no payment history but we have stripe_session_id, create synthetic entry
@@ -7550,8 +7550,8 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
                         }
                     }
                     
-                    if (originalPayments.length > 0) {
-                        console.log('✅ Found payment history by original purchase:', originalPayments.length, 'records');
+                if (originalPayments.length > 0) {
+                    console.log('✅ Found payment history by original purchase:', originalPayments.length, 'records');
                         // Merge with existing payment history, avoiding duplicates
                         const existingSessionIds = new Set(paymentHistory.map(p => p.stripe_session_id).filter(Boolean));
                         const newPayments = originalPayments.filter(p => !existingSessionIds.has(p.stripe_session_id));
@@ -7699,7 +7699,7 @@ app.post('/api/sync-payment-history/:bookingId', async (req, res) => {
                             if (isRelated) {
                                 try {
                                     console.log(`[SyncPayment] Found related session ${session.id}, syncing...`);
-                                    await savePaymentHistory(session, bookingId, null);
+                            await savePaymentHistory(session, bookingId, null);
                                     syncedCount++;
                                     syncedSessions.add(session.id);
                                     console.log(`[SyncPayment] ✅ Synced payment from session ${session.id}`);
@@ -7783,21 +7783,21 @@ app.post('/api/sync-payment-history/:bookingId', async (req, res) => {
                     }
                 }
 
-                // Update booking with stripe_session_id if not already set
+                            // Update booking with stripe_session_id if not already set
                 if (booking.stripe_session_id) {
-                    con.query(
-                        'UPDATE all_booking SET stripe_session_id = ? WHERE id = ? AND (stripe_session_id IS NULL OR stripe_session_id = "")',
-                        [booking.stripe_session_id, bookingId],
-                        (updateErr) => {
-                            if (updateErr) {
-                                console.error('Error updating booking with stripe_session_id:', updateErr);
-                            }
-                        }
-                    );
+                            con.query(
+                                'UPDATE all_booking SET stripe_session_id = ? WHERE id = ? AND (stripe_session_id IS NULL OR stripe_session_id = "")',
+                                [booking.stripe_session_id, bookingId],
+                                (updateErr) => {
+                                    if (updateErr) {
+                                        console.error('Error updating booking with stripe_session_id:', updateErr);
+                                    }
+                                }
+                            );
                 }
 
-                res.json({
-                    success: true,
+                            res.json({
+                                success: true,
                     message: `Payment history sync completed. Synced ${syncedCount} new payment(s).`,
                     syncedCount: syncedCount
                 });
@@ -13427,10 +13427,125 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         // For Flight Voucher, flight_date and location should only come from booking if booking exists and is scheduled
         // AND if the booking's voucher_code matches the Flight Voucher's voucher_ref
         // If Flight Voucher has no booking or booking is not scheduled or doesn't match, these should be null
+        // IMPORTANT: If voucher is redeemed, get flight_date and location from the redeemed booking (redeemed_voucher = 'Yes')
         let finalFlightDate = null;
         let finalLocation = null;
+        let isVoucherRedeemed = false; // Initialize flag for voucher redemption status
         
         if (isFlightVoucher) {
+            // First, check if voucher is redeemed by looking for bookings with redeemed_voucher = 'Yes'
+            const voucherCodeToCheck = effectiveVoucherRef || booking.voucher_code || voucherCodeToLookup;
+            let redeemedBooking = null;
+            
+            if (voucherCodeToCheck) {
+                try {
+                    // First, try to find booking with redeemed_voucher = 'Yes' for this voucher code
+                    const [redeemedBookingRows] = await new Promise((resolve, reject) => {
+                        con.query(`
+                            SELECT id, flight_date, location, status, redeemed_voucher
+                            FROM all_booking 
+                            WHERE voucher_code = ? 
+                            AND (redeemed_voucher = 'Yes' OR redeemed_voucher = 1)
+                            ORDER BY created_at DESC
+                            LIMIT 1
+                        `, [voucherCodeToCheck], (err, rows) => {
+                            if (err) reject(err);
+                            else resolve([rows]);
+                        });
+                    });
+                    
+                    if (redeemedBookingRows && redeemedBookingRows.length > 0) {
+                        redeemedBooking = redeemedBookingRows[0];
+                        console.log('✅ Customer Portal - Found redeemed booking (with flag):', {
+                            bookingId: redeemedBooking.id,
+                            flightDate: redeemedBooking.flight_date,
+                            location: redeemedBooking.location
+                        });
+                    } else {
+                        // If no booking with redeemed_voucher flag, check for booking with same voucher_code but different ID and flight_date
+                        // This handles cases where redeemed_voucher flag might not be set
+                        const [alternativeBookingRows] = await new Promise((resolve, reject) => {
+                            con.query(`
+                                SELECT id, flight_date, location, status, redeemed_voucher
+                                FROM all_booking 
+                                WHERE voucher_code = ? 
+                                AND id != ?
+                                AND flight_date IS NOT NULL
+                                ORDER BY created_at DESC
+                                LIMIT 1
+                            `, [voucherCodeToCheck, booking.id || 0], (err, rows) => {
+                                if (err) reject(err);
+                                else resolve([rows]);
+                            });
+                        });
+                        
+                        if (alternativeBookingRows && alternativeBookingRows.length > 0) {
+                            redeemedBooking = alternativeBookingRows[0];
+                            console.log('✅ Customer Portal - Found booking with flight_date (likely redeemed):', {
+                                bookingId: redeemedBooking.id,
+                                flightDate: redeemedBooking.flight_date,
+                                location: redeemedBooking.location
+                            });
+                        } else {
+                            // NEW: Search for bookings created via Redeem Voucher flow
+                            // These bookings have flight_type_source = 'Redeem Voucher' and were created after the original voucher booking
+                            // Match by email and created_at being after the original booking
+                            const [redeemFlowBookingRows] = await new Promise((resolve, reject) => {
+                                con.query(`
+                                    SELECT id, flight_date, location, status, redeemed_voucher, flight_type_source, created_at
+                                    FROM all_booking 
+                                    WHERE email = ?
+                                    AND flight_type_source = 'Redeem Voucher'
+                                    AND (redeemed_voucher = 'Yes' OR redeemed_voucher = 1)
+                                    AND created_at > ?
+                                    AND flight_date IS NOT NULL
+                                    ORDER BY created_at DESC
+                                    LIMIT 1
+                                `, [booking.email || customerEmail, booking.created_at || '1970-01-01'], (err, rows) => {
+                                    if (err) reject(err);
+                                    else resolve([rows]);
+                                });
+                            });
+                            
+                            if (redeemFlowBookingRows && redeemFlowBookingRows.length > 0) {
+                                redeemedBooking = redeemFlowBookingRows[0];
+                                console.log('✅ Customer Portal - Found redeemed booking via Redeem Voucher flow:', {
+                                    bookingId: redeemedBooking.id,
+                                    flightDate: redeemedBooking.flight_date,
+                                    location: redeemedBooking.location
+                                });
+                            }
+                        }
+                    }
+                } catch (redeemedBookingErr) {
+                    console.warn('⚠️ Customer Portal - Could not fetch redeemed booking:', redeemedBookingErr.message);
+                }
+            }
+            
+            // If redeemed booking exists, use its flight_date and location
+            if (redeemedBooking) {
+                // Mark voucher as redeemed since we found a redeemed booking
+                isVoucherRedeemed = true;
+                if (redeemedBooking.flight_date) {
+                    finalFlightDate = redeemedBooking.flight_date;
+                    finalLocation = redeemedBooking.location || null;
+                    console.log('✅ Customer Portal - Using flight_date and location from redeemed booking');
+                } else {
+                    finalFlightDate = null;
+                    finalLocation = null;
+                    console.log('ℹ️ Customer Portal - Redeemed booking found but no flight_date yet');
+                }
+            } else if (booking.redeemed_voucher === 'Yes' || booking.redeemed_voucher === 1) {
+                // Current booking itself is the redeemed booking - use its flight_date and location
+                if (booking.flight_date) {
+                    finalFlightDate = booking.flight_date;
+                    finalLocation = booking.location || null;
+                    console.log('✅ Customer Portal - Current booking is redeemed booking, using its flight_date and location');
+                } else {
+                    finalFlightDate = null;
+                    finalLocation = null;
+                }
+            } else {
             // For Flight Voucher, only use flight_date and location if:
             // 1. Booking exists
             // 2. Booking's voucher_code matches the Flight Voucher's voucher_ref (voucherCodeToLookup)
@@ -13450,6 +13565,7 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 // Flight Voucher not yet scheduled or booking doesn't match - set to null so frontend shows "Date Not Scheduled"
                 finalFlightDate = null;
                 finalLocation = null;
+                }
             }
         } else {
             // For non-Flight Voucher, use booking values as before
@@ -13481,34 +13597,53 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             }
         }
 
-        // Check if voucher is redeemed
+        // Check if voucher is redeemed (if not already set from redeemed booking check above)
         // Check all_booking for redeemed_voucher = 'Yes' or check all_vouchers for redeemed = 'Yes'
-        let isVoucherRedeemed = false;
+        if (!isVoucherRedeemed) {
         if (booking.redeemed_voucher === 'Yes' || booking.redeemed_voucher === 1) {
             isVoucherRedeemed = true;
         } else if (voucherInfo && (voucherInfo.redeemed === 'Yes' || voucherInfo.redeemed === 1)) {
             isVoucherRedeemed = true;
-        } else if (effectiveVoucherRef || booking.voucher_code) {
-            // Check if there's a booking with redeemed_voucher = 'Yes' for this voucher code
-            try {
-                const [redeemedCheckRows] = await new Promise((resolve, reject) => {
+            } else if (effectiveVoucherRef || booking.voucher_code) {
+                // Check if there's a booking with redeemed_voucher = 'Yes' for this voucher code
+                try {
                     const voucherCodeToCheck = effectiveVoucherRef || booking.voucher_code;
-                    con.query(`
-                        SELECT id FROM all_booking 
-                        WHERE voucher_code = ? 
-                        AND (redeemed_voucher = 'Yes' OR redeemed_voucher = 1)
-                        AND id != ?
-                        LIMIT 1
-                    `, [voucherCodeToCheck, booking.id], (err, rows) => {
-                        if (err) reject(err);
-                        else resolve([rows]);
+                    const [redeemedCheckRows] = await new Promise((resolve, reject) => {
+                        con.query(`
+                            SELECT id FROM all_booking 
+                            WHERE voucher_code = ? 
+                            AND (redeemed_voucher = 'Yes' OR redeemed_voucher = 1)
+                            AND id != ?
+                            LIMIT 1
+                        `, [voucherCodeToCheck, booking.id], (err, rows) => {
+                            if (err) reject(err);
+                            else resolve([rows]);
+                        });
                     });
-                });
-                if (redeemedCheckRows && redeemedCheckRows.length > 0) {
-                    isVoucherRedeemed = true;
+                    if (redeemedCheckRows && redeemedCheckRows.length > 0) {
+                        isVoucherRedeemed = true;
+                    } else {
+                        // Also check for Redeem Voucher flow bookings (same email, created after original booking)
+                        const [redeemFlowCheckRows] = await new Promise((resolve, reject) => {
+                            con.query(`
+                                SELECT id FROM all_booking 
+                                WHERE email = ?
+                                AND flight_type_source = 'Redeem Voucher'
+                                AND (redeemed_voucher = 'Yes' OR redeemed_voucher = 1)
+                                AND created_at > ?
+                                LIMIT 1
+                            `, [booking.email || customerEmail, booking.created_at || '1970-01-01'], (err, rows) => {
+                                if (err) reject(err);
+                                else resolve([rows]);
+                            });
+                        });
+                        if (redeemFlowCheckRows && redeemFlowCheckRows.length > 0) {
+                            isVoucherRedeemed = true;
+                        }
+                    }
+                } catch (redeemedCheckErr) {
+                    console.warn('⚠️ Customer Portal - Could not check if voucher is redeemed:', redeemedCheckErr.message);
                 }
-            } catch (redeemedCheckErr) {
-                console.warn('⚠️ Customer Portal - Could not check if voucher is redeemed:', redeemedCheckErr.message);
             }
         }
 

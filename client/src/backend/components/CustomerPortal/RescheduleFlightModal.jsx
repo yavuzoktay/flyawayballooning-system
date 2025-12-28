@@ -459,14 +459,19 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         const allSlotsClosed = allSlotsForDate.length > 0 && allSlotsForDate.every(slot => getSlotStatus(slot) === 'closed' && getRemainingSeats(slot) <= 0);
         const selectionHasAvailability = allSlotsForDate.some(slot => getAvailableSeatsForSelection(slot) > 0);
         const sharedSoldOut = (allSlotsForDate.length > 0 && sharedTotal === 0 && !hasOpenSlots) || allSlotsClosed;
-        const selectionSoldOut = allSlotsForDate.length === 0 || !selectionHasAvailability;
+        
+        // Check if there's enough space for all passengers
+        const passengerCount = pax || 1;
+        const hasEnoughSpace = total >= passengerCount;
+        const selectionSoldOut = allSlotsForDate.length === 0 || !selectionHasAvailability || !hasEnoughSpace;
 
         return {
             total,
             sharedTotal,
             sharedSoldOut,
             soldOut: selectionSoldOut,
-            slots: allSlotsForDate
+            slots: allSlotsForDate,
+            hasEnoughSpace
         };
     };
 
@@ -489,9 +494,10 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             const isPast = d.isBefore(dayjs(), 'day');
             const isSelected = selectedDate && dayjs(selectedDate).isSame(d, 'day');
             
-            const { total, soldOut, slots } = getSpacesForDate(d.toDate());
+            const { total, soldOut, slots, hasEnoughSpace } = getSpacesForDate(d.toDate());
             const hasAnySlots = slots.length > 0;
-            const isSelectable = inCurrentMonth && !isPast && hasAnySlots;
+            // Date is selectable only if there's enough space for all passengers
+            const isSelectable = inCurrentMonth && !isPast && hasAnySlots && hasEnoughSpace;
             
             cells.push(
                 <div
@@ -586,6 +592,16 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         if (!finalActivityId) {
             setError('Activity ID not found for selected location.');
             return;
+        }
+
+        // Validate passenger count vs available spaces
+        const passengerCount = pax || 1;
+        if (slotMatch) {
+            const availableForSelection = getAvailableSeatsForSelection(slotMatch);
+            if (availableForSelection < passengerCount) {
+                setError(`Insufficient space: This time slot has only ${availableForSelection} space${availableForSelection !== 1 ? 's' : ''} available, but you have ${passengerCount} passenger${passengerCount !== 1 ? 's' : ''}. Please select a different time slot with enough space.`);
+                return;
+            }
         }
 
         // Get booking ID from bookingData
@@ -865,11 +881,14 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                             // Use the same availability logic as calendar totals:
                                             // this accounts for shared/private resource constraints (Balloon 210 / 105) and global locks.
                                             const availableForSelection = getAvailableSeatsForSelection(slot);
-                                            const isAvailable = availableForSelection > 0;
+                                            const passengerCount = pax || 1;
+                                            // Check if there's enough space for all passengers
+                                            const hasEnoughSpace = availableForSelection >= passengerCount;
+                                            const isAvailable = availableForSelection > 0 && hasEnoughSpace;
                                             const isSelected = selectedTime === slot.time;
                                             const slotDateTime = dayjs(`${dayjs(selectedDate).format('YYYY-MM-DD')} ${slot.time}`);
                                             const isPastTime = slotDateTime.isBefore(dayjs());
-                                            const isDisabled = !isAvailable || isPastTime;
+                                            const isDisabled = !isAvailable || isPastTime || !hasEnoughSpace;
 
                                             return (
                                                 <Button
@@ -914,7 +933,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                                         }
                                                     }}
                                                 >
-                                                    {slot.time} {isAvailable ? `(${availableForSelection} Spaces)` : '(Not Available)'}
+                                                    {slot.time} {isAvailable ? `(${availableForSelection} Spaces)` : `(${availableForSelection} Spaces - Insufficient for ${passengerCount} passenger${passengerCount > 1 ? 's' : ''})`}
                                                     </Button>
                                             );
                                         })
