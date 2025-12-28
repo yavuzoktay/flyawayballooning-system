@@ -3808,6 +3808,9 @@ setBookingDetail(finalVoucherDetail);
             }
             console.log('🔄 Rebook - Final voucher type:', voucherType);
 
+            // Preserve original created_at to maintain table position after rebook
+            const originalCreatedAt = bookingDetail.booking.created_at || bookingDetail.booking.createdAt || null;
+            
             const payload = {
                 activitySelect: flightType,
                 chooseLocation: selectedLocation || bookingDetail.booking.location,
@@ -3824,7 +3827,8 @@ setBookingDetail(finalVoucherDetail);
                 email_template_type_override: 'booking_rescheduled_automatic',
                 history_entries: historyEntriesPayload,
                 voucher_type: voucherType, // Add voucher_type from Rebook popup selection
-                selectedVoucherType: { title: voucherType } // Add selectedVoucherType for backend compatibility
+                selectedVoucherType: { title: voucherType }, // Add selectedVoucherType for backend compatibility
+                created_at: originalCreatedAt // Preserve original created_at to maintain table position
             };
 
             // First delete the old booking
