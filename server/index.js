@@ -5292,6 +5292,90 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                 storeData.processed = false;
                 return res.status(500).send('Internal server error');
             }
+        } else if (event.type === 'payment_intent.succeeded') {
+            // Handle payment_intent.succeeded to capture payments from different devices/sessions
+            const paymentIntent = event.data.object;
+            console.log('✅ Webhook: Payment intent succeeded:', paymentIntent.id);
+            console.log('✅ Webhook: Payment intent metadata:', paymentIntent.metadata);
+
+            try {
+                // Try to find booking by metadata
+                let bookingId = null;
+                let voucherId = null;
+
+                if (paymentIntent.metadata) {
+                    if (paymentIntent.metadata.booking_id) {
+                        bookingId = parseInt(paymentIntent.metadata.booking_id);
+                    } else if (paymentIntent.metadata.bookingId) {
+                        bookingId = parseInt(paymentIntent.metadata.bookingId);
+                    }
+                    if (paymentIntent.metadata.voucher_id) {
+                        voucherId = parseInt(paymentIntent.metadata.voucher_id);
+                    } else if (paymentIntent.metadata.voucherId) {
+                        voucherId = parseInt(paymentIntent.metadata.voucherId);
+                    }
+                }
+
+                // If no booking ID in metadata, try to find by customer email
+                if (!bookingId && paymentIntent.receipt_email) {
+                    const [bookingRows] = await con.promise().query(
+                        'SELECT id FROM all_booking WHERE email = ? ORDER BY created_at DESC LIMIT 1',
+                        [paymentIntent.receipt_email]
+                    );
+                    if (bookingRows && bookingRows.length > 0) {
+                        bookingId = bookingRows[0].id;
+                        console.log(`[PaymentIntent] Found booking by email: ${bookingId}`);
+                    }
+                }
+
+                // Check if payment history already exists for this payment intent
+                if (paymentIntent.id) {
+                    const [existingPayments] = await con.promise().query(
+                        'SELECT id FROM payment_history WHERE stripe_payment_intent_id = ?',
+                        [paymentIntent.id]
+                    );
+
+                    if (existingPayments && existingPayments.length > 0) {
+                        console.log(`[PaymentIntent] Payment history already exists for payment intent ${paymentIntent.id}`);
+                        return res.json({ received: true, message: 'Payment already recorded' });
+                    }
+                }
+
+                // Try to get checkout session from payment intent
+                let session = null;
+                if (paymentIntent.metadata && paymentIntent.metadata.checkout_session_id) {
+                    try {
+                        session = await stripe.checkout.sessions.retrieve(paymentIntent.metadata.checkout_session_id);
+                        console.log(`[PaymentIntent] Retrieved checkout session: ${session.id}`);
+                    } catch (sessionError) {
+                        console.warn(`[PaymentIntent] Could not retrieve checkout session: ${sessionError.message}`);
+                    }
+                }
+
+                // If we have a session, use it; otherwise create a mock session from payment intent
+                if (!session) {
+                    session = {
+                        id: `pi_${paymentIntent.id}`,
+                        payment_intent: paymentIntent.id,
+                        amount_total: paymentIntent.amount,
+                        currency: paymentIntent.currency,
+                        payment_status: 'paid'
+                    };
+                }
+
+                // Save payment history
+                if (bookingId || voucherId) {
+                    await savePaymentHistory(session, bookingId, voucherId);
+                    console.log(`✅ [PaymentIntent] Payment history saved for booking ${bookingId || 'N/A'}, voucher ${voucherId || 'N/A'}`);
+                } else {
+                    console.warn(`⚠️ [PaymentIntent] Could not determine booking/voucher ID for payment intent ${paymentIntent.id}`);
+                    // Still try to save with null booking/voucher - might be linked later via sync
+                    await savePaymentHistory(session, null, null);
+                }
+            } catch (piError) {
+                console.error('Error processing payment_intent.succeeded:', piError);
+                // Don't fail the webhook - just log the error
+            }
         } else {
             console.log('Webhook event type not handled:', event.type);
         }
@@ -7479,9 +7563,9 @@ app.post('/api/sync-payment-history/:bookingId', async (req, res) => {
     }
 
     try {
-        // Get booking with stripe_session_id
+        // Get booking with stripe_session_id and email for finding related payments
         con.query(
-            'SELECT id, stripe_session_id FROM all_booking WHERE id = ?',
+            'SELECT id, stripe_session_id, email, name FROM all_booking WHERE id = ?',
             [bookingId],
             async (err, results) => {
                 if (err) {
@@ -7501,66 +7585,171 @@ app.post('/api/sync-payment-history/:bookingId', async (req, res) => {
                 }
 
                 const booking = results[0];
+                let syncedCount = 0;
+                const syncedSessions = new Set();
 
-                if (!booking.stripe_session_id) {
-                    return res.status(400).json({
-                        success: false,
-                        message: 'Booking does not have a Stripe session ID'
-                    });
+                // Get existing payment history to avoid duplicates
+                const [existingPayments] = await con.promise().query(
+                    'SELECT stripe_session_id, stripe_payment_intent_id, stripe_charge_id FROM payment_history WHERE booking_id = ?',
+                    [bookingId]
+                );
+                const existingSessionIds = new Set(existingPayments.map(p => p.stripe_session_id).filter(Boolean));
+                const existingPaymentIntentIds = new Set(existingPayments.map(p => p.stripe_payment_intent_id).filter(Boolean));
+                const existingChargeIds = new Set(existingPayments.map(p => p.stripe_charge_id).filter(Boolean));
+
+                // Method 1: Sync from booking's stripe_session_id if it exists
+                if (booking.stripe_session_id && !existingSessionIds.has(booking.stripe_session_id)) {
+                    try {
+                        console.log(`[SyncPayment] Syncing payment from booking's stripe_session_id: ${booking.stripe_session_id}`);
+                        const session = await stripe.checkout.sessions.retrieve(booking.stripe_session_id);
+                        await savePaymentHistory(session, bookingId, null);
+                        syncedCount++;
+                        syncedSessions.add(booking.stripe_session_id);
+                        console.log(`[SyncPayment] ✅ Synced payment from session ${booking.stripe_session_id}`);
+                    } catch (stripeError) {
+                        console.error(`[SyncPayment] Error syncing from booking session ${booking.stripe_session_id}:`, stripeError.message);
+                    }
                 }
 
-                // Check if payment history already exists
-                con.query(
-                    'SELECT id FROM payment_history WHERE booking_id = ? AND stripe_session_id = ?',
-                    [bookingId, booking.stripe_session_id],
-                    async (checkErr, checkResults) => {
-                        if (checkErr) {
-                            console.error('Error checking payment history:', checkErr);
-                            return res.status(500).json({
-                                success: false,
-                                message: 'Error checking payment history',
-                                error: checkErr.message
-                            });
-                        }
-
-                        if (checkResults.length > 0) {
-                            return res.json({
-                                success: true,
-                                message: 'Payment history already exists for this booking',
-                                data: checkResults[0]
-                            });
-                        }
-
-                        // Retrieve session from Stripe
+                // Method 2: Find all checkout sessions for this customer (email) and booking metadata
+                if (booking.email) {
+                    try {
+                        console.log(`[SyncPayment] Searching for all checkout sessions for email: ${booking.email}`);
+                        // List sessions by customer email - note: this requires customer_email to be set during session creation
+                        // If that's not available, we'll try a different approach
+                        let sessions = [];
                         try {
-                            const session = await stripe.checkout.sessions.retrieve(booking.stripe_session_id);
-                            await savePaymentHistory(session, bookingId, null);
-
-                            // Update booking with stripe_session_id if not already set
-                            con.query(
-                                'UPDATE all_booking SET stripe_session_id = ? WHERE id = ? AND (stripe_session_id IS NULL OR stripe_session_id = "")',
-                                [booking.stripe_session_id, bookingId],
-                                (updateErr) => {
-                                    if (updateErr) {
-                                        console.error('Error updating booking with stripe_session_id:', updateErr);
-                                    }
-                                }
+                            const sessionsList = await stripe.checkout.sessions.list({
+                                limit: 100
+                            });
+                            // Filter by email from session customer_details or metadata
+                            sessions = sessionsList.data.filter(s => 
+                                (s.customer_details && s.customer_details.email === booking.email) ||
+                                (s.customer_email === booking.email) ||
+                                (s.metadata && s.metadata.email === booking.email)
                             );
-
-                            res.json({
-                                success: true,
-                                message: 'Payment history synced successfully'
-                            });
-                        } catch (stripeError) {
-                            console.error('Error retrieving Stripe session:', stripeError);
-                            return res.status(500).json({
-                                success: false,
-                                message: 'Error retrieving Stripe session',
-                                error: stripeError.message
-                            });
+                        } catch (listError) {
+                            console.warn('[SyncPayment] Could not list all sessions, trying alternative method:', listError.message);
                         }
+
+                        for (const session of sessions) {
+                            // Skip if we already have this session
+                            if (existingSessionIds.has(session.id) || syncedSessions.has(session.id)) {
+                                continue;
+                            }
+
+                            // Check if this session is related to this booking
+                            // Check metadata or payment intent for booking reference
+                            const isRelated = 
+                                (session.metadata && (session.metadata.booking_id === bookingId.toString() || session.metadata.bookingId === bookingId.toString())) ||
+                                (session.payment_intent && !existingPaymentIntentIds.has(session.payment_intent)) ||
+                                (session.payment_status === 'paid' && session.amount_total > 0);
+
+                            if (isRelated) {
+                                try {
+                                    console.log(`[SyncPayment] Found related session ${session.id}, syncing...`);
+                                    await savePaymentHistory(session, bookingId, null);
+                                    syncedCount++;
+                                    syncedSessions.add(session.id);
+                                    console.log(`[SyncPayment] ✅ Synced payment from session ${session.id}`);
+                                } catch (syncError) {
+                                    console.error(`[SyncPayment] Error syncing session ${session.id}:`, syncError.message);
+                                }
+                            }
+                        }
+                    } catch (listError) {
+                        console.error('[SyncPayment] Error listing checkout sessions:', listError.message);
                     }
-                );
+                }
+
+                // Method 3: Find all payment intents for this customer and check if they're related
+                if (booking.email) {
+                    try {
+                        console.log(`[SyncPayment] Searching for payment intents for email: ${booking.email}`);
+                        const paymentIntents = await stripe.paymentIntents.list({
+                            limit: 100
+                        });
+
+                        for (const pi of paymentIntents.data) {
+                            // Skip if we already have this payment intent
+                            if (existingPaymentIntentIds.has(pi.id)) {
+                                continue;
+                            }
+
+                            // Check if this payment intent is related to this booking
+                            // Look for booking reference in metadata, receipt_email, or customer
+                            const isRelated = 
+                                (pi.metadata && (pi.metadata.booking_id === bookingId.toString() || pi.metadata.bookingId === bookingId.toString())) ||
+                                (pi.receipt_email === booking.email && pi.status === 'succeeded') ||
+                                (pi.customer_email === booking.email && pi.status === 'succeeded');
+
+                            if (isRelated) {
+                                try {
+                                    // Get the checkout session if it exists in metadata
+                                    if (pi.metadata && pi.metadata.checkout_session_id) {
+                                        try {
+                                            const actualSession = await stripe.checkout.sessions.retrieve(pi.metadata.checkout_session_id);
+                                            // Only sync if we don't already have this session
+                                            if (!existingSessionIds.has(actualSession.id) && !syncedSessions.has(actualSession.id)) {
+                                                await savePaymentHistory(actualSession, bookingId, null);
+                                                syncedSessions.add(actualSession.id);
+                                                syncedCount++;
+                                                console.log(`[SyncPayment] ✅ Synced payment from checkout session ${actualSession.id} (via payment intent ${pi.id})`);
+                                            }
+                                        } catch (sessionError) {
+                                            // If session doesn't exist or can't be retrieved, save from payment intent directly
+                                            const mockSession = {
+                                                id: `pi_${pi.id}`,
+                                                payment_intent: pi.id,
+                                                amount_total: pi.amount,
+                                                currency: pi.currency,
+                                                payment_status: pi.status === 'succeeded' ? 'paid' : pi.status
+                                            };
+                                            await savePaymentHistory(mockSession, bookingId, null);
+                                            syncedCount++;
+                                            console.log(`[SyncPayment] ✅ Synced payment from payment intent ${pi.id} (no session found)`);
+                                        }
+                                    } else {
+                                        // No session metadata, create mock session from payment intent
+                                        const mockSession = {
+                                            id: `pi_${pi.id}`,
+                                            payment_intent: pi.id,
+                                            amount_total: pi.amount,
+                                            currency: pi.currency,
+                                            payment_status: pi.status === 'succeeded' ? 'paid' : pi.status
+                                        };
+                                        await savePaymentHistory(mockSession, bookingId, null);
+                                        syncedCount++;
+                                        console.log(`[SyncPayment] ✅ Synced payment from payment intent ${pi.id}`);
+                                    }
+                                } catch (piError) {
+                                    console.error(`[SyncPayment] Error syncing payment intent ${pi.id}:`, piError.message);
+                                }
+                            }
+                        }
+                    } catch (piListError) {
+                        console.error('[SyncPayment] Error listing payment intents:', piListError.message);
+                    }
+                }
+
+                // Update booking with stripe_session_id if not already set
+                if (booking.stripe_session_id) {
+                    con.query(
+                        'UPDATE all_booking SET stripe_session_id = ? WHERE id = ? AND (stripe_session_id IS NULL OR stripe_session_id = "")',
+                        [booking.stripe_session_id, bookingId],
+                        (updateErr) => {
+                            if (updateErr) {
+                                console.error('Error updating booking with stripe_session_id:', updateErr);
+                            }
+                        }
+                    );
+                }
+
+                res.json({
+                    success: true,
+                    message: `Payment history sync completed. Synced ${syncedCount} new payment(s).`,
+                    syncedCount: syncedCount
+                });
             }
         );
     } catch (error) {
@@ -13239,6 +13428,37 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             }
         }
 
+        // Check if voucher is redeemed
+        // Check all_booking for redeemed_voucher = 'Yes' or check all_vouchers for redeemed = 'Yes'
+        let isVoucherRedeemed = false;
+        if (booking.redeemed_voucher === 'Yes' || booking.redeemed_voucher === 1) {
+            isVoucherRedeemed = true;
+        } else if (voucherInfo && (voucherInfo.redeemed === 'Yes' || voucherInfo.redeemed === 1)) {
+            isVoucherRedeemed = true;
+        } else if (effectiveVoucherRef || booking.voucher_code) {
+            // Check if there's a booking with redeemed_voucher = 'Yes' for this voucher code
+            try {
+                const [redeemedCheckRows] = await new Promise((resolve, reject) => {
+                    const voucherCodeToCheck = effectiveVoucherRef || booking.voucher_code;
+                    con.query(`
+                        SELECT id FROM all_booking 
+                        WHERE voucher_code = ? 
+                        AND (redeemed_voucher = 'Yes' OR redeemed_voucher = 1)
+                        AND id != ?
+                        LIMIT 1
+                    `, [voucherCodeToCheck, booking.id], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
+                });
+                if (redeemedCheckRows && redeemedCheckRows.length > 0) {
+                    isVoucherRedeemed = true;
+                }
+            } catch (redeemedCheckErr) {
+                console.warn('⚠️ Customer Portal - Could not check if voucher is redeemed:', redeemedCheckErr.message);
+            }
+        }
+
         // Format the response
         const response = {
             success: true,
@@ -13268,7 +13488,8 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 flight_attempts: finalFlightAttempts,
                 activity_id: booking.activity_id || null,
                 book_flight: finalBookFlight, // Add book_flight to identify Flight Voucher
-                is_flight_voucher: isFlightVoucher // Add flag to identify Flight Voucher
+                is_flight_voucher: isFlightVoucher, // Add flag to identify Flight Voucher
+                is_voucher_redeemed: isVoucherRedeemed // Add flag to indicate if voucher is redeemed
             }
         };
 

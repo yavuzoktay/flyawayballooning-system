@@ -477,13 +477,14 @@ const CustomerPortal = () => {
                                 // For Flight Vouchers (Your Booking Flight Voucher section), show both Booking ID and Voucher Ref (non-clickable)
                                 // For regular bookings (Your Booking section), show only Booking ID - NO Voucher Ref
                                 if (isFlightVoucher && bookingData.voucher_ref) {
+                                    const isRedeemed = bookingData.is_voucher_redeemed === true || bookingData.is_voucher_redeemed === 1;
                                     return (
                                         <Box sx={{ mb: 2 }}>
                                             <Typography variant="body1" sx={{ fontWeight: 500, mb: 0.5 }}>
                                                 {bookingData.booking_reference || bookingData.id || 'N/A'}
                                             </Typography>
                                             <Typography variant="body2" sx={{ fontWeight: 600, color: '#555' }}>
-                                                Voucher Ref: {bookingData.voucher_ref}
+                                                Voucher Ref: {bookingData.voucher_ref} {isRedeemed ? 'Yes' : ''}
                                             </Typography>
                                         </Box>
                                     );
@@ -653,8 +654,12 @@ const CustomerPortal = () => {
                         const expiryDate = bookingData.expires ? dayjs(bookingData.expires) : null;
                         const isExpired = expiryDate ? expiryDate.isBefore(now, 'day') : false;
 
+                        // Check if voucher is redeemed (for Flight Voucher)
+                        const isVoucherRedeemed = bookingData.is_voucher_redeemed === true || bookingData.is_voucher_redeemed === 1;
+
                         // If voucher / booking has expired, ALL actions in the portal must be disabled
                         // regardless of flight date / 120-hour rules.
+                        // If voucher is redeemed (Flight Voucher), disable Reschedule and Cancel buttons
                         let canReschedule;
                         let canChangeLocation;
                         let canCancel;
@@ -667,6 +672,14 @@ const CustomerPortal = () => {
                             canCancel = false;
                             canResendConfirmation = false;
                             canExtendVoucher = false;
+                        } else if (isVoucherRedeemed) {
+                            // If voucher is redeemed, disable Reschedule and Cancel buttons
+                            canReschedule = false;
+                            canCancel = false;
+                            // Other actions can still be available
+                            canChangeLocation = isCancelled || hoursUntilFlight > 120;
+                            canResendConfirmation = !resendingConfirmation;
+                            canExtendVoucher = !extendingVoucher;
                         } else if (isFlightDatePassed) {
                             // If flight date has passed, disable Change Location and Extend Voucher
                             canReschedule = isCancelled || hoursUntilFlight > 120;
@@ -697,11 +710,13 @@ const CustomerPortal = () => {
                                     title={
                                         isExpired 
                                             ? "Voucher / Booking has expired"
-                                            : (!canReschedule 
-                                                ? (isCancelled 
-                                                    ? "Flight cancelled - pick a new date"
-                                                    : "Less than 120 hours remaining until your flight")
-                                                : "")
+                                            : isVoucherRedeemed
+                                                ? "Voucher has been redeemed and cannot be rescheduled"
+                                                : (!canReschedule 
+                                                    ? (isCancelled 
+                                                        ? "Flight cancelled - pick a new date"
+                                                        : "Less than 120 hours remaining until your flight")
+                                                    : "")
                                     }
                                     arrow
                                 >
@@ -746,6 +761,8 @@ const CustomerPortal = () => {
                                     title={
                                         isExpired
                                             ? "Voucher / Booking has expired"
+                                            : isVoucherRedeemed
+                                                ? "Voucher has been redeemed and cannot be cancelled"
                                             : (isCancelled
                                                 ? "Flight is cancelled"
                                                 : (!canCancel ? "Less than 120 hours remaining until your flight" : ""))

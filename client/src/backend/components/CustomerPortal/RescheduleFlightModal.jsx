@@ -612,34 +612,131 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         setConfirmDialogOpen(false);
         setSubmitting(true);
         try {
-            // Use the reschedule endpoint to update existing booking
-            const rescheduleResponse = await axios.patch(`/api/customer-portal-reschedule/${pendingRescheduleData.bookingId}`, {
-                flight_date: pendingRescheduleData.selectedDateTime,
-                location: pendingRescheduleData.selectedLocation,
-                activity_id: pendingRescheduleData.finalActivityId
-            });
+            // Check if this is a Flight Voucher with voucher_ref (should use redeem flow)
+            const voucherRef = bookingData?.voucher_ref || bookingData?.voucher_code;
+            const isFlightVoucherWithVoucherCode = isFlightVoucher && voucherRef;
 
-            if (!rescheduleResponse.data?.success) {
-                throw new Error(rescheduleResponse.data?.message || 'Failed to reschedule flight');
+            if (isFlightVoucherWithVoucherCode) {
+                // Use createRedeemBooking endpoint for Flight Voucher reschedule (redeem flow)
+                console.log('🔄 Flight Voucher reschedule - Using redeem booking flow');
+                console.log('Voucher Ref:', voucherRef);
+
+                // Prepare passenger data from booking
+                const passengerData = [];
+                if (bookingData.passengers && bookingData.passengers.length > 0) {
+                    bookingData.passengers.forEach(p => {
+                        passengerData.push({
+                            firstName: p.first_name || bookingData.name?.split(' ')[0] || '',
+                            lastName: p.last_name || bookingData.name?.split(' ').slice(1).join(' ') || '',
+                            weight: p.weight || '',
+                            email: p.email || bookingData.email || '',
+                            phone: p.phone || bookingData.phone || ''
+                        });
+                    });
+                } else {
+                    // Fallback if no passenger data
+                    const nameParts = (bookingData.name || '').split(' ');
+                    passengerData.push({
+                        firstName: nameParts[0] || '',
+                        lastName: nameParts.slice(1).join(' ') || '',
+                        weight: '',
+                        email: bookingData.email || '',
+                        phone: bookingData.phone || ''
+                    });
+                }
+
+                // Determine flight type
+                const flightTypeStr = (bookingData.flight_type || bookingData.experience || 'Shared Flight').toLowerCase();
+                const chooseFlightType = {
+                    type: flightTypeStr.includes('private') ? 'Private Charter' : 'Shared Flight'
+                };
+
+                // Format date and time
+                const datePart = pendingRescheduleData.selectedDateTime.split(' ')[0];
+                const timePart = pendingRescheduleData.selectedDateTime.split(' ')[1] || '';
+
+                const redeemBookingPayload = {
+                    activitySelect: 'Redeem Voucher',
+                    chooseLocation: pendingRescheduleData.selectedLocation,
+                    chooseFlightType: chooseFlightType,
+                    passengerData: passengerData,
+                    additionalInfo: {},
+                    selectedDate: datePart,
+                    selectedTime: timePart,
+                    voucher_code: voucherRef,
+                    totalPrice: 0,
+                    activity_id: pendingRescheduleData.finalActivityId
+                };
+
+                console.log('🔄 Redeem Booking Payload:', redeemBookingPayload);
+
+                const redeemResponse = await axios.post('/api/createRedeemBooking', redeemBookingPayload);
+
+                if (!redeemResponse.data?.success) {
+                    throw new Error(redeemResponse.data?.error || redeemResponse.data?.message || 'Failed to create redeem booking');
+                }
+
+                const newBookingId = redeemResponse.data.bookingId;
+                console.log('✅ New booking created via redeem flow:', newBookingId);
+
+                // Mark voucher as redeemed
+                try {
+                    await axios.post('/api/redeem-voucher', {
+                        voucher_code: voucherRef,
+                        booking_id: newBookingId
+                    });
+                    console.log('✅ Voucher marked as redeemed');
+                } catch (redeemErr) {
+                    console.warn('⚠️ Warning: Could not mark voucher as redeemed:', redeemErr);
+                    // Continue even if redeem-voucher fails
+                }
+
+                // Fetch the new booking data
+                const bookingResponse = await axios.get(`/api/getBookingDetail?booking_id=${newBookingId}`);
+                const newBooking = bookingResponse.data?.data || bookingResponse.data;
+
+                if (onRescheduleSuccess) {
+                    onRescheduleSuccess(newBooking);
+                }
+
+                setSuccessPayload({
+                    bookingId: newBookingId,
+                    location: pendingRescheduleData.selectedLocation,
+                    previousFlightDateTime: bookingData?.flight_date || null,
+                    newFlightDateTime: pendingRescheduleData.selectedDateTime
+                });
+                setSuccessDialogOpen(true);
+                setPendingRescheduleData(null);
+            } else {
+                // Regular booking reschedule - update existing booking
+                const rescheduleResponse = await axios.patch(`/api/customer-portal-reschedule/${pendingRescheduleData.bookingId}`, {
+                    flight_date: pendingRescheduleData.selectedDateTime,
+                    location: pendingRescheduleData.selectedLocation,
+                    activity_id: pendingRescheduleData.finalActivityId
+                });
+
+                if (!rescheduleResponse.data?.success) {
+                    throw new Error(rescheduleResponse.data?.message || 'Failed to reschedule flight');
+                }
+
+                const updatedBooking = rescheduleResponse.data?.data;
+
+                if (onRescheduleSuccess) {
+                    onRescheduleSuccess(updatedBooking);
+                }
+
+                setSuccessPayload({
+                    bookingId: updatedBooking?.id || pendingRescheduleData.bookingId,
+                    location: pendingRescheduleData.selectedLocation,
+                    previousFlightDateTime: bookingData?.flight_date || null,
+                    newFlightDateTime: pendingRescheduleData.selectedDateTime
+                });
+                setSuccessDialogOpen(true);
+                setPendingRescheduleData(null);
             }
-
-            const updatedBooking = rescheduleResponse.data?.data;
-
-            if (onRescheduleSuccess) {
-                onRescheduleSuccess(updatedBooking);
-            }
-
-            setSuccessPayload({
-                bookingId: updatedBooking?.id || pendingRescheduleData.bookingId,
-                location: pendingRescheduleData.selectedLocation,
-                previousFlightDateTime: bookingData?.flight_date || null,
-                newFlightDateTime: pendingRescheduleData.selectedDateTime
-            });
-            setSuccessDialogOpen(true);
-            setPendingRescheduleData(null);
         } catch (err) {
             console.error('Error rescheduling flight:', err);
-            setError(err.response?.data?.message || err.message || 'Failed to reschedule flight. Please try again later.');
+            setError(err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to reschedule flight. Please try again later.');
         } finally {
             setSubmitting(false);
         }
