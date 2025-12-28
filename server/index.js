@@ -7378,9 +7378,10 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
         const voucher = voucherRows[0];
         console.log('📋 Found voucher:', { id: voucher.id, voucher_ref: voucher.voucher_ref, stripe_session_id: voucher.stripe_session_id });
 
-        // Get full voucher info including paid amount
+        // Get full voucher info including paid amount and purchaser info
         const [fullVoucherRows] = await con.promise().query(
-            `SELECT id, voucher_ref, stripe_session_id, paid, created_at, name, email 
+            `SELECT id, voucher_ref, stripe_session_id, paid, created_at, name, email, 
+                    purchaser_email, purchaser_name, purchaser_phone, book_flight, voucher_type
              FROM all_vouchers 
              WHERE id = ? OR voucher_ref = ? 
              LIMIT 1`,
@@ -7421,11 +7422,14 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
         }
 
         // Method 3: If voucher has paid amount, always include it in payment history
+        // This is especially important for Gift Vouchers where payment is tied to the voucher itself
         // Check if we already have a payment entry for this voucher amount
         const voucherPaidAmount = fullVoucher.paid ? parseFloat(fullVoucher.paid) : 0;
         const hasVoucherPayment = paymentHistory.some(p => 
-            Math.abs(parseFloat(p.amount || 0) - voucherPaidAmount) < 0.01 &&
-            (p.voucher_id === fullVoucher.id || p.origin === 'voucher_purchase')
+            (p.id === `voucher_${fullVoucher.id}`) ||
+            (Math.abs(parseFloat(p.amount || 0) - voucherPaidAmount) < 0.01 &&
+             (p.voucher_id === fullVoucher.id || p.origin === 'voucher_purchase') &&
+             p.stripe_session_id === fullVoucher.stripe_session_id)
         );
         
         if (voucherPaidAmount > 0 && !hasVoucherPayment) {
@@ -7442,7 +7446,8 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
                 created_at: fullVoucher.created_at || new Date(),
                 origin: 'voucher_purchase'
             };
-            paymentHistory.push(voucherPaymentEntry);
+            // Insert at the beginning to show voucher payment first
+            paymentHistory.unshift(voucherPaymentEntry);
             console.log('✅ Added voucher payment entry to payment history');
         }
 
@@ -7474,38 +7479,84 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
         }
 
         // Method 5: Try to find original purchase booking (where voucher was bought)
-        if (paymentHistory.length === 0) {
-            // Find booking where this voucher was originally purchased
-            // Look for bookings with matching email/name and paid amount, created around voucher creation time
-            const [originalPurchaseResults] = await con.promise().query(
-                `SELECT b.id, b.stripe_session_id, ph.*
-                 FROM all_booking b
-                 LEFT JOIN payment_history ph ON ph.booking_id = b.id
-                 WHERE b.email = ? 
-                 AND ABS(TIMESTAMPDIFF(HOUR, b.created_at, ?)) <= 2
-                 AND (b.paid = ? OR ph.amount = ?)
-                 AND ph.id IS NOT NULL
-                 ORDER BY b.created_at DESC
-                 LIMIT 5`,
-                [fullVoucher.email || '', fullVoucher.created_at || new Date(), fullVoucher.paid || 0, fullVoucher.paid || 0]
-            );
+        // For Gift Vouchers, use purchaser_email; for others, use email
+        if (paymentHistory.length === 0 || paymentHistory.every(p => p.origin === 'voucher_purchase')) {
+            // Determine which email to use for search
+            const searchEmail = fullVoucher.purchaser_email || fullVoucher.email || '';
+            const searchName = fullVoucher.purchaser_name || fullVoucher.name || '';
+            const voucherPaidAmount = fullVoucher.paid ? parseFloat(fullVoucher.paid) : 0;
             
-            if (originalPurchaseResults && originalPurchaseResults.length > 0) {
-                const originalPayments = originalPurchaseResults
-                    .filter(r => r.id) // Only entries with payment history
-                    .map(r => ({
-                        id: r.id,
-                        booking_id: r.id,
-                        stripe_session_id: r.stripe_session_id,
-                        amount: r.amount,
-                        currency: r.currency || 'GBP',
-                        payment_status: r.payment_status || 'succeeded',
-                        created_at: r.created_at,
-                        origin: 'voucher_original_purchase'
-                    }));
-                if (originalPayments.length > 0) {
-                    console.log('✅ Found payment history by original purchase:', originalPayments.length, 'records');
-                    paymentHistory = originalPayments;
+            if (searchEmail || searchName) {
+                // Find booking where this voucher was originally purchased
+                // Look for bookings with matching email/name and paid amount, created around voucher creation time
+                const [originalPurchaseResults] = await con.promise().query(
+                    `SELECT b.id, b.stripe_session_id, b.email, b.name, ph.*
+                     FROM all_booking b
+                     LEFT JOIN payment_history ph ON ph.booking_id = b.id
+                     WHERE (
+                         (b.email = ? AND ? != '')
+                         OR (b.name = ? AND ? != '')
+                     )
+                     AND ABS(TIMESTAMPDIFF(HOUR, b.created_at, ?)) <= 24
+                     AND (
+                         (b.paid = ? AND ? > 0)
+                         OR (ph.amount = ? AND ? > 0)
+                         OR (ABS(b.paid - ?) < 0.01 AND ? > 0)
+                     )
+                     AND (ph.id IS NOT NULL OR b.stripe_session_id IS NOT NULL)
+                     ORDER BY ABS(TIMESTAMPDIFF(HOUR, b.created_at, ?)) ASC, b.created_at DESC
+                     LIMIT 10`,
+                    [
+                        searchEmail, searchEmail,
+                        searchName, searchName,
+                        fullVoucher.created_at || new Date(),
+                        voucherPaidAmount, voucherPaidAmount,
+                        voucherPaidAmount, voucherPaidAmount,
+                        voucherPaidAmount, voucherPaidAmount,
+                        fullVoucher.created_at || new Date()
+                    ]
+                );
+                
+                if (originalPurchaseResults && originalPurchaseResults.length > 0) {
+                    // Filter and map results
+                    const originalPayments = [];
+                    for (const row of originalPurchaseResults) {
+                        if (row.id && row.stripe_session_id) {
+                            // If we have payment history, use it
+                            if (row.amount) {
+                                originalPayments.push({
+                                    id: row.id,
+                                    booking_id: row.id,
+                                    stripe_session_id: row.stripe_session_id,
+                                    amount: row.amount,
+                                    currency: row.currency || 'GBP',
+                                    payment_status: row.payment_status || 'succeeded',
+                                    created_at: row.created_at,
+                                    origin: 'voucher_original_purchase'
+                                });
+                            } else {
+                                // If no payment history but we have stripe_session_id, create synthetic entry
+                                originalPayments.push({
+                                    id: `booking_${row.id}`,
+                                    booking_id: row.id,
+                                    stripe_session_id: row.stripe_session_id,
+                                    amount: voucherPaidAmount,
+                                    currency: 'GBP',
+                                    payment_status: 'succeeded',
+                                    created_at: row.created_at || fullVoucher.created_at || new Date(),
+                                    origin: 'voucher_original_purchase_synthetic'
+                                });
+                            }
+                        }
+                    }
+                    
+                    if (originalPayments.length > 0) {
+                        console.log('✅ Found payment history by original purchase:', originalPayments.length, 'records');
+                        // Merge with existing payment history, avoiding duplicates
+                        const existingSessionIds = new Set(paymentHistory.map(p => p.stripe_session_id).filter(Boolean));
+                        const newPayments = originalPayments.filter(p => !existingSessionIds.has(p.stripe_session_id));
+                        paymentHistory = [...paymentHistory, ...newPayments];
+                    }
                 }
             }
         }

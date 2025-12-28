@@ -598,17 +598,25 @@ const BookingPage = () => {
         setPaymentHistoryLoading(true);
         try {
             let paymentData = [];
+            const existingIds = new Set();
             
-            // For vouchers, prioritize voucher-based payment history first
+            // For vouchers, ALWAYS fetch voucher-based payment history first
             // This ensures we get the voucher's own payment info (all_vouchers.paid)
-            if (voucherIdOrRef && !bookingId) {
+            // This is especially important for Gift Vouchers where payment is tied to the voucher itself
+            if (voucherIdOrRef) {
                 try {
-                    console.log(`[PaymentHistory] Fetching voucher payment history first for: ${voucherIdOrRef}`);
+                    console.log(`[PaymentHistory] Fetching voucher payment history for: ${voucherIdOrRef}`);
                     const voucherResponse = await axios.get(`/api/voucher-payment-history/${voucherIdOrRef}`);
                     const voucherPaymentData = voucherResponse.data?.data || [];
                     if (voucherPaymentData.length > 0) {
                         console.log(`[PaymentHistory] Found ${voucherPaymentData.length} records via voucher endpoint`);
                         paymentData = voucherPaymentData;
+                        // Track existing IDs to avoid duplicates
+                        voucherPaymentData.forEach(p => {
+                            if (p.id) existingIds.add(p.id);
+                            if (p.stripe_session_id) existingIds.add(`session_${p.stripe_session_id}`);
+                            if (p.stripe_charge_id) existingIds.add(`charge_${p.stripe_charge_id}`);
+                        });
                     }
                 } catch (voucherError) {
                     console.log('[PaymentHistory] Voucher payment history fetch failed:', voucherError?.message);
@@ -623,10 +631,21 @@ const BookingPage = () => {
                     
                     // Merge voucher and booking payment data (avoid duplicates)
                     if (bookingPaymentData.length > 0) {
-                        const existingIds = new Set(paymentData.map(p => p.id));
-                        const newPayments = bookingPaymentData.filter(p => !existingIds.has(p.id));
+                        const newPayments = bookingPaymentData.filter(p => {
+                            const id = p.id || `session_${p.stripe_session_id}` || `charge_${p.stripe_charge_id}`;
+                            if (existingIds.has(id) || existingIds.has(p.id) || 
+                                (p.stripe_session_id && existingIds.has(`session_${p.stripe_session_id}`)) ||
+                                (p.stripe_charge_id && existingIds.has(`charge_${p.stripe_charge_id}`))) {
+                                return false;
+                            }
+                            existingIds.add(id);
+                            if (p.id) existingIds.add(p.id);
+                            if (p.stripe_session_id) existingIds.add(`session_${p.stripe_session_id}`);
+                            if (p.stripe_charge_id) existingIds.add(`charge_${p.stripe_charge_id}`);
+                            return true;
+                        });
                         paymentData = [...paymentData, ...newPayments];
-                        console.log(`[PaymentHistory] Found ${bookingPaymentData.length} records for booking ${bookingId}, total: ${paymentData.length}`);
+                        console.log(`[PaymentHistory] Found ${bookingPaymentData.length} records for booking ${bookingId}, added ${newPayments.length} new, total: ${paymentData.length}`);
                     }
                     
                     // Always attempt to sync from Stripe to capture any missing payments
@@ -637,8 +656,19 @@ const BookingPage = () => {
                         const syncResponse = await axios.get(`/api/booking-payment-history/${bookingId}`);
                         const syncedData = syncResponse.data?.data || [];
                         if (syncedData.length > 0) {
-                            const existingIds = new Set(paymentData.map(p => p.id || `${p.stripe_session_id}_${p.stripe_charge_id}`));
-                            const newPayments = syncedData.filter(p => !existingIds.has(p.id || `${p.stripe_session_id}_${p.stripe_charge_id}`));
+                            const newPayments = syncedData.filter(p => {
+                                const id = p.id || `session_${p.stripe_session_id}` || `charge_${p.stripe_charge_id}`;
+                                if (existingIds.has(id) || existingIds.has(p.id) || 
+                                    (p.stripe_session_id && existingIds.has(`session_${p.stripe_session_id}`)) ||
+                                    (p.stripe_charge_id && existingIds.has(`charge_${p.stripe_charge_id}`))) {
+                                    return false;
+                                }
+                                existingIds.add(id);
+                                if (p.id) existingIds.add(p.id);
+                                if (p.stripe_session_id) existingIds.add(`session_${p.stripe_session_id}`);
+                                if (p.stripe_charge_id) existingIds.add(`charge_${p.stripe_charge_id}`);
+                                return true;
+                            });
                             if (newPayments.length > 0) {
                                 paymentData = [...paymentData, ...newPayments];
                                 console.log(`[PaymentHistory] After sync, found ${newPayments.length} new records, total: ${paymentData.length}`);
@@ -655,14 +685,15 @@ const BookingPage = () => {
                 }
             }
             
-            // If still no payment history and we have voucher info, try voucher-based payment history as fallback
-            if (paymentData.length === 0 && voucherIdOrRef && bookingId) {
+            // If still no payment history and we have voucher info, try voucher-based payment history as final fallback
+            // This handles cases where voucher payment wasn't found in initial fetch
+            if (paymentData.length === 0 && voucherIdOrRef) {
                 try {
-                    console.log(`[PaymentHistory] Trying voucher payment history as fallback for: ${voucherIdOrRef}`);
+                    console.log(`[PaymentHistory] Trying voucher payment history as final fallback for: ${voucherIdOrRef}`);
                     const voucherResponse = await axios.get(`/api/voucher-payment-history/${voucherIdOrRef}`);
                     const voucherPaymentData = voucherResponse.data?.data || [];
                     if (voucherPaymentData.length > 0) {
-                        console.log(`[PaymentHistory] Found ${voucherPaymentData.length} records via voucher endpoint (fallback)`);
+                        console.log(`[PaymentHistory] Found ${voucherPaymentData.length} records via voucher endpoint (final fallback)`);
                         paymentData = voucherPaymentData;
                     }
                 } catch (voucherError) {
