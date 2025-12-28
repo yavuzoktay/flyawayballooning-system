@@ -540,15 +540,22 @@ const getBookingConfirmationReceiptHtml = (booking = {}) => {
     }
     // For Flight Voucher, location should be "-" instead of actual location
     // Check multiple ways to identify Flight Voucher:
-    // 1. book_flight === 'Flight Voucher'
+    // 1. book_flight === 'Flight Voucher' or contains 'Flight Voucher'
     // 2. is_flight_voucher === true
     // 3. contextType === 'voucher' and not Gift Voucher
     // 4. location is already "-" (set from frontend)
+    // 5. voucher_type contains 'Flight Voucher' or is a Flight Voucher type
+    // 6. template name is 'Flight Voucher Confirmation' (passed via booking.templateName)
+    const bookFlight = String(booking?.book_flight || '').toLowerCase();
+    const voucherType = String(booking?.voucher_type || '').toLowerCase();
+    const templateName = String(booking?.templateName || '').toLowerCase();
     const isFlightVoucher = 
-        booking?.book_flight === 'Flight Voucher' || 
+        bookFlight.includes('flight voucher') || 
         booking?.is_flight_voucher === true ||
-        (booking?.contextType === 'voucher' && booking?.book_flight !== 'Gift Voucher') ||
-        booking?.location === '-';
+        (booking?.contextType === 'voucher' && bookFlight !== 'gift voucher' && !bookFlight.includes('gift')) ||
+        booking?.location === '-' ||
+        voucherType.includes('flight voucher') ||
+        templateName === 'flight voucher confirmation';
     const location = isFlightVoucher ? '-' : escapeHtml(booking?.location || 'Bath');
     const experience = escapeHtml(booking?.flight_type || 'Flight Experience');
     const guestCount = receiptItems.length;
@@ -762,8 +769,14 @@ const DEFAULT_TEMPLATE_BUILDERS = {
             : '';
         const messageHtml = customMessageHtml || getFlightVoucherMessageHtml(booking);
 
+        // Add template name to booking object so receipt can identify Flight Voucher
+        const bookingWithTemplate = {
+            ...booking,
+            templateName: 'Flight Voucher Confirmation'
+        };
+
         // Replace prompts in the message
-        const messageWithPrompts = replacePrompts(messageHtml, booking);
+        const messageWithPrompts = replacePrompts(messageHtml, bookingWithTemplate);
 
         return buildEmailLayout({
             subject,
@@ -1158,8 +1171,14 @@ export const buildEmailHtml = ({ templateName, messageHtml, booking, personalNot
         : getDefaultTemplateMessageHtml(effectiveTemplateName, booking);
     const messageWithNote = applyPersonalNote(baseMessage, personalNote);
     
+    // Add template name to booking object so receipt can identify Flight Voucher
+    const bookingWithTemplate = {
+        ...booking,
+        templateName: effectiveTemplateName
+    };
+    
     // Replace prompts in the message (including [Receipt] if present)
-    const messageWithPromptsReplaced = replacePrompts(messageWithNote, booking);
+    const messageWithPromptsReplaced = replacePrompts(messageWithNote, bookingWithTemplate);
     
     // Use template builder to get the email layout
     // The template builder will handle [Receipt] prompt correctly

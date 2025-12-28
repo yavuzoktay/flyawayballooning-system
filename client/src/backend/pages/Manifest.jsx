@@ -4882,9 +4882,9 @@ const Manifest = () => {
                     alignItems: 'center',
                     pb: 2
                 }}>
-                    <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                    <Box component="span" sx={{ fontWeight: 700, fontSize: '1.5rem' }}>
                         Payments / Promos
-                    </Typography>
+                    </Box>
                     <Box sx={{ display: 'flex', gap: 1 }}>
                         <Button 
                             variant="outlined" 

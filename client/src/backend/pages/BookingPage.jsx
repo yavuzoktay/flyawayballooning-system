@@ -629,22 +629,26 @@ const BookingPage = () => {
                         console.log(`[PaymentHistory] Found ${bookingPaymentData.length} records for booking ${bookingId}, total: ${paymentData.length}`);
                     }
                     
-                    // If no payment history found via booking, try to sync from Stripe
-                    if (bookingPaymentData.length === 0) {
-                        try {
-                            console.log(`[PaymentHistory] No records found for booking ${bookingId}, attempting sync...`);
-                            await axios.post(`/api/sync-payment-history/${bookingId}`);
-                            const syncResponse = await axios.get(`/api/booking-payment-history/${bookingId}`);
-                            const syncedData = syncResponse.data?.data || [];
-                            if (syncedData.length > 0) {
-                                const existingIds = new Set(paymentData.map(p => p.id));
-                                const newPayments = syncedData.filter(p => !existingIds.has(p.id));
+                    // Always attempt to sync from Stripe to capture any missing payments
+                    // This ensures payments from different devices/sessions are captured
+                    try {
+                        console.log(`[PaymentHistory] Attempting sync for booking ${bookingId} to capture any missing payments...`);
+                        await axios.post(`/api/sync-payment-history/${bookingId}`);
+                        const syncResponse = await axios.get(`/api/booking-payment-history/${bookingId}`);
+                        const syncedData = syncResponse.data?.data || [];
+                        if (syncedData.length > 0) {
+                            const existingIds = new Set(paymentData.map(p => p.id || `${p.stripe_session_id}_${p.stripe_charge_id}`));
+                            const newPayments = syncedData.filter(p => !existingIds.has(p.id || `${p.stripe_session_id}_${p.stripe_charge_id}`));
+                            if (newPayments.length > 0) {
                                 paymentData = [...paymentData, ...newPayments];
-                                console.log(`[PaymentHistory] After sync, found ${syncedData.length} records, total: ${paymentData.length}`);
+                                console.log(`[PaymentHistory] After sync, found ${newPayments.length} new records, total: ${paymentData.length}`);
+                            } else {
+                                console.log(`[PaymentHistory] Sync completed, no new payments found`);
                             }
-                        } catch (syncError) {
-                            console.log('[PaymentHistory] Sync failed:', syncError?.response?.data?.message || syncError.message);
                         }
+                    } catch (syncError) {
+                        console.log('[PaymentHistory] Sync failed (non-critical):', syncError?.response?.data?.message || syncError.message);
+                        // Don't fail the entire fetch if sync fails - we still have existing payment data
                     }
                 } catch (bookingError) {
                     console.log('[PaymentHistory] Booking payment history fetch failed:', bookingError?.message);
@@ -6636,9 +6640,9 @@ setBookingDetail(finalVoucherDetail);
                         alignItems: 'center',
                         pb: 2
                     }}>
-                        <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                        <Box component="span" sx={{ fontWeight: 700, fontSize: '1.5rem' }}>
                             Payments / Promos
-                        </Typography>
+                        </Box>
                         <Box sx={{ display: 'flex', gap: 1 }}>
                             <Button 
                                 variant="outlined" 
