@@ -6358,8 +6358,25 @@ app.get('/api/getAllBookingData', (req, res) => {
                 }
             }
 
-            // For Redeem Voucher bookings, if status is 'Open', change it to 'Scheduled'
+            // If flight_date is set, status should be 'Scheduled' (not 'Open')
             let finalStatus = rest.status;
+            const hasFlightDate = rest.flight_date && rest.flight_date !== null && rest.flight_date !== '' && rest.flight_date !== '0000-00-00 00:00:00' && rest.flight_date !== 'null';
+            
+            if (hasFlightDate && (finalStatus === 'Open' || finalStatus === null || finalStatus === '')) {
+                finalStatus = 'Scheduled';
+                // Update database if booking exists
+                if (rest.id) {
+                    con.query('UPDATE all_booking SET status = ? WHERE id = ?', ['Scheduled', rest.id], (updateErr) => {
+                        if (updateErr) {
+                            console.warn('Failed to update status to Scheduled for booking with flight_date', rest.id, updateErr.message);
+                        } else {
+                            console.log('✅ Updated status to Scheduled for booking with flight_date:', rest.id);
+                        }
+                    });
+                }
+            }
+            
+            // For Redeem Voucher bookings, if status is still 'Open', change it to 'Scheduled'
             if (flight_type_source === 'Redeem Voucher' && finalStatus === 'Open') {
                 finalStatus = 'Scheduled';
                 // Update database if booking exists
@@ -9419,8 +9436,11 @@ app.post('/api/createBooking', (req, res) => {
         console.log('chooseFlightType.passengerCount:', chooseFlightType.passengerCount);
         console.log('actualPaxCount (FINAL):', actualPaxCount);
 
-        // Determine status: use from req.body if provided (for rebook operations), otherwise default to 'Confirmed'
-        const bookingStatus = req.body.status || 'Confirmed';
+        // Determine status: if flight_date is set, status should be 'Scheduled', otherwise use from req.body or default to 'Confirmed'
+        let bookingStatus = req.body.status || 'Confirmed';
+        if (bookingDateTime && bookingDateTime.trim() !== '' && bookingDateTime !== 'null' && bookingDateTime !== null) {
+            bookingStatus = 'Scheduled';
+        }
 
         // For Redeem Voucher, get original voucher price from all_vouchers table
         // This ensures we use the correct original price, not a doubled amount
