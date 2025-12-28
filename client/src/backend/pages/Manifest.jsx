@@ -3457,7 +3457,41 @@ const Manifest = () => {
                                 flightType: first.flight_type
                             });
                              
-                             const balloonResource = first.balloon_resources || 'N/A';
+                            // Calculate balloon resource using getAssignedResourceInfo (same as Booking Details popup)
+                            // Create a mock bookingDetail object for getAssignedResourceInfo
+                            const calculateBalloonResource = (flight) => {
+                                // Get all passengers for this flight
+                                const flightPassengers = Array.isArray(flight.passengers) ? flight.passengers : [];
+                                
+                                // Create mock bookingDetail object
+                                const mockBookingDetail = {
+                                    booking: {
+                                        experience: flight.experience || flight.flight_type,
+                                        flight_type: flight.flight_type,
+                                        pax: flightPassengers.length,
+                                        passenger_count: flightPassengers.length
+                                    },
+                                    passengers: flightPassengers
+                                };
+                                
+                                const resourceInfo = getAssignedResourceInfo(mockBookingDetail);
+                                return resourceInfo ? resourceInfo.resourceName : (flight.balloon_resources || 'N/A');
+                            };
+                            
+                            // For Private Flight, calculate resource for each flight separately
+                            // For Shared Flight, use the first flight's resource
+                            const isPrivateFlight = (first.flight_type || '').toLowerCase().includes('private') || 
+                                                   (first.flight_type || '').toLowerCase().includes('charter');
+                            
+                            let balloonResource = 'N/A';
+                            if (isPrivateFlight && groupFlights.length > 0) {
+                                // For Private Flight, use the first flight's resource (each booking has its own section now)
+                                balloonResource = calculateBalloonResource(first);
+                            } else {
+                                // For Shared Flight, calculate from first flight
+                                balloonResource = calculateBalloonResource(first);
+                            }
+                            
                             const timeSlot = first.time_slot || 'N/A';
                             // Find the correct flight time from availability if found, always show as local time
                             let displayFlightTime = '';
