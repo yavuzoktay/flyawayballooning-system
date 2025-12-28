@@ -59,6 +59,8 @@ const CustomerPortal = () => {
     const [cancellingFlight, setCancellingFlight] = useState(false);
     const [resendingConfirmation, setResendingConfirmation] = useState(false);
     const [extendingVoucher, setExtendingVoucher] = useState(false);
+    const [paymentHistory, setPaymentHistory] = useState([]);
+    const [isFullyRefunded, setIsFullyRefunded] = useState(false);
 
     // Passenger edit states
     const [editingPassenger, setEditingPassenger] = useState(null);
@@ -89,6 +91,10 @@ const CustomerPortal = () => {
             console.log('✅ Customer Portal - Response received:', response.data);
             if (response.data.success) {
                 setBookingData(response.data.data);
+                // Fetch payment history after booking data is loaded
+                if (response.data.data?.id) {
+                    fetchPaymentHistory(response.data.data.id);
+                }
             } else {
                 console.error('❌ Customer Portal - API returned error:', response.data);
                 setError(response.data.message || 'Failed to load booking data');
@@ -105,6 +111,45 @@ const CustomerPortal = () => {
             setError(errorMessage);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchPaymentHistory = async (bookingId) => {
+        if (!bookingId) return;
+        
+        try {
+            const response = await axios.get(`/api/booking-payment-history/${bookingId}`);
+            const paymentData = response.data?.data || [];
+            setPaymentHistory(paymentData);
+            
+            // Calculate total payments and total refunds
+            let totalPayments = 0;
+            let totalRefunds = 0;
+            
+            paymentData.forEach(payment => {
+                const amount = parseFloat(payment.amount || 0);
+                if (payment.payment_status === 'refunded' || amount < 0) {
+                    // Refund (negative amount or refunded status)
+                    totalRefunds += Math.abs(amount);
+                } else if (payment.payment_status === 'succeeded' && amount > 0) {
+                    // Payment (positive amount with succeeded status)
+                    totalPayments += amount;
+                }
+            });
+            
+            // Check if fully refunded (total refunds >= total payments)
+            const fullyRefunded = totalPayments > 0 && totalRefunds >= totalPayments;
+            setIsFullyRefunded(fullyRefunded);
+            
+            console.log('[CustomerPortal] Payment history:', {
+                totalPayments,
+                totalRefunds,
+                fullyRefunded
+            });
+        } catch (error) {
+            console.error('[CustomerPortal] Error fetching payment history:', error);
+            setPaymentHistory([]);
+            setIsFullyRefunded(false);
         }
     };
 
@@ -527,28 +572,39 @@ const CustomerPortal = () => {
                                     const flightDate = hasFlightDate ? dayjs(bookingData.flight_date) : null;
                                     const now = dayjs();
                                     const isFlightDatePassed = flightDate ? flightDate.isBefore(now, 'day') : false;
-                                    const isDisabled = changingLocation || isFlightDatePassed;
+                                    const isDisabled = changingLocation || isFlightDatePassed || isFullyRefunded;
                                     
                                     return (
-                                        <Typography
-                                            component="span"
-                                            onClick={isDisabled ? undefined : () => {
-                                                setSelectedNewLocation(bookingData.location || '');
-                                                setChangeLocationModalOpen(true);
-                                            }}
-                                            sx={{
-                                                color: isDisabled ? '#9ca3af' : '#1d4ed8',
-                                                fontWeight: 600,
-                                                fontSize: '0.9rem',
-                                                cursor: isDisabled ? 'default' : 'pointer',
-                                                textDecoration: 'underline',
-                                                '&:hover': isDisabled ? {} : {
-                                                    color: '#1e40af'
-                                                }
-                                            }}
+                                        <Tooltip
+                                            title={
+                                                isFullyRefunded
+                                                    ? "Full refund has been processed. Location cannot be changed."
+                                                    : isFlightDatePassed
+                                                        ? "Flight date has passed. Location cannot be changed."
+                                                        : ""
+                                            }
+                                            arrow
                                         >
-                                            {changingLocation ? 'Processing...' : 'Change'}
-                                        </Typography>
+                                            <Typography
+                                                component="span"
+                                                onClick={isDisabled ? undefined : () => {
+                                                    setSelectedNewLocation(bookingData.location || '');
+                                                    setChangeLocationModalOpen(true);
+                                                }}
+                                                sx={{
+                                                    color: isDisabled ? '#9ca3af' : '#1d4ed8',
+                                                    fontWeight: 600,
+                                                    fontSize: '0.9rem',
+                                                    cursor: isDisabled ? 'default' : 'pointer',
+                                                    textDecoration: 'underline',
+                                                    '&:hover': isDisabled ? {} : {
+                                                        color: '#1e40af'
+                                                    }
+                                                }}
+                                            >
+                                                {changingLocation ? 'Processing...' : 'Change'}
+                                            </Typography>
+                                        </Tooltip>
                                     );
                                 })()}
                             </Box>
@@ -613,23 +669,36 @@ const CustomerPortal = () => {
                                     const isFlightDatePassed = flightDate ? flightDate.isBefore(now, 'day') : false;
                                     const isDisabled = extendingVoucher || isFlightDatePassed;
                                     
+                                    const isExtendDisabled = isDisabled || isFullyRefunded;
+                                    
                                     return (
-                                        <Typography
-                                            component="span"
-                                            onClick={isDisabled ? undefined : handleExtendVoucher}
-                                            sx={{
-                                                color: isDisabled ? '#9ca3af' : '#1d4ed8',
-                                                fontWeight: 600,
-                                                fontSize: '0.9rem',
-                                                cursor: isDisabled ? 'default' : 'pointer',
-                                                textDecoration: 'underline',
-                                                '&:hover': isDisabled ? {} : {
-                                                    color: '#1e40af'
-                                                }
-                                            }}
+                                        <Tooltip
+                                            title={
+                                                isFullyRefunded
+                                                    ? "Full refund has been processed. Voucher cannot be extended."
+                                                    : isDisabled
+                                                        ? "Voucher cannot be extended"
+                                                        : ""
+                                            }
+                                            arrow
                                         >
-                                            {extendingVoucher ? 'Processing...' : 'Extend'}
-                                        </Typography>
+                                            <Typography
+                                                component="span"
+                                                onClick={isExtendDisabled ? undefined : handleExtendVoucher}
+                                                sx={{
+                                                    color: isExtendDisabled ? '#9ca3af' : '#1d4ed8',
+                                                    fontWeight: 600,
+                                                    fontSize: '0.9rem',
+                                                    cursor: isExtendDisabled ? 'default' : 'pointer',
+                                                    textDecoration: 'underline',
+                                                    '&:hover': isExtendDisabled ? {} : {
+                                                        color: '#1e40af'
+                                                    }
+                                                }}
+                                            >
+                                                {extendingVoucher ? 'Processing...' : 'Extend'}
+                                            </Typography>
+                                        </Tooltip>
                                     );
                                 })()}
                             </Box>
@@ -660,6 +729,7 @@ const CustomerPortal = () => {
                         // If voucher / booking has expired, ALL actions in the portal must be disabled
                         // regardless of flight date / 120-hour rules.
                         // If voucher is redeemed (Flight Voucher), disable Reschedule and Cancel buttons
+                        // If fully refunded, disable Change, Extend, and Reschedule buttons
                         let canReschedule;
                         let canChangeLocation;
                         let canCancel;
@@ -672,6 +742,14 @@ const CustomerPortal = () => {
                             canCancel = false;
                             canResendConfirmation = false;
                             canExtendVoucher = false;
+                        } else if (isFullyRefunded) {
+                            // If fully refunded, disable Change, Extend, Reschedule, and Cancel buttons
+                            canReschedule = false;
+                            canChangeLocation = false;
+                            canExtendVoucher = false;
+                            canCancel = false;
+                            // Resend Confirmation can still be available
+                            canResendConfirmation = !resendingConfirmation;
                         } else if (isVoucherRedeemed) {
                             // If voucher is redeemed, disable Reschedule and Cancel buttons
                             canReschedule = false;
@@ -710,6 +788,8 @@ const CustomerPortal = () => {
                                     title={
                                         isExpired 
                                             ? "Voucher / Booking has expired"
+                                            : isFullyRefunded
+                                                ? "Full refund has been processed. This booking cannot be rescheduled."
                                             : isVoucherRedeemed
                                                 ? "Voucher has been redeemed and cannot be rescheduled"
                                                 : (!canReschedule 
@@ -761,6 +841,8 @@ const CustomerPortal = () => {
                                     title={
                                         isExpired
                                             ? "Voucher / Booking has expired"
+                                            : isFullyRefunded
+                                                ? "Full refund has been processed. This booking cannot be cancelled."
                                             : isVoucherRedeemed
                                                 ? "Voucher has been redeemed and cannot be cancelled"
                                             : (isCancelled
@@ -1493,7 +1575,7 @@ const CustomerPortal = () => {
                     >
                         Cancel
                     </Button>
-                    {selectedNewLocation && selectedDate && selectedTime && (
+                    {selectedNewLocation && selectedDate && selectedTime && !isFullyRefunded && (
                         <Button
                             onClick={async () => {
                                 if (!selectedNewLocation || !selectedDate || !selectedTime) {

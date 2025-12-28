@@ -578,11 +578,14 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
             }));
         }
  
+        // Don't filter by available <= 0 here - let getSpacesForDate handle resource usage
+        // This ensures we check all slots for resource usage calculation
         const filtered = availabilities.filter(a => {
-            if (a.status && a.status.toLowerCase() !== 'open') return false;
-            if (a.available !== undefined && a.available <= 0) return false;
+            // Only filter out past slots and closed slots without capacity
             const slotDateTime = dayjs(`${a.date} ${a.time}`);
             if (slotDateTime.isBefore(dayjs())) return false;
+            // Don't filter by available <= 0 - resource usage will be checked in getSpacesForDate
+            // if (a.available !== undefined && a.available <= 0) return false;
             if (!a.flight_types || a.flight_types.toLowerCase() === 'all') return true;
             const typesArr = a.flight_types.split(',').map(t => normalizeType(t));
             return selectedTypes.some(selectedType => typesArr.includes(selectedType));
@@ -629,6 +632,108 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         }
     }, [selectedVoucherTypes, onVoucherTypesChange]);
 
+    // Get passenger count from current booking for resource usage calculation
+    const currentBookingPassengerCount = useMemo(() => {
+        if (!bookingDetail?.booking) return 0;
+        const booking = bookingDetail.booking;
+        // Try multiple sources for passenger count
+        const pax = booking.pax || booking.passenger_count || booking.numberOfPassengers || 0;
+        if (pax > 0) return Number(pax);
+        
+        // Try to get from passengers array
+        if (bookingDetail.passengers && Array.isArray(bookingDetail.passengers)) {
+            return bookingDetail.passengers.length;
+        }
+        
+        return 0;
+    }, [bookingDetail]);
+
+    // Determine if current booking is private or shared
+    const isCurrentBookingPrivate = useMemo(() => {
+        if (!bookingDetail?.booking) return false;
+        const flightType = (bookingDetail.booking.experience || bookingDetail.booking.flight_type || '').toLowerCase();
+        return flightType.includes('private');
+    }, [bookingDetail]);
+
+    const isCurrentBookingSmallPrivate = useMemo(() => {
+        return isCurrentBookingPrivate && currentBookingPassengerCount > 0 && currentBookingPassengerCount <= 4;
+    }, [isCurrentBookingPrivate, currentBookingPassengerCount]);
+
+    // Balloon 210 global usage tracking (same as Live Availability)
+    const normalizeSlotDate = (value) => {
+        if (!value) return '';
+        return String(value).split('T')[0].split(' ')[0].trim();
+    };
+    const normalizeSlotTime = (value) => {
+        if (!value) return '';
+        return String(value).trim();
+    };
+    
+    const balloon210InUseByDateTime = useMemo(() => {
+        const map = new Map();
+        (availabilities || []).forEach(s => {
+            const dateKey = normalizeSlotDate(s?.date);
+            const timeKey = normalizeSlotTime(s?.time);
+            if (!dateKey || !timeKey) return;
+            const key = `${dateKey}|${timeKey}`;
+            const balloon210LockedAny = Number(s?.balloon210_locked || s?.shared_slots_used || 0) > 0;
+            const sharedBookedAny = Number(s?.shared_booked || s?.shared_consumed_pax || 0);
+            if (balloon210LockedAny || sharedBookedAny > 0) {
+                map.set(key, true);
+            }
+        });
+        return map;
+    }, [availabilities]);
+
+    // Get available seats for a slot based on resource usage (same logic as Live Availability)
+    const getAvailableSeatsForSlot = (slot) => {
+        if (!slot) return 0;
+
+        const baseAvailable = Number(slot.calculated_available !== undefined && slot.calculated_available !== null
+            ? slot.calculated_available
+            : slot.available || 0);
+        const balloon210Locked = Number(slot.balloon210_locked || slot.shared_slots_used || 0) > 0;
+        const sharedBooked = Number(slot.shared_booked || slot.shared_consumed_pax || 0);
+
+        // SHARED FLOW (uses Balloon 210)
+        if (!isCurrentBookingPrivate) {
+            // If Balloon 210 is assigned to a different location, no shared seats are available
+            if (balloon210Locked) {
+                return 0;
+            }
+            return baseAvailable;
+        }
+
+        // PRIVATE FLOW
+        if (isCurrentBookingSmallPrivate) {
+            // 1–4 pax private charter uses Balloon 105 resource
+            const remaining105 = (typeof slot.private_charter_small_remaining === 'number')
+                ? slot.private_charter_small_remaining
+                : (Number(slot.private_charter_small_bookings || 0) > 0 ? 0 : 4);
+
+            if (remaining105 <= 0) {
+                return 0;
+            }
+
+            return remaining105 >= currentBookingPassengerCount ? remaining105 : 0;
+        }
+
+        // Large private charter (5–8 pax) uses Balloon 210 exclusively
+        const slotDateKey = normalizeSlotDate(slot?.date);
+        const slotTimeKey = normalizeSlotTime(slot?.time);
+        const balloon210InUseGlobally = slotDateKey && slotTimeKey
+            ? Boolean(balloon210InUseByDateTime.get(`${slotDateKey}|${slotTimeKey}`))
+            : false;
+
+        // If Balloon 210 is already consumed by shared at this date+time (any location), block large private.
+        // Also block if this specific slot indicates Balloon 210 is locked or shared booked.
+        if (balloon210Locked || sharedBooked > 0 || balloon210InUseGlobally) {
+            return 0;
+        }
+
+        return baseAvailable >= currentBookingPassengerCount ? baseAvailable : 0;
+    };
+
     const getTimesForDate = (date, useGiftVoucher = false) => {
         if (!date) return [];
         const dateStr = dayjs(date).format('YYYY-MM-DD');
@@ -648,8 +753,16 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
             if (!a.date) return false;
             const slotDate = a.date.includes('T') ? a.date.split('T')[0] : a.date;
             return slotDate === dateStr;
-        });
-        console.log('Filtered times for date:', dateStr, 'count:', times.length, 'times:', times.map(t => ({ time: t.time, date: t.date })));
+        }).map(slot => {
+            // Calculate available seats based on resource usage
+            const availableSeats = getAvailableSeatsForSlot(slot);
+            return {
+                ...slot,
+                available: availableSeats,
+                calculated_available: availableSeats
+            };
+        }).filter(slot => slot.available > 0); // Only show slots with available seats
+        console.log('Filtered times for date:', dateStr, 'count:', times.length, 'times:', times.map(t => ({ time: t.time, date: t.date, available: t.available })));
         return times;
     };
 
@@ -658,6 +771,95 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
     const startOfMonth = currentMonth.startOf('month');
     const endOfMonth = currentMonth.endOf('month');
     const startDay = startOfMonth.day(); // 0-6 (Sun-Sat)
+
+    // Get spaces for a date (similar to Live Availability's getSpacesForDate)
+    const getSpacesForDate = (date, useGiftVoucher = false) => {
+        const dateStr = dayjs(date).format('YYYY-MM-DD');
+        
+        // Use ALL availabilities (not filtered) to check resource usage properly
+        // Similar to Live Availability section which uses finalFilteredAvailabilities but checks all slots
+        const availabilitiesToUse = useGiftVoucher ? giftVoucherFilteredAvailabilities : availabilities;
+        
+        // Get all slots for this date from ALL availabilities
+        // We need to check all slots, not just filtered ones, to properly calculate resource usage
+        const allSlotsForDate = availabilitiesToUse.filter(a => {
+            if (!a.date) return false;
+            const slotDate = a.date.includes('T') ? a.date.split('T')[0] : a.date;
+            return slotDate === dateStr;
+        });
+        
+        // Apply flight type filtering if needed (but keep all slots for resource calculation)
+        const normalizeType = t => t.replace(' Flight', '').trim().toLowerCase();
+        const selectedTypes = selectedFlightTypes.length > 0 ? selectedFlightTypes.map(t => normalizeType(t)) : [];
+        
+        // Filter slots by flight type if flight types are selected
+        // If no flight types selected, show all slots (let user see all options)
+        const filteredSlotsForDate = selectedTypes.length > 0
+            ? allSlotsForDate.filter(a => {
+                if (!a.flight_types || a.flight_types.toLowerCase() === 'all') return true;
+                const typesArr = a.flight_types.split(',').map(t => normalizeType(t));
+                return selectedTypes.some(selectedType => typesArr.includes(selectedType));
+            })
+            : allSlotsForDate;
+        
+        // Calculate available seats for each slot based on resource usage
+        // Use filteredSlotsForDate for calculation, but check resource usage on all slots
+        const slotsWithAvailability = filteredSlotsForDate.map(slot => ({
+            ...slot,
+            availableSeats: getAvailableSeatsForSlot(slot)
+        }));
+        
+        // Filter out slots with 0 available seats (resource constraints)
+        // Also filter out past slots
+        const availableSlots = slotsWithAvailability.filter(s => {
+            if (s.availableSeats <= 0) return false;
+            // Check if slot is in the past
+            const slotDateTime = dayjs(`${s.date} ${s.time}`);
+            if (slotDateTime.isBefore(dayjs())) return false;
+            // Don't filter by status - let resource usage determine availability
+            return true;
+        });
+        
+        // Calculate totals
+        const total = availableSlots.reduce((acc, s) => acc + s.availableSeats, 0);
+        const soldOut = allSlotsForDate.length > 0 && total <= 0;
+        
+        // For private selection, calculate private-specific availability
+        let privateAvailable = 0;
+        if (isCurrentBookingPrivate) {
+            privateAvailable = availableSlots.reduce((acc, s) => {
+                // Only count slots that are available for private bookings
+                if (isCurrentBookingSmallPrivate) {
+                    // Small private (1-4 pax) uses Balloon 105
+                    const remaining105 = (typeof s.private_charter_small_remaining === 'number')
+                        ? s.private_charter_small_remaining
+                        : (Number(s.private_charter_small_bookings || 0) > 0 ? 0 : 4);
+                    return acc + (remaining105 > 0 ? s.availableSeats : 0);
+                } else {
+                    // Large private (5-8 pax) uses Balloon 210
+                    const slotDateKey = normalizeSlotDate(s?.date);
+                    const slotTimeKey = normalizeSlotTime(s?.time);
+                    const balloon210InUseGlobally = slotDateKey && slotTimeKey
+                        ? Boolean(balloon210InUseByDateTime.get(`${slotDateKey}|${slotTimeKey}`))
+                        : false;
+                    const balloon210Locked = Number(s.balloon210_locked || s.shared_slots_used || 0) > 0;
+                    const sharedBooked = Number(s.shared_booked || s.shared_consumed_pax || 0);
+                    if (!balloon210Locked && sharedBooked === 0 && !balloon210InUseGlobally) {
+                        return acc + s.availableSeats;
+                    }
+                }
+                return acc;
+            }, 0);
+        }
+        
+        return {
+            total,
+            soldOut,
+            privateAvailable: isCurrentBookingPrivate ? privateAvailable : total,
+            slots: availableSlots,
+            allSlots: allSlotsForDate
+        };
+    };
 
     const buildDayCells = (useGiftVoucher = false) => {
         const cells = [];
@@ -713,31 +915,17 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
             if (isSelected) {
                 console.log('Date is selected:', d.format('YYYY-MM-DD'), 'selectedDate:', selectedDate ? dayjs(selectedDate).format('YYYY-MM-DD') : 'null');
             }
-            // Aggregate availability for this date
-            // Handle both date formats: "2025-11-14" or "2025-11-14T00:00:00.000Z"
-            const dateStr = d.format('YYYY-MM-DD');
-            const slots = availabilitiesToUse.filter(a => {
-                if (!a.date) return false;
-                const slotDate = a.date.includes('T') ? a.date.split('T')[0] : a.date;
-                return slotDate === dateStr;
-            });
-            const totalAvailable = slots.reduce((acc, s) => acc + (Number(s.available) || 0), 0);
-            const soldOut = slots.length > 0 && totalAvailable <= 0;
+            // Use getSpacesForDate to get availability with resource usage consideration
+            const { total, soldOut, privateAvailable, slots: availableSlots } = getSpacesForDate(d.toDate(), useGiftVoucher);
+            const totalAvailable = isCurrentBookingPrivate ? privateAvailable : total;
+            const hasAvailableSlots = totalAvailable > 0 || availableSlots.length > 0;
             
-            // Debug: soldOut durumunu logla
-            if (slots.length > 0 && totalAvailable <= 0) {
-                console.log(`Date ${d.format('YYYY-MM-DD')} is sold out:`, {
-                    slotsLength: slots.length,
-                    totalAvailable,
-                    slots: slots.map(s => ({ id: s.id, available: s.available, capacity: s.capacity }))
-                });
-            }
             // Tarih seçilebilir olmalı eğer:
             // 1. Mevcut ay içinde
             // 2. Geçmiş değil
-            // Sold out kontrolünü kaldırıyoruz - kullanıcı her tarihe tıklayabilmeli
+            // 3. En az bir slot'ta kaynak kullanımına göre müsaitlik var
             const isCurrentBookingDate = bookingDetail?.booking?.flight_date && dayjs(bookingDetail.booking.flight_date).isSame(d, 'day');
-            const isSelectable = inCurrentMonth && !isPast;
+            const isSelectable = inCurrentMonth && !isPast && (hasAvailableSlots || isCurrentBookingDate);
             
             // Debug: Tarih seçilebilirlik durumunu logla
             if (inCurrentMonth && !isPast) {
@@ -745,10 +933,14 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                     inCurrentMonth,
                     isPast,
                     soldOut,
-                    isSelectable,
-                    slotsLength: slots.length,
+                    hasAvailableSlots,
                     totalAvailable,
-                    note: 'Sold out kontrolü kaldırıldı - tüm tarihler tıklanabilir'
+                    privateAvailable,
+                    availableSlotsCount: availableSlots.length,
+                    isSelectable,
+                    isCurrentBookingPrivate,
+                    isCurrentBookingSmallPrivate,
+                    note: 'Kaynak kullanımına göre müsaitlik kontrolü yapılıyor (Live Availability mantığı)'
                 });
             }
 
@@ -761,13 +953,13 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                             inCurrentMonth,
                             isPast,
                             soldOut,
-                            slotsLength: slots.length
+                            slotsLength: availableSlots.length
                         });
                         if (isSelectable) {
                             console.log('Setting selected date to:', d.format('YYYY-MM-DD'));
                             setSelectedDate(d.toDate());
                             setSelectedTime(null);
-                            console.log('Date selected successfully:', d.format('YYYY-MM-DD'), 'has slots:', slots.length > 0);
+                            console.log('Date selected successfully:', d.format('YYYY-MM-DD'), 'has slots:', availableSlots.length > 0);
                         } else {
                             console.log('Date not selectable:', d.format('YYYY-MM-DD'));
                         }
@@ -816,7 +1008,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                     <div style={{ fontSize: 10, fontWeight: 600 }}>
                         {isCurrentBookingDate 
                             ? 'Current' 
-                            : (slots.length === 0 ? '' : (soldOut ? 'Sold Out' : `${totalAvailable} Spaces`))
+                            : (availableSlots.length === 0 ? '' : (soldOut ? 'Sold Out' : `${totalAvailable} Spaces`))
                         }
                     </div>
                 </div>
@@ -933,7 +1125,9 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                         </Box>
                                                     )}
                                                     {getTimesForDate(selectedDate, true).map(slot => {
-                                                        const isAvailable = slot.available > 0;
+                                                        // Use calculated available seats from getAvailableSeatsForSlot
+                                                        const availableSeats = getAvailableSeatsForSlot(slot);
+                                                        const isAvailable = availableSeats > 0;
                                                         // Format time: "09:00:00" -> "09:00"
                                                         const timeDisplay = slot.time ? (slot.time.includes(':') ? slot.time.substring(0, 5) : slot.time) : '';
                                                         const timeForComparison = slot.time ? (slot.time.includes(':') ? slot.time.substring(0, 5) : slot.time) : '';
@@ -990,7 +1184,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                                     }
                                                                 }}
                                                             >
-                                                                {timeDisplay} ({(Number(slot.available) || Number(slot.calculated_available) || 0)} Spaces)
+                                                                {timeDisplay} ({availableSeats} Spaces)
                                                             </Button>
                                                         );
                                                     })}
@@ -1271,7 +1465,9 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                         </Box>
                                                     )}
                                                     {getTimesForDate(selectedDate).map(slot => {
-                                                        const isAvailable = slot.available > 0;
+                                                        // Use calculated available seats from getAvailableSeatsForSlot
+                                                        const availableSeats = getAvailableSeatsForSlot(slot);
+                                                        const isAvailable = availableSeats > 0;
                                                         const isSelected = selectedTime === slot.time;
                                                         const slotDateTime = dayjs(`${dayjs(selectedDate).format('YYYY-MM-DD')} ${slot.time}`);
                                                         const isPastTime = slotDateTime.isBefore(dayjs());
@@ -1319,7 +1515,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                                     }
                                                                 }}
                                                             >
-                                                                {slot.time} ({(Number(slot.available) || Number(slot.calculated_available) || 0)} Spaces)
+                                                                {slot.time} ({availableSeats} Spaces)
                                                             </Button>
                                                         );
                                                     })}

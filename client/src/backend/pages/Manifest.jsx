@@ -1547,6 +1547,16 @@ const Manifest = () => {
         const loc = normalizeText(f.location);
         const type = normalizeText(f.flight_type);
         const time = normalizeTime(f);
+        
+        // For Private Flight, include booking ID in the key to create separate sections for each booking
+        const isPrivateFlight = type.includes('private') || type.includes('charter');
+        if (isPrivateFlight && f.id) {
+            // Each Private Flight booking gets its own section
+            const key = `${loc}||${type}||${time}||${f.id}`;
+            return key;
+        }
+        
+        // For Shared Flight, group by location, type, and time (existing behavior)
         const key = `${loc}||${type}||${time}`;
         return key;
     });
@@ -3468,14 +3478,18 @@ const Manifest = () => {
                                             <Box display="flex" flexDirection="column" alignItems="flex-start">
                                                 {/* Section başlığında activityName ve flight time birlikte gösterilecek */}
                                                 {/* Check if any booking in this group has Proposal Flight voucher type */}
+                                                {/* For Private Flight, show booking ID in the title */}
                                                 {(() => {
                                                     const hasProposal = groupFlights.some(f => {
                                                         const voucherType = (f.voucher_type || '').toLowerCase();
                                                         return voucherType.includes('proposal');
                                                     });
+                                                    const isPrivateFlight = (first.flight_type || '').toLowerCase().includes('private') || 
+                                                                           (first.flight_type || '').toLowerCase().includes('charter');
                                                     const titleSuffix = hasProposal ? ' | Proposal' : '';
+                                                    const bookingIdSuffix = isPrivateFlight && first.id ? ` | Booking ID: ${first.id}` : '';
                                                     return (
-                                                        <Typography variant="h6">{activityName}{titleSuffix} - Flight Time: {displayFlightTime}</Typography>
+                                                        <Typography variant="h6">{activityName}{titleSuffix}{bookingIdSuffix} - Flight Time: {displayFlightTime}</Typography>
                                                     );
                                                 })()}
                                                 <Box display="flex" alignItems="center" gap={3} mt={1}>
