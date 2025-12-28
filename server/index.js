@@ -9193,7 +9193,8 @@ app.post('/api/createBooking', (req, res) => {
         preferred_time,
         preferred_day,
         email_template_override,
-        email_template_type_override
+        email_template_type_override,
+        created_at // Preserve original created_at for rebook operations
     } = req.body;
 
     // Unify add-on field: always use choose_add_on as array of {name, price}
@@ -9302,7 +9303,8 @@ app.post('/api/createBooking', (req, res) => {
     }
 
     function insertBookingAndPassengers(expiresDateFinal) {
-        const nowDate = moment().format('YYYY-MM-DD HH:mm:ss');
+        // Use provided created_at if available (for rebook operations), otherwise use current date
+        const nowDate = created_at ? moment(created_at).format('YYYY-MM-DD HH:mm:ss') : moment().format('YYYY-MM-DD HH:mm:ss');
         const mainPassenger = passengerData[0] || {};
 
         // Ensure email is set - try passenger email first, then booking email field
