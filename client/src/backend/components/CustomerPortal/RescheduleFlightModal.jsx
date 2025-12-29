@@ -728,8 +728,16 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 const bookingResponse = await axios.get(`/api/getBookingDetail?booking_id=${newBookingId}`);
                 const newBooking = bookingResponse.data?.data || bookingResponse.data;
 
+                // Enhance the booking data with reschedule information for immediate UI update
+                const enhancedBooking = {
+                    ...newBooking,
+                    flight_date: pendingRescheduleData.selectedDateTime,
+                    location: pendingRescheduleData.selectedLocation,
+                    is_voucher_redeemed: true // Mark as redeemed since we just created a redeem booking
+                };
+
                 if (onRescheduleSuccess) {
-                    onRescheduleSuccess(newBooking);
+                    onRescheduleSuccess(enhancedBooking);
                 }
 
                 setSuccessPayload({
@@ -754,8 +762,15 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
 
                 const updatedBooking = rescheduleResponse.data?.data;
 
+                // Enhance the booking data with reschedule information for immediate UI update
+                const enhancedBooking = {
+                    ...updatedBooking,
+                    flight_date: pendingRescheduleData.selectedDateTime,
+                    location: pendingRescheduleData.selectedLocation
+                };
+
                 if (onRescheduleSuccess) {
-                    onRescheduleSuccess(updatedBooking);
+                    onRescheduleSuccess(enhancedBooking);
                 }
 
                 setSuccessPayload({
