@@ -615,9 +615,43 @@ const CustomerPortal = () => {
                         <Box>
                             <Typography variant="body2" color="text.secondary">Booking Created Date</Typography>
                             <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                                {bookingData.created_at
-                                    ? dayjs(bookingData.created_at).format('DD/MM/YYYY HH:mm')
-                                    : 'N/A'}
+                                {(() => {
+                                    if (!bookingData.created_at) {
+                                        return 'N/A';
+                                    }
+                                    
+                                    // Handle different date formats from backend
+                                    let dateToFormat = bookingData.created_at;
+                                    
+                                    // If it's already a formatted string (DD/MM/YYYY HH:mm), extract date part
+                                    if (typeof dateToFormat === 'string' && dateToFormat.includes('/')) {
+                                        // Extract date part (before space if time exists)
+                                        const datePart = dateToFormat.split(' ')[0];
+                                        // If it's already in DD/MM/YYYY format, return it directly
+                                        if (datePart.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+                                            return datePart;
+                                        }
+                                    }
+                                    
+                                    // Try to parse with dayjs
+                                    const parsedDate = dayjs(dateToFormat);
+                                    if (parsedDate.isValid()) {
+                                        return parsedDate.format('DD/MM/YYYY HH:mm');
+                                    }
+                                    
+                                    // If parsing fails, try to handle MySQL date format or other formats
+                                    try {
+                                        const dateObj = new Date(dateToFormat);
+                                        if (!isNaN(dateObj.getTime())) {
+                                            return dayjs(dateObj).format('DD/MM/YYYY HH:mm');
+                                        }
+                                    } catch (e) {
+                                        console.warn('Failed to parse created_at:', dateToFormat, e);
+                                    }
+                                    
+                                    // Fallback: return the original value or N/A
+                                    return 'N/A';
+                                })()}
                             </Typography>
                         </Box>
                         <Box>
@@ -1074,18 +1108,19 @@ const CustomerPortal = () => {
                     setRescheduleModalOpen(false);
                     
                     // Immediately update bookingData state with the updated data for instant UI update
-                    // This ensures Flight Date and Location are updated instantly without waiting for backend fetch
+                    // This ensures Flight Date, Location, and Status are updated instantly without waiting for backend fetch
                     if (updatedData) {
                         console.log('🔄 Customer Portal - Updating bookingData with reschedule result:', updatedData);
                         setBookingData(prevData => {
                             // Merge updated data with previous data, prioritizing updated fields
-                            // RescheduleFlightModal already includes flight_date and location in updatedData
+                            // RescheduleFlightModal already includes flight_date, location, and status in updatedData
                             const mergedData = {
                                 ...prevData,
                                 ...updatedData,
-                                // Ensure flight_date and location are updated (RescheduleFlightModal already sets these)
+                                // Ensure flight_date, location, and status are updated (RescheduleFlightModal already sets these)
                                 flight_date: updatedData.flight_date || prevData?.flight_date,
                                 location: updatedData.location || prevData?.location,
+                                status: updatedData.status || prevData?.status || 'Scheduled', // Set to Scheduled when rescheduled
                                 // For Flight Voucher, update is_voucher_redeemed flag if applicable
                                 is_voucher_redeemed: updatedData.is_voucher_redeemed !== undefined 
                                     ? updatedData.is_voucher_redeemed 
