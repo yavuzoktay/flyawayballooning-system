@@ -1118,22 +1118,32 @@ const CustomerPortal = () => {
                                 ...prevData,
                                 ...updatedData,
                                 // Ensure flight_date, location, and status are updated (RescheduleFlightModal already sets these)
+                                // Priority: updatedData > explicit 'Scheduled' (when flight_date exists) > prevData
                                 flight_date: updatedData.flight_date || prevData?.flight_date,
                                 location: updatedData.location || prevData?.location,
-                                status: updatedData.status || prevData?.status || 'Scheduled', // Set to Scheduled when rescheduled
+                                // If flight_date exists, status should be 'Scheduled' (explicitly set)
+                                status: updatedData.status || (updatedData.flight_date ? 'Scheduled' : (prevData?.status || 'Open')),
                                 // For Flight Voucher, update is_voucher_redeemed flag if applicable
                                 is_voucher_redeemed: updatedData.is_voucher_redeemed !== undefined 
                                     ? updatedData.is_voucher_redeemed 
                                     : prevData?.is_voucher_redeemed
                             };
                             console.log('🔄 Customer Portal - Merged bookingData:', mergedData);
+                            console.log('🔄 Customer Portal - Status update:', {
+                                'updatedData.status': updatedData.status,
+                                'updatedData.flight_date': updatedData.flight_date,
+                                'final status': mergedData.status
+                            });
                             return mergedData;
                         });
                     }
                     
                     // Also fetch fresh booking data from backend to ensure we have the latest complete data
                     // This is especially important for Flight Voucher where redeemed booking info needs to be fetched
-                    await fetchBookingData();
+                    // Add a small delay to ensure backend has finished processing the new booking
+                    setTimeout(async () => {
+                        await fetchBookingData();
+                    }, 500); // 500ms delay to ensure backend has processed the booking
                 }}
             />
 
