@@ -5316,15 +5316,67 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     }
                 }
 
-                // If no booking ID in metadata, try to find by customer email
+                // If no booking ID in metadata, try to find by customer email and amount
                 if (!bookingId && paymentIntent.receipt_email) {
-                    const [bookingRows] = await con.promise().query(
-                        'SELECT id FROM all_booking WHERE email = ? ORDER BY created_at DESC LIMIT 1',
+                    const paymentAmount = paymentIntent.amount ? (paymentIntent.amount / 100) : null; // Convert from cents to dollars
+                    
+                    // First try exact email match
+                    let [bookingRows] = await con.promise().query(
+                        'SELECT id, paid FROM all_booking WHERE email = ? ORDER BY created_at DESC LIMIT 10',
                         [paymentIntent.receipt_email]
                     );
-                    if (bookingRows && bookingRows.length > 0) {
+                    
+                    // If we have amount, try to match by email + amount (within 1% tolerance)
+                    if (paymentAmount && bookingRows && bookingRows.length > 0) {
+                        const matchedBooking = bookingRows.find(b => {
+                            const bookingPaid = parseFloat(b.paid) || 0;
+                            const diff = Math.abs(bookingPaid - paymentAmount);
+                            const tolerance = Math.max(bookingPaid * 0.01, 0.10); // 1% or 10 cents, whichever is larger
+                            return diff <= tolerance;
+                        });
+                        
+                        if (matchedBooking) {
+                            bookingId = matchedBooking.id;
+                            console.log(`[PaymentIntent] Found booking by email + amount match: ${bookingId} (amount: ${paymentAmount}, booking paid: ${matchedBooking.paid})`);
+                        } else if (bookingRows.length === 1) {
+                            // If only one booking with this email, use it
+                            bookingId = bookingRows[0].id;
+                            console.log(`[PaymentIntent] Found booking by email (single match): ${bookingId}`);
+                        }
+                    } else if (bookingRows && bookingRows.length > 0) {
+                        // No amount match, but we have email matches - use the most recent one
                         bookingId = bookingRows[0].id;
-                        console.log(`[PaymentIntent] Found booking by email: ${bookingId}`);
+                        console.log(`[PaymentIntent] Found booking by email (most recent): ${bookingId}`);
+                    }
+                }
+                
+                // Also try customer_email if receipt_email didn't work
+                if (!bookingId && paymentIntent.customer_email) {
+                    const paymentAmount = paymentIntent.amount ? (paymentIntent.amount / 100) : null;
+                    
+                    let [bookingRows] = await con.promise().query(
+                        'SELECT id, paid FROM all_booking WHERE email = ? ORDER BY created_at DESC LIMIT 10',
+                        [paymentIntent.customer_email]
+                    );
+                    
+                    if (paymentAmount && bookingRows && bookingRows.length > 0) {
+                        const matchedBooking = bookingRows.find(b => {
+                            const bookingPaid = parseFloat(b.paid) || 0;
+                            const diff = Math.abs(bookingPaid - paymentAmount);
+                            const tolerance = Math.max(bookingPaid * 0.01, 0.10);
+                            return diff <= tolerance;
+                        });
+                        
+                        if (matchedBooking) {
+                            bookingId = matchedBooking.id;
+                            console.log(`[PaymentIntent] Found booking by customer_email + amount: ${bookingId}`);
+                        } else if (bookingRows.length === 1) {
+                            bookingId = bookingRows[0].id;
+                            console.log(`[PaymentIntent] Found booking by customer_email (single match): ${bookingId}`);
+                        }
+                    } else if (bookingRows && bookingRows.length > 0) {
+                        bookingId = bookingRows[0].id;
+                        console.log(`[PaymentIntent] Found booking by customer_email (most recent): ${bookingId}`);
                     }
                 }
 
@@ -7683,6 +7735,10 @@ app.post('/api/sync-payment-history/:bookingId', async (req, res) => {
                 if (booking.email) {
                     try {
                         console.log(`[SyncPayment] Searching for all checkout sessions for email: ${booking.email}`);
+                        
+                        // Get booking amount for better matching
+                        const bookingAmount = booking.paid ? Math.round(parseFloat(booking.paid) * 100) : null; // Convert to cents
+                        
                         // List sessions by customer email - note: this requires customer_email to be set during session creation
                         // If that's not available, we'll try a different approach
                         let sessions = [];
@@ -7694,7 +7750,7 @@ app.post('/api/sync-payment-history/:bookingId', async (req, res) => {
                             sessions = sessionsList.data.filter(s => 
                                 (s.customer_details && s.customer_details.email === booking.email) ||
                                 (s.customer_email === booking.email) ||
-                                (s.metadata && s.metadata.email === booking.email)
+                                (s.metadata && (s.metadata.email === booking.email || s.metadata.customer_email === booking.email))
                             );
                         } catch (listError) {
                             console.warn('[SyncPayment] Could not list all sessions, trying alternative method:', listError.message);
@@ -7707,11 +7763,19 @@ app.post('/api/sync-payment-history/:bookingId', async (req, res) => {
                             }
 
                             // Check if this session is related to this booking
-                            // Check metadata or payment intent for booking reference
+                            // Check metadata, payment intent, or amount match
+                            const metadataMatch = 
+                                session.metadata && (session.metadata.booking_id === bookingId.toString() || session.metadata.bookingId === bookingId.toString());
+                            
+                            const amountMatch = bookingAmount && session.amount_total ? (Math.abs(session.amount_total - bookingAmount) < 10) : false; // Allow 10 cents difference
+                            
+                            const paymentIntentMatch = 
+                                session.payment_intent && !existingPaymentIntentIds.has(session.payment_intent);
+                            
                             const isRelated = 
-                                (session.metadata && (session.metadata.booking_id === bookingId.toString() || session.metadata.bookingId === bookingId.toString())) ||
-                                (session.payment_intent && !existingPaymentIntentIds.has(session.payment_intent)) ||
-                                (session.payment_status === 'paid' && session.amount_total > 0);
+                                metadataMatch ||
+                                paymentIntentMatch ||
+                                (session.payment_status === 'paid' && session.amount_total > 0 && amountMatch);
 
                             if (isRelated) {
                                 try {
@@ -7734,6 +7798,10 @@ app.post('/api/sync-payment-history/:bookingId', async (req, res) => {
                 if (booking.email) {
                     try {
                         console.log(`[SyncPayment] Searching for payment intents for email: ${booking.email}`);
+                        
+                        // Get booking amount for better matching
+                        const bookingAmount = booking.paid ? Math.round(parseFloat(booking.paid) * 100) : null; // Convert to cents
+                        
                         const paymentIntents = await stripe.paymentIntents.list({
                             limit: 100
                         });
@@ -7745,11 +7813,21 @@ app.post('/api/sync-payment-history/:bookingId', async (req, res) => {
                             }
 
                             // Check if this payment intent is related to this booking
-                            // Look for booking reference in metadata, receipt_email, or customer
+                            // Look for booking reference in metadata, receipt_email, customer, or amount match
+                            const emailMatch = 
+                                pi.receipt_email === booking.email || 
+                                pi.customer_email === booking.email ||
+                                (pi.metadata && (pi.metadata.email === booking.email || pi.metadata.customer_email === booking.email));
+                            
+                            const amountMatch = bookingAmount && pi.amount ? (Math.abs(pi.amount - bookingAmount) < 10) : false; // Allow 10 cents difference
+                            
+                            const metadataMatch = 
+                                pi.metadata && (pi.metadata.booking_id === bookingId.toString() || pi.metadata.bookingId === bookingId.toString());
+                            
                             const isRelated = 
-                                (pi.metadata && (pi.metadata.booking_id === bookingId.toString() || pi.metadata.bookingId === bookingId.toString())) ||
-                                (pi.receipt_email === booking.email && pi.status === 'succeeded') ||
-                                (pi.customer_email === booking.email && pi.status === 'succeeded');
+                                metadataMatch ||
+                                (emailMatch && pi.status === 'succeeded') ||
+                                (emailMatch && amountMatch && pi.status === 'succeeded');
 
                             if (isRelated) {
                                 try {
@@ -13566,29 +13644,45 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                     finalLocation = null;
                 }
             } else {
-            // For Flight Voucher, only use flight_date and location if:
-            // 1. Booking exists
-            // 2. Booking's voucher_code matches the Flight Voucher's voucher_ref (voucherCodeToLookup)
-            // 3. Booking is scheduled (status is 'Scheduled')
-            // 4. Booking has flight_date
-            const voucherMatches = booking && (
-                booking.voucher_code === effectiveVoucherRef || 
-                booking.voucher_code === voucherCodeToLookup ||
-                (voucherCodeToLookup && booking.voucher_code && booking.voucher_code.includes(voucherCodeToLookup)) ||
-                (effectiveVoucherRef && booking.voucher_code && booking.voucher_code.includes(effectiveVoucherRef))
-            );
-            
-            if (booking && voucherMatches && booking.flight_date && booking.status && booking.status.toLowerCase() === 'scheduled') {
-                finalFlightDate = booking.flight_date;
-                finalLocation = booking.location;
-            } else {
-                // Flight Voucher not yet scheduled or booking doesn't match - set to null so frontend shows "Date Not Scheduled"
-                finalFlightDate = null;
-                finalLocation = null;
+                // For Flight Voucher, only use flight_date and location if:
+                // 1. Booking exists
+                // 2. Booking's voucher_code matches the Flight Voucher's voucher_ref (voucherCodeToLookup)
+                // 3. Booking is scheduled (status is 'Scheduled') OR cancelled (status is 'Cancelled')
+                // 4. Booking has flight_date (for scheduled) OR location (for cancelled - needed for reschedule)
+                const voucherMatches = booking && (
+                    booking.voucher_code === effectiveVoucherRef || 
+                    booking.voucher_code === voucherCodeToLookup ||
+                    (voucherCodeToLookup && booking.voucher_code && booking.voucher_code.includes(voucherCodeToLookup)) ||
+                    (effectiveVoucherRef && booking.voucher_code && booking.voucher_code.includes(effectiveVoucherRef))
+                );
+                
+                const isScheduled = booking.status && booking.status.toLowerCase() === 'scheduled';
+                const isCancelled = booking.status && booking.status.toLowerCase() === 'cancelled';
+                
+                if (booking && voucherMatches) {
+                    if (isScheduled && booking.flight_date) {
+                        // Scheduled booking - use flight_date and location
+                        finalFlightDate = booking.flight_date;
+                        finalLocation = booking.location;
+                    } else if (isCancelled && booking.location) {
+                        // Cancelled booking - use location for reschedule (flight_date is null/Not Scheduled)
+                        // Location is needed for RescheduleFlightModal to fetch availabilities
+                        finalFlightDate = null; // Show "Not Scheduled" in UI
+                        finalLocation = booking.location; // Keep location for reschedule functionality
+                    } else {
+                        // Flight Voucher not yet scheduled or booking doesn't match - set to null so frontend shows "Date Not Scheduled"
+                        finalFlightDate = null;
+                        finalLocation = null;
+                    }
+                } else {
+                    // Flight Voucher not yet scheduled or booking doesn't match - set to null so frontend shows "Date Not Scheduled"
+                    finalFlightDate = null;
+                    finalLocation = null;
                 }
             }
         } else {
             // For non-Flight Voucher, use booking values as before
+            // For cancelled bookings, still return location for reschedule functionality
             finalFlightDate = booking.flight_date;
             finalLocation = booking.location;
         }
@@ -13624,23 +13718,23 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             isVoucherRedeemed = true;
         } else if (voucherInfo && (voucherInfo.redeemed === 'Yes' || voucherInfo.redeemed === 1)) {
             isVoucherRedeemed = true;
-            } else if (effectiveVoucherRef || booking.voucher_code) {
-                // Check if there's a booking with redeemed_voucher = 'Yes' for this voucher code
-                try {
+        } else if (effectiveVoucherRef || booking.voucher_code) {
+            // Check if there's a booking with redeemed_voucher = 'Yes' for this voucher code
+            try {
                     const voucherCodeToCheck = effectiveVoucherRef || booking.voucher_code;
                     const [redeemedCheckRows] = await new Promise((resolve, reject) => {
-                        con.query(`
-                            SELECT id FROM all_booking 
-                            WHERE voucher_code = ? 
-                            AND (redeemed_voucher = 'Yes' OR redeemed_voucher = 1)
-                            AND id != ?
-                            LIMIT 1
-                        `, [voucherCodeToCheck, booking.id], (err, rows) => {
-                            if (err) reject(err);
-                            else resolve([rows]);
-                        });
+                    con.query(`
+                        SELECT id FROM all_booking 
+                        WHERE voucher_code = ? 
+                        AND (redeemed_voucher = 'Yes' OR redeemed_voucher = 1)
+                        AND id != ?
+                        LIMIT 1
+                    `, [voucherCodeToCheck, booking.id], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
                     });
-                    if (redeemedCheckRows && redeemedCheckRows.length > 0) {
+                });
+                if (redeemedCheckRows && redeemedCheckRows.length > 0) {
                         isVoucherRedeemed = true;
                     } else {
                         // Also check for Redeem Voucher flow bookings (same email, created after original booking)
@@ -13658,11 +13752,11 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                             });
                         });
                         if (redeemFlowCheckRows && redeemFlowCheckRows.length > 0) {
-                            isVoucherRedeemed = true;
+                    isVoucherRedeemed = true;
                         }
-                    }
-                } catch (redeemedCheckErr) {
-                    console.warn('⚠️ Customer Portal - Could not check if voucher is redeemed:', redeemedCheckErr.message);
+                }
+            } catch (redeemedCheckErr) {
+                console.warn('⚠️ Customer Portal - Could not check if voucher is redeemed:', redeemedCheckErr.message);
                 }
             }
         }

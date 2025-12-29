@@ -2086,9 +2086,38 @@ const Manifest = () => {
             const activityResponse = await axios.get(`/api/activity/${activityId}`);
             const activity = activityResponse.data.data;
             
-            // Determine flight type based on passenger count
-            const passengerCount = bookingDetail.booking.pax || 1;
-            const flightType = passengerCount === 1 ? 'Shared Flight' : 'Private Flight';
+            // Determine flight type from selectedFlightTypes parameter (user's selection in Rebook popup)
+            // This is critical: use the user's selection, not passenger count
+            let flightType = '';
+            if (selectedFlightTypes && selectedFlightTypes.length > 0) {
+                // Check if Shared is selected
+                if (selectedFlightTypes.includes('shared')) {
+                    flightType = 'Shared Flight';
+                } else if (selectedFlightTypes.includes('private')) {
+                    flightType = 'Private Flight';
+                }
+            }
+            
+            // Fallback to existing booking flight type if no selection
+            if (!flightType) {
+                const existingFlightType = bookingDetail.booking.flight_type || '';
+                if (existingFlightType.toLowerCase().includes('shared')) {
+                    flightType = 'Shared Flight';
+                } else if (existingFlightType.toLowerCase().includes('private')) {
+                    flightType = 'Private Flight';
+                } else {
+                    // Last fallback: use passenger count (but this should rarely happen)
+                    const passengerCount = bookingDetail.booking.pax || 1;
+                    flightType = passengerCount === 1 ? 'Shared Flight' : 'Private Flight';
+                }
+            }
+            
+            console.log('🔄 Manifest Rebook - Selected Flight Types:', selectedFlightTypes);
+            console.log('🔄 Manifest Rebook - Determined Flight Type:', flightType);
+            
+            // Determine passenger count from existing passengers or booking
+            const existingPassengers = bookingDetail.passengers || [];
+            const passengerCount = existingPassengers.length > 0 ? existingPassengers.length : (bookingDetail.booking.pax || 1);
             
             // Calculate price based on flight type
             let totalPrice = bookingDetail.booking.paid || 0;
@@ -2104,8 +2133,54 @@ const Manifest = () => {
             // Keep the existing flight_attempts value. It is incremented only when a flight is cancelled.
             const currentAttempts = parseInt(bookingDetail.booking.flight_attempts || 0, 10);
             
+            // Get voucher type from selectedVoucherTypes or existing booking
+            let voucherType = bookingDetail.booking.voucher_type || '';
+            if (selectedVoucherTypes && selectedVoucherTypes.length > 0) {
+                // Use the first selected voucher type (since only one can be selected)
+                // For private voucher types, it's already a title (e.g., 'Private Charter', 'Proposal Flight')
+                // For shared voucher types, it's a key (e.g., 'weekday morning', 'any day flight') - convert to title case
+                const selected = selectedVoucherTypes[0];
+                console.log('🔄 Manifest Rebook - Selected voucher types:', selectedVoucherTypes);
+                console.log('🔄 Manifest Rebook - First selected:', selected);
+                if (selected && typeof selected === 'string') {
+                    // Check if it's a key (lowercase) or already a title (has capital letters)
+                    if (selected === selected.toLowerCase() && selected.includes(' ')) {
+                        // It's a key, convert to title case
+                        voucherType = selected.split(' ').map(word => 
+                            word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                        ).join(' ');
+                        console.log('🔄 Manifest Rebook - Converted key to title case:', voucherType);
+                    } else {
+                        // It's already a title, use as is
+                        voucherType = selected;
+                        console.log('🔄 Manifest Rebook - Using title as is:', voucherType);
+                    }
+                } else {
+                    voucherType = selected;
+                    console.log('🔄 Manifest Rebook - Using selected as is (non-string):', voucherType);
+                }
+            } else if (!voucherType) {
+                // Fallback to default if no selection and no existing voucher type
+                voucherType = 'Any Day Flight';
+                console.log('🔄 Manifest Rebook - Using fallback voucher type:', voucherType);
+            } else {
+                console.log('🔄 Manifest Rebook - Using existing booking voucher type:', voucherType);
+            }
+            console.log('🔄 Manifest Rebook - Final voucher type:', voucherType);
+            
+            // Determine experience from flightType - this is critical for manifest page Type display
+            // experience field is used in manifest page to show "Type: Shared Flight" or "Type: Private Flight"
+            let experience = flightType; // Default to flightType
+            if (flightType === 'Shared Flight') {
+                experience = 'Shared Flight';
+            } else if (flightType === 'Private Flight' || flightType === 'Private Charter') {
+                experience = 'Private Charter'; // Use 'Private Charter' for consistency
+            }
+            
+            console.log('🔄 Manifest Rebook - Flight Type:', flightType, 'Experience:', experience);
+            
             // Prepare passenger data for new booking
-            const existingPassengers = bookingDetail.passengers || [];
+            // Note: existingPassengers is already defined above (line 2119)
             let passengerData = [];
             if (existingPassengers.length > 0) {
                 // Use existing passenger data
@@ -2132,6 +2207,9 @@ const Manifest = () => {
                 }];
             }
 
+            // Preserve original created_at to maintain table position after rebook
+            const originalCreatedAt = bookingDetail.booking.created_at || bookingDetail.booking.createdAt || null;
+
             const payload = {
                 activitySelect: flightType,
                 chooseLocation: selectedLocation || bookingDetail.booking.location,
@@ -2143,9 +2221,14 @@ const Manifest = () => {
                 additionalInfo: { notes: bookingDetail.booking.additional_notes || '' },
                 voucher_code: bookingDetail.booking.voucher_code || null,
                 flight_attempts: currentAttempts, // Preserve attempts value during rebook
+                status: 'Scheduled', // Set status to Scheduled for rebook operations
                 email_template_override: 'Booking Rescheduled',
                 email_template_type_override: 'booking_rescheduled_automatic',
-                history_entries: historyEntriesPayload
+                history_entries: historyEntriesPayload,
+                voucher_type: voucherType, // Add voucher_type from Rebook popup selection
+                selectedVoucherType: { title: voucherType }, // Add selectedVoucherType for backend compatibility
+                experience: experience, // Add experience field - critical for manifest page Type display
+                created_at: originalCreatedAt // Preserve original created_at to maintain table position
             };
             // First delete the old booking
             await axios.delete(`/api/deleteBooking/${bookingDetail.booking.id}`);
@@ -3897,8 +3980,25 @@ const Manifest = () => {
                                             </>
                                         ) : (
                                             <>
-                                                {bookingDetail.booking.name || '-'}
-                                                <IconButton size="small" onClick={() => handleEditClick('name', bookingDetail.booking.name)}><EditIcon fontSize="small" /></IconButton>
+                                                {(() => {
+                                                    // Always show Passenger 1's name (first_name + last_name)
+                                                    const passenger1 = bookingDetail.passengers && bookingDetail.passengers.length > 0 
+                                                        ? bookingDetail.passengers[0] 
+                                                        : null;
+                                                    const passenger1Name = passenger1 
+                                                        ? `${passenger1.first_name || ''} ${passenger1.last_name || ''}`.trim() 
+                                                        : '';
+                                                    return passenger1Name || bookingDetail.booking.name || '-';
+                                                })()}
+                                                <IconButton size="small" onClick={() => {
+                                                    const passenger1 = bookingDetail.passengers && bookingDetail.passengers.length > 0 
+                                                        ? bookingDetail.passengers[0] 
+                                                        : null;
+                                                    const passenger1Name = passenger1 
+                                                        ? `${passenger1.first_name || ''} ${passenger1.last_name || ''}`.trim() 
+                                                        : '';
+                                                    handleEditClick('name', passenger1Name || bookingDetail.booking.name || '');
+                                                }}><EditIcon fontSize="small" /></IconButton>
                                             </>
                                         )}</Typography>
                                         <Typography><b>Booking ID:</b> {bookingDetail.booking.id || '-'}</Typography>

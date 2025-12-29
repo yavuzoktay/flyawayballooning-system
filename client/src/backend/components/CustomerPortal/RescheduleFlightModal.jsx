@@ -297,12 +297,29 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             return;
         }
 
-        // For non-flight voucher, use existing booking location and skip loading locations list
+        // For non-flight voucher, use existing booking location but still load activities
+        // This is needed for cancelled bookings where activityId might be missing
         if (!isFlightVoucher) {
             const loc = bookingData?.location ? [bookingData.location] : [];
             setAvailableLocations([]);
             setSelectedLocations(loc);
-            setActivities([]);
+            
+            // Still load activities for non-flight voucher to resolve activityId from location if needed
+            const loadActivities = async () => {
+                try {
+                    const resp = await axios.get('/api/activities');
+                    if (resp.data?.success) {
+                        const acts = Array.isArray(resp.data.data) ? resp.data.data : [];
+                        const liveActs = acts.filter(a => a.status === 'Live');
+                        setActivities(liveActs);
+                        console.log('RescheduleFlightModal - Loaded activities for non-flight voucher:', liveActs.length);
+                    }
+                } catch (err) {
+                    console.error('RescheduleFlightModal - Error loading activities:', err);
+                }
+            };
+            
+            loadActivities();
             return;
         }
 
