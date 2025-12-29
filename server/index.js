@@ -6277,12 +6277,18 @@ app.get('/api/getAllBookingData', (req, res) => {
         SELECT 
             ab.*, 
             -- Use Passenger 1's name (first passenger by id ASC) if available, otherwise use booking name
+            -- This ensures the name in All Bookings table matches the Booking Details popup
+            -- The popup shows: Passenger 1's name (first_name + last_name) OR booking.name
+            -- NULLIF converts empty string to NULL so COALESCE can fallback to ab.name
             COALESCE(
-                (SELECT CONCAT(p1.first_name, ' ', p1.last_name) 
-                 FROM passenger p1 
-                 WHERE p1.booking_id = ab.id 
-                 ORDER BY p1.id ASC 
-                 LIMIT 1),
+                NULLIF(
+                    (SELECT TRIM(CONCAT(COALESCE(p1.first_name, ''), ' ', COALESCE(p1.last_name, ''))) 
+                     FROM passenger p1 
+                     WHERE p1.booking_id = ab.id 
+                     ORDER BY p1.id ASC 
+                     LIMIT 1),
+                    ''
+                ),
                 ab.name
             ) as name,
             ab.name as passenger_name,
@@ -6569,6 +6575,8 @@ app.get('/api/getAllBookingData', (req, res) => {
                 });
 
                 // Create a map of booking_id -> first passenger name
+                // This ensures the name displayed in the table matches the Booking Details popup
+                // (which shows Passenger 1's name or falls back to booking.name)
                 const firstPassengerNameByBooking = {};
                 firstPassengersRows.forEach(p => {
                     const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim();
@@ -6908,9 +6916,17 @@ app.get('/api/getAllBookingData', (req, res) => {
 
                 // Add additional information and add-on items to each booking object
                 enriched.forEach((booking, index) => {
-                    // Update name from first passenger if available
+                    // Update name from first passenger if available (same logic as Booking Details popup)
+                    // Always prioritize Passenger 1's name (first_name + last_name) over booking.name
+                    // This ensures consistency between the All Bookings table and Booking Details popup
+                    // The SQL query already sets name via COALESCE, but this JS update ensures consistency
+                    // and handles cases where passenger data might be updated after the SQL query
                     if (firstPassengerNameByBooking[booking.id]) {
                         booking.name = firstPassengerNameByBooking[booking.id];
+                    } else {
+                        // If no passenger name found in map, keep the SQL query result (which uses COALESCE)
+                        // The SQL query already handles: Passenger 1 name OR booking.name
+                        // So we don't need to do anything here - booking.name is already correct
                     }
 
                     const bookingAnswers = answersByBooking[booking.id] || [];
@@ -13761,31 +13777,33 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                         } else {
                             // NEW: Search for bookings created via Redeem Voucher flow
                             // These bookings have flight_type_source = 'Redeem Voucher' and were created after the original voucher booking
-                            // Match by email and created_at being after the original booking
-                            const [redeemFlowBookingRows] = await new Promise((resolve, reject) => {
-                                con.query(`
-                                    SELECT id, flight_date, location, status, redeemed_voucher, flight_type_source, created_at
-                                    FROM all_booking 
-                                    WHERE email = ?
-                                    AND flight_type_source = 'Redeem Voucher'
-                                    AND (redeemed_voucher = 'Yes' OR redeemed_voucher = 1)
-                                    AND created_at > ?
-                                    AND flight_date IS NOT NULL
-                                    ORDER BY created_at DESC
-                                    LIMIT 1
-                                `, [booking.email || customerEmail, booking.created_at || '1970-01-01'], (err, rows) => {
-                                    if (err) reject(err);
-                                    else resolve([rows]);
+                            // IMPORTANT: Must match by voucher_code to ensure we're checking the same voucher, not just email
+                            // Only check if voucherCodeToCheck is available
+                            if (voucherCodeToCheck) {
+                                const [redeemFlowBookingRows] = await new Promise((resolve, reject) => {
+                                    con.query(`
+                                        SELECT id, flight_date, location, status, redeemed_voucher, flight_type_source, created_at
+                                        FROM all_booking 
+                                        WHERE voucher_code = ?
+                                        AND flight_type_source = 'Redeem Voucher'
+                                        AND (redeemed_voucher = 'Yes' OR redeemed_voucher = 1)
+                                        AND flight_date IS NOT NULL
+                                        ORDER BY created_at DESC
+                                        LIMIT 1
+                                    `, [voucherCodeToCheck], (err, rows) => {
+                                        if (err) reject(err);
+                                        else resolve([rows]);
+                                    });
                                 });
-                            });
-                            
-                            if (redeemFlowBookingRows && redeemFlowBookingRows.length > 0) {
-                                redeemedBooking = redeemFlowBookingRows[0];
-                                console.log('✅ Customer Portal - Found redeemed booking via Redeem Voucher flow:', {
-                                    bookingId: redeemedBooking.id,
-                                    flightDate: redeemedBooking.flight_date,
-                                    location: redeemedBooking.location
-                                });
+                                
+                                if (redeemFlowBookingRows && redeemFlowBookingRows.length > 0) {
+                                    redeemedBooking = redeemFlowBookingRows[0];
+                                    console.log('✅ Customer Portal - Found redeemed booking via Redeem Voucher flow:', {
+                                        bookingId: redeemedBooking.id,
+                                        flightDate: redeemedBooking.flight_date,
+                                        location: redeemedBooking.location
+                                    });
+                                }
                             }
                         }
                     }
@@ -13924,22 +13942,25 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 if (redeemedCheckRows && redeemedCheckRows.length > 0) {
                         isVoucherRedeemed = true;
                     } else {
-                        // Also check for Redeem Voucher flow bookings (same email, created after original booking)
-                        const [redeemFlowCheckRows] = await new Promise((resolve, reject) => {
-                            con.query(`
-                                SELECT id FROM all_booking 
-                                WHERE email = ?
-                                AND flight_type_source = 'Redeem Voucher'
-                                AND (redeemed_voucher = 'Yes' OR redeemed_voucher = 1)
-                                AND created_at > ?
-                                LIMIT 1
-                            `, [booking.email || customerEmail, booking.created_at || '1970-01-01'], (err, rows) => {
-                                if (err) reject(err);
-                                else resolve([rows]);
+                        // Also check for Redeem Voucher flow bookings
+                        // IMPORTANT: Must match by voucher_code to ensure we're checking the same voucher, not just email
+                        // This prevents marking a voucher as redeemed when a different voucher with the same email is redeemed
+                        if (voucherCodeToCheck) {
+                            const [redeemFlowCheckRows] = await new Promise((resolve, reject) => {
+                                con.query(`
+                                    SELECT id FROM all_booking 
+                                    WHERE voucher_code = ?
+                                    AND flight_type_source = 'Redeem Voucher'
+                                    AND (redeemed_voucher = 'Yes' OR redeemed_voucher = 1)
+                                    LIMIT 1
+                                `, [voucherCodeToCheck], (err, rows) => {
+                                    if (err) reject(err);
+                                    else resolve([rows]);
+                                });
                             });
-                        });
-                        if (redeemFlowCheckRows && redeemFlowCheckRows.length > 0) {
-                    isVoucherRedeemed = true;
+                            if (redeemFlowCheckRows && redeemFlowCheckRows.length > 0) {
+                                isVoucherRedeemed = true;
+                            }
                         }
                 }
             } catch (redeemedCheckErr) {
