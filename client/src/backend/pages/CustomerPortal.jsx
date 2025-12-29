@@ -1072,7 +1072,32 @@ const CustomerPortal = () => {
                 onRescheduleSuccess={async (updatedData) => {
                     // Close the modal first
                     setRescheduleModalOpen(false);
-                    // Fetch fresh booking data from backend to ensure we have the latest flight_date
+                    
+                    // Immediately update bookingData state with the updated data for instant UI update
+                    // This ensures Flight Date and Location are updated instantly without waiting for backend fetch
+                    if (updatedData) {
+                        console.log('🔄 Customer Portal - Updating bookingData with reschedule result:', updatedData);
+                        setBookingData(prevData => {
+                            // Merge updated data with previous data, prioritizing updated fields
+                            // RescheduleFlightModal already includes flight_date and location in updatedData
+                            const mergedData = {
+                                ...prevData,
+                                ...updatedData,
+                                // Ensure flight_date and location are updated (RescheduleFlightModal already sets these)
+                                flight_date: updatedData.flight_date || prevData?.flight_date,
+                                location: updatedData.location || prevData?.location,
+                                // For Flight Voucher, update is_voucher_redeemed flag if applicable
+                                is_voucher_redeemed: updatedData.is_voucher_redeemed !== undefined 
+                                    ? updatedData.is_voucher_redeemed 
+                                    : prevData?.is_voucher_redeemed
+                            };
+                            console.log('🔄 Customer Portal - Merged bookingData:', mergedData);
+                            return mergedData;
+                        });
+                    }
+                    
+                    // Also fetch fresh booking data from backend to ensure we have the latest complete data
+                    // This is especially important for Flight Voucher where redeemed booking info needs to be fetched
                     await fetchBookingData();
                 }}
             />
