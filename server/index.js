@@ -2105,13 +2105,18 @@ app.post('/api/createRedeemBooking', (req, res) => {
                 console.log('paidAmount (original voucher price):', paidAmount);
                 console.log('resolvedVoucherType:', resolvedVoucherType || null);
 
+                // Determine status: if flight_date exists, status should be 'Scheduled'
+                const initialStatus = (bookingDateTime && bookingDateTime !== null && bookingDateTime !== '' && bookingDateTime !== '0000-00-00 00:00:00') 
+                    ? 'Scheduled' 
+                    : 'Open';
+
                 const bookingValues = [
                     passengerName,
                     chooseFlightType.type || 'Shared Flight',
                     bookingDateTime,
                     actualPaxCount, // Use actual passenger count instead of chooseFlightType.passengerCount
                     chooseLocation,
-                    'Open',
+                    initialStatus, // Set to 'Scheduled' if flight_date exists, otherwise 'Open'
                     paidAmount, // Use original voucher price instead of totalPrice
                     0,
                     generatedVoucherCode, // Use the newly generated voucher code
@@ -2225,33 +2230,50 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     });
                 }
 
-                // Create passenger record
+                // Create passenger records sequentially to preserve order
+                // Insert passengers one by one to ensure the database insertion order matches the array order
                 if (passengerData && passengerData.length > 0) {
                     const passengerSql = `
-                INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone)
-                VALUES (?, ?, ?, ?, ?, ?)
-            `;
+                        INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    `;
 
-                    passengerData.forEach((passenger, index) => {
-                        if (passenger.firstName) {
-                            const passengerValues = [
-                                bookingId,
-                                passenger.firstName,
-                                passenger.lastName || '',
-                                passenger.weight || '',
-                                passenger.email || '',
-                                passenger.phone || ''
-                            ];
-
-                            con.query(passengerSql, passengerValues, (passengerErr) => {
-                                if (passengerErr) {
-                                    console.error('Error creating passenger:', passengerErr);
-                                } else {
-                                    console.log(`Passenger ${index + 1} created for booking ${bookingId}`);
-                                }
-                            });
+                    // Filter out passengers without firstName
+                    const validPassengers = passengerData.filter(passenger => passenger.firstName);
+                    
+                    // Insert passengers sequentially using recursive callback pattern
+                    const insertPassengerSequentially = (index) => {
+                        if (index >= validPassengers.length) {
+                            // All passengers inserted, continue with response
+                            console.log(`All ${validPassengers.length} passengers created for booking ${bookingId}`);
+                            return;
                         }
-                    });
+
+                        const passenger = validPassengers[index];
+                        const passengerValues = [
+                            bookingId,
+                            passenger.firstName,
+                            passenger.lastName || '',
+                            passenger.weight || '',
+                            passenger.email || '',
+                            passenger.phone || ''
+                        ];
+
+                        con.query(passengerSql, passengerValues, (passengerErr) => {
+                            if (passengerErr) {
+                                console.error(`Error creating passenger ${index + 1}:`, passengerErr);
+                                // Continue with next passenger even if one fails
+                                insertPassengerSequentially(index + 1);
+                            } else {
+                                console.log(`Passenger ${index + 1} created for booking ${bookingId}`);
+                                // Insert next passenger
+                                insertPassengerSequentially(index + 1);
+                            }
+                        });
+                    };
+
+                    // Start sequential insertion
+                    insertPassengerSequentially(0);
                 }
 
                 // Save additional info answers if provided
@@ -11141,8 +11163,9 @@ app.get('/api/getBookingDetail', async (req, res) => {
         booking.preferred_time = booking.preferred_time || '';
         booking.preferred_day = booking.preferred_day || '';
         // 2. Passenger bilgileri
+        // Order by id ASC to preserve the original insertion order (passenger sequence)
         const [passengerRows] = await new Promise((resolve, reject) => {
-            con.query('SELECT * FROM passenger WHERE booking_id = ?', [booking_id], (err, rows) => {
+            con.query('SELECT * FROM passenger WHERE booking_id = ? ORDER BY id ASC', [booking_id], (err, rows) => {
                 if (err) reject(err);
                 else resolve([rows]);
             });
@@ -13467,8 +13490,9 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             } catch (parseErr) {
                 console.warn('⚠️ Customer Portal - Failed to parse voucher_passenger_details:', parseErr.message);
                 // Fallback to passenger table
+                // Order by id ASC to preserve the original insertion order (passenger sequence)
                 const [passengerRows] = await new Promise((resolve, reject) => {
-                    con.query('SELECT * FROM passenger WHERE booking_id = ?', [booking.id], (err, rows) => {
+                    con.query('SELECT * FROM passenger WHERE booking_id = ? ORDER BY id ASC', [booking.id], (err, rows) => {
                         if (err) reject(err);
                         else resolve([rows]);
                     });
@@ -13477,8 +13501,9 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             }
         } else {
             // For non-Flight Voucher or if voucher_passenger_details not available, use passenger table
+            // Order by id ASC to preserve the original insertion order (passenger sequence)
             const [passengerRows] = await new Promise((resolve, reject) => {
-                con.query('SELECT * FROM passenger WHERE booking_id = ?', [booking.id], (err, rows) => {
+                con.query('SELECT * FROM passenger WHERE booking_id = ? ORDER BY id ASC', [booking.id], (err, rows) => {
                     if (err) reject(err);
                     else resolve([rows]);
                 });
@@ -13647,25 +13672,38 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 }
             }
             
-            // If redeemed booking exists, use its flight_date and location
+            // If redeemed booking exists, use its flight_date, location, and status
             if (redeemedBooking) {
                 // Mark voucher as redeemed since we found a redeemed booking
                 isVoucherRedeemed = true;
                 if (redeemedBooking.flight_date) {
                     finalFlightDate = redeemedBooking.flight_date;
                     finalLocation = redeemedBooking.location || null;
-                    console.log('✅ Customer Portal - Using flight_date and location from redeemed booking');
+                    // If flight_date exists, status should be 'Scheduled'
+                    // Use redeemedBooking.status if it's 'Scheduled', otherwise set to 'Scheduled'
+                    if (redeemedBooking.status && redeemedBooking.status.toLowerCase() === 'scheduled') {
+                        booking.status = 'Scheduled';
+                    } else {
+                        booking.status = 'Scheduled'; // Set to Scheduled when flight_date exists
+                    }
+                    console.log('✅ Customer Portal - Using flight_date, location, and status from redeemed booking');
                 } else {
                     finalFlightDate = null;
                     finalLocation = null;
                     console.log('ℹ️ Customer Portal - Redeemed booking found but no flight_date yet');
                 }
             } else if (booking.redeemed_voucher === 'Yes' || booking.redeemed_voucher === 1) {
-                // Current booking itself is the redeemed booking - use its flight_date and location
+                // Current booking itself is the redeemed booking - use its flight_date, location, and status
                 if (booking.flight_date) {
                     finalFlightDate = booking.flight_date;
                     finalLocation = booking.location || null;
-                    console.log('✅ Customer Portal - Current booking is redeemed booking, using its flight_date and location');
+                    // If flight_date exists, status should be 'Scheduled'
+                    if (booking.status && booking.status.toLowerCase() !== 'scheduled') {
+                        booking.status = 'Scheduled';
+                    } else if (!booking.status || booking.status === 'Open' || booking.status === 'Not Scheduled') {
+                        booking.status = 'Scheduled';
+                    }
+                    console.log('✅ Customer Portal - Current booking is redeemed booking, using its flight_date, location, and status');
                 } else {
                     finalFlightDate = null;
                     finalLocation = null;
@@ -13816,6 +13854,15 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             }
         }
 
+        // Determine final status: if flight_date exists, status should be 'Scheduled'
+        let finalStatus = booking.status;
+        if (finalFlightDate && finalFlightDate !== null && finalFlightDate !== '') {
+            // If flight_date exists, status should be 'Scheduled' (not 'Open' or 'Not Scheduled')
+            if (!finalStatus || finalStatus === 'Open' || finalStatus === 'Not Scheduled' || finalStatus.toLowerCase() === 'open' || finalStatus.toLowerCase() === 'not scheduled') {
+                finalStatus = 'Scheduled';
+            }
+        }
+
         // Format the response
         const response = {
             success: true,
@@ -13830,7 +13877,7 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 flight_type: booking.flight_type || booking.experience,
                 experience: booking.experience || booking.flight_type,
                 location: finalLocation,
-                status: booking.status,
+                status: finalStatus,
                 pax: booking.pax,
                 passengers: finalPassengerRows,
                 voucher_code: booking.voucher_code || effectiveVoucherRef || voucherRef,
@@ -16910,8 +16957,9 @@ app.get('/api/getVoucherDetail', async (req, res) => {
             if (bookingRows && bookingRows.length > 0) {
                 booking = bookingRows[0];
                 // 3. Passenger bilgileri
+                // Order by id ASC to preserve the original insertion order (passenger sequence)
                 const [passengerRows] = await new Promise((resolve, reject) => {
-                    con.query('SELECT * FROM passenger WHERE booking_id = ?', [booking.id], (err, rows) => {
+                    con.query('SELECT * FROM passenger WHERE booking_id = ? ORDER BY id ASC', [booking.id], (err, rows) => {
                         if (err) reject(err);
                         else resolve([rows]);
                     });
