@@ -23000,7 +23000,28 @@ function getBookingConfirmationReceiptHtml(booking = {}) {
     
     const receiptId = booking.receipt_number || booking.booking_reference || booking.id || '';
     const receiptSoldDate = booking.created_at ? formatDate(booking.created_at) : null;
-    const location = escapeHtml(booking.location || booking.preferred_location || 'Bath');
+    
+    // For Flight Voucher and Gift Voucher, location should not be shown in Description
+    // Check multiple ways to identify Flight Voucher and Gift Voucher
+    const bookFlight = String(booking?.book_flight || '').toLowerCase();
+    const voucherType = String(booking?.voucher_type || '').toLowerCase();
+    const templateName = String(booking?.templateName || '').toLowerCase();
+    const isFlightVoucher = 
+        bookFlight.includes('flight voucher') || 
+        booking?.is_flight_voucher === true ||
+        (booking?.contextType === 'voucher' && bookFlight !== 'gift voucher' && !bookFlight.includes('gift')) ||
+        booking?.location === '-' ||
+        voucherType.includes('flight voucher') ||
+        templateName === 'flight voucher confirmation' ||
+        templateName === 'flight voucher';
+    const isGiftVoucher = 
+        bookFlight.includes('gift voucher') || 
+        templateName === 'gift voucher confirmation' ||
+        templateName === 'gift voucher';
+    // For both Flight Voucher and Gift Voucher, location should not be shown in Description
+    // Always set location to empty string for vouchers, never show location in DESCRIPTION
+    // This ensures "Bath" or any other location is not displayed for vouchers
+    const location = (isFlightVoucher || isGiftVoucher) ? '' : (booking?.location || booking?.preferred_location ? escapeHtml(booking.location || booking.preferred_location) : '');
     const experience = escapeHtml(booking.flight_type || booking.experience || booking.experience_type || 'Flight Experience');
     const guestCount = receiptItems.length > 0 ? receiptItems.length : (booking.pax || booking.numberOfPassengers || 0);
 
@@ -23062,8 +23083,7 @@ function getBookingConfirmationReceiptHtml(booking = {}) {
                             ${flightDateTime ? `<div style="margin-top:4px; font-size:12px; color:#64748b; font-weight:400;">Booked For: ${escapeHtml(flightDateTime)}</div>` : ''}
                         </td>
                         <td data-label="Description" style="padding:12px 0; border-bottom:1px solid #f1f5f9;">
-                            ${location}
-                            ${guestCount > 0 ? `<div style="margin-top:4px; font-size:12px; color:#64748b;">Guests: ${guestCount}</div>` : ''}
+                            ${location ? `${location}${guestCount > 0 ? `<div style="margin-top:4px; font-size:12px; color:#64748b;">Guests: ${guestCount}</div>` : ''}` : (guestCount > 0 ? `<div style="font-size:12px; color:#64748b;">Guests: ${guestCount}</div>` : '')}
                         </td>
                         <td data-label="Amount" style="padding:12px 0; border-bottom:1px solid #f1f5f9;" align="right">
                             £${subtotal != null ? subtotal.toFixed(2) : '—'}
@@ -23551,7 +23571,7 @@ function generateFlightVoucherConfirmationEmail(voucher, template = null) {
         // Set original_amount to paid if not explicitly set (vouchers are typically fully paid)
         original_amount: effectiveOriginalAmount,
         originalAmount: effectiveOriginalAmount,
-        // Map location
+        // Map location - will be set to empty string in receipt if Flight Voucher or Gift Voucher
         location: voucher.preferred_location || voucher.location || 'Bath',
         // Map flight type
         flight_type: voucher.experience_type || voucher.flight_type || 'Shared Flight',
@@ -23561,6 +23581,11 @@ function generateFlightVoucherConfirmationEmail(voucher, template = null) {
         // Map receipt number
         receipt_number: voucher.voucher_ref || voucher.id || '',
         booking_reference: voucher.voucher_ref || voucher.id || '',
+        // Add book_flight and templateName to identify Flight Voucher in receipt generation
+        // This ensures location is not shown in DESCRIPTION for Flight Voucher emails
+        book_flight: voucher.book_flight || 'Flight Voucher',
+        templateName: 'Flight Voucher Confirmation',
+        is_flight_voucher: true,
         // Parse passengers from voucher_passenger_details if available
         passengers: (() => {
             if (voucher.voucher_passenger_details) {
@@ -23663,8 +23688,16 @@ function generateGiftVoucherConfirmationEmail(voucher, template = null) {
         messageHtml = getGiftVoucherMessageHtml(voucher);
     }
 
+    // Add book_flight and templateName to voucher object to identify Gift Voucher in receipt generation
+    // This ensures location is not shown in DESCRIPTION for Gift Voucher emails
+    const voucherWithTemplate = {
+        ...voucher,
+        book_flight: voucher.book_flight || 'Gift Voucher',
+        templateName: 'Gift Voucher Confirmation'
+    };
+
     // Replace prompts in the message
-    const messageWithPrompts = replacePrompts(messageHtml, voucher);
+    const messageWithPrompts = replacePrompts(messageHtml, voucherWithTemplate);
     const bodyHtml = messageWithPrompts;
 
     // Build email layout (matches frontend buildEmailLayout)
