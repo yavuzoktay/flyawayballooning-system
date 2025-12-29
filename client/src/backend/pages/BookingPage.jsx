@@ -648,11 +648,13 @@ const BookingPage = () => {
                         console.log(`[PaymentHistory] Found ${bookingPaymentData.length} records for booking ${bookingId}, added ${newPayments.length} new, total: ${paymentData.length}`);
                     }
                     
-                    // Always attempt to sync from Stripe to capture any missing payments
+                    // ALWAYS attempt to sync from Stripe to capture any missing payments
                     // This ensures payments from different devices/sessions are captured
+                    // Even if we already have payment history, sync to catch any new payments
                     try {
-                        console.log(`[PaymentHistory] Attempting sync for booking ${bookingId} to capture any missing payments...`);
+                        console.log(`[PaymentHistory] Always attempting sync for booking ${bookingId} to capture any missing payments from different devices...`);
                         await axios.post(`/api/sync-payment-history/${bookingId}`);
+                        // Fetch again after sync to get any newly synced payments
                         const syncResponse = await axios.get(`/api/booking-payment-history/${bookingId}`);
                         const syncedData = syncResponse.data?.data || [];
                         if (syncedData.length > 0) {
@@ -671,13 +673,15 @@ const BookingPage = () => {
                             });
                             if (newPayments.length > 0) {
                                 paymentData = [...paymentData, ...newPayments];
-                                console.log(`[PaymentHistory] After sync, found ${newPayments.length} new records, total: ${paymentData.length}`);
+                                console.log(`[PaymentHistory] ✅ After sync, found ${newPayments.length} new records, total: ${paymentData.length}`);
                             } else {
-                                console.log(`[PaymentHistory] Sync completed, no new payments found`);
+                                console.log(`[PaymentHistory] Sync completed, no new payments found (${syncedData.length} total in DB)`);
                             }
+                        } else {
+                            console.log(`[PaymentHistory] Sync completed, but no payment history found in database`);
                         }
                     } catch (syncError) {
-                        console.log('[PaymentHistory] Sync failed (non-critical):', syncError?.response?.data?.message || syncError.message);
+                        console.log('[PaymentHistory] ⚠️ Sync failed (non-critical):', syncError?.response?.data?.message || syncError.message);
                         // Don't fail the entire fetch if sync fails - we still have existing payment data
                     }
                 } catch (bookingError) {
@@ -3811,6 +3815,17 @@ setBookingDetail(finalVoucherDetail);
             // Preserve original created_at to maintain table position after rebook
             const originalCreatedAt = bookingDetail.booking.created_at || bookingDetail.booking.createdAt || null;
             
+            // Determine experience from flightType - this is critical for manifest page Type display
+            // experience field is used in manifest page to show "Type: Shared Flight" or "Type: Private Flight"
+            let experience = flightType; // Default to flightType
+            if (flightType === 'Shared Flight') {
+                experience = 'Shared Flight';
+            } else if (flightType === 'Private Flight' || flightType === 'Private Charter') {
+                experience = 'Private Charter'; // Use 'Private Charter' for consistency
+            }
+            
+            console.log('🔄 Rebook - Flight Type:', flightType, 'Experience:', experience);
+            
             const payload = {
                 activitySelect: flightType,
                 chooseLocation: selectedLocation || bookingDetail.booking.location,
@@ -3828,6 +3843,7 @@ setBookingDetail(finalVoucherDetail);
                 history_entries: historyEntriesPayload,
                 voucher_type: voucherType, // Add voucher_type from Rebook popup selection
                 selectedVoucherType: { title: voucherType }, // Add selectedVoucherType for backend compatibility
+                experience: experience, // Add experience field - critical for manifest page Type display
                 created_at: originalCreatedAt // Preserve original created_at to maintain table position
             };
 
@@ -5150,8 +5166,25 @@ setBookingDetail(finalVoucherDetail);
                                                 </>
                                             ) : (
                                                 <>
-                                                    {bookingDetail.booking.name || '-'}
-                                                    <IconButton size="small" onClick={() => handleEditClick('name', bookingDetail.booking.name)}><EditIcon fontSize="small" /></IconButton>
+                                                    {(() => {
+                                                        // Always show Passenger 1's name (first_name + last_name)
+                                                        const passenger1 = bookingDetail.passengers && bookingDetail.passengers.length > 0 
+                                                            ? bookingDetail.passengers[0] 
+                                                            : null;
+                                                        const passenger1Name = passenger1 
+                                                            ? `${passenger1.first_name || ''} ${passenger1.last_name || ''}`.trim() 
+                                                            : '';
+                                                        return passenger1Name || bookingDetail.booking.name || '-';
+                                                    })()}
+                                                    <IconButton size="small" onClick={() => {
+                                                        const passenger1 = bookingDetail.passengers && bookingDetail.passengers.length > 0 
+                                                            ? bookingDetail.passengers[0] 
+                                                            : null;
+                                                        const passenger1Name = passenger1 
+                                                            ? `${passenger1.first_name || ''} ${passenger1.last_name || ''}`.trim() 
+                                                            : '';
+                                                        handleEditClick('name', passenger1Name || bookingDetail.booking.name || '');
+                                                    }}><EditIcon fontSize="small" /></IconButton>
                                                 </>
                                             )}</Typography>
                                             <Typography><b>Booking ID:</b> {bookingDetail.booking.id || '-'}</Typography>
