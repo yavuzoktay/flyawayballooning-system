@@ -7490,11 +7490,13 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
         
         if (!isNaN(parseInt(voucherIdentifier))) {
             // It's a numeric ID
-            voucherQuery = `SELECT id, voucher_ref, stripe_session_id FROM all_vouchers WHERE id = ?`;
+            // Note: stripe_session_id column doesn't exist in all_vouchers table, so we don't select it
+            voucherQuery = `SELECT id, voucher_ref FROM all_vouchers WHERE id = ?`;
             voucherParams = [parseInt(voucherIdentifier)];
         } else {
             // It's a voucher_ref
-            voucherQuery = `SELECT id, voucher_ref, stripe_session_id FROM all_vouchers WHERE voucher_ref = ?`;
+            // Note: stripe_session_id column doesn't exist in all_vouchers table, so we don't select it
+            voucherQuery = `SELECT id, voucher_ref FROM all_vouchers WHERE voucher_ref = ?`;
             voucherParams = [voucherIdentifier];
         }
 
@@ -7506,11 +7508,12 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
         }
 
         const voucher = voucherRows[0];
-        console.log('📋 Found voucher:', { id: voucher.id, voucher_ref: voucher.voucher_ref, stripe_session_id: voucher.stripe_session_id });
+        console.log('📋 Found voucher:', { id: voucher.id, voucher_ref: voucher.voucher_ref });
 
         // Get full voucher info including paid amount and purchaser info
+        // Note: stripe_session_id column doesn't exist in all_vouchers table, so we don't select it
         const [fullVoucherRows] = await con.promise().query(
-            `SELECT id, voucher_ref, stripe_session_id, paid, created_at, name, email, 
+            `SELECT id, voucher_ref, paid, created_at, name, email, 
                     purchaser_email, purchaser_name, purchaser_phone, book_flight, voucher_type
              FROM all_vouchers 
              WHERE id = ? OR voucher_ref = ? 
@@ -7540,16 +7543,8 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
         }
 
         // Method 2: If not found, try by stripe_session_id from voucher
-        if (paymentHistory.length === 0 && fullVoucher.stripe_session_id) {
-            const [sessionResults] = await con.promise().query(
-                `SELECT * FROM payment_history WHERE stripe_session_id = ? ORDER BY created_at DESC`,
-                [fullVoucher.stripe_session_id]
-            );
-            if (sessionResults && sessionResults.length > 0) {
-                console.log('✅ Found payment history by stripe_session_id:', sessionResults.length, 'records');
-                paymentHistory = sessionResults;
-            }
-        }
+        // Note: stripe_session_id column doesn't exist in all_vouchers table, so we skip this method
+        // We'll rely on voucher_id and booking_id methods instead
 
         // Method 3: If voucher has paid amount, always include it in payment history
         // This is especially important for Gift Vouchers where payment is tied to the voucher itself
@@ -7558,8 +7553,7 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
         const hasVoucherPayment = paymentHistory.some(p => 
             (p.id === `voucher_${fullVoucher.id}`) ||
             (Math.abs(parseFloat(p.amount || 0) - voucherPaidAmount) < 0.01 &&
-             (p.voucher_id === fullVoucher.id || p.origin === 'voucher_purchase') &&
-             p.stripe_session_id === fullVoucher.stripe_session_id)
+             (p.voucher_id === fullVoucher.id || p.origin === 'voucher_purchase'))
         );
         
         if (voucherPaidAmount > 0 && !hasVoucherPayment) {
@@ -7569,7 +7563,7 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
                 id: `voucher_${fullVoucher.id}`,
                 booking_id: null,
                 voucher_id: fullVoucher.id,
-                stripe_session_id: fullVoucher.stripe_session_id || null,
+                stripe_session_id: null, // stripe_session_id column doesn't exist in all_vouchers table
                 amount: voucherPaidAmount,
                 currency: 'GBP',
                 payment_status: 'succeeded',
@@ -23018,10 +23012,9 @@ function getBookingConfirmationReceiptHtml(booking = {}) {
         bookFlight.includes('gift voucher') || 
         templateName === 'gift voucher confirmation' ||
         templateName === 'gift voucher';
-    // For both Flight Voucher and Gift Voucher, location should not be shown in Description
-    // Always set location to empty string for vouchers, never show location in DESCRIPTION
+    // For both Flight Voucher and Gift Voucher, location should show "-" instead of actual location
     // This ensures "Bath" or any other location is not displayed for vouchers
-    const location = (isFlightVoucher || isGiftVoucher) ? '' : (booking?.location || booking?.preferred_location ? escapeHtml(booking.location || booking.preferred_location) : '');
+    const location = (isFlightVoucher || isGiftVoucher) ? '—' : (booking?.location || booking?.preferred_location ? escapeHtml(booking.location || booking.preferred_location) : '');
     const experience = escapeHtml(booking.flight_type || booking.experience || booking.experience_type || 'Flight Experience');
     const guestCount = receiptItems.length > 0 ? receiptItems.length : (booking.pax || booking.numberOfPassengers || 0);
 
@@ -23083,7 +23076,7 @@ function getBookingConfirmationReceiptHtml(booking = {}) {
                             ${flightDateTime ? `<div style="margin-top:4px; font-size:12px; color:#64748b; font-weight:400;">Booked For: ${escapeHtml(flightDateTime)}</div>` : ''}
                         </td>
                         <td data-label="Description" style="padding:12px 0; border-bottom:1px solid #f1f5f9;">
-                            ${location ? `${location}${guestCount > 0 ? `<div style="margin-top:4px; font-size:12px; color:#64748b;">Guests: ${guestCount}</div>` : ''}` : (guestCount > 0 ? `<div style="font-size:12px; color:#64748b;">Guests: ${guestCount}</div>` : '')}
+                            ${(isFlightVoucher || isGiftVoucher) ? `—${guestCount > 0 ? `<div style="margin-top:4px; font-size:12px; color:#64748b;">Guests: ${guestCount}</div>` : ''}` : (location ? `${location}${guestCount > 0 ? `<div style="margin-top:4px; font-size:12px; color:#64748b;">Guests: ${guestCount}</div>` : ''}` : (guestCount > 0 ? `<div style="font-size:12px; color:#64748b;">Guests: ${guestCount}</div>` : ''))}
                         </td>
                         <td data-label="Amount" style="padding:12px 0; border-bottom:1px solid #f1f5f9;" align="right">
                             £${subtotal != null ? subtotal.toFixed(2) : '—'}
