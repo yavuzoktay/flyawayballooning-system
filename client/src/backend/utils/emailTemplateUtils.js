@@ -558,12 +558,16 @@ const getBookingConfirmationReceiptHtml = (booking = {}) => {
         (booking?.contextType === 'voucher' && bookFlight !== 'gift voucher' && !bookFlight.includes('gift')) ||
         booking?.location === '-' ||
         voucherType.includes('flight voucher') ||
-        templateName === 'flight voucher confirmation';
+        templateName === 'flight voucher confirmation' ||
+        templateName === 'flight voucher';
     const isGiftVoucher = 
         bookFlight.includes('gift voucher') || 
-        templateName === 'gift voucher confirmation';
+        templateName === 'gift voucher confirmation' ||
+        templateName === 'gift voucher';
     // For both Flight Voucher and Gift Voucher, location should not be shown in Description
-    const location = (isFlightVoucher || isGiftVoucher) ? '' : escapeHtml(booking?.location || 'Bath');
+    // Always set location to empty string for vouchers, never show location in DESCRIPTION
+    // This ensures "Bath" or any other location is not displayed for vouchers
+    const location = (isFlightVoucher || isGiftVoucher) ? '' : (booking?.location ? escapeHtml(booking.location) : '');
     const experience = escapeHtml(booking?.flight_type || 'Flight Experience');
     const guestCount = receiptItems.length;
     
