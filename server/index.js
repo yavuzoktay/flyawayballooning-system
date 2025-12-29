@@ -1736,7 +1736,21 @@ app.post('/api/createRedeemBooking', (req, res) => {
     createRedeemBookingLogic();
 
     function createRedeemBookingLogic() {
-        const passengerName = `${passengerData[0].firstName} ${passengerData[0].lastName}`;
+        // Ensure booking name uses the first passenger (Passenger 1) from passengerData
+        // passengerData should already be in the correct order (Passenger 1 first, Passenger 2 second, etc.)
+        // This matches the order displayed in Flight Voucher Details
+        const firstPassenger = passengerData && passengerData.length > 0 ? passengerData[0] : null;
+        const passengerName = firstPassenger 
+            ? `${firstPassenger.firstName || ''} ${firstPassenger.lastName || ''}`.trim()
+            : 'Guest';
+        
+        // Log passenger data order for debugging
+        console.log('🔄 createRedeemBooking - Passenger data order:', passengerData?.map((p, i) => ({
+            index: i,
+            name: `${p.firstName || ''} ${p.lastName || ''}`.trim()
+        })));
+        console.log('🔄 createRedeemBooking - Booking name (from Passenger 1):', passengerName);
+        
         const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
         // Format booking date
@@ -6262,6 +6276,15 @@ app.get('/api/getAllBookingData', (req, res) => {
     const sql = `
         SELECT 
             ab.*, 
+            -- Use Passenger 1's name (first passenger by id ASC) if available, otherwise use booking name
+            COALESCE(
+                (SELECT CONCAT(p1.first_name, ' ', p1.last_name) 
+                 FROM passenger p1 
+                 WHERE p1.booking_id = ab.id 
+                 ORDER BY p1.id ASC 
+                 LIMIT 1),
+                ab.name
+            ) as name,
             ab.name as passenger_name,
             -- Calculate actual paid amount from payment_history (includes promo codes and refunds)
             -- Only override if there are payment records; otherwise use the stored paid value
@@ -11172,6 +11195,105 @@ app.get('/api/getBookingDetail', async (req, res) => {
         });
         // Eğer passenger kaydı yok ama booking.pax > 0 ise, placeholder passenger listesi üret
         let passengers = passengerRows || [];
+        
+        // If this booking was created from a Flight Voucher (redeemed_voucher = 'Yes' or flight_type_source = 'Redeem Voucher'),
+        // try to get the original voucher's passenger_details order and sort passengers to match that order
+        // This ensures Booking Details matches Flight Voucher Details passenger order
+        if (passengers.length > 0 && 
+            (booking.redeemed_voucher === 'Yes' || booking.redeemed_voucher === 1 || booking.flight_type_source === 'Redeem Voucher')) {
+            try {
+                // Try to find the original voucher by voucher_code first
+                // If not found, try to find by email and created_at (voucher created before booking)
+                let voucherRows = null;
+                
+                if (booking.voucher_code) {
+                    const [voucherRowsByCode] = await new Promise((resolve, reject) => {
+                        con.query('SELECT voucher_passenger_details FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [booking.voucher_code], (err, rows) => {
+                            if (err) reject(err);
+                            else resolve([rows]);
+                        });
+                    });
+                    if (voucherRowsByCode && voucherRowsByCode.length > 0) {
+                        voucherRows = voucherRowsByCode;
+                    }
+                }
+                
+                // If not found by voucher_code, try to find by email and created_at
+                if (!voucherRows || voucherRows.length === 0) {
+                    const [voucherRowsByEmail] = await new Promise((resolve, reject) => {
+                        con.query(`
+                            SELECT voucher_passenger_details 
+                            FROM all_vouchers 
+                            WHERE (email = ? OR purchaser_email = ?) 
+                            AND created_at < ? 
+                            AND book_flight = 'Flight Voucher'
+                            ORDER BY created_at DESC 
+                            LIMIT 1
+                        `, [booking.email, booking.email, booking.created_at || '9999-12-31'], (err, rows) => {
+                            if (err) reject(err);
+                            else resolve([rows]);
+                        });
+                    });
+                    if (voucherRowsByEmail && voucherRowsByEmail.length > 0) {
+                        voucherRows = voucherRowsByEmail;
+                    }
+                }
+                
+                if (voucherRows && voucherRows.length > 0 && voucherRows[0].voucher_passenger_details) {
+                    let voucherPassengerDetails = null;
+                    try {
+                        voucherPassengerDetails = typeof voucherRows[0].voucher_passenger_details === 'string'
+                            ? JSON.parse(voucherRows[0].voucher_passenger_details)
+                            : voucherRows[0].voucher_passenger_details;
+                    } catch (parseErr) {
+                        console.warn('Failed to parse voucher_passenger_details for passenger ordering:', parseErr);
+                    }
+                    
+                    if (Array.isArray(voucherPassengerDetails) && voucherPassengerDetails.length > 0) {
+                        // Sort passengers to match voucher_passenger_details order
+                        // Match by first_name and last_name
+                        const sortedPassengers = [];
+                        const usedPassengerIds = new Set();
+                        
+                        // First, add passengers in the order they appear in voucher_passenger_details
+                        voucherPassengerDetails.forEach(vp => {
+                            const vpFirstName = (vp.first_name || vp.firstName || '').trim().toLowerCase();
+                            const vpLastName = (vp.last_name || vp.lastName || '').trim().toLowerCase();
+                            
+                            // Find matching passenger in passengerRows
+                            const matchingPassenger = passengers.find(p => {
+                                if (usedPassengerIds.has(p.id)) return false;
+                                const pFirstName = (p.first_name || '').trim().toLowerCase();
+                                const pLastName = (p.last_name || '').trim().toLowerCase();
+                                return pFirstName === vpFirstName && pLastName === vpLastName;
+                            });
+                            
+                            if (matchingPassenger) {
+                                sortedPassengers.push(matchingPassenger);
+                                usedPassengerIds.add(matchingPassenger.id);
+                            }
+                        });
+                        
+                        // Add any remaining passengers that weren't matched (shouldn't happen, but just in case)
+                        passengers.forEach(p => {
+                            if (!usedPassengerIds.has(p.id)) {
+                                sortedPassengers.push(p);
+                            }
+                        });
+                        
+                        if (sortedPassengers.length === passengers.length) {
+                            passengers = sortedPassengers;
+                            console.log('✅ getBookingDetail - Sorted passengers to match voucher_passenger_details order');
+                        } else {
+                            console.warn('⚠️ getBookingDetail - Passenger count mismatch, using original order');
+                        }
+                    }
+                }
+            } catch (voucherOrderErr) {
+                console.warn('⚠️ getBookingDetail - Could not sort passengers by voucher order:', voucherOrderErr.message);
+                // Continue with original order if sorting fails
+            }
+        }
         const paxCount = parseInt(booking.pax, 10) || 0;
         // Booking name'den ad/soyad çıkarımı
         const fullName = (booking.name || '').trim();

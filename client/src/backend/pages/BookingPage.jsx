@@ -5718,9 +5718,9 @@ setBookingDetail(finalVoucherDetail);
                                                     bookingDetail.passengers && bookingDetail.passengers.length > 0 ? (
                                                         <Box>
                                                             {(() => {
-                                                                // Sort passengers by ID to identify original booking passengers (from ballooning-book)
-                                                                // Original passengers are those with lower IDs (created first)
-                                                                const sortedPassengers = [...bookingDetail.passengers].sort((a, b) => (a.id || 0) - (b.id || 0));
+                                                                // Use passengers in the order they come from backend (already sorted by ORDER BY id ASC)
+                                                                // This preserves the original insertion order and matches Flight Voucher Details
+                                                                const passengers = bookingDetail.passengers;
                                                                                                 
                                                                 // Calculate original passenger count from original_amount
                                                                 // original_amount = 220 * originalPaxCount (for Shared Flight)
@@ -5728,15 +5728,14 @@ setBookingDetail(finalVoucherDetail);
                                                                 const originalAmount = parseFloat(bookingDetail.booking?.original_amount) || 0;
                                                                 const originalPaxCount = originalAmount > 0 
                                                                     ? Math.round(originalAmount / BASE_PRICE_PER_PASSENGER) 
-                                                                    : sortedPassengers.length; // Fallback to all passengers if original_amount is 0
+                                                                    : passengers.length; // Fallback to all passengers if original_amount is 0
                                                                                                 
-                                                                                                return sortedPassengers.map((p, i) => {
+                                                                                                return passengers.map((p, i) => {
                                                                                                     const isOriginalPassenger = i < originalPaxCount; // First N passengers are from original booking (ballooning-book)
-                                                                                                    const passengerIndex = bookingDetail.passengers.findIndex(pp => pp.id === p.id);
                                                                                                     
                                                                                                     return (
                                                                 <Typography key={p.id}>
-                                                                            Passenger {passengerIndex + 1}: {editingPassenger === p.id ? (
+                                                                            Passenger {i + 1}: {editingPassenger === p.id ? (
                                                                         <>
                                                                             <input
                                                                                 value={editPassengerFirstName}
@@ -5899,7 +5898,7 @@ setBookingDetail(finalVoucherDetail);
                                                                                         
                                                                                         // Add-on price (only for first passenger)
                                                                                         let addOnPrice = 0;
-                                                                                        const isFirstPassenger = passengerIndex === 0;
+                                                                                        const isFirstPassenger = i === 0;
                                                                                         addOnPrice = isFirstPassenger ? addOnTotalPrice : 0;
                                                                                         
                                                                                         // Build price display string
@@ -5924,7 +5923,7 @@ setBookingDetail(finalVoucherDetail);
                                                                                 );
                                                                             })()}
                                                                             <IconButton size="small" onClick={() => handleEditPassengerClick(p)}><EditIcon fontSize="small" /></IconButton>
-                                                                            {passengerIndex > 0 && ( // Only show delete button for additional passengers (not the first one)
+                                                                            {i > 0 && ( // Only show delete button for additional passengers (not the first one)
                                                                                 <IconButton 
                                                                                     size="small" 
                                                                                     onClick={() => handleDeletePassenger(p.id)}

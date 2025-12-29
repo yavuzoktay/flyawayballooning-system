@@ -655,8 +655,13 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 console.log('Voucher Ref:', voucherRef);
 
                 // Prepare passenger data from booking
+                // Use passengers in the order they come from backend (already sorted by ORDER BY id ASC)
+                // This ensures Passenger 1 is first, Passenger 2 is second, etc.
+                // The first passenger (passengerData[0]) will be used as the booking name
                 const passengerData = [];
                 if (bookingData.passengers && bookingData.passengers.length > 0) {
+                    // Use passengers in the exact order from backend (already sorted by ORDER BY id ASC)
+                    // This preserves the original insertion order and matches Flight Voucher Details
                     bookingData.passengers.forEach(p => {
                         passengerData.push({
                             firstName: p.first_name || bookingData.name?.split(' ')[0] || '',
@@ -677,6 +682,12 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                         phone: bookingData.phone || ''
                     });
                 }
+                
+                // Log passenger data order for debugging
+                console.log('🔄 RescheduleFlightModal - Passenger data order:', passengerData.map((p, i) => ({
+                    index: i,
+                    name: `${p.firstName} ${p.lastName}`.trim()
+                })));
 
                 // Determine flight type
                 const flightTypeStr = (bookingData.flight_type || bookingData.experience || 'Shared Flight').toLowerCase();
