@@ -13219,6 +13219,33 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         // This allows Flight Voucher to be displayed even if not yet redeemed
         if (!booking && voucherInfoForLookup && voucherInfoForLookup.book_flight === 'Flight Voucher') {
             console.log('ℹ️ Customer Portal - Booking not found, but Flight Voucher exists. Creating synthetic booking from voucher.');
+            
+            // Format created_at to ensure it's a valid date string
+            let syntheticCreatedAt = null;
+            const createdAtSource = voucherInfoForLookup.created_at || createdAt;
+            if (createdAtSource) {
+                try {
+                    if (typeof createdAtSource === 'string' && createdAtSource.match(/^\d{4}-\d{2}-\d{2}/)) {
+                        // ISO format (YYYY-MM-DD or YYYY-MM-DD HH:mm:ss)
+                        syntheticCreatedAt = createdAtSource;
+                    } else if (createdAtSource instanceof Date) {
+                        // Date object - convert to ISO string
+                        syntheticCreatedAt = createdAtSource.toISOString();
+                    } else {
+                        // Try to parse and format
+                        const dateObj = new Date(createdAtSource);
+                        if (!isNaN(dateObj.getTime())) {
+                            syntheticCreatedAt = dateObj.toISOString();
+                        } else {
+                            syntheticCreatedAt = createdAtSource;
+                        }
+                    }
+                } catch (err) {
+                    console.warn('⚠️ Customer Portal - Error formatting synthetic created_at:', err, createdAtSource);
+                    syntheticCreatedAt = createdAtSource;
+                }
+            }
+            
             // Create a synthetic booking object from voucher info
             booking = {
                 id: voucherInfoForLookup.id || voucherIdFromToken || null,
@@ -13236,14 +13263,14 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 paid: 0,
                 due: 0,
                 expires: voucherInfoForLookup.voucher_expires || null,
-                created_at: voucherInfoForLookup.created_at || createdAt || null,
+                created_at: syntheticCreatedAt,
                 flight_attempts: 0,
                 experience: null,
                 flight_type: null,
                 activity_id: null,
                 additional_notes: null
             };
-            console.log('✅ Customer Portal - Created synthetic booking from Flight Voucher:', booking.id);
+            console.log('✅ Customer Portal - Created synthetic booking from Flight Voucher:', booking.id, 'created_at:', syntheticCreatedAt);
         }
 
         if (!booking) {
@@ -13761,6 +13788,34 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             }
         }
 
+        // Format created_at to ensure it's a valid date string
+        // Handle different date formats (MySQL Date, ISO string, etc.)
+        let formattedCreatedAt = null;
+        if (booking.created_at) {
+            try {
+                // If it's already a formatted string, use it
+                if (typeof booking.created_at === 'string' && booking.created_at.match(/^\d{4}-\d{2}-\d{2}/)) {
+                    // ISO format (YYYY-MM-DD or YYYY-MM-DD HH:mm:ss)
+                    formattedCreatedAt = booking.created_at;
+                } else if (booking.created_at instanceof Date) {
+                    // Date object - convert to ISO string
+                    formattedCreatedAt = booking.created_at.toISOString();
+                } else {
+                    // Try to parse and format
+                    const dateObj = new Date(booking.created_at);
+                    if (!isNaN(dateObj.getTime())) {
+                        formattedCreatedAt = dateObj.toISOString();
+                    } else {
+                        // If parsing fails, use the original value
+                        formattedCreatedAt = booking.created_at;
+                    }
+                }
+            } catch (err) {
+                console.warn('⚠️ Customer Portal - Error formatting created_at:', err, booking.created_at);
+                formattedCreatedAt = booking.created_at;
+            }
+        }
+
         // Format the response
         const response = {
             success: true,
@@ -13785,7 +13840,7 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 paid: booking.paid,
                 due: booking.due,
                 expires: booking.expires || (voucherInfo && voucherInfo.voucher_expires) || booking.expires,
-                created_at: booking.created_at,
+                created_at: formattedCreatedAt,
                 additional_notes: booking.additional_notes,
                 flight_attempts: finalFlightAttempts,
                 activity_id: booking.activity_id || null,

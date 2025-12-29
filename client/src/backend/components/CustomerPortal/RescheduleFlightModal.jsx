@@ -733,6 +733,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                     ...newBooking,
                     flight_date: pendingRescheduleData.selectedDateTime,
                     location: pendingRescheduleData.selectedLocation,
+                    status: 'Scheduled', // Set status to Scheduled when flight is rescheduled
                     is_voucher_redeemed: true // Mark as redeemed since we just created a redeem booking
                 };
 
@@ -766,7 +767,8 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 const enhancedBooking = {
                     ...updatedBooking,
                     flight_date: pendingRescheduleData.selectedDateTime,
-                    location: pendingRescheduleData.selectedLocation
+                    location: pendingRescheduleData.selectedLocation,
+                    status: 'Scheduled' // Set status to Scheduled when flight is rescheduled
                 };
 
                 if (onRescheduleSuccess) {
