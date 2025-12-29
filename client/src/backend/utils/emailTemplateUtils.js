@@ -564,10 +564,9 @@ const getBookingConfirmationReceiptHtml = (booking = {}) => {
         bookFlight.includes('gift voucher') || 
         templateName === 'gift voucher confirmation' ||
         templateName === 'gift voucher';
-    // For both Flight Voucher and Gift Voucher, location should not be shown in Description
-    // Always set location to empty string for vouchers, never show location in DESCRIPTION
+    // For both Flight Voucher and Gift Voucher, location should show "-" instead of actual location
     // This ensures "Bath" or any other location is not displayed for vouchers
-    const location = (isFlightVoucher || isGiftVoucher) ? '' : (booking?.location ? escapeHtml(booking.location) : '');
+    const location = (isFlightVoucher || isGiftVoucher) ? '—' : (booking?.location ? escapeHtml(booking.location) : '');
     const experience = escapeHtml(booking?.flight_type || 'Flight Experience');
     const guestCount = receiptItems.length;
     
@@ -629,7 +628,7 @@ const getBookingConfirmationReceiptHtml = (booking = {}) => {
                             ${flightDateTime ? `<div style="margin-top:4px; font-size:12px; color:#64748b; font-weight:400;">Booked For: ${escapeHtml(flightDateTime)}</div>` : ''}
                         </td>
                         <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;">
-                            ${location ? `${location}${guestCount > 0 ? `<div style="margin-top:4px; font-size:12px; color:#64748b;">Guests: ${guestCount}</div>` : ''}` : (guestCount > 0 ? `<div style="font-size:12px; color:#64748b;">Guests: ${guestCount}</div>` : '')}
+                            ${(isFlightVoucher || isGiftVoucher) ? `—${guestCount > 0 ? `<div style="margin-top:4px; font-size:12px; color:#64748b;">Guests: ${guestCount}</div>` : ''}` : (location ? `${location}${guestCount > 0 ? `<div style="margin-top:4px; font-size:12px; color:#64748b;">Guests: ${guestCount}</div>` : ''}` : (guestCount > 0 ? `<div style="font-size:12px; color:#64748b;">Guests: ${guestCount}</div>` : ''))}
                         </td>
                         <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;" align="right">
                             £${subtotal != null ? subtotal.toFixed(2) : '—'}

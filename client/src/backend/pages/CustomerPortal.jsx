@@ -90,10 +90,18 @@ const CustomerPortal = () => {
 
             console.log('✅ Customer Portal - Response received:', response.data);
             if (response.data.success) {
-                setBookingData(response.data.data);
+                const bookingDataResponse = response.data.data;
+                setBookingData(bookingDataResponse);
                 // Fetch payment history after booking data is loaded
-                if (response.data.data?.id) {
-                    fetchPaymentHistory(response.data.data.id);
+                // Only fetch if we have a valid booking_id (not just voucher ID for Flight Voucher)
+                // For Flight Voucher, payment history might not exist or might be linked differently
+                // We'll still try to fetch, but the endpoint should handle Flight Voucher cases gracefully
+                if (bookingDataResponse?.id) {
+                    // Pass bookingData to fetchPaymentHistory so it can check if it's a Flight Voucher
+                    fetchPaymentHistory(bookingDataResponse.id, bookingDataResponse);
+                } else {
+                    // If no booking ID, ensure isFullyRefunded is false
+                    setIsFullyRefunded(false);
                 }
             } else {
                 console.error('❌ Customer Portal - API returned error:', response.data);
@@ -114,9 +122,113 @@ const CustomerPortal = () => {
         }
     };
 
-    const fetchPaymentHistory = async (bookingId) => {
-        if (!bookingId) return;
+    const fetchPaymentHistory = async (bookingId, bookingDataParam = null) => {
+        if (!bookingId) {
+            // If no booking ID, ensure isFullyRefunded is false
+            setIsFullyRefunded(false);
+            return;
+        }
         
+        // Use passed bookingDataParam or fallback to state (state might not be updated yet)
+        const currentBookingData = bookingDataParam || bookingData;
+        
+        // Check if this is a Flight Voucher
+        const isFlightVoucher = currentBookingData?.is_flight_voucher || currentBookingData?.book_flight === 'Flight Voucher';
+        
+        // For Flight Voucher, we should NOT rely on payment_history table for refund status
+        // Flight Voucher refund status should be determined by all_vouchers table (redeemed, paid fields)
+        // Since we don't have direct access to all_vouchers in frontend, we'll assume NOT refunded
+        // unless we have explicit payment history showing refunds
+        if (isFlightVoucher) {
+            console.log('[CustomerPortal] Flight Voucher detected, checking payment history with extra caution');
+            // For Flight Voucher, only mark as refunded if we have explicit refund records
+            // Otherwise, assume NOT refunded (safer default for Flight Vouchers)
+            try {
+                const voucherRef = currentBookingData?.voucher_ref || currentBookingData?.voucher_code;
+                let paymentData = [];
+                
+                if (voucherRef) {
+                    try {
+                        // Try fetching payment history by voucher_ref
+                        const voucherResponse = await axios.get(`/api/voucher-payment-history/${voucherRef}`);
+                        if (voucherResponse.data?.success && voucherResponse.data?.data?.length > 0) {
+                            paymentData = voucherResponse.data.data;
+                            console.log('[CustomerPortal] Found payment history by voucher_ref:', voucherRef, paymentData.length, 'records');
+                        }
+                    } catch (voucherError) {
+                        console.warn('[CustomerPortal] Error fetching voucher payment history:', voucherError);
+                    }
+                }
+                
+                // Also try booking_id as fallback
+                if (paymentData.length === 0) {
+                    try {
+                        const bookingResponse = await axios.get(`/api/booking-payment-history/${bookingId}`);
+                        paymentData = bookingResponse.data?.data || [];
+                        console.log('[CustomerPortal] Fallback to booking payment history:', bookingId, paymentData.length, 'records');
+                    } catch (bookingError) {
+                        console.warn('[CustomerPortal] Error fetching booking payment history:', bookingError);
+                    }
+                }
+                
+                setPaymentHistory(paymentData);
+                
+                // For Flight Voucher, only mark as fully refunded if we have explicit refund records
+                // AND the refunds are greater than or equal to payments
+                let totalPayments = 0;
+                let totalRefunds = 0;
+                
+                paymentData.forEach(payment => {
+                    const amount = parseFloat(payment.amount || 0);
+                    if (payment.payment_status === 'refunded' || amount < 0) {
+                        totalRefunds += Math.abs(amount);
+                    } else if (payment.payment_status === 'succeeded' && amount > 0) {
+                        totalPayments += amount;
+                    }
+                });
+                
+                // For Flight Voucher: Check paid field from bookingData
+                // If paid > 0 and no refunds in payment history, assume NOT refunded
+                const paidAmount = parseFloat(currentBookingData?.paid || 0);
+                
+                // For Flight Voucher: Only mark as refunded if:
+                // 1. We have payment data AND refunds >= payments, OR
+                // 2. paid is 0 or null (indicating full refund)
+                // If paid > 0 and no payment history or no refunds, assume NOT refunded
+                let fullyRefunded = false;
+                if (paymentData.length > 0 && totalPayments > 0) {
+                    // We have payment history, check if refunds >= payments
+                    fullyRefunded = totalRefunds >= totalPayments;
+                } else if (paidAmount <= 0) {
+                    // No payment history but paid is 0 or negative, might be refunded
+                    // But this is less reliable, so we'll be conservative
+                    fullyRefunded = false; // Don't assume refunded just because paid is 0
+                } else {
+                    // paid > 0 and no payment history or no refunds, definitely NOT refunded
+                    fullyRefunded = false;
+                }
+                
+                setIsFullyRefunded(fullyRefunded);
+                
+                console.log('[CustomerPortal] Flight Voucher payment history:', {
+                    bookingId,
+                    voucherRef,
+                    paymentDataCount: paymentData.length,
+                    totalPayments,
+                    totalRefunds,
+                    paidAmount,
+                    fullyRefunded
+                });
+            } catch (error) {
+                console.error('[CustomerPortal] Error fetching Flight Voucher payment history:', error);
+                setPaymentHistory([]);
+                // For Flight Voucher, if error occurs, assume NOT refunded (safer default)
+                setIsFullyRefunded(false);
+            }
+            return;
+        }
+        
+        // For regular bookings (non-Flight Voucher), use normal payment history check
         try {
             const response = await axios.get(`/api/booking-payment-history/${bookingId}`);
             const paymentData = response.data?.data || [];
@@ -138,10 +250,14 @@ const CustomerPortal = () => {
             });
             
             // Check if fully refunded (total refunds >= total payments)
-            const fullyRefunded = totalPayments > 0 && totalRefunds >= totalPayments;
+            // IMPORTANT: Only mark as fully refunded if we have actual payment data
+            // If payment history is empty or has no payments, assume NOT refunded
+            const fullyRefunded = paymentData.length > 0 && totalPayments > 0 && totalRefunds >= totalPayments;
             setIsFullyRefunded(fullyRefunded);
             
             console.log('[CustomerPortal] Payment history:', {
+                bookingId,
+                paymentDataCount: paymentData.length,
                 totalPayments,
                 totalRefunds,
                 fullyRefunded
@@ -149,6 +265,7 @@ const CustomerPortal = () => {
         } catch (error) {
             console.error('[CustomerPortal] Error fetching payment history:', error);
             setPaymentHistory([]);
+            // If error occurs, assume NOT refunded (safer default)
             setIsFullyRefunded(false);
         }
     };
