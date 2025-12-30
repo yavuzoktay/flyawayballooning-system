@@ -1260,13 +1260,25 @@ const CustomerPortal = () => {
                                 // For Flight Voucher, update is_voucher_redeemed flag if applicable
                                 is_voucher_redeemed: updatedData.is_voucher_redeemed !== undefined 
                                     ? updatedData.is_voucher_redeemed 
-                                    : prevData?.is_voucher_redeemed
+                                    : prevData?.is_voucher_redeemed,
+                                // Preserve Flight Voucher flags
+                                book_flight: updatedData.book_flight || prevData?.book_flight,
+                                is_flight_voucher: updatedData.is_flight_voucher !== undefined 
+                                    ? updatedData.is_flight_voucher 
+                                    : prevData?.is_flight_voucher,
+                                // Preserve voucher information
+                                voucher_ref: updatedData.voucher_ref || prevData?.voucher_ref,
+                                voucher_code: updatedData.voucher_code || prevData?.voucher_code
                             };
                             console.log('🔄 Customer Portal - Merged bookingData:', mergedData);
                             console.log('🔄 Customer Portal - Status update:', {
                                 'updatedData.status': updatedData.status,
                                 'updatedData.flight_date': updatedData.flight_date,
-                                'final status': mergedData.status
+                                'updatedData.location': updatedData.location,
+                                'updatedData.is_voucher_redeemed': updatedData.is_voucher_redeemed,
+                                'final status': mergedData.status,
+                                'final flight_date': mergedData.flight_date,
+                                'final location': mergedData.location
                             });
                             return mergedData;
                         });
