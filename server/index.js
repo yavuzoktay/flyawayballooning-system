@@ -14108,7 +14108,11 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 voucher_type_detail: finalVoucherTypeDetail || booking.voucher_type_detail || finalVoucherType || booking.voucher_type,
                 paid: booking.paid,
                 due: booking.due,
-                expires: booking.expires || (voucherInfo && voucherInfo.voucher_expires) || booking.expires,
+                // For Flight Voucher, prioritize voucher_expires from all_vouchers table
+                // For other types, use booking.expires first, then fallback to voucher_expires
+                expires: (isFlightVoucher && voucherInfo && voucherInfo.voucher_expires) 
+                    ? voucherInfo.voucher_expires 
+                    : (booking.expires || (voucherInfo && voucherInfo.voucher_expires) || null),
                 created_at: formattedCreatedAt,
                 additional_notes: booking.additional_notes,
                 flight_attempts: finalFlightAttempts,
@@ -23711,11 +23715,19 @@ function generateFlightVoucherConfirmationEmail(voucher, template = null) {
         // Map flight type
         flight_type: voucher.experience_type || voucher.flight_type || 'Shared Flight',
         experience: voucher.experience_type || voucher.flight_type || 'Shared Flight',
-        // Map voucher code
+        // Map voucher code (use voucher_ref, not voucher_code to avoid duplication)
         voucher_code: voucher.voucher_ref || voucher.voucher_code || '',
+        voucher_ref: voucher.voucher_ref || voucher.voucher_code || '',
         // Map receipt number
         receipt_number: voucher.voucher_ref || voucher.id || '',
         booking_reference: voucher.voucher_ref || voucher.id || '',
+        // IMPORTANT: Set voucher_id to voucher.id so buildCustomerPortalToken can use it
+        // buildCustomerPortalToken will add the 'voucher-' prefix automatically
+        // Don't override id here, let buildCustomerPortalToken handle the prefix
+        voucher_id: voucher.id || null,
+        // Ensure id is set to voucher.id (not voucher-{voucher.id}) so buildCustomerPortalToken can detect it
+        // buildCustomerPortalToken checks voucher_id first, then falls back to id if voucher_id is null
+        id: voucher.id || null,
         // Add book_flight and templateName to identify Flight Voucher in receipt generation
         // This ensures location is not shown in DESCRIPTION for Flight Voucher emails
         book_flight: voucher.book_flight || 'Flight Voucher',
@@ -23751,6 +23763,7 @@ function generateFlightVoucherConfirmationEmail(voucher, template = null) {
         })(),
         numberOfPassengers: voucher.numberOfPassengers || 0,
         // Map created date - format as DD/MM/YYYY HH:mm (same as frontend)
+        // IMPORTANT: Both created and created_at must be formatted for buildCustomerPortalToken
         created: (() => {
             const rawCreated = voucher.created_at || voucher.created || '';
             if (rawCreated) {
