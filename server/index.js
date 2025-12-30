@@ -22783,19 +22783,76 @@ function buildCustomerPortalToken(booking = {}) {
         booking.portal_link_token;
     if (explicitToken) return explicitToken;
 
-    const parts = [
-        booking.id ?? booking.booking_id ?? booking.bookingId ?? '',
-        booking.booking_reference ?? booking.bookingReference ?? '',
-        booking.voucher_code ?? booking.voucherCode ?? '',
-        booking.email ?? booking.customer_email ?? '',
-        booking.created_at ?? booking.created ?? '',
-    ]
-        .map((part) => (part == null ? '' : String(part).trim()))
-        .filter((part) => part !== '');
+    // For Flight Voucher, use voucher ID instead of booking ID
+    // For Gift Voucher, use voucher ID
+    // For other types, use booking ID
+    const isFlightVoucher = booking.book_flight === 'Flight Voucher' || booking.is_flight_voucher;
+    const isGiftVoucher = booking.book_flight === 'Gift Voucher';
+    
+    // Get voucher ID from _original if available, or from booking.voucher_id
+    const voucherId = booking._original?.id || booking.voucher_id || null;
+    
+    // Determine ID to use: voucher ID for Flight/Gift Voucher, booking ID for others
+    let idToUse = '';
+    if (isFlightVoucher || isGiftVoucher) {
+        // Use voucher ID with prefix for Flight/Gift Voucher
+        if (voucherId) {
+            idToUse = `voucher-${voucherId}`;
+        } else if (booking.id && String(booking.id).startsWith('voucher-')) {
+            // Already in voucher- format
+            idToUse = String(booking.id);
+        } else {
+            // Fallback: use booking ID if voucher ID not available
+            idToUse = booking.id ?? booking.booking_id ?? booking.bookingId ?? '';
+        }
+    } else {
+        // For regular bookings, use booking ID
+        idToUse = booking.id ?? booking.booking_id ?? booking.bookingId ?? '';
+    }
+    
+    // For Flight Voucher, use purchaser_email instead of email
+    // For Gift Voucher, use recipient_email
+    // For other types, use email
+    let emailToUse = '';
+    if (isFlightVoucher) {
+        emailToUse = booking.purchaser_email || booking._original?.purchaser_email || booking.email || booking.customer_email || '';
+    } else if (isGiftVoucher) {
+        emailToUse = booking.recipient_email || booking._original?.recipient_email || booking.email || booking.customer_email || '';
+    } else {
+        emailToUse = booking.email || booking.customer_email || '';
+    }
 
-    if (!parts.length) return null;
+    // Format created_at to DD/MM/YYYY HH:mm format (same as frontend)
+    let formattedCreatedAt = '';
+    const rawCreatedAt = booking.created_at ?? booking.created ?? '';
+    if (rawCreatedAt) {
+        try {
+            // Try to parse and format the date
+            const dateObj = moment(rawCreatedAt);
+            if (dateObj.isValid()) {
+                // Format as DD/MM/YYYY HH:mm (same as frontend)
+                formattedCreatedAt = dateObj.format('DD/MM/YYYY HH:mm');
+            } else {
+                // If parsing fails, use the original value
+                formattedCreatedAt = String(rawCreatedAt).trim();
+            }
+        } catch (e) {
+            // If error, use original value
+            formattedCreatedAt = String(rawCreatedAt).trim();
+        }
+    }
+
+    const sourceParts = [
+        idToUse,
+        booking.voucher_code ?? booking.voucherCode ?? booking.voucher_ref ?? '',
+        emailToUse,
+        formattedCreatedAt
+    ].map((part) => (part == null ? '' : String(part).trim()))
+     .filter((part) => part !== '');
+
+    if (!sourceParts.length) return null;
     try {
-        return Buffer.from(parts.join('|'), 'utf8').toString('base64');
+        return Buffer.from(sourceParts.join('|'), 'utf8').toString('base64');
     } catch (error) {
         console.warn('Error encoding customer portal token:', error);
         return null;
@@ -23608,9 +23665,35 @@ function generateFlightVoucherConfirmationEmail(voucher, template = null) {
             return 0;
         })(),
         numberOfPassengers: voucher.numberOfPassengers || 0,
-        // Map created date
-        created: voucher.created_at || voucher.created,
-        created_at: voucher.created_at || voucher.created
+        // Map created date - format as DD/MM/YYYY HH:mm (same as frontend)
+        created: (() => {
+            const rawCreated = voucher.created_at || voucher.created || '';
+            if (rawCreated) {
+                try {
+                    const dateObj = moment(rawCreated);
+                    if (dateObj.isValid()) {
+                        return dateObj.format('DD/MM/YYYY HH:mm');
+                    }
+                } catch (e) {
+                    // If error, use original value
+                }
+            }
+            return rawCreated;
+        })(),
+        created_at: (() => {
+            const rawCreated = voucher.created_at || voucher.created || '';
+            if (rawCreated) {
+                try {
+                    const dateObj = moment(rawCreated);
+                    if (dateObj.isValid()) {
+                        return dateObj.format('DD/MM/YYYY HH:mm');
+                    }
+                } catch (e) {
+                    // If error, use original value
+                }
+            }
+            return rawCreated;
+        })()
     };
     
     // Debug logging for voucher to booking conversion
