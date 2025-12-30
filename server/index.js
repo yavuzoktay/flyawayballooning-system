@@ -13876,19 +13876,17 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                             });
                         } else {
                             // NEW: Search for bookings created via Redeem Voucher flow
-                            // These bookings have flight_type_source = 'Redeem Voucher' and were created after the original voucher booking
-                            // IMPORTANT: Must match by voucher_code to ensure we're checking the same voucher, not just email
-                            // Only check if voucherCodeToCheck is available
+                            // IMPORTANT: When a Flight Voucher is rescheduled, createRedeemBooking creates a NEW booking
+                            // with a NEW voucher_code (e.g., "BAT26XXX"), NOT the original voucher code (e.g., "GATWETRN1")
+                            // So we need to check if the original voucher is redeemed, and if so, find the redeemed booking
+                            // by matching email and created_at (the redeemed booking is created after the original voucher)
                             if (voucherCodeToCheck) {
-                                const [redeemFlowBookingRows] = await new Promise((resolve, reject) => {
+                                // First, check if the original voucher is marked as redeemed in all_vouchers
+                                const [voucherStatusRows] = await new Promise((resolve, reject) => {
                                     con.query(`
-                                        SELECT id, flight_date, location, status, redeemed_voucher, flight_type_source, created_at
-                                        FROM all_booking 
-                                        WHERE voucher_code = ?
-                                        AND flight_type_source = 'Redeem Voucher'
-                                        AND (redeemed_voucher = 'Yes' OR redeemed_voucher = 1)
-                                        AND flight_date IS NOT NULL
-                                        ORDER BY created_at DESC
+                                        SELECT redeemed, status, created_at
+                                        FROM all_vouchers 
+                                        WHERE UPPER(voucher_ref) = UPPER(?)
                                         LIMIT 1
                                     `, [voucherCodeToCheck], (err, rows) => {
                                         if (err) reject(err);
@@ -13896,13 +13894,40 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                                     });
                                 });
                                 
-                                if (redeemFlowBookingRows && redeemFlowBookingRows.length > 0) {
-                                    redeemedBooking = redeemFlowBookingRows[0];
-                                    console.log('✅ Customer Portal - Found redeemed booking via Redeem Voucher flow:', {
-                                        bookingId: redeemedBooking.id,
-                                        flightDate: redeemedBooking.flight_date,
-                                        location: redeemedBooking.location
+                                const isVoucherRedeemed = voucherStatusRows && voucherStatusRows.length > 0 && 
+                                    (voucherStatusRows[0].redeemed === 'Yes' || voucherStatusRows[0].status === 'Used');
+                                
+                                if (isVoucherRedeemed && booking.email) {
+                                    // Voucher is redeemed, find the redeemed booking by matching email and created_at
+                                    // The redeemed booking should be created after the original voucher booking
+                                    const originalBookingCreatedAt = booking.created_at || booking.createdAt;
+                                    
+                                    const [redeemFlowBookingRows] = await new Promise((resolve, reject) => {
+                                        con.query(`
+                                            SELECT id, flight_date, location, status, redeemed_voucher, flight_type_source, created_at, email
+                                            FROM all_booking 
+                                            WHERE flight_type_source = 'Redeem Voucher'
+                                            AND (redeemed_voucher = 'Yes' OR redeemed_voucher = 1)
+                                            AND flight_date IS NOT NULL
+                                            AND email = ?
+                                            ${originalBookingCreatedAt ? 'AND created_at > ?' : ''}
+                                            ORDER BY created_at DESC
+                                            LIMIT 1
+                                        `, originalBookingCreatedAt ? [booking.email, originalBookingCreatedAt] : [booking.email], (err, rows) => {
+                                            if (err) reject(err);
+                                            else resolve([rows]);
+                                        });
                                     });
+                                    
+                                    if (redeemFlowBookingRows && redeemFlowBookingRows.length > 0) {
+                                        redeemedBooking = redeemFlowBookingRows[0];
+                                        console.log('✅ Customer Portal - Found redeemed booking via Redeem Voucher flow (by email):', {
+                                            bookingId: redeemedBooking.id,
+                                            flightDate: redeemedBooking.flight_date,
+                                            location: redeemedBooking.location,
+                                            email: redeemedBooking.email
+                                        });
+                                    }
                                 }
                             }
                         }
@@ -13953,6 +13978,7 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                     
                     if (redeemedBookingFullRows && redeemedBookingFullRows.length > 0) {
                         // Replace booking with the redeemed booking
+                        const originalBookingId = booking.id;
                         booking = redeemedBookingFullRows[0];
                         console.log('✅ Customer Portal - Switched to redeemed booking:', booking.id);
                         
