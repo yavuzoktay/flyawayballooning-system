@@ -794,13 +794,33 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 const bookingResponse = await axios.get(`/api/getBookingDetail?booking_id=${newBookingId}`);
                 const newBooking = bookingResponse.data?.data || bookingResponse.data;
 
+                // Format flight_date to ISO format for consistency with backend
+                // selectedDateTime is in "YYYY-MM-DD HH:mm" format, convert to ISO
+                let formattedFlightDate = pendingRescheduleData.selectedDateTime;
+                try {
+                    // Parse the selectedDateTime and convert to ISO format
+                    const dateTimeParts = pendingRescheduleData.selectedDateTime.split(' ');
+                    if (dateTimeParts.length === 2) {
+                        const [datePart, timePart] = dateTimeParts;
+                        formattedFlightDate = `${datePart}T${timePart}:00`;
+                    }
+                } catch (e) {
+                    console.warn('Could not format flight_date, using original:', e);
+                }
+
                 // Enhance the booking data with reschedule information for immediate UI update
                 const enhancedBooking = {
                     ...newBooking,
-                    flight_date: pendingRescheduleData.selectedDateTime,
+                    flight_date: formattedFlightDate || pendingRescheduleData.selectedDateTime,
                     location: pendingRescheduleData.selectedLocation,
                     status: 'Scheduled', // Set status to Scheduled when flight is rescheduled
-                    is_voucher_redeemed: true // Mark as redeemed since we just created a redeem booking
+                    is_voucher_redeemed: true, // Mark as redeemed since we just created a redeem booking
+                    // Ensure book_flight and is_flight_voucher flags are preserved
+                    book_flight: bookingData?.book_flight || 'Flight Voucher',
+                    is_flight_voucher: true,
+                    // Preserve voucher information
+                    voucher_ref: bookingData?.voucher_ref || bookingData?.voucher_code,
+                    voucher_code: bookingData?.voucher_code || bookingData?.voucher_ref
                 };
 
                 if (onRescheduleSuccess) {
@@ -829,10 +849,24 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
 
                 const updatedBooking = rescheduleResponse.data?.data;
 
+                // Format flight_date to ISO format for consistency with backend
+                // selectedDateTime is in "YYYY-MM-DD HH:mm" format, convert to ISO
+                let formattedFlightDate = pendingRescheduleData.selectedDateTime;
+                try {
+                    // Parse the selectedDateTime and convert to ISO format
+                    const dateTimeParts = pendingRescheduleData.selectedDateTime.split(' ');
+                    if (dateTimeParts.length === 2) {
+                        const [datePart, timePart] = dateTimeParts;
+                        formattedFlightDate = `${datePart}T${timePart}:00`;
+                    }
+                } catch (e) {
+                    console.warn('Could not format flight_date, using original:', e);
+                }
+
                 // Enhance the booking data with reschedule information for immediate UI update
                 const enhancedBooking = {
                     ...updatedBooking,
-                    flight_date: pendingRescheduleData.selectedDateTime,
+                    flight_date: formattedFlightDate || pendingRescheduleData.selectedDateTime,
                     location: pendingRescheduleData.selectedLocation,
                     status: 'Scheduled' // Set status to Scheduled when flight is rescheduled
                 };
