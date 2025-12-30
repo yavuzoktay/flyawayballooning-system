@@ -6298,6 +6298,15 @@ app.get('/api/getAllBookingData', (req, res) => {
                 (SELECT SUM(ph.amount) FROM payment_history ph WHERE ph.booking_id = ab.id),
                 ab.paid
             ) as paid,
+            -- Check if booking has any refunds (payment_status = 'refunded' or amount < 0)
+            CASE 
+                WHEN EXISTS (
+                    SELECT 1 FROM payment_history ph 
+                    WHERE ph.booking_id = ab.id 
+                    AND (ph.payment_status = 'refunded' OR ph.amount < 0 OR ph.origin = 'refund')
+                ) THEN 1
+                ELSE 0
+            END as has_refund,
             -- NOTE: We keep ab.voucher_type intact (as stored on booking) to match getBookingDetail behaviour.
             -- We also compute a filtered voucher type for legacy logic, but we do NOT use it for the public 'voucher_type'
             -- field returned by getAllBookingData anymore (see JS enrichment logic below).
@@ -7426,36 +7435,61 @@ app.get('/api/booking-payment-history/:bookingId', (req, res) => {
         });
     }
 
-    const sql = `
-        SELECT 
-            id,
-            booking_id,
-            stripe_session_id,
-            stripe_charge_id,
-            stripe_payment_intent_id,
-            amount,
-            currency,
-            card_last4,
-            card_brand,
-            wallet_type,
-            transaction_id,
-            payout_id,
-            payment_status,
-            fingerprint,
-            origin,
-            card_present,
-            created_at,
-            arriving_on,
-            refund_comment,
-            refunded_payment_id
-        FROM payment_history
-        WHERE booking_id = ?
-        ORDER BY created_at DESC
-    `;
+    // First, get the booking's stripe_session_id to verify payment associations
+    con.query(
+        'SELECT id, stripe_session_id FROM all_booking WHERE id = ?',
+        [bookingId],
+        (bookingErr, bookingResults) => {
+            if (bookingErr) {
+                console.error('Error fetching booking:', bookingErr);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Error fetching booking',
+                    error: bookingErr.message
+                });
+            }
 
-    con.query(sql, [bookingId], (err, results) => {
-        if (err) {
-            console.error('Error fetching payment history:', err);
+            if (bookingResults.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Booking not found'
+                });
+            }
+
+            const booking = bookingResults[0];
+            const bookingStripeSessionId = booking.stripe_session_id;
+
+            const sql = `
+                SELECT 
+                    id,
+                    booking_id,
+                    stripe_session_id,
+                    stripe_charge_id,
+                    stripe_payment_intent_id,
+                    amount,
+                    currency,
+                    card_last4,
+                    card_brand,
+                    wallet_type,
+                    transaction_id,
+                    payout_id,
+                    payment_status,
+                    fingerprint,
+                    origin,
+                    card_present,
+                    created_at,
+                    arriving_on,
+                    refund_comment,
+                    refunded_payment_id
+                FROM payment_history
+                WHERE booking_id = ?
+                ORDER BY created_at DESC
+                LIMIT 1000
+            `;
+
+            con.query(sql, [bookingId], (err, results) => {
+                if (err) {
+                    console.error('Error fetching payment history:', err);
             return res.status(500).json({
                 success: false,
                 message: 'Error fetching payment history',
@@ -7463,11 +7497,127 @@ app.get('/api/booking-payment-history/:bookingId', (req, res) => {
             });
         }
 
-        res.json({
-            success: true,
-            data: results
-        });
-    });
+                // Filter results to ensure all payments have the correct booking_id (data integrity check)
+                // This prevents showing payments that might have been incorrectly associated
+                let filteredResults = results.filter(payment => payment.booking_id === bookingId);
+
+                // STRICT VALIDATION: If booking has a stripe_session_id, ONLY return payments that match that session_id
+                // OR refunds that reference payments from that session
+                // This prevents showing payments from other bookings that were incorrectly associated with this booking_id
+                if (bookingStripeSessionId) {
+                    // Get payment IDs that belong to this booking's session
+                    const sessionPaymentIds = new Set(
+                        filteredResults
+                            .filter(p => p.stripe_session_id === bookingStripeSessionId)
+                            .map(p => p.id)
+                            .filter(Boolean)
+                    );
+                    
+                    // Filter to only include:
+                    // 1. Payments with matching stripe_session_id
+                    // 2. Refunds that reference payments from this session (refunded_payment_id in sessionPaymentIds)
+                    // 3. Payments without stripe_session_id (legacy payments, but only if there are no session payments)
+                    const sessionPayments = filteredResults.filter(p => p.stripe_session_id === bookingStripeSessionId);
+                    const refundPayments = filteredResults.filter(p => 
+                        p.refunded_payment_id && sessionPaymentIds.has(p.refunded_payment_id)
+                    );
+                    const legacyPayments = filteredResults.filter(p => !p.stripe_session_id);
+                    
+                    if (sessionPayments.length > 0) {
+                        // If we have session payments, only return those + their refunds
+                        filteredResults = [...sessionPayments, ...refundPayments];
+                        console.log(`[PaymentHistory] Strict filtering: ${results.length} total, ${filteredResults.length} match booking session ${bookingStripeSessionId}`);
+                    } else if (legacyPayments.length > 0) {
+                        // If no session payments but we have legacy payments, include those (old data)
+                        filteredResults = legacyPayments;
+                        console.log(`[PaymentHistory] No session payments found, using ${legacyPayments.length} legacy payments for booking ${bookingId}`);
+                    } else {
+                        // No matching payments found
+                        filteredResults = [];
+                        console.warn(`[PaymentHistory] No payments match booking ${bookingId} session ${bookingStripeSessionId}`);
+                    }
+                    
+                    // Log if payments were filtered out
+                    if (filteredResults.length < results.length) {
+                        const filteredCount = results.length - filteredResults.length;
+                        console.warn(`[PaymentHistory] Filtered out ${filteredCount} payments that don't match booking ${bookingId} session ${bookingStripeSessionId}`);
+                    }
+                } else {
+                    // Booking has no stripe_session_id - need alternative filtering method
+                    // Group payments by stripe_session_id to identify distinct payment sessions
+                    const paymentsBySession = {};
+                    filteredResults.forEach(payment => {
+                        const sessionId = payment.stripe_session_id || 'no_session';
+                        if (!paymentsBySession[sessionId]) {
+                            paymentsBySession[sessionId] = [];
+                        }
+                        paymentsBySession[sessionId].push(payment);
+                    });
+                    
+                    const sessionCounts = Object.keys(paymentsBySession).map(sessionId => ({
+                        sessionId,
+                        count: paymentsBySession[sessionId].length
+                    })).sort((a, b) => b.count - a.count);
+                    
+                    // If there are multiple distinct payment sessions, this suggests data integrity issues
+                    // In this case, we should only show payments from the most recent session (by created_at)
+                    // OR if there's one dominant session, use that
+                    if (sessionCounts.length > 1 && sessionCounts[0].count < filteredResults.length * 0.8) {
+                        // Multiple sessions detected - find the most recent session by payment date
+                        let mostRecentSession = null;
+                        let mostRecentDate = null;
+                        
+                        Object.keys(paymentsBySession).forEach(sessionId => {
+                            const sessionPayments = paymentsBySession[sessionId];
+                            const latestPayment = sessionPayments.reduce((latest, current) => {
+                                const currentDate = new Date(current.created_at || 0);
+                                const latestDate = new Date(latest.created_at || 0);
+                                return currentDate > latestDate ? current : latest;
+                            });
+                            
+                            if (!mostRecentDate || new Date(latestPayment.created_at || 0) > mostRecentDate) {
+                                mostRecentDate = new Date(latestPayment.created_at || 0);
+                                mostRecentSession = sessionId;
+                            }
+                        });
+                        
+                        if (mostRecentSession && mostRecentSession !== 'no_session') {
+                            // Only return payments from the most recent session
+                            filteredResults = paymentsBySession[mostRecentSession];
+                            console.warn(`[PaymentHistory] Multiple payment sessions detected for booking ${bookingId}. Showing only payments from most recent session: ${mostRecentSession} (${filteredResults.length} payments)`);
+                        } else if (sessionCounts[0].count >= filteredResults.length * 0.5) {
+                            // If one session has majority, use that
+                            const dominantSession = sessionCounts[0].sessionId;
+                            filteredResults = paymentsBySession[dominantSession];
+                            console.warn(`[PaymentHistory] Multiple payment sessions detected for booking ${bookingId}. Showing only payments from dominant session: ${dominantSession} (${filteredResults.length} payments)`);
+                        }
+                    }
+                }
+
+                // Log if any payments were filtered out (indicates data integrity issue)
+                if (filteredResults.length !== results.length) {
+                    console.warn(`[PaymentHistory] Data integrity issue: ${results.length - filteredResults.length} payments filtered out for booking ${bookingId}`);
+                }
+
+                // Log sample payment data for debugging (first 5 payments)
+                if (filteredResults.length > 0) {
+                    const samplePayments = filteredResults.slice(0, 5).map(p => ({
+                        id: p.id,
+                        booking_id: p.booking_id,
+                        stripe_session_id: p.stripe_session_id,
+                        amount: p.amount,
+                        created_at: p.created_at
+                    }));
+                    console.log(`[PaymentHistory] Sample payments for booking ${bookingId}:`, JSON.stringify(samplePayments));
+                }
+
+                res.json({
+                    success: true,
+                    data: filteredResults
+                });
+            });
+        }
+    );
 });
 
 // Get Payment History for a voucher (by voucher ID or voucher_ref)
@@ -7575,135 +7725,20 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
             console.log('✅ Added voucher payment entry to payment history');
         }
 
-        // Method 4: If not found, try by linked booking (booking that used this voucher code)
-        if (paymentHistory.length === 0 || paymentHistory.every(p => p.origin === 'voucher_purchase')) {
-            const [bookingResults] = await con.promise().query(
-                `SELECT b.id as booking_id, b.stripe_session_id as booking_stripe_session
-                 FROM all_booking b 
-                 WHERE b.voucher_code = ?
-                 ORDER BY b.created_at DESC
-                 LIMIT 1`,
-                [voucher.voucher_ref]
-            );
-            
-            if (bookingResults && bookingResults.length > 0) {
-                const linkedBooking = bookingResults[0];
-                console.log('📋 Found linked booking:', linkedBooking.booking_id);
-                
-                // Get payment history for linked booking
-                const [linkedPayments] = await con.promise().query(
-                    `SELECT * FROM payment_history WHERE booking_id = ? ORDER BY created_at DESC`,
-                    [linkedBooking.booking_id]
-                );
-                if (linkedPayments && linkedPayments.length > 0) {
-                    console.log('✅ Found payment history by linked booking:', linkedPayments.length, 'records');
-                    paymentHistory = linkedPayments;
-                }
-            }
-        }
+        // Method 4: REMOVED - Linked booking payment history was too broad
+        // This method was fetching ALL payments from a booking that uses the voucher code,
+        // which could include payments from other transactions or multiple payments for the same booking
+        // We now only return payments specifically linked to this voucher:
+        // 1. Payments with voucher_id matching this voucher
+        // 2. Voucher's own paid amount (synthetic entry) - only 1 entry
+        // We do NOT fetch linked booking payments as they may not be specific to this voucher
 
-        // Method 5: Try to find original purchase booking (where voucher was bought)
-        // For Gift Vouchers, use purchaser_email; for others, use email
-        if (paymentHistory.length === 0 || paymentHistory.every(p => p.origin === 'voucher_purchase')) {
-            // Determine which email to use for search
-            const searchEmail = fullVoucher.purchaser_email || fullVoucher.email || '';
-            const searchName = fullVoucher.purchaser_name || fullVoucher.name || '';
-            const voucherPaidAmount = fullVoucher.paid ? parseFloat(fullVoucher.paid) : 0;
-            
-            if (searchEmail || searchName) {
-            // Find booking where this voucher was originally purchased
-            // Look for bookings with matching email/name and paid amount, created around voucher creation time
-            const [originalPurchaseResults] = await con.promise().query(
-                    `SELECT b.id, b.stripe_session_id, b.email, b.name, ph.*
-                 FROM all_booking b
-                 LEFT JOIN payment_history ph ON ph.booking_id = b.id
-                     WHERE (
-                         (b.email = ? AND ? != '')
-                         OR (b.name = ? AND ? != '')
-                     )
-                     AND ABS(TIMESTAMPDIFF(HOUR, b.created_at, ?)) <= 24
-                     AND (
-                         (b.paid = ? AND ? > 0)
-                         OR (ph.amount = ? AND ? > 0)
-                         OR (ABS(b.paid - ?) < 0.01 AND ? > 0)
-                     )
-                     AND (ph.id IS NOT NULL OR b.stripe_session_id IS NOT NULL)
-                     ORDER BY ABS(TIMESTAMPDIFF(HOUR, b.created_at, ?)) ASC, b.created_at DESC
-                     LIMIT 10`,
-                    [
-                        searchEmail, searchEmail,
-                        searchName, searchName,
-                        fullVoucher.created_at || new Date(),
-                        voucherPaidAmount, voucherPaidAmount,
-                        voucherPaidAmount, voucherPaidAmount,
-                        voucherPaidAmount, voucherPaidAmount,
-                        fullVoucher.created_at || new Date()
-                    ]
-            );
-            
-            if (originalPurchaseResults && originalPurchaseResults.length > 0) {
-                    // Filter and map results
-                    const originalPayments = [];
-                    for (const row of originalPurchaseResults) {
-                        if (row.id && row.stripe_session_id) {
-                            // If we have payment history, use it
-                            if (row.amount) {
-                                originalPayments.push({
-                                    id: row.id,
-                                    booking_id: row.id,
-                                    stripe_session_id: row.stripe_session_id,
-                                    amount: row.amount,
-                                    currency: row.currency || 'GBP',
-                                    payment_status: row.payment_status || 'succeeded',
-                                    created_at: row.created_at,
-                        origin: 'voucher_original_purchase'
-                                });
-                            } else {
-                                // If no payment history but we have stripe_session_id, create synthetic entry
-                                originalPayments.push({
-                                    id: `booking_${row.id}`,
-                                    booking_id: row.id,
-                                    stripe_session_id: row.stripe_session_id,
-                                    amount: voucherPaidAmount,
-                                    currency: 'GBP',
-                                    payment_status: 'succeeded',
-                                    created_at: row.created_at || fullVoucher.created_at || new Date(),
-                                    origin: 'voucher_original_purchase_synthetic'
-                                });
-                            }
-                        }
-                    }
-                    
-                if (originalPayments.length > 0) {
-                    console.log('✅ Found payment history by original purchase:', originalPayments.length, 'records');
-                        // Merge with existing payment history, avoiding duplicates
-                        const existingSessionIds = new Set(paymentHistory.map(p => p.stripe_session_id).filter(Boolean));
-                        const newPayments = originalPayments.filter(p => !existingSessionIds.has(p.stripe_session_id));
-                        paymentHistory = [...paymentHistory, ...newPayments];
-                    }
-                }
-            }
-        }
-
-        // Method 4: Try by voucher_ref in booking's stripe metadata (original purchase)
-        if (paymentHistory.length === 0) {
-            // Find the original booking where this voucher was purchased
-            // This would be a booking with type 'voucher' or no voucher_code but matching paid amount
-            const [originalBookingResults] = await con.promise().query(
-                `SELECT b.id, b.stripe_session_id, ph.*
-                 FROM all_booking b
-                 LEFT JOIN payment_history ph ON ph.booking_id = b.id
-                 WHERE b.stripe_session_id IS NOT NULL
-                 AND ph.id IS NOT NULL
-                 AND (
-                     b.voucher_code IS NULL OR b.voucher_code = ''
-                 )
-                 ORDER BY b.created_at DESC
-                 LIMIT 50`,
-                []
-            );
-            // This is a fallback - in production, vouchers should be linked properly
-        }
+        // Method 5: REMOVED - This method was too broad and fetched all user payments
+        // Instead, we only return payments specifically linked to this voucher:
+        // 1. Payments with voucher_id matching this voucher
+        // 2. Voucher's own paid amount (synthetic entry)
+        // 3. Payments from booking that uses this voucher's voucher_ref
+        // We do NOT search by email/name as that would return all user payments
 
         console.log('📋 Final payment history count:', paymentHistory.length);
         
@@ -7786,152 +7821,17 @@ app.post('/api/sync-payment-history/:bookingId', async (req, res) => {
                     }
                 }
 
-                // Method 2: Find all checkout sessions for this customer (email) and booking metadata
-                if (booking.email) {
-                    try {
-                        console.log(`[SyncPayment] Searching for all checkout sessions for email: ${booking.email}`);
-                        
-                        // Get booking amount for better matching
-                        const bookingAmount = booking.paid ? Math.round(parseFloat(booking.paid) * 100) : null; // Convert to cents
-                        
-                        // List sessions by customer email - note: this requires customer_email to be set during session creation
-                        // If that's not available, we'll try a different approach
-                        let sessions = [];
-                        try {
-                            const sessionsList = await stripe.checkout.sessions.list({
-                                limit: 100
-                            });
-                            // Filter by email from session customer_details or metadata
-                            sessions = sessionsList.data.filter(s => 
-                                (s.customer_details && s.customer_details.email === booking.email) ||
-                                (s.customer_email === booking.email) ||
-                                (s.metadata && (s.metadata.email === booking.email || s.metadata.customer_email === booking.email))
-                            );
-                        } catch (listError) {
-                            console.warn('[SyncPayment] Could not list all sessions, trying alternative method:', listError.message);
-                        }
+                // Method 2: REMOVED - Email-based search was too broad and slow
+                // This method was fetching all checkout sessions (limit 100) and filtering by email,
+                // which caused performance issues and returned payments from other bookings
+                // We now only sync from the booking's own stripe_session_id (Method 1)
+                // If additional payments are needed, they should be linked via booking_id or voucher_id in metadata
 
-                        for (const session of sessions) {
-                            // Skip if we already have this session
-                            if (existingSessionIds.has(session.id) || syncedSessions.has(session.id)) {
-                                continue;
-                            }
-
-                            // Check if this session is related to this booking
-                            // Check metadata, payment intent, or amount match
-                            const metadataMatch = 
-                                session.metadata && (session.metadata.booking_id === bookingId.toString() || session.metadata.bookingId === bookingId.toString());
-                            
-                            const amountMatch = bookingAmount && session.amount_total ? (Math.abs(session.amount_total - bookingAmount) < 10) : false; // Allow 10 cents difference
-                            
-                            const paymentIntentMatch = 
-                                session.payment_intent && !existingPaymentIntentIds.has(session.payment_intent);
-                            
-                            const isRelated = 
-                                metadataMatch ||
-                                paymentIntentMatch ||
-                                (session.payment_status === 'paid' && session.amount_total > 0 && amountMatch);
-
-                            if (isRelated) {
-                                try {
-                                    console.log(`[SyncPayment] Found related session ${session.id}, syncing...`);
-                            await savePaymentHistory(session, bookingId, null);
-                                    syncedCount++;
-                                    syncedSessions.add(session.id);
-                                    console.log(`[SyncPayment] ✅ Synced payment from session ${session.id}`);
-                                } catch (syncError) {
-                                    console.error(`[SyncPayment] Error syncing session ${session.id}:`, syncError.message);
-                                }
-                            }
-                        }
-                    } catch (listError) {
-                        console.error('[SyncPayment] Error listing checkout sessions:', listError.message);
-                    }
-                }
-
-                // Method 3: Find all payment intents for this customer and check if they're related
-                if (booking.email) {
-                    try {
-                        console.log(`[SyncPayment] Searching for payment intents for email: ${booking.email}`);
-                        
-                        // Get booking amount for better matching
-                        const bookingAmount = booking.paid ? Math.round(parseFloat(booking.paid) * 100) : null; // Convert to cents
-                        
-                        const paymentIntents = await stripe.paymentIntents.list({
-                            limit: 100
-                        });
-
-                        for (const pi of paymentIntents.data) {
-                            // Skip if we already have this payment intent
-                            if (existingPaymentIntentIds.has(pi.id)) {
-                                continue;
-                            }
-
-                            // Check if this payment intent is related to this booking
-                            // Look for booking reference in metadata, receipt_email, customer, or amount match
-                            const emailMatch = 
-                                pi.receipt_email === booking.email || 
-                                pi.customer_email === booking.email ||
-                                (pi.metadata && (pi.metadata.email === booking.email || pi.metadata.customer_email === booking.email));
-                            
-                            const amountMatch = bookingAmount && pi.amount ? (Math.abs(pi.amount - bookingAmount) < 10) : false; // Allow 10 cents difference
-                            
-                            const metadataMatch = 
-                                pi.metadata && (pi.metadata.booking_id === bookingId.toString() || pi.metadata.bookingId === bookingId.toString());
-                            
-                            const isRelated = 
-                                metadataMatch ||
-                                (emailMatch && pi.status === 'succeeded') ||
-                                (emailMatch && amountMatch && pi.status === 'succeeded');
-
-                            if (isRelated) {
-                                try {
-                                    // Get the checkout session if it exists in metadata
-                                    if (pi.metadata && pi.metadata.checkout_session_id) {
-                                        try {
-                                            const actualSession = await stripe.checkout.sessions.retrieve(pi.metadata.checkout_session_id);
-                                            // Only sync if we don't already have this session
-                                            if (!existingSessionIds.has(actualSession.id) && !syncedSessions.has(actualSession.id)) {
-                                                await savePaymentHistory(actualSession, bookingId, null);
-                                                syncedSessions.add(actualSession.id);
-                                                syncedCount++;
-                                                console.log(`[SyncPayment] ✅ Synced payment from checkout session ${actualSession.id} (via payment intent ${pi.id})`);
-                                            }
-                                        } catch (sessionError) {
-                                            // If session doesn't exist or can't be retrieved, save from payment intent directly
-                                            const mockSession = {
-                                                id: `pi_${pi.id}`,
-                                                payment_intent: pi.id,
-                                                amount_total: pi.amount,
-                                                currency: pi.currency,
-                                                payment_status: pi.status === 'succeeded' ? 'paid' : pi.status
-                                            };
-                                            await savePaymentHistory(mockSession, bookingId, null);
-                                            syncedCount++;
-                                            console.log(`[SyncPayment] ✅ Synced payment from payment intent ${pi.id} (no session found)`);
-                                        }
-                                    } else {
-                                        // No session metadata, create mock session from payment intent
-                                        const mockSession = {
-                                            id: `pi_${pi.id}`,
-                                            payment_intent: pi.id,
-                                            amount_total: pi.amount,
-                                            currency: pi.currency,
-                                            payment_status: pi.status === 'succeeded' ? 'paid' : pi.status
-                                        };
-                                        await savePaymentHistory(mockSession, bookingId, null);
-                                        syncedCount++;
-                                        console.log(`[SyncPayment] ✅ Synced payment from payment intent ${pi.id}`);
-                                    }
-                                } catch (piError) {
-                                    console.error(`[SyncPayment] Error syncing payment intent ${pi.id}:`, piError.message);
-                                }
-                            }
-                        }
-                    } catch (piListError) {
-                        console.error('[SyncPayment] Error listing payment intents:', piListError.message);
-                    }
-                }
+                // Method 3: REMOVED - Email-based payment intent search was too broad and slow
+                // This method was listing all payment intents (limit 100) and filtering by email,
+                // which caused performance issues and returned payments from other bookings
+                // We now only sync from the booking's own stripe_session_id (Method 1)
+                // If additional payments are needed, they should be linked via booking_id or voucher_id in metadata
 
                             // Update booking with stripe_session_id if not already set
                 if (booking.stripe_session_id) {
@@ -7972,6 +7872,14 @@ app.post('/api/refund-payment', async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'Missing required fields: paymentId, bookingId, and amount are required'
+            });
+        }
+
+        // Validate paymentId is numeric (not a synthetic voucher payment ID like "voucher_123")
+        if (isNaN(parseInt(paymentId)) || String(paymentId).startsWith('voucher_')) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid payment ID. Voucher payments cannot be refunded through this endpoint.'
             });
         }
 
@@ -9344,7 +9252,8 @@ app.post('/api/createBooking', (req, res) => {
         preferred_day,
         email_template_override,
         email_template_type_override,
-        created_at // Preserve original created_at for rebook operations
+        created_at, // Preserve original created_at for rebook operations
+        rebook_from_booking_id // Old booking ID for payment history transfer during rebook
     } = req.body;
 
     // Unify add-on field: always use choose_add_on as array of {name, price}
@@ -9783,6 +9692,31 @@ app.post('/api/createBooking', (req, res) => {
         function handleBookingInsertSuccess(result) {
             const bookingId = result.insertId;
             const createdAt = nowDate;
+
+            // If this booking was created via a rebook operation, transfer payment history from old booking
+            if (rebook_from_booking_id && !isNaN(parseInt(rebook_from_booking_id))) {
+                console.log('🔄 Rebook detected - Transferring payment history from old booking:', rebook_from_booking_id, 'to new booking:', bookingId);
+                
+                // Transfer payment history from old booking to new booking
+                const transferPaymentHistorySql = `
+                    UPDATE payment_history 
+                    SET booking_id = ? 
+                    WHERE booking_id = ?
+                `;
+                
+                con.query(transferPaymentHistorySql, [bookingId, parseInt(rebook_from_booking_id)], (transferErr, transferResult) => {
+                    if (transferErr) {
+                        console.error('❌ Error transferring payment history during rebook:', transferErr);
+                        // Don't fail the entire operation if payment history transfer fails
+                    } else {
+                        console.log('✅ Payment history transferred successfully:', {
+                            oldBookingId: rebook_from_booking_id,
+                            newBookingId: bookingId,
+                            affectedRows: transferResult.affectedRows
+                        });
+                    }
+                });
+            }
 
             // If this booking was created via a rebook operation, previous history entries
             // can be passed in history_entries. Copy them to preserve the timeline.
