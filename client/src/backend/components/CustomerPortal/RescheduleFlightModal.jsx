@@ -323,8 +323,10 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             return;
         }
 
+        // For Flight Voucher, always load activities to show available locations
         const loadActivities = async () => {
             try {
+                setLoading(true);
                 const resp = await axios.get('/api/activities');
                 if (resp.data?.success) {
                     const acts = Array.isArray(resp.data.data) ? resp.data.data : [];
@@ -334,15 +336,33 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                     const locs = Array.from(new Set(liveActs.map(a => a.location).filter(Boolean)));
                     setAvailableLocations(locs);
 
+                    console.log('RescheduleFlightModal - Loaded activities for Flight Voucher:', {
+                        totalActivities: liveActs.length,
+                        availableLocations: locs,
+                        isFlightVoucher: isFlightVoucher,
+                        bookingData: {
+                            book_flight: bookingData?.book_flight,
+                            is_flight_voucher: bookingData?.is_flight_voucher,
+                            location: bookingData?.location,
+                            activity_id: bookingData?.activity_id
+                        }
+                    });
+
                     // Do not preselect locations; user must choose.
+                } else {
+                    console.error('RescheduleFlightModal - Failed to load activities:', resp.data);
+                    setError('Could not load available locations. Please try again later.');
                 }
             } catch (err) {
                 console.error('RescheduleFlightModal - Error loading activities:', err);
+                setError('Could not load available locations. Please try again later.');
+            } finally {
+                setLoading(false);
             }
         };
 
         loadActivities();
-    }, [open, bookingData?.location, selectedLocations.length, isFlightVoucher]);
+    }, [open, isFlightVoucher, bookingData?.book_flight, bookingData?.is_flight_voucher]);
 
     // Fetch availabilities when modal opens or selected locations change
     useEffect(() => {
@@ -356,7 +376,23 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
 
         const fetchAvailabilitiesForLocations = async () => {
             const targetLocations = isFlightVoucher ? selectedLocations : (bookingData?.location ? [bookingData.location] : []);
-            if (targetLocations.length === 0) return;
+            
+            // For Flight Voucher, show helpful message if no locations selected
+            if (isFlightVoucher && targetLocations.length === 0) {
+                setAvailabilities([]);
+                setError(null);
+                setLoading(false);
+                return;
+            }
+            
+            // For non-Flight Voucher, if no location, don't fetch
+            if (!isFlightVoucher && targetLocations.length === 0) {
+                setAvailabilities([]);
+                setError(null);
+                setLoading(false);
+                return;
+            }
+            
             setLoading(true);
             setError(null);
             setSelectedDate(null);
@@ -373,37 +409,56 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                     let finalActivityId = activityId;
                     if (!finalActivityId) {
                         const act = activities.find(a => a.location === loc && a.status === 'Live');
-                        if (act) finalActivityId = act.id;
+                        if (act) {
+                            finalActivityId = act.id;
+                            console.log('RescheduleFlightModal - Found activity for location:', loc, 'activityId:', finalActivityId);
+                        } else {
+                            console.warn('RescheduleFlightModal - No activity found for location:', loc, 'available activities:', activities.map(a => ({ location: a.location, id: a.id, status: a.status })));
+                        }
                     }
 
                     if (!finalActivityId) {
-                        console.warn('RescheduleFlightModal - No activity ID for location:', loc);
+                        console.warn('RescheduleFlightModal - No activity ID for location:', loc, 'Skipping...');
                         continue;
                     }
 
-                    const availResponse = await axios.get(`/api/activity/${finalActivityId}/availabilities`);
-                    if (availResponse.data?.success) {
-                        const data = Array.isArray(availResponse.data.data) ? availResponse.data.data : [];
-                        // Preserve location on slots (fallback to loc)
-                        const withLoc = data.map(d => ({
-                            ...d,
-                            location: d.location || loc,
-                            activity_id: d.activity_id || finalActivityId
-                        }));
-                        collected.push(...withLoc);
-                        console.log('RescheduleFlightModal - Loaded availabilities:', data.length, 'for location:', loc, 'activityId:', finalActivityId);
+                    try {
+                        const availResponse = await axios.get(`/api/activity/${finalActivityId}/availabilities`);
+                        if (availResponse.data?.success) {
+                            const data = Array.isArray(availResponse.data.data) ? availResponse.data.data : [];
+                            // Preserve location on slots (fallback to loc)
+                            const withLoc = data.map(d => ({
+                                ...d,
+                                location: d.location || loc,
+                                activity_id: d.activity_id || finalActivityId
+                            }));
+                            collected.push(...withLoc);
+                            console.log('RescheduleFlightModal - Loaded availabilities:', data.length, 'for location:', loc, 'activityId:', finalActivityId);
+                        } else {
+                            console.warn('RescheduleFlightModal - Failed to fetch availabilities for location:', loc, 'response:', availResponse.data);
+                        }
+                    } catch (availErr) {
+                        console.error('RescheduleFlightModal - Error fetching availabilities for location:', loc, 'error:', availErr);
+                        // Continue with other locations even if one fails
                     }
                 }
 
-                setAvailabilities(collected);
-                } catch (err) {
-                    console.error('Error loading availabilities:', err);
-                    setError('Could not fetch availabilities. Please try again later.');
-                    setAvailabilities([]);
-                } finally {
-                    setLoading(false);
+                if (collected.length === 0 && targetLocations.length > 0) {
+                    setError('No available dates found for selected locations. Please try selecting different locations.');
+                } else {
+                    setError(null);
                 }
-            };
+                
+                setAvailabilities(collected);
+                console.log('RescheduleFlightModal - Total availabilities collected:', collected.length, 'for locations:', targetLocations);
+            } catch (err) {
+                console.error('RescheduleFlightModal - Error loading availabilities:', err);
+                setError('Could not fetch availabilities. Please try again later.');
+                setAvailabilities([]);
+            } finally {
+                setLoading(false);
+            }
+        };
 
         fetchAvailabilitiesForLocations();
     }, [open, selectedLocations, activities, activityId, voucherType, experience, bookingData, isFlightVoucher]);
