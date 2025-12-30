@@ -2228,12 +2228,13 @@ const Manifest = () => {
                 voucher_type: voucherType, // Add voucher_type from Rebook popup selection
                 selectedVoucherType: { title: voucherType }, // Add selectedVoucherType for backend compatibility
                 experience: experience, // Add experience field - critical for manifest page Type display
-                created_at: originalCreatedAt // Preserve original created_at to maintain table position
+                created_at: originalCreatedAt, // Preserve original created_at to maintain table position
+                rebook_from_booking_id: bookingDetail.booking.id // Add old booking ID for payment history transfer
             };
-            // First delete the old booking
-            await axios.delete(`/api/deleteBooking/${bookingDetail.booking.id}`);
-            // Then create the new booking (this will automatically send the confirmation email)
+            // Create the new booking first (this will transfer payment history from old booking)
             const createResponse = await axios.post('/api/createBooking', payload);
+            // Then delete the old booking after payment history is transferred
+            await axios.delete(`/api/deleteBooking/${bookingDetail.booking.id}`);
             
             // Clear all states
             setRebookModalOpen(false);
@@ -4341,6 +4342,8 @@ const Manifest = () => {
                                                     sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d', mt: 1 }}
                                                     onClick={() => {
                                                         if (bookingDetail?.booking?.id) {
+                                                            // Clear payment history before opening modal to avoid showing stale data
+                                                            setPaymentHistory([]);
                                                             setPaymentHistoryModalOpen(true);
                                                             fetchPaymentHistory(bookingDetail.booking.id);
                                                         }

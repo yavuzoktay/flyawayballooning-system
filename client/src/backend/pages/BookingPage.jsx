@@ -603,6 +603,7 @@ const BookingPage = () => {
             // For vouchers, ALWAYS fetch voucher-based payment history first
             // This ensures we get the voucher's own payment info (all_vouchers.paid)
             // This is especially important for Gift Vouchers where payment is tied to the voucher itself
+            let hasVoucherPayments = false;
             if (voucherIdOrRef) {
                 try {
                     console.log(`[PaymentHistory] Fetching voucher payment history for: ${voucherIdOrRef}`);
@@ -611,6 +612,7 @@ const BookingPage = () => {
                     if (voucherPaymentData.length > 0) {
                         console.log(`[PaymentHistory] Found ${voucherPaymentData.length} records via voucher endpoint`);
                         paymentData = voucherPaymentData;
+                        hasVoucherPayments = true;
                         // Track existing IDs to avoid duplicates
                         voucherPaymentData.forEach(p => {
                             if (p.id) existingIds.add(p.id);
@@ -623,8 +625,10 @@ const BookingPage = () => {
                 }
             }
             
-            // If we have a bookingId, try booking-based payment history
-            if (bookingId) {
+            // If we have a bookingId AND no voucher payments found, try booking-based payment history
+            // IMPORTANT: If voucher payments exist, we should NOT fetch booking payments
+            // to avoid showing payments from other transactions or duplicate entries
+            if (bookingId && !hasVoucherPayments) {
                 try {
                     const response = await axios.get(`/api/booking-payment-history/${bookingId}`);
                     const bookingPaymentData = response.data?.data || [];
@@ -648,41 +652,27 @@ const BookingPage = () => {
                         console.log(`[PaymentHistory] Found ${bookingPaymentData.length} records for booking ${bookingId}, added ${newPayments.length} new, total: ${paymentData.length}`);
                     }
                     
-                    // ALWAYS attempt to sync from Stripe to capture any missing payments
-                    // This ensures payments from different devices/sessions are captured
-                    // Even if we already have payment history, sync to catch any new payments
-                    try {
-                        console.log(`[PaymentHistory] Always attempting sync for booking ${bookingId} to capture any missing payments from different devices...`);
-                        await axios.post(`/api/sync-payment-history/${bookingId}`);
-                        // Fetch again after sync to get any newly synced payments
-                        const syncResponse = await axios.get(`/api/booking-payment-history/${bookingId}`);
-                        const syncedData = syncResponse.data?.data || [];
-                        if (syncedData.length > 0) {
-                            const newPayments = syncedData.filter(p => {
-                                const id = p.id || `session_${p.stripe_session_id}` || `charge_${p.stripe_charge_id}`;
-                                if (existingIds.has(id) || existingIds.has(p.id) || 
-                                    (p.stripe_session_id && existingIds.has(`session_${p.stripe_session_id}`)) ||
-                                    (p.stripe_charge_id && existingIds.has(`charge_${p.stripe_charge_id}`))) {
-                                    return false;
-                                }
-                                existingIds.add(id);
-                                if (p.id) existingIds.add(p.id);
-                                if (p.stripe_session_id) existingIds.add(`session_${p.stripe_session_id}`);
-                                if (p.stripe_charge_id) existingIds.add(`charge_${p.stripe_charge_id}`);
-                                return true;
-                            });
-                            if (newPayments.length > 0) {
-                                paymentData = [...paymentData, ...newPayments];
-                                console.log(`[PaymentHistory] ✅ After sync, found ${newPayments.length} new records, total: ${paymentData.length}`);
+                    // Only sync if we have no payment history at all
+                    // This prevents unnecessary slow sync operations when payment history already exists
+                    if (paymentData.length === 0) {
+                        try {
+                            console.log(`[PaymentHistory] No payment history found, attempting sync for booking ${bookingId}...`);
+                            await axios.post(`/api/sync-payment-history/${bookingId}`);
+                            // Fetch again after sync to get any newly synced payments
+                            const syncResponse = await axios.get(`/api/booking-payment-history/${bookingId}`);
+                            const syncedData = syncResponse.data?.data || [];
+                            if (syncedData.length > 0) {
+                                paymentData = syncedData;
+                                console.log(`[PaymentHistory] ✅ After sync, found ${syncedData.length} records`);
                             } else {
-                                console.log(`[PaymentHistory] Sync completed, no new payments found (${syncedData.length} total in DB)`);
+                                console.log(`[PaymentHistory] Sync completed, but no payment history found in database`);
                             }
-                        } else {
-                            console.log(`[PaymentHistory] Sync completed, but no payment history found in database`);
+                        } catch (syncError) {
+                            console.log('[PaymentHistory] ⚠️ Sync failed (non-critical):', syncError?.response?.data?.message || syncError.message);
+                            // Don't fail the entire fetch if sync fails - we still have existing payment data
                         }
-                    } catch (syncError) {
-                        console.log('[PaymentHistory] ⚠️ Sync failed (non-critical):', syncError?.response?.data?.message || syncError.message);
-                        // Don't fail the entire fetch if sync fails - we still have existing payment data
+                    } else {
+                        console.log(`[PaymentHistory] Payment history already exists (${paymentData.length} records), skipping sync to improve performance`);
                     }
                 } catch (bookingError) {
                     console.log('[PaymentHistory] Booking payment history fetch failed:', bookingError?.message);
@@ -691,7 +681,8 @@ const BookingPage = () => {
             
             // If still no payment history and we have voucher info, try voucher-based payment history as final fallback
             // This handles cases where voucher payment wasn't found in initial fetch
-            if (paymentData.length === 0 && voucherIdOrRef) {
+            // IMPORTANT: Only fetch if we haven't already fetched voucher payments (to avoid duplicates)
+            if (paymentData.length === 0 && voucherIdOrRef && !hasVoucherPayments) {
                 try {
                     console.log(`[PaymentHistory] Trying voucher payment history as final fallback for: ${voucherIdOrRef}`);
                     const voucherResponse = await axios.get(`/api/voucher-payment-history/${voucherIdOrRef}`);
@@ -731,6 +722,17 @@ const BookingPage = () => {
     const handleRefundSubmit = async () => {
         if (!selectedPaymentForRefund) return;
         
+        // Validate that this is a real payment entry (not synthetic voucher payment)
+        const paymentId = selectedPaymentForRefund.id;
+        const bookingId = selectedPaymentForRefund.booking_id;
+        const stripeChargeId = selectedPaymentForRefund.stripe_charge_id || selectedPaymentForRefund.stripe_payment_intent_id;
+        
+        // Check if this is a synthetic payment (voucher payment entry)
+        if (String(paymentId || '').startsWith('voucher_') || !bookingId || !stripeChargeId) {
+            alert('This payment cannot be refunded through this method. Please contact support for voucher refunds.');
+            return;
+        }
+        
         const amount = parseFloat(refundAmount);
         const maxAmount = parseFloat(selectedPaymentForRefund.amount || 0);
         
@@ -747,11 +749,11 @@ const BookingPage = () => {
         setProcessingRefund(true);
         try {
             const response = await axios.post('/api/refund-payment', {
-                paymentId: selectedPaymentForRefund.id,
-                bookingId: selectedPaymentForRefund.booking_id,
+                paymentId: paymentId,
+                bookingId: bookingId,
                 amount: amount,
                 comment: refundComment,
-                stripeChargeId: selectedPaymentForRefund.stripe_charge_id || selectedPaymentForRefund.stripe_payment_intent_id
+                stripeChargeId: stripeChargeId
             });
             
             if (response.data.success) {
@@ -3844,14 +3846,15 @@ setBookingDetail(finalVoucherDetail);
                 voucher_type: voucherType, // Add voucher_type from Rebook popup selection
                 selectedVoucherType: { title: voucherType }, // Add selectedVoucherType for backend compatibility
                 experience: experience, // Add experience field - critical for manifest page Type display
-                created_at: originalCreatedAt // Preserve original created_at to maintain table position
+                created_at: originalCreatedAt, // Preserve original created_at to maintain table position
+                rebook_from_booking_id: bookingDetail.booking.id // Add old booking ID for payment history transfer
             };
 
-            // First delete the old booking
-            await axios.delete(`/api/deleteBooking/${bookingDetail.booking.id}`);
-            
-            // Then create the new booking (this will automatically send the confirmation email)
+            // Create the new booking first (this will transfer payment history from old booking)
             const createResponse = await axios.post('/api/createBooking', payload);
+            
+            // Then delete the old booking after payment history is transferred
+            await axios.delete(`/api/deleteBooking/${bookingDetail.booking.id}`);
             
             // Clear all states
             setRebookModalOpen(false);
@@ -4696,7 +4699,8 @@ setBookingDetail(finalVoucherDetail);
                                             due: item.due || '',
                                             voucher_code: item.voucher_code || '',
                                             flight_attempts: item.flight_attempts ?? 0,
-                                            expires: item.expires || ''
+                                            expires: item.expires || '',
+                                            has_refund: item.has_refund || 0
                                         }))}
                                         selectable={true}
                                         onSelectionChange={handleBookingSelectionChange}
@@ -5585,6 +5589,8 @@ setBookingDetail(finalVoucherDetail);
                                                             // For linked bookings, also check booking payment history
                                                             const linkedBookingId = bookingDetail?.voucher?.booking_id || bookingDetail?.booking?.id;
                                                             
+                                                            // Clear payment history before opening modal to avoid showing stale data
+                                                            setPaymentHistory([]);
                                                             setPaymentHistoryModalOpen(true);
                                                             // Pass voucher ID/ref first, then booking ID
                                                             // This ensures voucher's own payment is fetched first
@@ -6855,7 +6861,12 @@ setBookingDetail(finalVoucherDetail);
                                                     >
                                                         {isExpanded ? '▼' : '▶'}
                                                     </IconButton>
-                                                    {payment.payment_status === 'succeeded' && (
+                                                    {payment.payment_status === 'succeeded' && 
+                                                     // Only show refund button for real payment entries (not synthetic voucher payments)
+                                                     // Synthetic payments have string IDs like "voucher_123" and null booking_id
+                                                     !String(payment.id || '').startsWith('voucher_') && 
+                                                     payment.booking_id && 
+                                                     (payment.stripe_charge_id || payment.stripe_payment_intent_id) && (
                                                         <Button 
                                                             size="small" 
                                                             variant="outlined"
