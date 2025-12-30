@@ -792,7 +792,9 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
 
                 // Fetch the new booking data
                 const bookingResponse = await axios.get(`/api/getBookingDetail?booking_id=${newBookingId}`);
-                const newBooking = bookingResponse.data?.data || bookingResponse.data;
+                const bookingDetail = bookingResponse.data?.data || bookingResponse.data;
+                // Handle nested structure (bookingDetail.booking) or flat structure
+                const newBooking = bookingDetail?.booking || bookingDetail;
 
                 // Format flight_date to ISO format for consistency with backend
                 // selectedDateTime is in "YYYY-MM-DD HH:mm" format, convert to ISO
@@ -809,19 +811,45 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 }
 
                 // Enhance the booking data with reschedule information for immediate UI update
+                // This enhancedBooking will be used to update the Customer Portal UI immediately
+                // without needing to fetch from backend (which would return the old voucher booking)
                 const enhancedBooking = {
                     ...newBooking,
+                    // Use new booking ID (the redeemed booking)
+                    id: newBookingId,
+                    booking_id: newBookingId,
+                    booking_reference: newBookingId,
+                    // Set flight date, location, and status from reschedule
                     flight_date: formattedFlightDate || pendingRescheduleData.selectedDateTime,
                     location: pendingRescheduleData.selectedLocation,
                     status: 'Scheduled', // Set status to Scheduled when flight is rescheduled
-                    is_voucher_redeemed: true, // Mark as redeemed since we just created a redeem booking
+                    // Mark as redeemed since we just created a redeem booking
+                    is_voucher_redeemed: true,
+                    redeemed_voucher: 'Yes',
                     // Ensure book_flight and is_flight_voucher flags are preserved
                     book_flight: bookingData?.book_flight || 'Flight Voucher',
                     is_flight_voucher: true,
-                    // Preserve voucher information
+                    // Preserve voucher information from original booking
                     voucher_ref: bookingData?.voucher_ref || bookingData?.voucher_code,
-                    voucher_code: bookingData?.voucher_code || bookingData?.voucher_ref
+                    voucher_code: bookingData?.voucher_code || bookingData?.voucher_ref,
+                    // Preserve passenger information if available
+                    passengers: newBooking?.passengers || bookingData?.passengers || [],
+                    pax: newBooking?.pax || bookingData?.pax || 0,
+                    // Preserve customer information
+                    name: newBooking?.name || bookingData?.name,
+                    email: newBooking?.email || bookingData?.email,
+                    phone: newBooking?.phone || bookingData?.phone,
+                    // Preserve expiry date from original voucher
+                    expires: bookingData?.expires || newBooking?.expires
                 };
+                
+                console.log('✅ RescheduleFlightModal - Enhanced booking for Flight Voucher redeem:', {
+                    newBookingId,
+                    flight_date: enhancedBooking.flight_date,
+                    location: enhancedBooking.location,
+                    status: enhancedBooking.status,
+                    is_voucher_redeemed: enhancedBooking.is_voucher_redeemed
+                });
 
                 if (onRescheduleSuccess) {
                     onRescheduleSuccess(enhancedBooking);

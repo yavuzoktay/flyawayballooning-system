@@ -1284,16 +1284,24 @@ const CustomerPortal = () => {
                         });
                     }
                     
-                    // Also fetch fresh booking data from backend to ensure we have the latest complete data
-                    // This is especially important for Flight Voucher where redeemed booking info needs to be fetched
-                    // Add a delay to ensure backend has finished processing the new booking
-                    // For Flight Voucher redeem flow, we need more time as a new booking is created
+                    // For Flight Voucher redeem flow, skip fetchBookingData() because:
+                    // 1. Token is for the original voucher booking, not the new redeemed booking
+                    // 2. fetchBookingData() would fetch the old booking and overwrite our updates
+                    // 3. enhancedBooking already contains all the new booking information we need
                     const isFlightVoucherRedeem = updatedData?.is_voucher_redeemed === true;
-                    const delay = isFlightVoucherRedeem ? 1500 : 500; // Longer delay for Flight Voucher redeem
-                    setTimeout(async () => {
-                        console.log('🔄 Customer Portal - Fetching fresh booking data after reschedule...');
-                        await fetchBookingData();
-                    }, delay);
+                    
+                    if (isFlightVoucherRedeem) {
+                        console.log('🔄 Customer Portal - Flight Voucher redeemed, skipping fetchBookingData() to preserve updated booking info');
+                        // Don't fetch - the enhancedBooking data is already set in state
+                        // The server endpoint would return the old voucher booking, not the new redeemed booking
+                    } else {
+                        // For regular booking reschedule, fetch fresh data from backend
+                        // Add a small delay to ensure backend has finished processing
+                        setTimeout(async () => {
+                            console.log('🔄 Customer Portal - Fetching fresh booking data after reschedule...');
+                            await fetchBookingData();
+                        }, 500);
+                    }
                 }}
             />
 
