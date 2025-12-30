@@ -690,12 +690,16 @@ const CustomerPortal = () => {
                                     const now = dayjs();
                                     const isFlightDatePassed = flightDate ? flightDate.isBefore(now, 'day') : false;
                                     const isVoucherRedeemed = bookingData.is_voucher_redeemed === true || bookingData.is_voucher_redeemed === 1;
-                                    const isDisabled = changingLocation || isFlightDatePassed || isFullyRefunded || isVoucherRedeemed;
+                                    // Only apply redeemed check for Flight Voucher section
+                                    const bookFlight = (bookingData.book_flight || '').toString().trim().toLowerCase();
+                                    const isFlightVoucher = bookingData.is_flight_voucher || bookFlight === 'flight voucher';
+                                    const shouldApplyRedeemedCheck = isFlightVoucher;
+                                    const isDisabled = changingLocation || isFlightDatePassed || isFullyRefunded || (isVoucherRedeemed && shouldApplyRedeemedCheck);
                                     
                                     return (
                                         <Tooltip
                                             title={
-                                                isVoucherRedeemed
+                                                (isVoucherRedeemed && shouldApplyRedeemedCheck)
                                                     ? "Voucher has been redeemed. Location cannot be changed."
                                                     : isFullyRefunded
                                                         ? "Full refund has been processed. Location cannot be changed."
@@ -822,14 +826,18 @@ const CustomerPortal = () => {
                                     const now = dayjs();
                                     const isFlightDatePassed = flightDate ? flightDate.isBefore(now, 'day') : false;
                                     const isVoucherRedeemed = bookingData.is_voucher_redeemed === true || bookingData.is_voucher_redeemed === 1;
+                                    // Only apply redeemed check for Flight Voucher section
+                                    const bookFlight = (bookingData.book_flight || '').toString().trim().toLowerCase();
+                                    const isFlightVoucher = bookingData.is_flight_voucher || bookFlight === 'flight voucher';
+                                    const shouldApplyRedeemedCheck = isFlightVoucher;
                                     const isDisabled = extendingVoucher || isFlightDatePassed;
                                     
-                                    const isExtendDisabled = isDisabled || isFullyRefunded || isVoucherRedeemed;
+                                    const isExtendDisabled = isDisabled || isFullyRefunded || (isVoucherRedeemed && shouldApplyRedeemedCheck);
                                     
                                     return (
                                         <Tooltip
                                             title={
-                                                isVoucherRedeemed
+                                                (isVoucherRedeemed && shouldApplyRedeemedCheck)
                                                     ? "Voucher has been redeemed. Voucher cannot be extended."
                                                     : isFullyRefunded
                                                         ? "Full refund has been processed. Voucher cannot be extended."
@@ -882,10 +890,18 @@ const CustomerPortal = () => {
 
                         // Check if voucher is redeemed (for Flight Voucher)
                         const isVoucherRedeemed = bookingData.is_voucher_redeemed === true || bookingData.is_voucher_redeemed === 1;
+                        // Determine if this is a Flight Voucher section
+                        const bookFlight = (bookingData.book_flight || '').toString().trim().toLowerCase();
+                        const isFlightVoucher = bookingData.is_flight_voucher || bookFlight === 'flight voucher';
+                        
+                        // IMPORTANT: is_voucher_redeemed should only affect "Your Booking Flight Voucher" section
+                        // For regular bookings ("Your Booking" section), is_voucher_redeemed should NOT disable buttons
+                        // This allows bookings created from redeemed vouchers to still have functional buttons
+                        const shouldApplyRedeemedCheck = isFlightVoucher;
 
                         // If voucher / booking has expired, ALL actions in the portal must be disabled
                         // regardless of flight date / 120-hour rules.
-                        // If voucher is redeemed (Flight Voucher), disable Reschedule and Cancel buttons
+                        // If voucher is redeemed (Flight Voucher ONLY), disable Reschedule and Cancel buttons
                         // If fully refunded, disable Change, Extend, and Reschedule buttons
                         let canReschedule;
                         let canChangeLocation;
@@ -907,8 +923,9 @@ const CustomerPortal = () => {
                             canCancel = false;
                             // Resend Confirmation can still be available
                             canResendConfirmation = !resendingConfirmation;
-                        } else if (isVoucherRedeemed) {
-                            // If voucher is redeemed, disable Reschedule, Cancel, Change Location, and Extend buttons
+                        } else if (isVoucherRedeemed && shouldApplyRedeemedCheck) {
+                            // If voucher is redeemed AND this is a Flight Voucher section, disable Reschedule, Cancel, Change Location, and Extend buttons
+                            // For regular bookings, redeemed status should NOT disable buttons
                             canReschedule = false;
                             canCancel = false;
                             canChangeLocation = false;
@@ -947,7 +964,7 @@ const CustomerPortal = () => {
                                             ? "Voucher / Booking has expired"
                                             : isFullyRefunded
                                                 ? "Full refund has been processed. This booking cannot be rescheduled."
-                                            : isVoucherRedeemed
+                                            : (isVoucherRedeemed && shouldApplyRedeemedCheck)
                                                 ? "Voucher has been redeemed and cannot be rescheduled"
                                                 : (!canReschedule 
                                                     ? (isCancelled 
@@ -1000,7 +1017,7 @@ const CustomerPortal = () => {
                                             ? "Voucher / Booking has expired"
                                             : isFullyRefunded
                                                 ? "Full refund has been processed. This booking cannot be cancelled."
-                                            : isVoucherRedeemed
+                                            : (isVoucherRedeemed && shouldApplyRedeemedCheck)
                                                 ? "Voucher has been redeemed and cannot be cancelled"
                                             : (isCancelled
                                                 ? "Flight is cancelled"
