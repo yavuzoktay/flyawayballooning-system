@@ -669,11 +669,28 @@ const CustomerPortal = () => {
                         <Box>
                             <Typography variant="body2" color="text.secondary">Flight Date</Typography>
                             <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                                {bookingData.status && bookingData.status.toLowerCase() === 'cancelled'
-                                    ? 'Not Scheduled'
-                                    : bookingData.flight_date
-                                        ? dayjs(bookingData.flight_date).format('DD/MM/YYYY HH:mm')
-                                        : (bookingData.is_flight_voucher ? 'Date Not Scheduled' : 'Not Scheduled')}
+                                {(() => {
+                                    if (bookingData.status && bookingData.status.toLowerCase() === 'cancelled') {
+                                        return 'Not Scheduled';
+                                    }
+                                    if (bookingData.flight_date) {
+                                        try {
+                                            // Try to parse and format the flight_date
+                                            const flightDate = dayjs(bookingData.flight_date);
+                                            if (flightDate.isValid()) {
+                                                return flightDate.format('DD/MM/YYYY HH:mm');
+                                            } else {
+                                                // If dayjs can't parse, try to format the string directly
+                                                console.warn('⚠️ Customer Portal - Invalid flight_date format:', bookingData.flight_date);
+                                                return String(bookingData.flight_date);
+                                            }
+                                        } catch (e) {
+                                            console.error('⚠️ Customer Portal - Error formatting flight_date:', e, bookingData.flight_date);
+                                            return String(bookingData.flight_date || 'Date Not Scheduled');
+                                        }
+                                    }
+                                    return bookingData.is_flight_voucher ? 'Date Not Scheduled' : 'Not Scheduled';
+                                })()}
                             </Typography>
                         </Box>
                         <Box>
@@ -1246,39 +1263,64 @@ const CustomerPortal = () => {
                     if (updatedData) {
                         console.log('🔄 Customer Portal - Updating bookingData with reschedule result:', updatedData);
                         setBookingData(prevData => {
-                            // Merge updated data with previous data, prioritizing updated fields
-                            // RescheduleFlightModal already includes flight_date, location, and status in updatedData
-                            const mergedData = {
-                                ...prevData,
-                                ...updatedData,
-                                // Ensure flight_date, location, and status are updated (RescheduleFlightModal already sets these)
-                                // Priority: updatedData > explicit 'Scheduled' (when flight_date exists) > prevData
-                                flight_date: updatedData.flight_date || prevData?.flight_date,
-                                location: updatedData.location || prevData?.location,
-                                // If flight_date exists, status should be 'Scheduled' (explicitly set)
-                                status: updatedData.status || (updatedData.flight_date ? 'Scheduled' : (prevData?.status || 'Open')),
-                                // For Flight Voucher, update is_voucher_redeemed flag if applicable
-                                is_voucher_redeemed: updatedData.is_voucher_redeemed !== undefined 
-                                    ? updatedData.is_voucher_redeemed 
-                                    : prevData?.is_voucher_redeemed,
-                                // Preserve Flight Voucher flags
-                                book_flight: updatedData.book_flight || prevData?.book_flight,
-                                is_flight_voucher: updatedData.is_flight_voucher !== undefined 
-                                    ? updatedData.is_flight_voucher 
-                                    : prevData?.is_flight_voucher,
-                                // Preserve voucher information
-                                voucher_ref: updatedData.voucher_ref || prevData?.voucher_ref,
-                                voucher_code: updatedData.voucher_code || prevData?.voucher_code
-                            };
+                            // For Flight Voucher redeem, use updatedData as the primary source since it contains the new booking
+                            // For regular reschedule, merge with prevData but prioritize updatedData fields
+                            const isFlightVoucherRedeem = updatedData?.is_voucher_redeemed === true;
+                            
+                            let mergedData;
+                            if (isFlightVoucherRedeem) {
+                                // For Flight Voucher redeem, updatedData is the complete new booking
+                                // Use it as-is, only fallback to prevData for fields that might be missing
+                                mergedData = {
+                                    ...prevData,
+                                    ...updatedData,
+                                    // Explicitly set critical fields from updatedData (don't use || fallback)
+                                    flight_date: updatedData.flight_date !== undefined && updatedData.flight_date !== null 
+                                        ? updatedData.flight_date 
+                                        : prevData?.flight_date,
+                                    location: updatedData.location !== undefined && updatedData.location !== null 
+                                        ? updatedData.location 
+                                        : prevData?.location,
+                                    status: updatedData.status || 'Scheduled', // Always 'Scheduled' when rescheduled
+                                    is_voucher_redeemed: true, // Always true for redeem flow
+                                    // Preserve Flight Voucher flags
+                                    book_flight: updatedData.book_flight || prevData?.book_flight || 'Flight Voucher',
+                                    is_flight_voucher: true,
+                                    // Preserve voucher information
+                                    voucher_ref: updatedData.voucher_ref || prevData?.voucher_ref,
+                                    voucher_code: updatedData.voucher_code || prevData?.voucher_code,
+                                    // Preserve expiry date from original voucher
+                                    expires: updatedData.expires !== undefined 
+                                        ? updatedData.expires 
+                                        : prevData?.expires
+                                };
+                            } else {
+                                // For regular booking reschedule, merge with prevData
+                                mergedData = {
+                                    ...prevData,
+                                    ...updatedData,
+                                    // Ensure flight_date, location, and status are updated
+                                    flight_date: updatedData.flight_date !== undefined && updatedData.flight_date !== null 
+                                        ? updatedData.flight_date 
+                                        : prevData?.flight_date,
+                                    location: updatedData.location !== undefined && updatedData.location !== null 
+                                        ? updatedData.location 
+                                        : prevData?.location,
+                                    status: updatedData.status || (updatedData.flight_date ? 'Scheduled' : (prevData?.status || 'Open'))
+                                };
+                            }
+                            
                             console.log('🔄 Customer Portal - Merged bookingData:', mergedData);
                             console.log('🔄 Customer Portal - Status update:', {
+                                'isFlightVoucherRedeem': isFlightVoucherRedeem,
                                 'updatedData.status': updatedData.status,
                                 'updatedData.flight_date': updatedData.flight_date,
                                 'updatedData.location': updatedData.location,
                                 'updatedData.is_voucher_redeemed': updatedData.is_voucher_redeemed,
                                 'final status': mergedData.status,
                                 'final flight_date': mergedData.flight_date,
-                                'final location': mergedData.location
+                                'final location': mergedData.location,
+                                'final is_voucher_redeemed': mergedData.is_voucher_redeemed
                             });
                             return mergedData;
                         });
