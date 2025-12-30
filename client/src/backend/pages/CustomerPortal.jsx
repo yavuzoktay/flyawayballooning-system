@@ -1286,10 +1286,14 @@ const CustomerPortal = () => {
                     
                     // Also fetch fresh booking data from backend to ensure we have the latest complete data
                     // This is especially important for Flight Voucher where redeemed booking info needs to be fetched
-                    // Add a small delay to ensure backend has finished processing the new booking
+                    // Add a delay to ensure backend has finished processing the new booking
+                    // For Flight Voucher redeem flow, we need more time as a new booking is created
+                    const isFlightVoucherRedeem = updatedData?.is_voucher_redeemed === true;
+                    const delay = isFlightVoucherRedeem ? 1500 : 500; // Longer delay for Flight Voucher redeem
                     setTimeout(async () => {
+                        console.log('🔄 Customer Portal - Fetching fresh booking data after reschedule...');
                         await fetchBookingData();
-                    }, 500); // 500ms delay to ensure backend has processed the booking
+                    }, delay);
                 }}
             />
 
