@@ -87,11 +87,31 @@ const buildCustomerPortalToken = (booking = {}) => {
         emailToUse = booking.email || booking.customer_email || '';
     }
 
+    // Format created_at to DD/MM/YYYY HH:mm format (same as server-side)
+    let formattedCreatedAt = '';
+    const rawCreatedAt = booking.created_at ?? booking.created ?? '';
+    if (rawCreatedAt) {
+        try {
+            // Try to parse and format the date using dayjs
+            const dateObj = dayjs(rawCreatedAt);
+            if (dateObj.isValid()) {
+                // Format as DD/MM/YYYY HH:mm (same as server-side)
+                formattedCreatedAt = dateObj.format('DD/MM/YYYY HH:mm');
+            } else {
+                // If parsing fails, use the original value
+                formattedCreatedAt = String(rawCreatedAt).trim();
+            }
+        } catch (e) {
+            // If error, use original value
+            formattedCreatedAt = String(rawCreatedAt).trim();
+        }
+    }
+
     const sourceParts = [
         idToUse,
         booking.voucher_code ?? booking.voucherCode ?? booking.voucher_ref ?? '',
         emailToUse,
-        booking.created_at ?? booking.created ?? '',
+        formattedCreatedAt
     ].map((part) => (part == null ? '' : String(part).trim()))
      .filter((part) => part !== '');
 
@@ -800,6 +820,38 @@ const DEFAULT_TEMPLATE_BUILDERS = {
             ]
         });
     },
+    // Alias for "Your Flight Voucher" - uses same builder as "Flight Voucher Confirmation"
+    'Your Flight Voucher': ({ template, booking }) => {
+        const customerName = booking?.name || booking?.customer_name || 'Guest';
+        const subject = template?.subject || '🎈 Your Flight Voucher is ready';
+
+        const customMessageHtml = template?.body
+            ? extractMessageFromTemplateBody(template.body)
+            : '';
+        const messageHtml = customMessageHtml || getFlightVoucherMessageHtml(booking);
+
+        // Add template name to booking object so receipt can identify Flight Voucher
+        const bookingWithTemplate = {
+            ...booking,
+            templateName: 'Your Flight Voucher'
+        };
+
+        // Replace prompts in the message
+        const messageWithPrompts = replacePrompts(messageHtml, bookingWithTemplate);
+
+        return buildEmailLayout({
+            subject,
+            headline: '',
+            heroImage: HERO_IMAGE_URL,
+            bodyHtml: messageWithPrompts,
+            customerName,
+            signatureLines: [],
+            footerLinks: [
+                { label: 'Download voucher', url: 'https://flyawayballooning.com/account/vouchers' },
+                { label: 'Gift FAQs', url: 'https://flyawayballooning.com/gift-faqs' }
+            ]
+        });
+    },
     // Booking Confirmation builder (reused for "Your Flight Confirmation" alias)
     'Booking Confirmation': buildBookingConfirmationEmail,
     'Your Flight Confirmation': buildBookingConfirmationEmail,
@@ -956,6 +1008,8 @@ export const getDefaultTemplateMessageHtml = (templateName, booking = DEFAULT_ED
         case 'gift card confirmation':
             return getGiftCardMessageHtml(booking);
         case 'flight voucher confirmation':
+            return getFlightVoucherMessageHtml(booking);
+        case 'your flight voucher':
             return getFlightVoucherMessageHtml(booking);
         case 'request for payment/deposit':
             return getPaymentRequestMessageHtml(booking);
@@ -1186,11 +1240,45 @@ export const buildEmailHtml = ({ templateName, messageHtml, booking, personalNot
         : getDefaultTemplateMessageHtml(effectiveTemplateName, booking);
     const messageWithNote = applyPersonalNote(baseMessage, personalNote);
     
-    // Add template name to booking object so receipt can identify Flight Voucher
-    const bookingWithTemplate = {
+    // Normalize template name for Flight Voucher detection
+    const normalizedTemplateName = normalizeTemplateName(effectiveTemplateName).toLowerCase();
+    const isFlightVoucherTemplate = normalizedTemplateName === 'flight voucher confirmation' || 
+                                     normalizedTemplateName === 'your flight voucher' ||
+                                     normalizedTemplateName.includes('flight voucher');
+    
+    // For Flight Voucher templates, ensure booking object has correct fields for Customer Portal URL generation
+    // This matches the structure used in server-side generateFlightVoucherConfirmationEmail
+    let bookingWithTemplate = {
         ...booking,
         templateName: effectiveTemplateName
     };
+    
+    // If this is a Flight Voucher template, ensure Flight Voucher fields are set correctly
+    if (isFlightVoucherTemplate) {
+        // Set Flight Voucher identification fields
+        bookingWithTemplate = {
+            ...bookingWithTemplate,
+            book_flight: bookingWithTemplate.book_flight || 'Flight Voucher',
+            is_flight_voucher: true,
+            // Ensure voucher_id is set - use id if it's a voucher, or extract from id if it has voucher- prefix
+            voucher_id: bookingWithTemplate.voucher_id || (() => {
+                const id = bookingWithTemplate.id || bookingWithTemplate.booking_id || bookingWithTemplate.bookingId;
+                if (id && String(id).startsWith('voucher-')) {
+                    // Extract voucher ID from voucher-{id} format
+                    return String(id).replace(/^voucher-/, '');
+                }
+                // If id doesn't have voucher- prefix but this is a Flight Voucher, use id as voucher_id
+                return id || null;
+            })(),
+            // Ensure id is set (without voucher- prefix) so buildCustomerPortalToken can add it
+            id: bookingWithTemplate.id || bookingWithTemplate.booking_id || bookingWithTemplate.bookingId || null,
+            // For Flight Voucher, use purchaser_email if available, otherwise fall back to email
+            purchaser_email: bookingWithTemplate.purchaser_email || bookingWithTemplate.email || bookingWithTemplate.customer_email || '',
+            // Ensure created_at is formatted (if available)
+            created_at: bookingWithTemplate.created_at || bookingWithTemplate.created || '',
+            created: bookingWithTemplate.created || bookingWithTemplate.created_at || ''
+        };
+    }
     
     // Replace prompts in the message (including [Receipt] if present)
     const messageWithPromptsReplaced = replacePrompts(messageWithNote, bookingWithTemplate);
