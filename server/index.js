@@ -13775,18 +13775,37 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
 
         // For Flight Voucher, use customer info from all_vouchers table
         // For other types, use booking info
+        // IMPORTANT: If we switched to redeemed booking, use customer info from redeemed booking
+        // Otherwise, use voucherInfo for Flight Voucher
         let customerName = booking.name;
         let customerEmail = booking.email;
         let customerPhone = booking.phone;
         
-        if (isFlightVoucher && voucherInfo) {
-            // Flight Voucher: use name, email, phone from all_vouchers
+        // Check if booking was switched to redeemed booking (booking.id might have changed)
+        // If booking has flight_date and is a Flight Voucher, it's likely a redeemed booking
+        const isRedeemedBooking = isFlightVoucher && booking.flight_date && 
+            (booking.redeemed_voucher === 'Yes' || booking.redeemed_voucher === 1 || 
+             booking.flight_type_source === 'Redeem Voucher');
+        
+        if (isFlightVoucher && voucherInfo && !isRedeemedBooking) {
+            // Flight Voucher (not redeemed yet): use name, email, phone from all_vouchers
             // Prefer purchaser fields if available, otherwise use main fields
             customerName = voucherInfo.purchaser_name || voucherInfo.name || booking.name;
             customerEmail = voucherInfo.purchaser_email || voucherInfo.email || booking.email;
             customerPhone = voucherInfo.purchaser_phone || voucherInfo.purchaser_mobile || voucherInfo.phone || voucherInfo.mobile || booking.phone;
             
             console.log('✅ Customer Portal - Using Flight Voucher customer info from all_vouchers:', {
+                name: customerName,
+                email: customerEmail,
+                phone: customerPhone
+            });
+        } else if (isRedeemedBooking) {
+            // Redeemed booking: use customer info from the redeemed booking itself
+            customerName = booking.name || customerName;
+            customerEmail = booking.email || customerEmail;
+            customerPhone = booking.phone || customerPhone;
+            
+            console.log('✅ Customer Portal - Using redeemed booking customer info:', {
                 name: customerName,
                 email: customerEmail,
                 phone: customerPhone
@@ -13916,25 +13935,81 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                     console.log('ℹ️ Customer Portal - Current booking is redeemed but no flight_date yet');
                 }
             } else if (redeemedBooking && redeemedBooking.id !== booking.id) {
-                // Another booking with same voucher_code is redeemed, but current booking is not
-                // Use the redeemed booking's flight_date and location for display, but DON'T mark current booking as redeemed
-                // This allows the current booking to still have functional buttons
-                console.log('ℹ️ Customer Portal - Found redeemed booking with same voucher_code, but current booking is not redeemed');
-                console.log('ℹ️ Customer Portal - Using redeemed booking data for display, but keeping current booking buttons enabled');
-                if (redeemedBooking.flight_date) {
-                    finalFlightDate = redeemedBooking.flight_date;
-                    finalLocation = redeemedBooking.location || null;
-                    if (redeemedBooking.status && redeemedBooking.status.toLowerCase() === 'scheduled') {
-                        booking.status = 'Scheduled';
+                // Another booking with same voucher_code is redeemed - this is the new redeemed booking
+                // IMPORTANT: For Flight Voucher, when a redeemed booking exists, we should use the redeemed booking
+                // as the primary booking data, not the original voucher booking
+                // This ensures that after reschedule, the redeemed booking's data is shown
+                console.log('✅ Customer Portal - Found redeemed booking with same voucher_code, switching to redeemed booking');
+                console.log('✅ Customer Portal - Original booking ID:', booking.id, 'Redeemed booking ID:', redeemedBooking.id);
+                
+                // Fetch the complete redeemed booking data
+                try {
+                    const [redeemedBookingFullRows] = await new Promise((resolve, reject) => {
+                        con.query('SELECT * FROM all_booking WHERE id = ? LIMIT 1', [redeemedBooking.id], (err, rows) => {
+                            if (err) reject(err);
+                            else resolve([rows]);
+                        });
+                    });
+                    
+                    if (redeemedBookingFullRows && redeemedBookingFullRows.length > 0) {
+                        // Replace booking with the redeemed booking
+                        booking = redeemedBookingFullRows[0];
+                        console.log('✅ Customer Portal - Switched to redeemed booking:', booking.id);
+                        
+                        // Set flight_date, location, and status from redeemed booking
+                        if (booking.flight_date) {
+                            finalFlightDate = booking.flight_date;
+                            finalLocation = booking.location || null;
+                            if (booking.status && booking.status.toLowerCase() !== 'scheduled') {
+                                booking.status = 'Scheduled';
+                            } else if (!booking.status || booking.status === 'Open' || booking.status === 'Not Scheduled') {
+                                booking.status = 'Scheduled';
+                            }
+                            isVoucherRedeemed = true; // Mark as redeemed since we're using the redeemed booking
+                            console.log('✅ Customer Portal - Using redeemed booking flight_date, location, and status');
+                        } else {
+                            finalFlightDate = null;
+                            finalLocation = null;
+                        }
+                        
+                        // IMPORTANT: Since we switched to redeemed booking, we need to re-fetch passengers
+                        // from the redeemed booking, not from the original voucher booking
+                        // This will be handled below in the passenger fetching section
+                        // We'll set a flag to indicate we should use passenger table instead of voucher_passenger_details
+                        // Actually, we'll let the passenger fetching logic below handle it naturally
+                        // since booking.id is now the redeemed booking ID
                     } else {
-                        booking.status = 'Scheduled';
+                        // Fallback: use redeemedBooking data we already have
+                        console.warn('⚠️ Customer Portal - Could not fetch full redeemed booking, using partial data');
+                        if (redeemedBooking.flight_date) {
+                            finalFlightDate = redeemedBooking.flight_date;
+                            finalLocation = redeemedBooking.location || null;
+                            if (redeemedBooking.status && redeemedBooking.status.toLowerCase() === 'scheduled') {
+                                booking.status = 'Scheduled';
+                            } else {
+                                booking.status = 'Scheduled';
+                            }
+                        } else {
+                            finalFlightDate = null;
+                            finalLocation = null;
+                        }
                     }
-                    console.log('✅ Customer Portal - Using flight_date, location, and status from other redeemed booking for display');
-                } else {
-                    finalFlightDate = null;
-                    finalLocation = null;
+                } catch (redeemedBookingFetchErr) {
+                    console.error('❌ Customer Portal - Error fetching redeemed booking:', redeemedBookingFetchErr);
+                    // Fallback: use redeemedBooking data we already have
+                    if (redeemedBooking.flight_date) {
+                        finalFlightDate = redeemedBooking.flight_date;
+                        finalLocation = redeemedBooking.location || null;
+                        if (redeemedBooking.status && redeemedBooking.status.toLowerCase() === 'scheduled') {
+                            booking.status = 'Scheduled';
+                        } else {
+                            booking.status = 'Scheduled';
+                        }
+                    } else {
+                        finalFlightDate = null;
+                        finalLocation = null;
+                    }
                 }
-                // DON'T set isVoucherRedeemed = true here - current booking is not redeemed
             } else if (booking.redeemed_voucher === 'Yes' || booking.redeemed_voucher === 1) {
                 // Current booking itself is the redeemed booking - use its flight_date, location, and status
                 if (booking.flight_date) {
