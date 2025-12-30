@@ -9614,6 +9614,52 @@ app.post('/api/createBooking', (req, res) => {
         insertBookingWithFinalPaid();
         
         function insertBookingWithFinalPaid() {
+        // Ensure voucher_code exists in voucher_codes table before inserting booking
+        // This prevents foreign key constraint errors
+        if (voucher_code && voucher_code.trim() !== '') {
+            // Check if voucher_code exists in voucher_codes table
+            const checkVoucherCodeSql = `SELECT id FROM voucher_codes WHERE code = ? LIMIT 1`;
+            con.query(checkVoucherCodeSql, [voucher_code], (checkErr, checkRows) => {
+                if (checkErr) {
+                    console.error('Error checking voucher_code in voucher_codes table:', checkErr);
+                    // Continue anyway, will fail at INSERT if code doesn't exist
+                } else if (!checkRows || checkRows.length === 0) {
+                    // Voucher code doesn't exist, insert it
+                    console.log('⚠️ Voucher code not found in voucher_codes table, inserting:', voucher_code);
+                    const insertVoucherCodeSql = `
+                        INSERT INTO voucher_codes (code, paid_amount, is_active, current_uses, max_uses, created_at, updated_at)
+                        VALUES (?, ?, 1, 0, 1, NOW(), NOW())
+                    `;
+                    // Try to get paid amount from all_vouchers if available
+                    const getVoucherPaidSql = `SELECT paid FROM all_vouchers WHERE voucher_ref = ? OR voucher_code = ? LIMIT 1`;
+                    con.query(getVoucherPaidSql, [voucher_code, voucher_code], (voucherErr, voucherRows) => {
+                        const paidAmount = (voucherRows && voucherRows.length > 0 && voucherRows[0].paid) 
+                            ? parseFloat(voucherRows[0].paid) 
+                            : (finalPaidAmount || 0);
+                        
+                        con.query(insertVoucherCodeSql, [voucher_code, paidAmount], (insertErr) => {
+                            if (insertErr) {
+                                console.error('Error inserting voucher_code into voucher_codes table:', insertErr);
+                                // Continue anyway, will fail at INSERT if code doesn't exist
+                            } else {
+                                console.log('✅ Voucher code inserted into voucher_codes table:', voucher_code);
+                            }
+                            // Proceed with booking insertion
+                            proceedWithBookingInsert();
+                        });
+                    });
+                    return; // Exit early, will continue in callback
+                } else {
+                    // Voucher code exists, proceed with booking insertion
+                    proceedWithBookingInsert();
+                }
+            });
+        } else {
+            // No voucher_code, proceed directly
+            proceedWithBookingInsert();
+        }
+        
+        function proceedWithBookingInsert() {
         const bookingValues = [
             passengerName,
             chooseFlightType.type,
@@ -9692,9 +9738,49 @@ app.post('/api/createBooking', (req, res) => {
                 console.error('Error number:', err.errno);
                 console.error('Full error:', err);
                 console.error('=== END ERROR DETAILS ===');
+                
+                // If foreign key constraint error for voucher_code, try to insert it and retry
+                if (err.code === 'ER_NO_REFERENCED_ROW_2' && err.sqlMessage && err.sqlMessage.includes('voucher_code')) {
+                    console.log('⚠️ Foreign key constraint error for voucher_code, attempting to fix...');
+                    if (voucher_code && voucher_code.trim() !== '') {
+                        const insertVoucherCodeSql = `
+                            INSERT IGNORE INTO voucher_codes (code, paid_amount, is_active, current_uses, max_uses, created_at, updated_at)
+                            VALUES (?, ?, 1, 0, 1, NOW(), NOW())
+                        `;
+                        const getVoucherPaidSql = `SELECT paid FROM all_vouchers WHERE voucher_ref = ? OR voucher_code = ? LIMIT 1`;
+                        con.query(getVoucherPaidSql, [voucher_code, voucher_code], (voucherErr, voucherRows) => {
+                            const paidAmount = (voucherRows && voucherRows.length > 0 && voucherRows[0].paid) 
+                                ? parseFloat(voucherRows[0].paid) 
+                                : (finalPaidAmount || 0);
+                            
+                            con.query(insertVoucherCodeSql, [voucher_code, paidAmount], (insertErr) => {
+                                if (insertErr) {
+                                    console.error('Error inserting voucher_code into voucher_codes table:', insertErr);
+                                    return res.status(500).json({ success: false, error: 'Database query failed to create booking', details: err.message });
+                                } else {
+                                    console.log('✅ Voucher code inserted into voucher_codes table, retrying booking insertion:', voucher_code);
+                                    // Retry booking insertion
+                                    con.query(bookingSql, bookingValues, (retryErr, retryResult) => {
+                                        if (retryErr) {
+                                            console.error('Error on retry after inserting voucher_code:', retryErr);
+                                            return res.status(500).json({ success: false, error: 'Database query failed to create booking', details: retryErr.message });
+                                        }
+                                        handleBookingInsertSuccess(retryResult);
+                                    });
+                                }
+                            });
+                        });
+                        return; // Exit early, will continue in retry callback
+                    }
+                }
+                
                 return res.status(500).json({ success: false, error: 'Database query failed to create booking', details: err.message });
             }
-
+            
+            handleBookingInsertSuccess(result);
+        });
+        
+        function handleBookingInsertSuccess(result) {
             const bookingId = result.insertId;
             const createdAt = nowDate;
 
@@ -10014,7 +10100,8 @@ app.post('/api/createBooking', (req, res) => {
             } else {
                 insertPassengers();
             }
-        });
+        } // End of handleBookingInsertSuccess function
+        } // End of proceedWithBookingInsert function
         } // End of insertBookingWithFinalPaid function
     } // End of insertBookingAndPassengers function
 
@@ -13806,9 +13893,11 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 }
             }
             
-            // If redeemed booking exists, use its flight_date, location, and status
-            if (redeemedBooking) {
-                // Mark voucher as redeemed since we found a redeemed booking
+            // If redeemed booking exists AND it's the current booking, use its flight_date, location, and status
+            // IMPORTANT: Only mark as redeemed if the redeemed booking is the CURRENT booking
+            // Don't mark as redeemed just because another booking with the same voucher_code is redeemed
+            if (redeemedBooking && redeemedBooking.id === booking.id) {
+                // Current booking itself is the redeemed booking - mark as redeemed and use its data
                 isVoucherRedeemed = true;
                 if (redeemedBooking.flight_date) {
                     finalFlightDate = redeemedBooking.flight_date;
@@ -13820,12 +13909,32 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                     } else {
                         booking.status = 'Scheduled'; // Set to Scheduled when flight_date exists
                     }
-                    console.log('✅ Customer Portal - Using flight_date, location, and status from redeemed booking');
+                    console.log('✅ Customer Portal - Current booking is redeemed, using its flight_date, location, and status');
                 } else {
                     finalFlightDate = null;
                     finalLocation = null;
-                    console.log('ℹ️ Customer Portal - Redeemed booking found but no flight_date yet');
+                    console.log('ℹ️ Customer Portal - Current booking is redeemed but no flight_date yet');
                 }
+            } else if (redeemedBooking && redeemedBooking.id !== booking.id) {
+                // Another booking with same voucher_code is redeemed, but current booking is not
+                // Use the redeemed booking's flight_date and location for display, but DON'T mark current booking as redeemed
+                // This allows the current booking to still have functional buttons
+                console.log('ℹ️ Customer Portal - Found redeemed booking with same voucher_code, but current booking is not redeemed');
+                console.log('ℹ️ Customer Portal - Using redeemed booking data for display, but keeping current booking buttons enabled');
+                if (redeemedBooking.flight_date) {
+                    finalFlightDate = redeemedBooking.flight_date;
+                    finalLocation = redeemedBooking.location || null;
+                    if (redeemedBooking.status && redeemedBooking.status.toLowerCase() === 'scheduled') {
+                        booking.status = 'Scheduled';
+                    } else {
+                        booking.status = 'Scheduled';
+                    }
+                    console.log('✅ Customer Portal - Using flight_date, location, and status from other redeemed booking for display');
+                } else {
+                    finalFlightDate = null;
+                    finalLocation = null;
+                }
+                // DON'T set isVoucherRedeemed = true here - current booking is not redeemed
             } else if (booking.redeemed_voucher === 'Yes' || booking.redeemed_voucher === 1) {
                 // Current booking itself is the redeemed booking - use its flight_date, location, and status
                 if (booking.flight_date) {
@@ -13911,54 +14020,30 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         }
 
         // Check if voucher is redeemed (if not already set from redeemed booking check above)
-        // Check all_booking for redeemed_voucher = 'Yes' or check all_vouchers for redeemed = 'Yes'
+        // IMPORTANT: Only check if the CURRENT booking itself is redeemed, not other bookings with the same voucher_code
+        // This ensures that when a voucher is redeemed and a new booking is created, that new booking's
+        // customer portal buttons are not disabled just because the voucher was redeemed
+        // Each booking should be treated independently - only disable buttons if THIS booking is redeemed
         if (!isVoucherRedeemed) {
-        if (booking.redeemed_voucher === 'Yes' || booking.redeemed_voucher === 1) {
-            isVoucherRedeemed = true;
-        } else if (voucherInfo && (voucherInfo.redeemed === 'Yes' || voucherInfo.redeemed === 1)) {
-            isVoucherRedeemed = true;
-        } else if (effectiveVoucherRef || booking.voucher_code) {
-            // Check if there's a booking with redeemed_voucher = 'Yes' for this voucher code
-            try {
-                    const voucherCodeToCheck = effectiveVoucherRef || booking.voucher_code;
-                    const [redeemedCheckRows] = await new Promise((resolve, reject) => {
-                    con.query(`
-                        SELECT id FROM all_booking 
-                        WHERE voucher_code = ? 
-                        AND (redeemed_voucher = 'Yes' OR redeemed_voucher = 1)
-                        AND id != ?
-                        LIMIT 1
-                    `, [voucherCodeToCheck, booking.id], (err, rows) => {
-                        if (err) reject(err);
-                        else resolve([rows]);
-                    });
-                });
-                if (redeemedCheckRows && redeemedCheckRows.length > 0) {
+            // Only check if the current booking itself is redeemed
+            if (booking.redeemed_voucher === 'Yes' || booking.redeemed_voucher === 1) {
+                isVoucherRedeemed = true;
+                console.log('✅ Customer Portal - Current booking is marked as redeemed');
+            } else {
+                // For Flight Voucher, also check if the voucher itself is redeemed in all_vouchers table
+                // But this should only affect the voucher display, not the booking's action buttons
+                // However, if this is a Flight Voucher (not a booking created from redeem), we should check voucher status
+                if (isFlightVoucher && voucherInfo && (voucherInfo.redeemed === 'Yes' || voucherInfo.redeemed === 1)) {
+                    // Only mark as redeemed if this is the original Flight Voucher, not a booking created from redeem
+                    // If booking has flight_date or flight_type_source = 'Redeem Voucher', it's a booking created from redeem
+                    // In that case, don't mark as redeemed based on voucher status
+                    const isRedeemBooking = booking.flight_type_source === 'Redeem Voucher' || booking.flight_date !== null;
+                    if (!isRedeemBooking) {
                         isVoucherRedeemed = true;
+                        console.log('✅ Customer Portal - Flight Voucher is marked as redeemed in all_vouchers');
                     } else {
-                        // Also check for Redeem Voucher flow bookings
-                        // IMPORTANT: Must match by voucher_code to ensure we're checking the same voucher, not just email
-                        // This prevents marking a voucher as redeemed when a different voucher with the same email is redeemed
-                        if (voucherCodeToCheck) {
-                            const [redeemFlowCheckRows] = await new Promise((resolve, reject) => {
-                                con.query(`
-                                    SELECT id FROM all_booking 
-                                    WHERE voucher_code = ?
-                                    AND flight_type_source = 'Redeem Voucher'
-                                    AND (redeemed_voucher = 'Yes' OR redeemed_voucher = 1)
-                                    LIMIT 1
-                                `, [voucherCodeToCheck], (err, rows) => {
-                                    if (err) reject(err);
-                                    else resolve([rows]);
-                                });
-                            });
-                            if (redeemFlowCheckRows && redeemFlowCheckRows.length > 0) {
-                                isVoucherRedeemed = true;
-                            }
-                        }
-                }
-            } catch (redeemedCheckErr) {
-                console.warn('⚠️ Customer Portal - Could not check if voucher is redeemed:', redeemedCheckErr.message);
+                        console.log('ℹ️ Customer Portal - This is a booking created from redeem, not marking as redeemed based on voucher status');
+                    }
                 }
             }
         }
