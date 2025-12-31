@@ -2138,7 +2138,9 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     now, // created_at
                     expiresDateFinal || null, // expires - calculated from voucher created_at
                     passengerData[0].email || null,
-                    passengerData[0].phone || null,
+                    (passengerData[0].countryCode && passengerData[0].phone
+                        ? `${passengerData[0].countryCode}${passengerData[0].phone}`.trim()
+                        : (passengerData[0].phone || null)),
                     activity_id || null,
                     'Yes', // Redeem Voucher bookings always have redeemed_voucher = Yes
                     0, // flight_attempts (always 0 for redeem voucher bookings)
@@ -6546,18 +6548,19 @@ app.get('/api/getAllBookingData', (req, res) => {
             }
 
             // Ensure phone number includes country code
-            // If phone doesn't start with +, try to get it from passenger table
+            // Priority: 1) passenger table phone with country code, 2) booking phone with country code, 3) infer from pattern
             if (rest.phone && !rest.phone.startsWith('+')) {
                 try {
+                    // First, try to get phone from passenger table (most reliable source)
                     const [passengerRows] = await con.promise().query(
-                        'SELECT phone FROM passenger WHERE booking_id = ? AND phone IS NOT NULL AND phone != "" ORDER BY id ASC LIMIT 1',
+                        'SELECT phone FROM passenger WHERE booking_id = ? AND phone IS NOT NULL AND phone != "" AND phone LIKE "+%" ORDER BY id ASC LIMIT 1',
                         [rest.id]
                     );
                     if (passengerRows && passengerRows.length > 0 && passengerRows[0].phone && passengerRows[0].phone.startsWith('+')) {
                         // Use phone from passenger if it has country code
                         rest.phone = passengerRows[0].phone;
                     } else {
-                        // If phone doesn't have country code, try to infer from common patterns
+                        // If passenger table doesn't have phone with country code, try to infer from common patterns
                         // UK numbers starting with 0 or 7
                         const phoneStr = String(rest.phone).trim();
                         if (phoneStr.startsWith('0') || /^7\d{9}$/.test(phoneStr)) {
@@ -6566,6 +6569,24 @@ app.get('/api/getAllBookingData', (req, res) => {
                     }
                 } catch (phoneErr) {
                     console.warn('Error checking passenger phone for country code:', phoneErr.message);
+                    // Fallback: try to infer from pattern if query fails
+                    const phoneStr = String(rest.phone).trim();
+                    if (phoneStr && !phoneStr.startsWith('+') && (phoneStr.startsWith('0') || /^7\d{9}$/.test(phoneStr))) {
+                        rest.phone = '+44' + phoneStr.replace(/^0/, '');
+                    }
+                }
+            } else if (!rest.phone) {
+                // If booking phone is empty, try to get from passenger table
+                try {
+                    const [passengerRows] = await con.promise().query(
+                        'SELECT phone FROM passenger WHERE booking_id = ? AND phone IS NOT NULL AND phone != "" ORDER BY id ASC LIMIT 1',
+                        [rest.id]
+                    );
+                    if (passengerRows && passengerRows.length > 0 && passengerRows[0].phone) {
+                        rest.phone = passengerRows[0].phone;
+                    }
+                } catch (phoneErr) {
+                    console.warn('Error fetching passenger phone:', phoneErr.message);
                 }
             }
 
@@ -9883,6 +9904,11 @@ app.post('/api/createBooking', (req, res) => {
 
         // Ensure email is set - try passenger email first, then booking email field
         const bookingEmail = mainPassenger.email || (passengerData.find(p => p.email && p.email.trim())?.email) || null;
+        
+        // Combine countryCode and phone for mainPassenger phone
+        const mainPassengerPhone = mainPassenger.countryCode && mainPassenger.phone
+            ? `${mainPassenger.countryCode}${mainPassenger.phone}`.trim()
+            : (mainPassenger.phone || null);
         if (!bookingEmail) {
             console.warn('⚠️ [createBooking] No email found in passenger data for booking creation');
             console.warn('⚠️ [createBooking] Passenger data:', passengerData.map(p => ({ name: `${p.firstName} ${p.lastName}`, email: p.email })));
@@ -10105,7 +10131,7 @@ app.post('/api/createBooking', (req, res) => {
                 : (typeof additionalInfo?.prefer === 'string' && additionalInfo.prefer ? additionalInfo.prefer : null)),
             mainPassenger.weight || null,
             bookingEmail || mainPassenger.email || null, // Use bookingEmail (from any passenger) or fallback to mainPassenger.email
-            mainPassenger.phone || null,
+            mainPassengerPhone || null, // Use combined countryCode + phone
             choose_add_on_str,
             preferred_location || null,
             preferred_time || null,
@@ -10416,16 +10442,23 @@ app.post('/api/createBooking', (req, res) => {
 
             function insertPassengers() {
                 const passengerSql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund) VALUES ?';
-                const passengerValues = passengerData.map(p => [
-                    bookingId,
-                    p.firstName,
-                    p.lastName,
-                    p.weight,
-                    p.email || null,
-                    p.phone || null,
-                    p.ticketType || null,
-                    p.weatherRefund ? 1 : 0
-                ]);
+                const passengerValues = passengerData.map(p => {
+                    // Combine countryCode and phone for each passenger
+                    const passengerPhone = p.countryCode && p.phone
+                        ? `${p.countryCode}${p.phone}`.trim()
+                        : (p.phone || null);
+                    
+                    return [
+                        bookingId,
+                        p.firstName,
+                        p.lastName,
+                        p.weight,
+                        p.email || null,
+                        passengerPhone,
+                        p.ticketType || null,
+                        p.weatherRefund ? 1 : 0
+                    ];
+                });
 
                 // Log passenger emails before inserting
                 console.log('📧 [createBooking] Passenger emails being saved:', passengerValues.map((pv, idx) => ({
