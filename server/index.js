@@ -4651,7 +4651,7 @@ app.get('/api/webhook-test', (req, res) => {
 });
 
 // Function to save payment history from Stripe session
-async function savePaymentHistory(session, bookingId, voucherId) {
+async function savePaymentHistory(session, bookingId, voucherId, voucherRef = null) {
     try {
         const sessionId = session.id;
         const paymentIntentId = session.payment_intent;
@@ -4730,13 +4730,13 @@ async function savePaymentHistory(session, bookingId, voucherId) {
             }
         }
 
-        // Insert payment history (try with voucher_id first, fall back without if column doesn't exist)
+        // Insert payment history (try with voucher_id and voucher_ref first, fall back without if columns don't exist)
         const insertPaymentHistoryWithVoucher = `
             INSERT INTO payment_history (
-                booking_id, voucher_id, stripe_session_id, stripe_charge_id, stripe_payment_intent_id,
+                booking_id, voucher_id, voucher_ref, stripe_session_id, stripe_charge_id, stripe_payment_intent_id,
                 amount, currency, card_last4, card_brand, wallet_type, transaction_id,
                 payout_id, payment_status, fingerprint, origin, card_present, arriving_on
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         
         const insertPaymentHistoryWithoutVoucher = `
@@ -4747,12 +4747,13 @@ async function savePaymentHistory(session, bookingId, voucherId) {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
-        // Try inserting with voucher_id first
+        // Try inserting with voucher_id and voucher_ref first
         con.query(
             insertPaymentHistoryWithVoucher,
             [
                 bookingId || null,
                 voucherId || null,
+                voucherRef || null,
                 sessionId,
                 chargeId,
                 paymentIntentId,
@@ -4771,9 +4772,9 @@ async function savePaymentHistory(session, bookingId, voucherId) {
             ],
             (err, result) => {
                 if (err) {
-                    // If voucher_id column doesn't exist, try without it
+                    // If voucher_id/voucher_ref columns don't exist, try without them
                     if (err.code === 'ER_BAD_FIELD_ERROR') {
-                        console.log('ℹ️ voucher_id column not found in payment_history, inserting without it');
+                        console.log('ℹ️ voucher_id/voucher_ref columns not found in payment_history, inserting without them');
                         con.query(
                             insertPaymentHistoryWithoutVoucher,
                             [
@@ -4798,7 +4799,7 @@ async function savePaymentHistory(session, bookingId, voucherId) {
                                 if (err2) {
                                     console.error('Error saving payment history (fallback):', err2);
                                 } else {
-                                    console.log('✅ Payment history saved successfully (without voucher_id), ID:', result2.insertId);
+                                    console.log('✅ Payment history saved successfully (without voucher_id/voucher_ref), ID:', result2.insertId);
                                 }
                             }
                         );
@@ -5110,7 +5111,19 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     // Use voucher ID as the reference since there's no booking yet
                     try {
                         console.log('💳 [WEBHOOK] Saving payment history for voucher purchase, voucher ID:', voucherId);
-                        await savePaymentHistory(session, null, voucherId);
+                        // Get voucher_ref for the voucher
+                        let voucherRef = null;
+                        if (voucherId) {
+                            try {
+                                const [voucherRows] = await con.promise().query('SELECT voucher_ref FROM all_vouchers WHERE id = ?', [voucherId]);
+                                if (voucherRows && voucherRows.length > 0) {
+                                    voucherRef = voucherRows[0].voucher_ref;
+                                }
+                            } catch (err) {
+                                console.warn('Could not fetch voucher_ref:', err.message);
+                            }
+                        }
+                        await savePaymentHistory(session, null, voucherId, voucherRef);
                         
                         // Also update all_vouchers with stripe_session_id for payment tracking
                         const updateVoucherSession = `UPDATE all_vouchers SET stripe_session_id = ? WHERE id = ?`;
@@ -5470,7 +5483,19 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
 
                 // Save payment history
                 if (bookingId || voucherId) {
-                    await savePaymentHistory(session, bookingId, voucherId);
+                    // Get voucher_ref for the voucher
+                    let voucherRef = null;
+                    if (voucherId) {
+                        try {
+                            const [voucherRows] = await con.promise().query('SELECT voucher_ref FROM all_vouchers WHERE id = ?', [voucherId]);
+                            if (voucherRows && voucherRows.length > 0) {
+                                voucherRef = voucherRows[0].voucher_ref;
+                            }
+                        } catch (err) {
+                            console.warn('Could not fetch voucher_ref:', err.message);
+                        }
+                    }
+                    await savePaymentHistory(session, bookingId, voucherId, voucherRef);
                     console.log(`✅ [PaymentIntent] Payment history saved for booking ${bookingId || 'N/A'}, voucher ${voucherId || 'N/A'}`);
                 } else {
                     console.warn(`⚠️ [PaymentIntent] Could not determine booking/voucher ID for payment intent ${paymentIntent.id}`);
@@ -6517,6 +6542,30 @@ app.get('/api/getAllBookingData', (req, res) => {
                             console.log('✅ Updated status to Scheduled for redeem voucher booking:', rest.id);
                         }
                     });
+                }
+            }
+
+            // Ensure phone number includes country code
+            // If phone doesn't start with +, try to get it from passenger table
+            if (rest.phone && !rest.phone.startsWith('+')) {
+                try {
+                    const [passengerRows] = await con.promise().query(
+                        'SELECT phone FROM passenger WHERE booking_id = ? AND phone IS NOT NULL AND phone != "" ORDER BY id ASC LIMIT 1',
+                        [rest.id]
+                    );
+                    if (passengerRows && passengerRows.length > 0 && passengerRows[0].phone && passengerRows[0].phone.startsWith('+')) {
+                        // Use phone from passenger if it has country code
+                        rest.phone = passengerRows[0].phone;
+                    } else {
+                        // If phone doesn't have country code, try to infer from common patterns
+                        // UK numbers starting with 0 or 7
+                        const phoneStr = String(rest.phone).trim();
+                        if (phoneStr.startsWith('0') || /^7\d{9}$/.test(phoneStr)) {
+                            rest.phone = '+44' + phoneStr.replace(/^0/, '');
+                        }
+                    }
+                } catch (phoneErr) {
+                    console.warn('Error checking passenger phone for country code:', phoneErr.message);
                 }
             }
 
@@ -7700,7 +7749,12 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
             );
             if (voucherIdResults && voucherIdResults.length > 0) {
                 console.log('✅ Found payment history by voucher_id:', voucherIdResults.length, 'records');
-                paymentHistory = voucherIdResults;
+                // Ensure voucher_ref is included in results
+                paymentHistory = voucherIdResults.map(p => ({
+                    ...p,
+                    voucher_id: p.voucher_id || voucher.id,
+                    voucher_ref: p.voucher_ref || voucher.voucher_ref
+                }));
             }
         } catch (err) {
             // voucher_id column might not exist
@@ -7709,28 +7763,219 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
             }
         }
 
-        // Method 2: If not found, try by stripe_session_id from voucher
-        // Note: stripe_session_id column doesn't exist in all_vouchers table, so we skip this method
-        // We'll rely on voucher_id and booking_id methods instead
+        // Method 1b: Also try to find by voucher_ref (if column exists and not already found)
+        if (paymentHistory.length === 0 && voucher.voucher_ref) {
+            try {
+                const [voucherRefResults] = await con.promise().query(
+                    `SELECT * FROM payment_history WHERE voucher_ref = ? ORDER BY created_at DESC`,
+                    [voucher.voucher_ref]
+                );
+                if (voucherRefResults && voucherRefResults.length > 0) {
+                    console.log('✅ Found payment history by voucher_ref:', voucherRefResults.length, 'records');
+                    // Ensure voucher_id is included in results
+                    paymentHistory = voucherRefResults.map(p => ({
+                        ...p,
+                        voucher_id: p.voucher_id || voucher.id,
+                        voucher_ref: p.voucher_ref || voucher.voucher_ref
+                    }));
+                }
+            } catch (err) {
+                // voucher_ref column might not exist
+                if (err.code !== 'ER_BAD_FIELD_ERROR') {
+                    console.error('Error querying by voucher_ref:', err);
+                }
+            }
+        }
 
-        // Method 3: If voucher has paid amount, always include it in payment history
-        // This is especially important for Gift Vouchers where payment is tied to the voucher itself
-        // Check if we already have a payment entry for this voucher amount
+        // Method 2: If not found, try to find payment by amount and date matching
+        // This helps find payments that weren't properly linked with voucher_id/voucher_ref
+        if (paymentHistory.length === 0 && fullVoucher.paid) {
+            try {
+                const voucherPaidAmount = parseFloat(fullVoucher.paid);
+                const voucherCreatedDate = fullVoucher.created_at ? new Date(fullVoucher.created_at) : null;
+                
+                if (voucherPaidAmount > 0 && voucherCreatedDate) {
+                    // Search for payments with matching amount and created within 24 hours of voucher creation
+                    const startDate = new Date(voucherCreatedDate);
+                    startDate.setHours(startDate.getHours() - 24);
+                    const endDate = new Date(voucherCreatedDate);
+                    endDate.setHours(endDate.getHours() + 24);
+                    
+                    // First try: Find payments with exact amount, date range, and no voucher_id
+                    let [amountMatchResults] = await con.promise().query(
+                        `SELECT * FROM payment_history 
+                         WHERE ABS(amount - ?) < 0.01 
+                         AND created_at BETWEEN ? AND ?
+                         AND (voucher_id IS NULL OR voucher_id = 0 OR voucher_id = ?)
+                         AND (booking_id IS NULL OR booking_id = 0)
+                         AND stripe_charge_id IS NOT NULL
+                         AND stripe_charge_id != ''
+                         ORDER BY created_at DESC
+                         LIMIT 5`,
+                        [voucherPaidAmount, startDate, endDate, voucher.id]
+                    );
+                    
+                    // If not found, try a broader search without booking_id restriction
+                    if (!amountMatchResults || amountMatchResults.length === 0) {
+                        console.log('🔍 Trying broader search for payment history (including bookings)...');
+                        [amountMatchResults] = await con.promise().query(
+                            `SELECT * FROM payment_history 
+                             WHERE ABS(amount - ?) < 0.01 
+                             AND created_at BETWEEN ? AND ?
+                             AND (voucher_id IS NULL OR voucher_id = 0 OR voucher_id = ?)
+                             AND stripe_charge_id IS NOT NULL
+                             AND stripe_charge_id != ''
+                             ORDER BY created_at DESC
+                             LIMIT 5`,
+                            [voucherPaidAmount, startDate, endDate, voucher.id]
+                        );
+                    }
+                    
+                    if (amountMatchResults && amountMatchResults.length > 0) {
+                        console.log('✅ Found payment history by amount and date matching:', amountMatchResults.length, 'records');
+                        // Filter to get the best match (prefer records with matching voucher_id if any)
+                        let bestMatch = amountMatchResults[0];
+                        const exactVoucherMatch = amountMatchResults.find(p => p.voucher_id === voucher.id);
+                        if (exactVoucherMatch) {
+                            bestMatch = exactVoucherMatch;
+                        }
+                        
+                        // Update these records with voucher_id and voucher_ref
+                        paymentHistory = [bestMatch].map(p => ({
+                            ...p,
+                            voucher_id: voucher.id,
+                            voucher_ref: voucher.voucher_ref
+                        }));
+                        
+                        // Update the database record with voucher_id and voucher_ref (async, don't wait)
+                        try {
+                            // Try to update with voucher_id and voucher_ref
+                            const updateQuery = `
+                                UPDATE payment_history 
+                                SET voucher_id = ?, voucher_ref = ?
+                                WHERE id = ?
+                            `;
+                            con.query(updateQuery, [voucher.id, voucher.voucher_ref, bestMatch.id], (updateErr) => {
+                                if (updateErr) {
+                                    // If voucher_id/voucher_ref columns don't exist, that's okay
+                                    if (updateErr.code !== 'ER_BAD_FIELD_ERROR') {
+                                        console.warn('Could not update payment_history with voucher info:', updateErr.message);
+                                    }
+                                } else {
+                                    console.log(`✅ Updated payment_history record ${bestMatch.id} with voucher_id ${voucher.id} and voucher_ref ${voucher.voucher_ref}`);
+                                }
+                            });
+                        } catch (updateErr) {
+                            console.warn('Error updating payment_history:', updateErr.message);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn('Error querying payment history by amount/date:', err.message);
+            }
+        }
+
+        // Method 3: If no real payment found, try to sync from Stripe by searching for payment intents
+        // This helps when payment history wasn't properly saved during webhook
         const voucherPaidAmount = fullVoucher.paid ? parseFloat(fullVoucher.paid) : 0;
+        const hasRealPayment = paymentHistory.some(p => 
+            p.stripe_charge_id || p.stripe_payment_intent_id
+        );
+        
+        if (voucherPaidAmount > 0 && !hasRealPayment) {
+            console.log('🔍 No real payment history found, attempting to sync from Stripe...');
+            try {
+                // Search Stripe for payment intents matching the voucher amount and date
+                const voucherCreatedDate = fullVoucher.created_at ? new Date(fullVoucher.created_at) : new Date();
+                const startTimestamp = Math.floor((voucherCreatedDate.getTime() - 24 * 60 * 60 * 1000) / 1000); // 24 hours before
+                const endTimestamp = Math.floor((voucherCreatedDate.getTime() + 24 * 60 * 60 * 1000) / 1000); // 24 hours after
+                
+                // Search for payment intents with matching amount
+                const amountInCents = Math.round(voucherPaidAmount * 100);
+                const paymentIntents = await stripe.paymentIntents.list({
+                    limit: 100,
+                    created: { gte: startTimestamp, lte: endTimestamp }
+                });
+                
+                // Find matching payment intent
+                const matchingIntent = paymentIntents.data.find(pi => {
+                    const piAmount = pi.amount;
+                    return Math.abs(piAmount - amountInCents) < 1; // Allow 1 cent difference
+                });
+                
+                if (matchingIntent && matchingIntent.status === 'succeeded') {
+                    console.log('✅ Found matching Stripe payment intent:', matchingIntent.id);
+                    
+                    // Get the charge from payment intent
+                    const charges = matchingIntent.charges?.data || [];
+                    if (charges.length > 0) {
+                        const charge = charges[0];
+                        console.log('✅ Found Stripe charge:', charge.id);
+                        
+                        // Save payment history from Stripe data
+                        const sessionData = {
+                            id: matchingIntent.id, // Use payment intent ID as session ID
+                            payment_intent: matchingIntent.id,
+                            amount_total: amountInCents,
+                            currency: matchingIntent.currency || 'gbp'
+                        };
+                        
+                        // Save payment history with voucher info
+                        await savePaymentHistory(sessionData, null, voucher.id, voucher.voucher_ref);
+                        
+                        // Re-fetch payment history after sync
+                        try {
+                            const [syncedResults] = await con.promise().query(
+                                `SELECT * FROM payment_history WHERE voucher_id = ? OR voucher_ref = ? ORDER BY created_at DESC LIMIT 5`,
+                                [voucher.id, voucher.voucher_ref]
+                            );
+                            if (syncedResults && syncedResults.length > 0) {
+                                console.log('✅ Found payment history after Stripe sync:', syncedResults.length, 'records');
+                                paymentHistory = syncedResults.map(p => ({
+                                    ...p,
+                                    voucher_id: p.voucher_id || voucher.id,
+                                    voucher_ref: p.voucher_ref || voucher.voucher_ref
+                                }));
+                            }
+                        } catch (refetchErr) {
+                            console.warn('Error re-fetching payment history after sync:', refetchErr.message);
+                        }
+                    }
+                }
+            } catch (stripeError) {
+                console.warn('Error syncing payment history from Stripe:', stripeError.message);
+            }
+        }
+        
+        // Method 4: If voucher has paid amount but still no real payment history found, create synthetic entry
+        // This is especially important for Gift Vouchers where payment is tied to the voucher itself
+        // Only create synthetic entry if we don't have any real payment records with stripe_charge_id
+        const hasRealPaymentAfterSync = paymentHistory.some(p => 
+            p.stripe_charge_id || p.stripe_payment_intent_id
+        );
         const hasVoucherPayment = paymentHistory.some(p => 
             (p.id === `voucher_${fullVoucher.id}`) ||
             (Math.abs(parseFloat(p.amount || 0) - voucherPaidAmount) < 0.01 &&
              (p.voucher_id === fullVoucher.id || p.origin === 'voucher_purchase'))
         );
         
-        if (voucherPaidAmount > 0 && !hasVoucherPayment) {
-            console.log('📋 Voucher has paid amount, adding to payment history');
+        // Only create synthetic entry if:
+        // 1. Voucher has paid amount
+        // 2. No real payment records found (no stripe_charge_id) even after sync
+        // 3. No synthetic entry already exists
+        if (voucherPaidAmount > 0 && !hasRealPaymentAfterSync && !hasVoucherPayment) {
+            console.log('📋 Voucher has paid amount but no real payment history found after sync, adding synthetic entry');
             // Create a synthetic payment history entry from voucher data
+            // NOTE: This synthetic entry does NOT have stripe_charge_id, so refund button will NOT show
+            // Real payment entries from payment_history table will have stripe_charge_id and will show refund button
             const voucherPaymentEntry = {
                 id: `voucher_${fullVoucher.id}`,
                 booking_id: null,
                 voucher_id: fullVoucher.id,
+                voucher_ref: fullVoucher.voucher_ref,
                 stripe_session_id: null, // stripe_session_id column doesn't exist in all_vouchers table
+                stripe_charge_id: null, // No charge ID for synthetic entries
+                stripe_payment_intent_id: null, // No payment intent ID for synthetic entries
                 amount: voucherPaidAmount,
                 currency: 'GBP',
                 payment_status: 'succeeded',
@@ -7739,7 +7984,9 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
             };
             // Insert at the beginning to show voucher payment first
             paymentHistory.unshift(voucherPaymentEntry);
-            console.log('✅ Added voucher payment entry to payment history');
+            console.log('✅ Added synthetic voucher payment entry to payment history (no refund button - no stripe_charge_id)');
+        } else if (hasRealPaymentAfterSync) {
+            console.log('✅ Found real payment history with stripe_charge_id - refund button will be available');
         }
 
         // Method 4: REMOVED - Linked booking payment history was too broad
@@ -7757,11 +8004,136 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
         // 3. Payments from booking that uses this voucher's voucher_ref
         // We do NOT search by email/name as that would return all user payments
 
-        console.log('📋 Final payment history count:', paymentHistory.length);
+        // Method 5: Enrich payment history with missing Stripe data
+        // If payment records have stripe_charge_id or stripe_payment_intent_id but missing card details,
+        // fetch the missing information from Stripe
+        const enrichedPaymentHistory = await Promise.all(
+            paymentHistory.map(async (payment) => {
+                // Skip synthetic entries
+                if (String(payment.id || '').startsWith('voucher_')) {
+                    return payment;
+                }
+                
+                // If we have stripe_charge_id or stripe_payment_intent_id but missing card details, fetch from Stripe
+                const hasStripeId = payment.stripe_charge_id || payment.stripe_payment_intent_id;
+                const missingCardInfo = !payment.card_last4 || !payment.card_brand || !payment.fingerprint;
+                
+                if (hasStripeId && missingCardInfo) {
+                    try {
+                        let charge = null;
+                        
+                        // Try to get charge from stripe_charge_id first
+                        if (payment.stripe_charge_id) {
+                            try {
+                                charge = await stripe.charges.retrieve(payment.stripe_charge_id);
+                            } catch (chargeErr) {
+                                console.warn(`Could not retrieve charge ${payment.stripe_charge_id}:`, chargeErr.message);
+                            }
+                        }
+                        
+                        // If no charge found, try to get from payment intent
+                        if (!charge && payment.stripe_payment_intent_id) {
+                            try {
+                                const paymentIntent = await stripe.paymentIntents.retrieve(payment.stripe_payment_intent_id);
+                                if (paymentIntent.charges && paymentIntent.charges.data && paymentIntent.charges.data.length > 0) {
+                                    charge = paymentIntent.charges.data[0];
+                                }
+                            } catch (piErr) {
+                                console.warn(`Could not retrieve payment intent ${payment.stripe_payment_intent_id}:`, piErr.message);
+                            }
+                        }
+                        
+                        if (charge) {
+                            // Extract card information from charge
+                            const paymentMethod = charge.payment_method_details;
+                            if (paymentMethod && paymentMethod.card) {
+                                const card = paymentMethod.card;
+                                
+                                // Update payment object with missing information
+                                if (!payment.card_last4 && card.last4) {
+                                    payment.card_last4 = card.last4;
+                                }
+                                if (!payment.card_brand && card.brand) {
+                                    payment.card_brand = card.brand;
+                                }
+                                if (!payment.fingerprint && card.fingerprint) {
+                                    payment.fingerprint = card.fingerprint;
+                                }
+                                if (!payment.wallet_type && card.wallet) {
+                                    payment.wallet_type = card.wallet.type;
+                                }
+                                if (!payment.origin && card.country) {
+                                    payment.origin = card.country;
+                                }
+                                if (payment.card_present === null || payment.card_present === undefined) {
+                                    payment.card_present = card.present ? 1 : 0;
+                                }
+                                
+                                // Update transaction_id if missing
+                                if (!payment.transaction_id && charge.id) {
+                                    payment.transaction_id = charge.id;
+                                }
+                                
+                                // Update database with enriched data (async, don't wait)
+                                const updateFields = [];
+                                const updateValues = [];
+                                
+                                if (card.last4 && !payment.card_last4) {
+                                    updateFields.push('card_last4 = ?');
+                                    updateValues.push(card.last4);
+                                }
+                                if (card.brand && !payment.card_brand) {
+                                    updateFields.push('card_brand = ?');
+                                    updateValues.push(card.brand);
+                                }
+                                if (card.fingerprint && !payment.fingerprint) {
+                                    updateFields.push('fingerprint = ?');
+                                    updateValues.push(card.fingerprint);
+                                }
+                                if (card.wallet && card.wallet.type && !payment.wallet_type) {
+                                    updateFields.push('wallet_type = ?');
+                                    updateValues.push(card.wallet.type);
+                                }
+                                if (card.country && !payment.origin) {
+                                    updateFields.push('origin = ?');
+                                    updateValues.push(card.country);
+                                }
+                                if (payment.card_present === null || payment.card_present === undefined) {
+                                    updateFields.push('card_present = ?');
+                                    updateValues.push(card.present ? 1 : 0);
+                                }
+                                if (charge.id && !payment.transaction_id) {
+                                    updateFields.push('transaction_id = ?');
+                                    updateValues.push(charge.id);
+                                }
+                                
+                                if (updateFields.length > 0) {
+                                    updateValues.push(payment.id);
+                                    const updateQuery = `UPDATE payment_history SET ${updateFields.join(', ')} WHERE id = ?`;
+                                    con.query(updateQuery, updateValues, (updateErr) => {
+                                        if (updateErr) {
+                                            console.warn('Error updating payment history with Stripe data:', updateErr.message);
+                                        } else {
+                                            console.log(`✅ Enriched payment_history record ${payment.id} with Stripe data`);
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    } catch (enrichErr) {
+                        console.warn('Error enriching payment history with Stripe data:', enrichErr.message);
+                    }
+                }
+                
+                return payment;
+            })
+        );
+        
+        console.log('📋 Final payment history count:', enrichedPaymentHistory.length);
         
         res.json({
             success: true,
-            data: paymentHistory,
+            data: enrichedPaymentHistory,
             voucher: {
                 id: voucher.id,
                 voucher_ref: voucher.voucher_ref
@@ -7883,12 +8255,20 @@ app.post('/api/sync-payment-history/:bookingId', async (req, res) => {
 // Refund payment endpoint
 app.post('/api/refund-payment', async (req, res) => {
     try {
-        const { paymentId, bookingId, amount, comment, stripeChargeId } = req.body;
+        const { paymentId, bookingId, voucherId, voucherRef, amount, comment, stripeChargeId } = req.body;
 
-        if (!paymentId || !bookingId || !amount) {
+        if (!paymentId || !amount) {
             return res.status(400).json({
                 success: false,
-                message: 'Missing required fields: paymentId, bookingId, and amount are required'
+                message: 'Missing required fields: paymentId and amount are required'
+            });
+        }
+
+        // Must have either bookingId (for booking payments) or voucherId/voucherRef (for voucher payments)
+        if (!bookingId && !voucherId && !voucherRef) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields: bookingId or voucherId/voucherRef is required'
             });
         }
 
@@ -7896,7 +8276,7 @@ app.post('/api/refund-payment', async (req, res) => {
         if (isNaN(parseInt(paymentId)) || String(paymentId).startsWith('voucher_')) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid payment ID. Voucher payments cannot be refunded through this endpoint.'
+                message: 'Invalid payment ID. Synthetic voucher payments cannot be refunded through this endpoint.'
             });
         }
 
@@ -7915,10 +8295,25 @@ app.post('/api/refund-payment', async (req, res) => {
             });
         }
 
+        // Build query based on whether this is a booking or voucher payment
+        let paymentQuery = 'SELECT * FROM payment_history WHERE id = ?';
+        let queryParams = [paymentId];
+        
+        if (bookingId) {
+            paymentQuery += ' AND booking_id = ?';
+            queryParams.push(bookingId);
+        } else if (voucherId) {
+            paymentQuery += ' AND voucher_id = ?';
+            queryParams.push(voucherId);
+        } else if (voucherRef) {
+            paymentQuery += ' AND voucher_ref = ?';
+            queryParams.push(voucherRef);
+        }
+
         // Get payment details from database
         con.query(
-            'SELECT * FROM payment_history WHERE id = ? AND booking_id = ?',
-            [paymentId, bookingId],
+            paymentQuery,
+            queryParams,
             async (err, results) => {
                 if (err) {
                     console.error('Error fetching payment:', err);
@@ -7953,16 +8348,22 @@ app.post('/api/refund-payment', async (req, res) => {
                         amount: refundAmount,
                         metadata: {
                             payment_id: paymentId.toString(),
-                            booking_id: bookingId.toString(),
+                            booking_id: (bookingId || '').toString(),
+                            voucher_id: (voucherId || '').toString(),
+                            voucher_ref: (voucherRef || '').toString(),
                             comment: comment || '',
                             refunded_by: 'admin'
                         }
                     });
 
                     // Save refund record to database
+                    // Check if payment_history table has voucher_id and voucher_ref columns
+                    // If columns don't exist, we'll handle it gracefully
                     const refundSql = `
                         INSERT INTO payment_history (
                             booking_id,
+                            voucher_id,
+                            voucher_ref,
                             stripe_session_id,
                             stripe_charge_id,
                             stripe_payment_intent_id,
@@ -7973,12 +8374,79 @@ app.post('/api/refund-payment', async (req, res) => {
                             refund_comment,
                             refunded_payment_id,
                             created_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, 'refunded', 'refund', ?, ?, NOW())
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'refunded', 'refund', ?, ?, NOW())
                     `;
 
                     const refundAmountDecimal = (refundAmount / 100).toFixed(2);
                     
-                    // CRITICAL: First update the booking's paid amount (this must succeed)
+                    // Update paid amount - either booking or voucher
+                    const saveRefundRecord = () => {
+                        con.query(
+                            refundSql,
+                            [
+                                bookingId || null,
+                                voucherId || null,
+                                voucherRef || null,
+                                payment.stripe_session_id,
+                                refund.id,
+                                refund.payment_intent,
+                                -Math.abs(parseFloat(refundAmountDecimal)), // Negative amount for refund
+                                payment.currency || 'GBP',
+                                comment || null, // Refund comment/notes
+                                paymentId // Reference to the original payment that was refunded
+                            ],
+                            (insertErr) => {
+                                if (insertErr) {
+                                    // If voucher_id/voucher_ref columns don't exist, try without them
+                                    if (insertErr.code === 'ER_BAD_FIELD_ERROR') {
+                                        console.log('ℹ️ voucher_id/voucher_ref columns not found in payment_history, inserting without them');
+                                        const refundSqlWithoutVoucher = `
+                                            INSERT INTO payment_history (
+                                                booking_id,
+                                                stripe_session_id,
+                                                stripe_charge_id,
+                                                stripe_payment_intent_id,
+                                                amount,
+                                                currency,
+                                                payment_status,
+                                                origin,
+                                                refund_comment,
+                                                refunded_payment_id,
+                                                created_at
+                                            ) VALUES (?, ?, ?, ?, ?, ?, 'refunded', 'refund', ?, ?, NOW())
+                                        `;
+                                        con.query(
+                                            refundSqlWithoutVoucher,
+                                            [
+                                                bookingId || null,
+                                                payment.stripe_session_id,
+                                                refund.id,
+                                                refund.payment_intent,
+                                                -Math.abs(parseFloat(refundAmountDecimal)),
+                                                payment.currency || 'GBP',
+                                                comment || null,
+                                                paymentId
+                                            ],
+                                            (insertErr2) => {
+                                                if (insertErr2) {
+                                                    console.error('Error saving refund to database:', insertErr2);
+                                                } else {
+                                                    console.log(`✅ Refund record saved to payment_history`);
+                                                }
+                                            }
+                                        );
+                                    } else {
+                                        console.error('Error saving refund to database:', insertErr);
+                                    }
+                                } else {
+                                    console.log(`✅ Refund record saved to payment_history`);
+                                }
+                            }
+                        );
+                    };
+                    
+                    if (bookingId) {
+                        // Update booking's paid amount
                     const updateBookingSql = `
                         UPDATE all_booking 
                         SET paid = GREATEST(0, COALESCE(paid, 0) - ?)
@@ -7998,30 +8466,37 @@ app.post('/api/refund-payment', async (req, res) => {
                                     refundAmount: refundAmountDecimal
                                 });
                             }
-                            
-                            // Then save the refund record to payment_history
+                                saveRefundRecord();
+                            }
+                        );
+                    } else if (voucherId || voucherRef) {
+                        // Update voucher's paid amount
+                        const updateVoucherSql = voucherId
+                            ? `UPDATE all_vouchers SET paid = GREATEST(0, COALESCE(paid, 0) - ?) WHERE id = ?`
+                            : `UPDATE all_vouchers SET paid = GREATEST(0, COALESCE(paid, 0) - ?) WHERE voucher_ref = ?`;
+                        const voucherUpdateParam = voucherId || voucherRef;
+                        
                     con.query(
-                        refundSql,
-                        [
-                            bookingId,
-                            payment.stripe_session_id,
-                            refund.id,
-                            refund.payment_intent,
-                            -Math.abs(parseFloat(refundAmountDecimal)), // Negative amount for refund
-                            payment.currency || 'GBP',
-                            comment || null, // Refund comment/notes
-                            paymentId // Reference to the original payment that was refunded
-                        ],
-                        (insertErr) => {
-                            if (insertErr) {
-                                console.error('Error saving refund to database:', insertErr);
+                            updateVoucherSql,
+                            [parseFloat(refundAmountDecimal), voucherUpdateParam],
+                            (updateErr, updateResult) => {
+                                if (updateErr) {
+                                    console.error('Error updating voucher paid amount:', updateErr);
                             } else {
-                                        console.log(`✅ Refund record saved to payment_history for booking ${bookingId}`);
-                                    }
+                                    console.log(`✅ Voucher ${voucherUpdateParam} paid amount decreased by £${refundAmountDecimal}`, {
+                                        affectedRows: updateResult?.affectedRows,
+                                        voucherId,
+                                        voucherRef,
+                                        refundAmount: refundAmountDecimal
+                                    });
                                 }
-                            );
-                        }
-                    );
+                                saveRefundRecord();
+                            }
+                        );
+                    } else {
+                        // No booking or voucher to update, just save refund record
+                        saveRefundRecord();
+                    }
 
                     res.json({
                         success: true,
@@ -8030,7 +8505,8 @@ app.post('/api/refund-payment', async (req, res) => {
                             refundId: refund.id,
                             amount: refundAmountDecimal,
                             status: refund.status,
-                            bookingPaidUpdated: true
+                            bookingPaidUpdated: !!bookingId,
+                            voucherPaidUpdated: !!(voucherId || voucherRef)
                         }
                     });
                 } catch (stripeError) {
@@ -8926,6 +9402,26 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     assignedResource = getAssignedResource(flightTypeForResource, normalizedPassengerCount);
                 }
 
+                // Ensure phone numbers include country code
+                // Helper function to add country code if missing
+                const ensurePhoneWithCountryCode = (phone) => {
+                    if (!phone) return phone;
+                    const phoneStr = String(phone).trim();
+                    if (phoneStr.startsWith('+')) return phoneStr;
+                    // If phone doesn't have country code, try to infer from common patterns
+                    // UK numbers starting with 0 or 7
+                    if (phoneStr.startsWith('0') || /^7\d{9}$/.test(phoneStr)) {
+                        return '+44' + phoneStr.replace(/^0/, '');
+                    }
+                    return phoneStr;
+                };
+
+                // Update phone numbers to include country code if missing
+                const phoneWithCode = ensurePhoneWithCountryCode(row.phone);
+                const purchaserPhoneWithCode = ensurePhoneWithCountryCode(row.purchaser_phone || row.phone);
+                const recipientPhoneWithCode = ensurePhoneWithCountryCode(row.recipient_phone);
+                const bookingPhoneWithCode = ensurePhoneWithCountryCode(row.booking_phone);
+
                 return {
                     ...row,
                     voucher_ref,
@@ -8935,12 +9431,14 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     voucher_type: row.actual_voucher_type ?? '', // Changed to use actual_voucher_type for voucher_type column
                     actual_voucher_type: row.actual_voucher_type ?? '', // New field for actual voucher type
                     email: row.email ?? '',
-                    phone: row.phone ?? '',
+                    phone: phoneWithCode ?? '',
                     // Purchaser information fields
                     purchaser_name: row.purchaser_name ?? row.name ?? '',
                     purchaser_email: row.purchaser_email ?? row.email ?? '',
-                    purchaser_phone: row.purchaser_phone ?? row.phone ?? '',
-                    purchaser_mobile: row.purchaser_mobile ?? row.mobile ?? '',
+                    purchaser_phone: purchaserPhoneWithCode ?? '',
+                    purchaser_mobile: ensurePhoneWithCountryCode(row.purchaser_mobile || row.mobile) ?? '',
+                    // Recipient information fields (for Gift Vouchers)
+                    recipient_phone: recipientPhoneWithCode ?? (row.recipient_phone ?? ''),
                     expires: expiresVal ? (() => {
                         // Parse expires date correctly - handle both Date objects and string formats
                         if (typeof expiresVal === 'string' && expiresVal.includes('/')) {
@@ -8998,7 +9496,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
                         return createdMoment.isValid() ? createdMoment.format('DD/MM/YYYY HH:mm') : '';
                     })() : '',
                     booking_email: row.booking_email ?? '',
-                    booking_phone: row.booking_phone ?? '',
+                    booking_phone: bookingPhoneWithCode ?? '',
                     booking_id: row.booking_id ?? '',
                     passenger_info: row.passenger_info ?? '',
                     passenger_count: row.passenger_count ?? 0,
@@ -10036,18 +10534,24 @@ app.post('/api/createBooking', (req, res) => {
                     }
 
                     // Send automatic booking confirmation SMS for "Book Flight Date" bookings
-                    console.log('========================================');
-                    console.log('📱 [createBooking] SMS SEND PROCESS STARTING');
-                    console.log('📱 [createBooking] Booking ID:', bookingId);
-                    console.log('📱 [createBooking] Flight Type:', chooseFlightType);
-                    console.log('📱 [createBooking] Calling sendAutomaticBookingConfirmationSms...');
-                    console.log('========================================');
-                    
-                    try {
-                        sendAutomaticBookingConfirmationSms(bookingId);
-                        console.log('✅ [createBooking] sendAutomaticBookingConfirmationSms function called successfully');
-                    } catch (smsError) {
-                        console.error('❌ [createBooking] Error calling sendAutomaticBookingConfirmationSms:', smsError);
+                    // Only send SMS if activitySelect is "Book Flight" (which corresponds to "Book Flight Date" in UI)
+                    if (activitySelect === 'Book Flight' || activitySelect === 'Book Flight Date') {
+                        console.log('========================================');
+                        console.log('📱 [createBooking] SMS SEND PROCESS STARTING');
+                        console.log('📱 [createBooking] Booking ID:', bookingId);
+                        console.log('📱 [createBooking] Activity Select:', activitySelect);
+                        console.log('📱 [createBooking] Flight Type:', chooseFlightType);
+                        console.log('📱 [createBooking] Calling sendAutomaticBookingConfirmationSms...');
+                        console.log('========================================');
+                        
+                        try {
+                            sendAutomaticBookingConfirmationSms(bookingId);
+                            console.log('✅ [createBooking] sendAutomaticBookingConfirmationSms function called successfully');
+                        } catch (smsError) {
+                            console.error('❌ [createBooking] Error calling sendAutomaticBookingConfirmationSms:', smsError);
+                        }
+                    } else {
+                        console.log('⏭️ [createBooking] Skipping SMS - activitySelect is not "Book Flight". activitySelect:', activitySelect);
                     }
 
                     res.status(201).json({ success: true, message: 'Booking created successfully!', bookingId: bookingId, created_at: createdAt });
@@ -26053,23 +26557,155 @@ app.post('/api/sendBookingSms', async (req, res) => {
     }
 });
 
-// Helper function to normalize UK phone numbers to +44 format
-function normalizeUkPhone(raw) {
+// Bulk SMS endpoint
+app.post('/api/sendBulkBookingSms', async (req, res) => {
+    console.log('POST /api/sendBulkBookingSms called');
+    const { bookingIds, to, body, templateId } = req.body;
+
+    try {
+        if (!Array.isArray(to) || to.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Recipient list is empty'
+            });
+        }
+
+        if (!body) {
+            return res.status(400).json({
+                success: false,
+                message: 'Message body is required'
+            });
+        }
+
+        const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, TWILIO_MESSAGING_SERVICE_SID } = process.env;
+        if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
+            console.error('Twilio not configured');
+            return res.status(500).json({
+                success: false,
+                message: 'SMS service not configured'
+            });
+        }
+
+        const client = Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+        const uniqueRecipients = Array.from(new Set(to.map(p => String(p || '').trim()).filter(Boolean)));
+        
+        if (uniqueRecipients.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No valid recipient phone numbers'
+            });
+        }
+
+        const createParams = {
+            body: body,
+            statusCallback: process.env.TWILIO_STATUS_CALLBACK_URL || undefined
+        };
+
+        // Priority order for sender (same as single SMS)
+        const hasFromNumber = TWILIO_FROM_NUMBER && typeof TWILIO_FROM_NUMBER === 'string' && TWILIO_FROM_NUMBER.trim() !== '';
+        const hasMessagingService = TWILIO_MESSAGING_SERVICE_SID && typeof TWILIO_MESSAGING_SERVICE_SID === 'string' && TWILIO_MESSAGING_SERVICE_SID.trim() !== '';
+        
+        if (hasMessagingService) {
+            createParams.messagingServiceSid = TWILIO_MESSAGING_SERVICE_SID.trim();
+        } else if (!hasFromNumber) {
+            createParams.from = 'FLYAWAY';
+        } else {
+            createParams.from = TWILIO_FROM_NUMBER.trim();
+        }
+
+        let successCount = 0;
+        const failures = [];
+
+        // Fetch booking data for each booking to replace placeholders
+        const bookingDataMap = new Map();
+        if (Array.isArray(bookingIds) && bookingIds.length > 0) {
+            for (const bookingId of bookingIds) {
+                try {
+                    const bookingQuery = `SELECT * FROM all_booking WHERE id = ?`;
+                    const [bookingRows] = await con.promise().query(bookingQuery, [bookingId]);
+                    if (bookingRows && bookingRows.length > 0) {
+                        bookingDataMap.set(bookingId, bookingRows[0]);
+                    }
+                } catch (err) {
+                    console.warn(`Error fetching booking ${bookingId} for SMS:`, err.message);
+                }
+            }
+        }
+
+        // Send SMS to each recipient
+        for (const recipientPhone of uniqueRecipients) {
+            try {
+                // Find the corresponding booking for this phone number
+                let bookingForThisPhone = null;
+                if (Array.isArray(bookingIds) && bookingIds.length > 0) {
+                    for (const bookingId of bookingIds) {
+                        const booking = bookingDataMap.get(bookingId);
+                        if (booking) {
+                            // Clean phone number for comparison (remove whitespace, dashes, parentheses)
+                            const bookingPhone = cleanPhoneNumber(booking.phone || booking.mobile || '');
+                            if (bookingPhone === recipientPhone) {
+                                bookingForThisPhone = booking;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Replace placeholders for this specific booking
+                const bodyWithPrompts = bookingForThisPhone 
+                    ? replaceSmsPrompts(body, bookingForThisPhone)
+                    : body;
+
+                const msgParams = {
+                    ...createParams,
+                    to: recipientPhone,
+                    body: bodyWithPrompts
+                };
+
+                const msg = await client.messages.create(msgParams);
+                
+                // Log SMS
+                const bookingIdForLog = bookingForThisPhone ? bookingForThisPhone.id : null;
+                ensureSmsLogsSchema(() => {
+                    const sql = `INSERT INTO sms_logs (booking_id, to_number, body, status, sid, sent_at) VALUES (?, ?, ?, ?, ?, NOW())`;
+                    con.query(sql, [bookingIdForLog, recipientPhone, bodyWithPrompts, msg.status || 'queued', msg.sid], (err) => {
+                        if (err) console.error('Error logging sms:', err);
+                    });
+                });
+
+                successCount++;
+            } catch (error) {
+                console.error(`Error sending SMS to ${recipientPhone}:`, error);
+                failures.push({ phone: recipientPhone, error: error.message });
+            }
+        }
+
+        console.log(`Bulk SMS sent: ${successCount} successful, ${failures.length} failed`);
+
+        res.json({
+            success: true,
+            sentCount: successCount,
+            failedCount: failures.length,
+            failures: failures.length > 0 ? failures : undefined
+        });
+    } catch (error) {
+        console.error('Bulk SMS send error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Helper function to clean phone numbers (remove whitespace, dashes, parentheses) but keep international format
+function cleanPhoneNumber(raw) {
     if (!raw) return '';
     let s = String(raw).trim();
     // Replace whitespace, dashes, parentheses
     s = s.replace(/[\s\-()]/g, '');
     // Convert leading 00 to +
     if (s.startsWith('00')) s = '+' + s.slice(2);
-    // If already E.164
-    if (s.startsWith('+')) return s;
-    // If leading 0 assume UK national format
-    if (s.startsWith('0')) {
-        return '+44' + s.slice(1);
-    }
-    // If 10-11 digits and likely UK mobile (starts with 7)
-    if (/^7\d{8,9}$/.test(s)) return '+44' + s;
-    return s; // fallback - leave as is
+    return s; // Return cleaned phone number as-is (no country code assumption)
 }
 
 // Automatic SMS sending function (similar to sendAutomaticBookingConfirmationEmail)
@@ -26105,21 +26741,39 @@ async function sendAutomaticBookingConfirmationSms(bookingId) {
             const booking = bookingRows[0];
             
             // Determine booking type and template name
+            // For "Book Flight Date", we need to check if this is NOT a "Redeem Voucher" or "Buy Flight Voucher" booking
+            // "Book Flight Date" bookings have flight_type_source that is NOT "Redeem Voucher" and NOT containing "voucher"
             const flightType = booking.flight_type || '';
+            const flightTypeSource = booking.flight_type_source || '';
             const flightTypeLower = flightType.toLowerCase();
+            const flightTypeSourceLower = flightTypeSource.toLowerCase();
             let templateName = '';
             let shouldSendSms = false;
             
-            if (flightTypeLower.includes('book flight date')) {
+            // Check if this is a "Book Flight Date" booking
+            // "Book Flight Date" bookings:
+            // - flight_type_source is NOT "Redeem Voucher"
+            // - flight_type_source does NOT contain "voucher"
+            // - flight_type is typically "Private Charter" or "Shared Flight" (not "Book Flight Date")
+            // - We can identify "Book Flight Date" by exclusion: if it's not "Redeem Voucher" and not a voucher purchase, it's "Book Flight Date"
+            const isRedeemVoucher = flightTypeSourceLower === 'redeem voucher';
+            const isVoucherPurchase = flightTypeLower.includes('buy flight voucher') || 
+                                      flightTypeLower.includes('flight voucher') ||
+                                      flightTypeSourceLower.includes('buy flight voucher') ||
+                                      flightTypeSourceLower.includes('flight voucher');
+            
+            if (!isRedeemVoucher && !isVoucherPurchase) {
+                // This is a "Book Flight Date" booking
                 templateName = 'Booking Confirmation SMS';
                 shouldSendSms = true;
-            } else if (flightTypeLower.includes('buy flight voucher') || flightTypeLower.includes('flight voucher')) {
+            } else if (isVoucherPurchase) {
+                // This is a "Buy Flight Voucher" booking
                 templateName = 'Flight Voucher Confirmation SMS';
                 shouldSendSms = true;
             }
             
             if (!shouldSendSms) {
-                console.log('⏭️ [sendAutomaticBookingConfirmationSms] Skipping SMS - not a "Book Flight Date" or "Buy Flight Voucher" booking. flight_type:', flightType);
+                console.log('⏭️ [sendAutomaticBookingConfirmationSms] Skipping SMS - not a "Book Flight Date" or "Buy Flight Voucher" booking. flight_type:', flightType, 'flight_type_source:', flightTypeSource);
                 return;
             }
 
@@ -26130,10 +26784,10 @@ async function sendAutomaticBookingConfirmationSms(bookingId) {
                 return;
             }
 
-            // Normalize phone number to +44 format
-            const normalizedPhone = normalizeUkPhone(phoneNumber);
-            if (!normalizedPhone || !normalizedPhone.startsWith('+44')) {
-                console.warn('⚠️ [sendAutomaticBookingConfirmationSms] Invalid UK phone number:', phoneNumber, 'normalized:', normalizedPhone);
+            // Clean phone number (keep international format)
+            const normalizedPhone = cleanPhoneNumber(phoneNumber);
+            if (!normalizedPhone || !normalizedPhone.startsWith('+')) {
+                console.warn('⚠️ [sendAutomaticBookingConfirmationSms] Invalid international phone number:', phoneNumber, 'cleaned:', normalizedPhone);
                 return;
             }
 
@@ -26283,10 +26937,10 @@ async function sendAutomaticGiftVoucherConfirmationSms(voucherId, purchasingCont
                 return;
             }
 
-            // Normalize phone number to +44 format
-            const normalizedPhone = normalizeUkPhone(phoneNumber);
-            if (!normalizedPhone || !normalizedPhone.startsWith('+44')) {
-                console.warn('⚠️ [sendAutomaticGiftVoucherConfirmationSms] Invalid UK phone number:', phoneNumber, 'normalized:', normalizedPhone);
+            // Clean phone number (keep international format)
+            const normalizedPhone = cleanPhoneNumber(phoneNumber);
+            if (!normalizedPhone || !normalizedPhone.startsWith('+')) {
+                console.warn('⚠️ [sendAutomaticGiftVoucherConfirmationSms] Invalid international phone number:', phoneNumber, 'cleaned:', normalizedPhone);
                 return;
             }
 

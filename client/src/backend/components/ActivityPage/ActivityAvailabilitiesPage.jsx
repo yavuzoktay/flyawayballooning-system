@@ -53,11 +53,23 @@ const ActivityAvailabilitiesPage = () => {
             }
         });
 
-        // Fetch availabilities with increased timeout
-        const fetchAvailabilities = async () => {
+        // Fetch and auto-update availabilities with increased timeout
+        const fetchAndUpdateAvailabilities = async () => {
             setLoading(true);
             try {
-                // Fetch availabilities with 60 second timeout
+                // First, auto-update status and available counts
+                try {
+                    // Auto-update status
+                    await axios.post(`/api/activity/${id}/updateAvailabilityStatus`);
+                    
+                    // Update available counts
+                    await axios.post(`/api/activity/${id}/updateAvailableCounts`);
+                } catch (updateError) {
+                    console.warn('Error auto-updating availabilities (non-critical):', updateError);
+                    // Continue even if auto-update fails
+                }
+                
+                // Then fetch updated availabilities with 60 second timeout
                 const res = await axios.get(`/api/activity/${id}/availabilities`, {
                     timeout: 60000 // 60 seconds
                 });
@@ -76,7 +88,7 @@ const ActivityAvailabilitiesPage = () => {
             }
         };
 
-        fetchAvailabilities();
+        fetchAndUpdateAvailabilities();
     }, [id]);
 
     const handleRowClick = (row) => {
@@ -395,47 +407,6 @@ const ActivityAvailabilitiesPage = () => {
         }
     };
 
-    const handleAutoUpdateStatus = async () => {
-        try {
-            const response = await axios.post(`/api/activity/${id}/updateAvailabilityStatus`);
-            if (response.data.success) {
-                alert(`Successfully updated ${response.data.affectedRows} availability statuses!`);
-                // Refresh table to show updated statuses
-                setLoading(true);
-                axios.get(`/api/activity/${id}/availabilities`, { timeout: 60000 }).then(res => {
-                    if (res.data.success) setAvailabilities(res.data.data);
-                }).catch(error => {
-                    console.error('Error refreshing availabilities:', error);
-                }).finally(() => {
-                    setLoading(false);
-                });
-            }
-        } catch (error) {
-            console.error('Error auto-updating availability statuses:', error);
-            alert('Failed to auto-update availability statuses. Please try again.');
-        }
-    };
-
-    const handleUpdateAvailableCounts = async () => {
-        try {
-            const response = await axios.post(`/api/activity/${id}/updateAvailableCounts`);
-            if (response.data.success) {
-                alert(`Successfully updated ${response.data.updatedCount} availabilities with correct available counts and status!`);
-                // Refresh table to show updated data
-                setLoading(true);
-                axios.get(`/api/activity/${id}/availabilities`, { timeout: 60000 }).then(res => {
-                    if (res.data.success) setAvailabilities(res.data.data);
-                }).catch(error => {
-                    console.error('Error refreshing availabilities:', error);
-                }).finally(() => {
-                    setLoading(false);
-                });
-            }
-        } catch (error) {
-            console.error('Error updating available counts:', error);
-            alert('Failed to update available counts. Please try again.');
-        }
-    };
 
     return (
         <Container maxWidth="lg" style={{ marginTop: 40 }}>
@@ -501,24 +472,6 @@ const ActivityAvailabilitiesPage = () => {
                             ))}
                         </Box>
                     )}
-                    <Button 
-                        variant="contained" 
-                        color="secondary" 
-                        onClick={handleAutoUpdateStatus}
-                        title="Auto-update availability statuses based on current bookings"
-                        sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
-                    >
-                        Auto-Update Status
-                    </Button>
-                    <Button 
-                        variant="contained" 
-                        color="warning" 
-                        onClick={handleUpdateAvailableCounts}
-                        title="Update available counts and status based on actual bookings"
-                        sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
-                    >
-                        Update Available Counts
-                    </Button>
                     <Button 
                         variant="contained" 
                         color="primary" 

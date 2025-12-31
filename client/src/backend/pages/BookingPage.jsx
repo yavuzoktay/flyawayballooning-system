@@ -478,23 +478,15 @@ const BookingPage = () => {
         setSelectedBookingIds(selectedIds);
     }, []);
 
-    // Normalize UK phone numbers to +44 format for SMS
-    const normalizeUkPhone = (raw) => {
+    // Clean phone numbers (remove whitespace, dashes, parentheses) but keep international format
+    const cleanPhoneNumber = (raw) => {
         if (!raw) return '';
         let s = String(raw).trim();
         // Replace whitespace, dashes, parentheses
         s = s.replace(/[\s\-()]/g, '');
         // Convert leading 00 to +
         if (s.startsWith('00')) s = '+' + s.slice(2);
-        // If already E.164
-        if (s.startsWith('+')) return s;
-        // If leading 0 assume UK national format
-        if (s.startsWith('0')) {
-            return '+44' + s.slice(1);
-        }
-        // If 10-11 digits and likely UK mobile (starts with 7)
-        if (/^7\d{8,9}$/.test(s)) return '+44' + s;
-        return s; // fallback - leave as is
+        return s; // Return cleaned phone number as-is (no country code assumption)
     };
 
     const stripHtml = (input = '') => {
@@ -728,11 +720,19 @@ const BookingPage = () => {
         // Validate that this is a real payment entry (not synthetic voucher payment)
         const paymentId = selectedPaymentForRefund.id;
         const bookingId = selectedPaymentForRefund.booking_id;
+        const voucherId = selectedPaymentForRefund.voucher_id;
+        const voucherRef = selectedPaymentForRefund.voucher_ref;
         const stripeChargeId = selectedPaymentForRefund.stripe_charge_id || selectedPaymentForRefund.stripe_payment_intent_id;
         
         // Check if this is a synthetic payment (voucher payment entry)
-        if (String(paymentId || '').startsWith('voucher_') || !bookingId || !stripeChargeId) {
+        if (String(paymentId || '').startsWith('voucher_') || !stripeChargeId) {
             alert('This payment cannot be refunded through this method. Please contact support for voucher refunds.');
+            return;
+        }
+        
+        // Must have either bookingId (for booking payments) or voucherId/voucherRef (for voucher payments)
+        if (!bookingId && !voucherId && !voucherRef) {
+            alert('Invalid payment entry. Cannot process refund.');
             return;
         }
         
@@ -754,6 +754,8 @@ const BookingPage = () => {
             const response = await axios.post('/api/refund-payment', {
                 paymentId: paymentId,
                 bookingId: bookingId,
+                voucherId: voucherId,
+                voucherRef: voucherRef,
                 amount: amount,
                 comment: refundComment,
                 stripeChargeId: stripeChargeId
@@ -4296,7 +4298,7 @@ setBookingDetail(finalVoucherDetail);
 
     const handleSmsClick = (booking) => {
         setSelectedBookingForEmail(booking); // reuse selected booking
-        setSmsForm({ to: normalizeUkPhone(booking.phone || ''), message: '' });
+        setSmsForm({ to: cleanPhoneNumber(booking.phone || ''), message: '', template: 'custom' });
         setSmsModalOpen(true);
         // Load sms logs
         (async () => {
@@ -4315,6 +4317,48 @@ setBookingDetail(finalVoucherDetail);
             } catch {}
         }, 15000);
         setSmsPollId(pid);
+    };
+
+    const openSmsModalForBooking = (booking, options = {}) => {
+        if (!booking) return;
+        const contextType = options.contextType || booking.contextType || 'booking';
+        const contextId = options.contextId || booking.contextId || (booking.id ? String(booking.id) : '');
+        const bookingWithContext = { ...booking, contextType, contextId };
+        
+        setSelectedBookingForEmail(bookingWithContext);
+        
+        console.log('📱 Opening SMS modal...');
+        console.log('📚 Available smsTemplates:', smsTemplates);
+        
+        const firstTemplate = smsTemplates.length > 0 ? smsTemplates[0].id : 'custom';
+        let message = '';
+        let templateValue = 'custom';
+        
+        if (smsTemplates.length > 0) {
+            templateValue = String(firstTemplate);
+            message = smsTemplates[0].message || '';
+        }
+        
+        setSmsForm({
+            to: cleanPhoneNumber(bookingWithContext.phone || ''),
+            message,
+            template: templateValue
+        });
+        
+        setSmsPersonalNote('');
+        setSmsModalOpen(true);
+        
+        // Load SMS logs for the primary booking
+        if (bookingWithContext.id) {
+            (async () => {
+                try {
+                    setSmsLogsLoading(true);
+                    const resp = await axios.get(`/api/bookingSms/${bookingWithContext.id}`);
+                    setSmsLogs(resp.data?.data || []);
+                } catch { setSmsLogs([]); }
+                finally { setSmsLogsLoading(false); }
+            })();
+        }
     };
 
     useEffect(() => {
@@ -4368,12 +4412,12 @@ setBookingDetail(finalVoucherDetail);
     };
 
     const handleSendSms = async () => {
-        if (!smsForm.to || !smsForm.message) { alert('Please fill phone and message'); return; }
+        if (!smsForm.message) { alert('Please fill message'); return; }
         
-        // Normalize phone number to +44 format
-        const normalizedPhone = normalizeUkPhone(smsForm.to);
-        if (!normalizedPhone || !normalizedPhone.startsWith('+44')) {
-            alert('Please enter a valid UK phone number (will be converted to +44 format)');
+        const isBulk = selectedBookingIds && selectedBookingIds.length > 1;
+        
+        if (!isBulk && !smsForm.to) {
+            alert('Please fill phone number');
             return;
         }
         
@@ -4384,18 +4428,60 @@ setBookingDetail(finalVoucherDetail);
         
         setSmsSending(true);
         try {
-            const resp = await axios.post('/api/sendBookingSms', {
-                bookingId: selectedBookingForEmail?.id,
-                to: normalizedPhone,
-                body: finalMessage,
-                templateId: smsForm.template !== 'custom' ? smsForm.template : null
-            });
-            if (resp.data?.success) {
-                const logs = await axios.get(`/api/bookingSms/${selectedBookingForEmail?.id}`);
-                setSmsLogs(logs.data?.data || []);
-                setSmsModalOpen(false);
+            if (isBulk) {
+                // Bulk SMS to selected bookings
+                const recipients = booking
+                    .filter(b => selectedBookingIds.includes(b.id))
+                    .map(b => {
+                        const phone = cleanPhoneNumber(b.phone || b.mobile || '');
+                        // Accept any phone number that starts with + (international format)
+                        return phone && phone.startsWith('+') ? phone : null;
+                    })
+                    .filter(p => p !== null);
+
+                if (recipients.length === 0) {
+                    alert('No valid international phone numbers found for selected bookings.');
+                    setSmsSending(false);
+                    return;
+                }
+
+                const response = await axios.post('/api/sendBulkBookingSms', {
+                    bookingIds: selectedBookingIds,
+                    to: recipients,
+                    body: finalMessage,
+                    templateId: smsForm.template !== 'custom' ? smsForm.template : null
+                });
+
+                if (response.data.success) {
+                    alert(`SMS sent to ${recipients.length} bookings successfully!`);
+                    setSmsModalOpen(false);
+                    setSmsForm({ to: '', message: '', template: 'custom' });
+                    setSmsPersonalNote('');
+                } else {
+                    alert('Failed to send SMS: ' + (response.data.message || ''));
+                }
             } else {
-                alert('Failed to send SMS: ' + (resp.data?.message || ''));
+                // Single booking SMS
+                const cleanedPhone = cleanPhoneNumber(smsForm.to);
+                if (!cleanedPhone || !cleanedPhone.startsWith('+')) {
+                    alert('Please enter a valid international phone number (must start with +)');
+                    setSmsSending(false);
+                    return;
+                }
+                
+                const resp = await axios.post('/api/sendBookingSms', {
+                    bookingId: selectedBookingForEmail?.id,
+                    to: cleanedPhone,
+                    body: finalMessage,
+                    templateId: smsForm.template !== 'custom' ? smsForm.template : null
+                });
+                if (resp.data?.success) {
+                    const logs = await axios.get(`/api/bookingSms/${selectedBookingForEmail?.id}`);
+                    setSmsLogs(logs.data?.data || []);
+                    setSmsModalOpen(false);
+                } else {
+                    alert('Failed to send SMS: ' + (resp.data?.message || ''));
+                }
             }
         } catch (e) {
             alert('SMS error: ' + (e.response?.data?.message || e.message));
@@ -4568,6 +4654,24 @@ setBookingDetail(finalVoucherDetail);
                                             style={{ height: 40 }}
                                         >
                                             Bulk Email
+                                        </Button>
+                                        <Button
+                                            variant="contained"
+                                            color="info"
+                                            disabled={selectedBookingIds.length === 0}
+                                            onClick={() => {
+                                                if (selectedBookingIds.length === 0) return;
+                                                // Çoklu alıcılar için varsayılan booking'i kullan (ilk seçilen)
+                                                const primaryBooking = booking.find(b => b.id === selectedBookingIds[0]);
+                                                if (primaryBooking) {
+                                                    openSmsModalForBooking(primaryBooking, { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
+                                                } else if (filteredData.length > 0) {
+                                                    openSmsModalForBooking(filteredData[0], { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
+                                                }
+                                            }}
+                                            style={{ height: 40, background: '#17a2b8' }}
+                                        >
+                                            Bulk SMS
                                         </Button>
                                         <OutlinedInput
                                             placeholder="Search by name, email, phone, location..."
@@ -5640,8 +5744,101 @@ setBookingDetail(finalVoucherDetail);
                                                             (v?.voucher_type &&
                                                             typeof v.voucher_type === 'string' &&
                                                             v.voucher_type.toLowerCase().includes('flight')));
-                                                        const hasPhone = bookingDetail?.booking?.phone;
+                                                        
+                                                        // For Flight Voucher: check purchaser_phone, purchaser_mobile, or phone
+                                                        // For Gift Voucher: check recipient_phone or phone
+                                                        // For regular booking: check booking.phone
+                                                        const hasPhone = isFlightVoucher
+                                                            ? (v?.purchaser_phone || v?.purchaser_mobile || v?.phone || bookingDetail?.booking?.phone)
+                                                            : isGiftVoucher
+                                                                ? (v?.recipient_phone || v?.phone || bookingDetail?.booking?.phone)
+                                                                : (bookingDetail?.booking?.phone);
+                                                        
                                                         const smsHandler = () => {
+                                                            // For Flight Voucher, use voucher data
+                                                            if (isFlightVoucher && v) {
+                                                                const phone = v.purchaser_phone || v.purchaser_mobile || v.phone || '';
+                                                                const name = v.purchaser_name || v.name || '';
+                                                                const voucherId = v.id;
+                                                                
+                                                                const firstTemplate = smsTemplates.length > 0 ? smsTemplates[0] : null;
+                                                                let message = '';
+                                                                let templateValue = 'custom';
+                                                                if (firstTemplate) {
+                                                                    templateValue = String(firstTemplate.id);
+                                                                    message = firstTemplate.message || '';
+                                                                } else {
+                                                                    message = `Hi ${name || ''}, this is a message regarding your Fly Away Ballooning voucher.`;
+                                                                }
+                                                                
+                                                                setSmsForm({
+                                                                    to: cleanPhoneNumber(phone),
+                                                                    message,
+                                                                    template: templateValue
+                                                                });
+                                                                setSmsPersonalNote('');
+                                                                setSmsModalOpen(true);
+                                                                
+                                                                // Fetch SMS logs for voucher
+                                                                (async () => {
+                                                                    try {
+                                                                        setSmsLogsLoading(true);
+                                                                        // Use voucher ID or booking ID if available
+                                                                        const contextId = bookingDetail?.booking?.id || voucherId;
+                                                                        if (contextId) {
+                                                                            const resp = await axios.get(`/api/bookingSms/${contextId}`);
+                                                                            setSmsLogs(resp.data?.data || []);
+                                                                        } else {
+                                                                            setSmsLogs([]);
+                                                                        }
+                                                                    } catch { setSmsLogs([]); }
+                                                                    finally { setSmsLogsLoading(false); }
+                                                                })();
+                                                                return;
+                                                            }
+                                                            
+                                                            // For Gift Voucher, use voucher data
+                                                            if (isGiftVoucher && v) {
+                                                                const phone = v.recipient_phone || v.phone || '';
+                                                                const name = v.recipient_name || v.name || '';
+                                                                const voucherId = v.id;
+                                                                
+                                                                const firstTemplate = smsTemplates.length > 0 ? smsTemplates[0] : null;
+                                                                let message = '';
+                                                                let templateValue = 'custom';
+                                                                if (firstTemplate) {
+                                                                    templateValue = String(firstTemplate.id);
+                                                                    message = firstTemplate.message || '';
+                                                                } else {
+                                                                    message = `Hi ${name || ''}, this is a message regarding your Fly Away Ballooning gift voucher.`;
+                                                                }
+                                                                
+                                                                setSmsForm({
+                                                                    to: cleanPhoneNumber(phone),
+                                                                    message,
+                                                                    template: templateValue
+                                                                });
+                                                                setSmsPersonalNote('');
+                                                                setSmsModalOpen(true);
+                                                                
+                                                                // Fetch SMS logs for voucher
+                                                                (async () => {
+                                                                    try {
+                                                                        setSmsLogsLoading(true);
+                                                                        const contextId = bookingDetail?.booking?.id || voucherId;
+                                                                        if (contextId) {
+                                                                            const resp = await axios.get(`/api/bookingSms/${contextId}`);
+                                                                            setSmsLogs(resp.data?.data || []);
+                                                                        } else {
+                                                                            setSmsLogs([]);
+                                                                        }
+                                                                    } catch { setSmsLogs([]); }
+                                                                    finally { setSmsLogsLoading(false); }
+                                                                })();
+                                                                return;
+                                                            }
+                                                            
+                                                            // For regular booking
                                                             if (!bookingDetail?.booking) return;
                                                             const booking = bookingDetail.booking;
                                                             setSelectedBookingForEmail(booking);
@@ -5655,7 +5852,7 @@ setBookingDetail(finalVoucherDetail);
                                                                 message = `Hi ${booking.name || ''}, this is a message regarding your Fly Away Ballooning booking.`;
                                                             }
                                                             setSmsForm({
-                                                                to: normalizeUkPhone(booking.phone || ''),
+                                                                to: cleanPhoneNumber(booking.phone || ''),
                                                                 message,
                                                                 template: templateValue
                                                             });
@@ -6914,6 +7111,24 @@ setBookingDetail(finalVoucherDetail);
                                     const paymentDate = payment.created_at ? dayjs(payment.created_at) : null;
                                     const daysAgo = paymentDate ? dayjs().diff(paymentDate, 'day') : null;
                                     
+                                    // Debug: Log payment details for refund button visibility
+                                    if (index === 0) {
+                                        console.log('🔍 [Refund Button Debug] Payment details:', {
+                                            id: payment.id,
+                                            payment_status: payment.payment_status,
+                                            booking_id: payment.booking_id,
+                                            voucher_id: payment.voucher_id,
+                                            voucher_ref: payment.voucher_ref,
+                                            stripe_charge_id: payment.stripe_charge_id,
+                                            stripe_payment_intent_id: payment.stripe_payment_intent_id,
+                                            isSynthetic: String(payment.id || '').startsWith('voucher_'),
+                                            shouldShowRefund: payment.payment_status === 'succeeded' && 
+                                                             !String(payment.id || '').startsWith('voucher_') && 
+                                                             (payment.booking_id || payment.voucher_id || payment.voucher_ref) && 
+                                                             (payment.stripe_charge_id || payment.stripe_payment_intent_id)
+                                        });
+                                    }
+                                    
                                     return (
                                         <Box key={payment.id || index} sx={{ borderBottom: '1px solid #e2e8f0' }}>
                                             {/* Main Payment Row */}
@@ -6996,10 +7211,12 @@ setBookingDetail(finalVoucherDetail);
                                                         {isExpanded ? '▼' : '▶'}
                                                     </IconButton>
                                                     {payment.payment_status === 'succeeded' && 
-                                                     // Only show refund button for real payment entries (not synthetic voucher payments)
-                                                     // Synthetic payments have string IDs like "voucher_123" and null booking_id
+                                                     // Show refund button for:
+                                                     // 1. Booking payments (has booking_id and stripe charge/intent)
+                                                     // 2. Voucher payments (has voucher_id or voucher_ref and stripe charge/intent)
+                                                     // Exclude synthetic payments (string IDs like "voucher_123")
                                                      !String(payment.id || '').startsWith('voucher_') && 
-                                                     payment.booking_id && 
+                                                     (payment.booking_id || payment.voucher_id || payment.voucher_ref) && 
                                                      (payment.stripe_charge_id || payment.stripe_payment_intent_id) && (
                                                         <Button 
                                                             size="small" 
@@ -7815,7 +8032,10 @@ setBookingDetail(finalVoucherDetail);
                         Send a SMS
                         {selectedBookingForEmail && (
                             <Typography variant="subtitle2" color="textSecondary" sx={{ mt: 0.5 }}>
-                                Booking: {selectedBookingForEmail.name} ({selectedBookingForEmail.id})
+                                {selectedBookingIds && selectedBookingIds.length > 1 
+                                    ? `Bulk SMS to ${selectedBookingIds.length} bookings`
+                                    : `Booking: ${selectedBookingForEmail.name} (${selectedBookingForEmail.id})`
+                                }
                             </Typography>
                         )}
                     </DialogTitle>
