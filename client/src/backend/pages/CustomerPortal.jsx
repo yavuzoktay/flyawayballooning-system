@@ -706,23 +706,30 @@ const CustomerPortal = () => {
                                     const flightDate = hasFlightDate ? dayjs(bookingData.flight_date) : null;
                                     const now = dayjs();
                                     const isFlightDatePassed = flightDate ? flightDate.isBefore(now, 'day') : false;
+                                    
+                                    // Check if expiry date has passed (compare by day to avoid time-of-day edge cases)
+                                    const expiryDate = bookingData.expires ? dayjs(bookingData.expires) : null;
+                                    const isExpired = expiryDate ? expiryDate.isBefore(now, 'day') : false;
+                                    
                                     const isVoucherRedeemed = bookingData.is_voucher_redeemed === true || bookingData.is_voucher_redeemed === 1;
                                     // Only apply redeemed check for Flight Voucher section
                                     const bookFlight = (bookingData.book_flight || '').toString().trim().toLowerCase();
                                     const isFlightVoucher = bookingData.is_flight_voucher || bookFlight === 'flight voucher';
                                     const shouldApplyRedeemedCheck = isFlightVoucher;
-                                    const isDisabled = changingLocation || isFlightDatePassed || isFullyRefunded || (isVoucherRedeemed && shouldApplyRedeemedCheck);
+                                    const isDisabled = changingLocation || isFlightDatePassed || isFullyRefunded || (isVoucherRedeemed && shouldApplyRedeemedCheck) || isExpired;
                                     
                                     return (
                                         <Tooltip
                                             title={
-                                                (isVoucherRedeemed && shouldApplyRedeemedCheck)
-                                                    ? "Voucher has been redeemed. Location cannot be changed."
-                                                    : isFullyRefunded
-                                                        ? "Full refund has been processed. Location cannot be changed."
-                                                        : isFlightDatePassed
-                                                            ? "Flight date has passed. Location cannot be changed."
-                                                            : ""
+                                                isExpired
+                                                    ? "Voucher / Booking has expired. Location cannot be changed."
+                                                    : (isVoucherRedeemed && shouldApplyRedeemedCheck)
+                                                        ? "Voucher has been redeemed. Location cannot be changed."
+                                                        : isFullyRefunded
+                                                            ? "Full refund has been processed. Location cannot be changed."
+                                                            : isFlightDatePassed
+                                                                ? "Flight date has passed. Location cannot be changed."
+                                                                : ""
                                             }
                                             arrow
                                         >
@@ -842,6 +849,11 @@ const CustomerPortal = () => {
                                     const flightDate = hasFlightDate ? dayjs(bookingData.flight_date) : null;
                                     const now = dayjs();
                                     const isFlightDatePassed = flightDate ? flightDate.isBefore(now, 'day') : false;
+                                    
+                                    // Check if expiry date has passed (compare by day to avoid time-of-day edge cases)
+                                    const expiryDate = bookingData.expires ? dayjs(bookingData.expires) : null;
+                                    const isExpired = expiryDate ? expiryDate.isBefore(now, 'day') : false;
+                                    
                                     const isVoucherRedeemed = bookingData.is_voucher_redeemed === true || bookingData.is_voucher_redeemed === 1;
                                     // Only apply redeemed check for Flight Voucher section
                                     const bookFlight = (bookingData.book_flight || '').toString().trim().toLowerCase();
@@ -849,18 +861,20 @@ const CustomerPortal = () => {
                                     const shouldApplyRedeemedCheck = isFlightVoucher;
                                     const isDisabled = extendingVoucher || isFlightDatePassed;
                                     
-                                    const isExtendDisabled = isDisabled || isFullyRefunded || (isVoucherRedeemed && shouldApplyRedeemedCheck);
+                                    const isExtendDisabled = isDisabled || isFullyRefunded || (isVoucherRedeemed && shouldApplyRedeemedCheck) || isExpired;
                                     
                                     return (
                                         <Tooltip
                                             title={
-                                                (isVoucherRedeemed && shouldApplyRedeemedCheck)
-                                                    ? "Voucher has been redeemed. Voucher cannot be extended."
-                                                    : isFullyRefunded
-                                                        ? "Full refund has been processed. Voucher cannot be extended."
-                                                        : isDisabled
-                                                            ? "Voucher cannot be extended"
-                                                            : ""
+                                                isExpired
+                                                    ? "Voucher / Booking has expired. Voucher cannot be extended."
+                                                    : (isVoucherRedeemed && shouldApplyRedeemedCheck)
+                                                        ? "Voucher has been redeemed. Voucher cannot be extended."
+                                                        : isFullyRefunded
+                                                            ? "Full refund has been processed. Voucher cannot be extended."
+                                                            : isDisabled
+                                                                ? "Voucher cannot be extended"
+                                                                : ""
                                             }
                                             arrow
                                         >
