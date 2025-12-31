@@ -675,6 +675,14 @@ const PaginatedTable = ({
                                                         {item[id]}
                                                     </span>
                                                 ) : ''
+                                                            ) : id === 'paid' ? (
+                                                                // Show paid amount in red if refund exists
+                                                                <span style={{ 
+                                                                    color: (item.has_refund === 1 || item.has_refund === true) ? '#dc3545' : 'inherit',
+                                                                    fontWeight: (item.has_refund === 1 || item.has_refund === true) ? '600' : 'normal'
+                                                                }}>
+                                                                    {item[id]}
+                                                                </span>
                                                             ) : item[id]}
                                         </td>
                                     );

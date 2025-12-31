@@ -2082,7 +2082,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
             });
 
             function createBookingWithGeneratedCode(generatedVoucherCode) {
-                // Simple SQL with only essential columns (including expires, flight_attempts, flight_type_source, voucher_type)
+                // Simple SQL with only essential columns (including expires, flight_attempts, flight_type_source, voucher_type, experience)
                 const bookingSql = `
         INSERT INTO all_booking (
             name,
@@ -2103,8 +2103,9 @@ app.post('/api/createRedeemBooking', (req, res) => {
             flight_attempts,
             flight_type_source,
             voucher_type,
-            voucher_type_detail
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            voucher_type_detail,
+            experience
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
                 // Use actual passenger count from passengerData array
@@ -2143,7 +2144,8 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     0, // flight_attempts (always 0 for redeem voucher bookings)
                     'Redeem Voucher', // flight_type_source (always 'Redeem Voucher' for this endpoint)
                     resolvedVoucherType || null,
-                    null
+                    null,
+                    chooseFlightType.type || 'Shared Flight' // experience field - should match the selected experience (Private Charter or Shared Flight)
                 ];
 
                 console.log('=== REDEEM BOOKING SQL ===');
