@@ -1233,6 +1233,115 @@ export const replacePrompts = (html = '', booking = {}) => {
     return result;
 };
 
+// Replace SMS template placeholders with booking data (plain text, no HTML)
+export const replaceSmsPrompts = (text = '', booking = {}) => {
+    if (!text) return text;
+    if (!booking || Object.keys(booking).length === 0) {
+        console.warn('⚠️ replaceSmsPrompts: booking is empty, placeholders will not be replaced');
+        return text;
+    }
+    
+    // Extract name parts from booking name - try multiple field names
+    const bookingName = booking.name || booking.customer_name || booking.booking_name || '';
+    const nameParts = bookingName.trim().split(/\s+/).filter(part => part.length > 0);
+    const firstName = nameParts.length > 0 ? nameParts[0] : (bookingName || 'Guest');
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+    const fullName = bookingName || 'Guest';
+    
+    console.log('🔍 Frontend replaceSmsPrompts - bookingName:', bookingName, 'extracted:', { firstName, lastName, fullName });
+    
+    // Company name - default to "Fly Away Ballooning"
+    const companyName = 'Fly Away Ballooning';
+    
+    let result = text;
+    
+    // Replace [First Name] (case-insensitive)
+    result = result.replace(/\[First Name\]/gi, firstName);
+    
+    // Replace [Last Name] (case-insensitive)
+    result = result.replace(/\[Last Name\]/gi, lastName);
+    
+    // Replace [Full Name] (case-insensitive)
+    result = result.replace(/\[Full Name\]/gi, fullName);
+    
+    // Replace [Company Name] (case-insensitive)
+    result = result.replace(/\[Company Name\]/gi, companyName);
+    
+    // Replace [Email] (case-insensitive)
+    result = result.replace(/\[Email\]/gi, booking.email || booking.customer_email || '');
+    
+    // Replace [Phone] (case-insensitive)
+    result = result.replace(/\[Phone\]/gi, booking.phone || booking.customer_phone || '');
+    
+    // Replace [Booking ID] (case-insensitive)
+    result = result.replace(/\[Booking ID\]/gi, booking.id ? String(booking.id) : '');
+    
+    // Replace [Customer Portal Link] (case-insensitive) - for SMS, just return the URL
+    const customerPortalLink = getCustomerPortalLink(booking);
+    result = result.replace(/\[Customer Portal Link\]/gi, customerPortalLink || '');
+    
+    // Replace [Flight Date] (case-insensitive)
+    const flightDate = booking.flight_date || booking.flightDate || '';
+    if (flightDate) {
+        try {
+            const formattedDate = dayjs(flightDate).format('DD/MM/YYYY');
+            result = result.replace(/\[Flight Date\]/gi, formattedDate);
+        } catch (e) {
+            result = result.replace(/\[Flight Date\]/gi, flightDate);
+        }
+    } else {
+        result = result.replace(/\[Flight Date\]/gi, '');
+    }
+    
+    // Replace [Location] (case-insensitive)
+    result = result.replace(/\[Location\]/gi, booking.location || '');
+    
+    // Replace [Voucher Code] (case-insensitive)
+    result = result.replace(/\[Voucher Code\]/gi, booking.voucher_code || booking.voucherCode || '');
+    
+    // Replace [Experience Data] (case-insensitive)
+    // Format: "01/02/2026 11:00" (DD/MM/YYYY HH:mm) - matches "Booked For" format
+    let experienceData = '';
+    const expFlightDate = booking.flight_date || booking.flightDate || '';
+    const expTimeSlot = booking.time_slot || booking.timeSlot || '';
+    
+    if (expFlightDate) {
+        try {
+            // Parse flight_date
+            const dateObj = dayjs(expFlightDate);
+            
+            // Get time from time_slot if available, otherwise from flight_date
+            let timeStr = '';
+            if (expTimeSlot) {
+                // time_slot format: "HH:mm" or "HH:mm:ss"
+                timeStr = expTimeSlot.split(':').slice(0, 2).join(':');
+            } else if (expFlightDate.includes(' ') || expFlightDate.includes('T')) {
+                // Extract time from flight_date if it contains time
+                const timeMatch = expFlightDate.match(/(\d{1,2}):(\d{2})/);
+                if (timeMatch) {
+                    timeStr = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
+                }
+            }
+            
+            // Format date as DD/MM/YYYY
+            const formattedDate = dateObj.format('DD/MM/YYYY');
+            
+            // Combine date and time
+            if (timeStr) {
+                experienceData = `${formattedDate} ${timeStr}`;
+            } else {
+                experienceData = formattedDate;
+            }
+        } catch (e) {
+            // Fallback: use raw flight_date if parsing fails
+            experienceData = expFlightDate;
+        }
+    }
+    result = result.replace(/\[Experience Data\]/gi, experienceData);
+    
+    return result;
+};
+
 export const buildEmailHtml = ({ templateName, messageHtml, booking, personalNote }) => {
     const effectiveTemplateName = templateName || 'Custom Message';
     const baseMessage = messageHtml && messageHtml.trim() !== ''

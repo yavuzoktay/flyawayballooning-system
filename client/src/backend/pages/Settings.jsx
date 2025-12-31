@@ -221,6 +221,18 @@ const Settings = () => {
     const [selectedEmailTemplate, setSelectedEmailTemplate] = useState(null);
     const getDefaultTemplateBody = (templateName) => extractMessageFromTemplateBody(getDefaultTemplateMessageHtml(templateName)) || '';
 
+    // SMS Templates state
+    const [smsTemplates, setSmsTemplates] = useState([]);
+    const [smsTemplatesExpanded, setSmsTemplatesExpanded] = useState(false);
+    const [showSmsTemplateForm, setShowSmsTemplateForm] = useState(false);
+    const [showEditSmsTemplateForm, setShowEditSmsTemplateForm] = useState(false);
+    const [selectedSmsTemplate, setSelectedSmsTemplate] = useState(null);
+    const [smsTemplateFormData, setSmsTemplateFormData] = useState({
+        name: '',
+        message: '',
+        category: 'User Defined Message'
+    });
+
     // Customer Portal Content state
     const [customerPortalContents, setCustomerPortalContents] = useState([]);
     const [customerPortalExpanded, setCustomerPortalExpanded] = useState(false);
@@ -686,8 +698,7 @@ const Settings = () => {
         name: '',
         subject: '',
         body: getDefaultTemplateBody('Booking Confirmation'),
-        category: 'User Defined Message',
-        sms_enabled: false
+        category: 'User Defined Message'
     });
     
     // Collapsible sections state
@@ -750,11 +761,13 @@ const Settings = () => {
         fetchAdditionalInfoQuestions();
         fetchTermsAndConditions();
         fetchCrewMembers();
+        fetchSmsTemplates();
         fetchPilots();
         fetchPassengerTerms();
         fetchResources();
         fetchResourceGroups();
         fetchEmailTemplates();
+        fetchSmsTemplates();
         fetchCustomerPortalContents();
     }, []);
 
@@ -928,6 +941,18 @@ const Settings = () => {
         } catch (error) {
             console.error('Error fetching email templates:', error);
             setEmailTemplates([]);
+        }
+    };
+
+    const fetchSmsTemplates = async () => {
+        try {
+            const response = await axios.get('/api/sms-templates');
+            if (response.data?.success) {
+                setSmsTemplates(response.data.data);
+            }
+        } catch (error) {
+            console.error('Error fetching SMS templates:', error);
+            setSmsTemplates([]);
         }
     };
 
@@ -4706,7 +4731,6 @@ const Settings = () => {
                                             <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>SUBJECT</th>
                                             <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>CATEGORY</th>
                                             <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>EDITED</th>
-                                            <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>SMS ENABLED</th>
                                             <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ACTIONS</th>
                                         </tr>
                                     </thead>
@@ -4739,20 +4763,6 @@ const Settings = () => {
                                                         {template.edited ? <CheckCircle size={16} color="#10b981" /> : null}
                                                     </div>
                                                 </td>
-                                                <td style={{ padding: '16px', textAlign: 'center' }}>
-                                                    <div style={{ 
-                                                        width: '24px', 
-                                                        height: '24px', 
-                                                        borderRadius: '50%', 
-                                                        border: '2px solid #d1d5db',
-                                                        margin: '0 auto',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center'
-                                                    }}>
-                                                        {template.sms_enabled ? <CheckCircle size={16} color="#10b981" /> : null}
-                                                    </div>
-                                                </td>
                                                 <td style={{ padding: '16px' }}>
                                                     <div className="action-buttons" style={{ justifyContent: 'center' }}>
                                                         <button
@@ -4764,8 +4774,7 @@ const Settings = () => {
                                                     name: template.name,
                                                     subject: template.subject,
                                                                     body: extractMessageFromTemplateBody(template.body) || getDefaultTemplateBody(template.name),
-                                                    category: template.category,
-                                                    sms_enabled: template.sms_enabled || false
+                                                    category: template.category
                                                 });
                                                 setShowEditEmailTemplateForm(true);
                                                             }}
@@ -4780,6 +4789,142 @@ const Settings = () => {
                                                                     try {
                                                                         await axios.delete(`/api/email-templates/${template.id}`);
                                                                         fetchEmailTemplates();
+                                                                        alert('Template deleted successfully');
+                                                                    } catch (error) {
+                                                                        alert('Error deleting template: ' + (error.response?.data?.message || error.message));
+                                                                    }
+                                                                }
+                                                            }}
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* SMS Templates Section */}
+            <div className="settings-card" style={{ marginBottom: '24px' }}>
+                <div 
+                    className="card-header"
+                    onClick={() => setSmsTemplatesExpanded(!smsTemplatesExpanded)}
+                    style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        padding: '20px',
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                    }}
+                >
+                    <div>
+                        <h2 style={{ margin: 0, color: '#1f2937' }}>SMS Templates</h2>
+                        <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
+                            SMS message templates sent to customers via text message. Preview shows how messages appear on mobile devices.
+                        </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button 
+                            className="btn btn-primary"
+                            onClick={(e) => { e.stopPropagation(); setShowSmsTemplateForm(true); }}
+                            style={{ margin: 0 }}
+                        >
+                            <Plus size={20} />
+                            New Template
+                        </button>
+                        {smsTemplatesExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+                    </div>
+                </div>
+
+                {smsTemplatesExpanded && (
+                    <div style={{ padding: '20px', background: '#f9fafb', borderRadius: '0 0 12px 12px' }}>
+                        {smsTemplates.length === 0 ? (
+                            <div style={{ 
+                                textAlign: 'center', 
+                                padding: '40px 20px', 
+                                color: '#6b7280',
+                                background: '#fff',
+                                borderRadius: '8px',
+                                border: '1px dashed #d1d5db'
+                            }}>
+                                <p style={{ margin: 0, fontSize: '15px' }}>No SMS templates yet. Create your first template!</p>
+                            </div>
+                        ) : (
+                            <div style={{ overflowX: 'auto', background: '#fff', borderRadius: '8px', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                                            <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>NAME</th>
+                                            <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>MESSAGE PREVIEW</th>
+                                            <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>CATEGORY</th>
+                                            <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>EDITED</th>
+                                            <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ACTIONS</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {smsTemplates.map((template) => (
+                                            <tr key={template.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                                                <td style={{ padding: '16px' }}>
+                                                    <span style={{ fontWeight: 500, color: '#1f2937' }}>{template.name}</span>
+                                                </td>
+                                                <td style={{ padding: '16px' }}>
+                                                    <span style={{ color: '#475569', fontSize: '13px' }}>
+                                                        {template.message ? (template.message.length > 80 ? template.message.substring(0, 80) + '...' : template.message) : 'N/A'}
+                                                    </span>
+                                                </td>
+                                                <td style={{ padding: '16px' }}>
+                                                    <span style={{ color: '#475569' }}>{template.category}</span>
+                                                </td>
+                                                <td style={{ padding: '16px', textAlign: 'center' }}>
+                                                    <div style={{ 
+                                                        width: '24px', 
+                                                        height: '24px', 
+                                                        borderRadius: '50%', 
+                                                        border: '2px solid #d1d5db',
+                                                        margin: '0 auto',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center'
+                                                    }}>
+                                                        {template.edited ? <CheckCircle size={16} color="#10b981" /> : null}
+                                                    </div>
+                                                </td>
+                                                <td style={{ padding: '16px' }}>
+                                                    <div className="action-buttons" style={{ justifyContent: 'center' }}>
+                                                        <button
+                                                            className="action-btn edit"
+                                                            title="Edit"
+                                                            onClick={() => {
+                                                                setSelectedSmsTemplate(template);
+                                                                setSmsTemplateFormData({
+                                                                    name: template.name,
+                                                                    message: template.message || '',
+                                                                    category: template.category || 'User Defined Message'
+                                                                });
+                                                                setShowEditSmsTemplateForm(true);
+                                                            }}
+                                                        >
+                                                            <Edit size={16} />
+                                                        </button>
+                                                        <button
+                                                            className="action-btn delete"
+                                                            title="Delete"
+                                                            onClick={async () => {
+                                                                if (window.confirm(`Are you sure you want to delete "${template.name}"?`)) {
+                                                                    try {
+                                                                        await axios.delete(`/api/sms-templates/${template.id}`);
+                                                                        fetchSmsTemplates();
                                                                         alert('Template deleted successfully');
                                                                     } catch (error) {
                                                                         alert('Error deleting template: ' + (error.response?.data?.message || error.message));
@@ -7070,8 +7215,7 @@ const Settings = () => {
                                         name: '',
                                         subject: '',
                                         body: getDefaultTemplateBody('Booking Confirmation'),
-                                        category: 'User Defined Message',
-                                        sms_enabled: false
+                                        category: 'User Defined Message'
                                     });
                                 }}
                             >
@@ -7089,8 +7233,7 @@ const Settings = () => {
                                         name: '',
                                         subject: '',
                                         body: getDefaultTemplateBody('Booking Confirmation'),
-                                        category: 'User Defined Message',
-                                        sms_enabled: false
+                                        category: 'User Defined Message'
                                     });
                                     alert('Email template created successfully!');
                                 }
@@ -7220,7 +7363,6 @@ const Settings = () => {
                                             subject: '',
                                             body: '',
                                             category: 'User Defined Message',
-                                            sms_enabled: false
                                         });
                                     }}
                                     style={{ padding: '8px 20px' }}
@@ -7229,6 +7371,461 @@ const Settings = () => {
                                 </button>
                                 <button type="submit" className="btn btn-primary" style={{ padding: '8px 20px' }}>
                                     Create Template
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Create SMS Template Modal */}
+            {showSmsTemplateForm && (
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: '1200px', width: '95%', maxHeight: '90vh', overflow: 'auto' }}>
+                        <div className="modal-header">
+                            <h3 style={{ margin: 0, fontSize: '24px', fontWeight: 600 }}>SMS Message Template</h3>
+                            <button 
+                                className="close-btn"
+                                onClick={() => {
+                                    setShowSmsTemplateForm(false);
+                                    setSmsTemplateFormData({
+                                        name: '',
+                                        message: '',
+                                        category: 'User Defined Message'
+                                    });
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <form onSubmit={async (e) => {
+                            e.preventDefault();
+                            try {
+                                const response = await axios.post('/api/sms-templates', smsTemplateFormData);
+                                if (response.data?.success) {
+                                    fetchSmsTemplates();
+                                    setShowSmsTemplateForm(false);
+                                    setSmsTemplateFormData({
+                                        name: '',
+                                        message: '',
+                                        category: 'User Defined Message'
+                                    });
+                                    alert('SMS template created successfully!');
+                                }
+                            } catch (error) {
+                                alert('Error creating template: ' + (error.response?.data?.message || error.message));
+                            }
+                        }}>
+                            <div className="modal-body" style={{ display: 'flex', gap: '24px', padding: '24px' }}>
+                                {/* Left Column - Form */}
+                                <div style={{ flex: '0 0 350px' }}>
+                                    <div className="form-group" style={{ marginBottom: '20px' }}>
+                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>Name</label>
+                                        <input
+                                            type="text"
+                                            value={smsTemplateFormData.name}
+                                            onChange={(e) => setSmsTemplateFormData({ ...smsTemplateFormData, name: e.target.value })}
+                                            placeholder="Booking Confirmation SMS"
+                                            required
+                                            style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px' }}
+                                        />
+                                        <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>
+                                            This will help you identify this message when choosing from your list of messages. Not visible to the recipient.
+                                        </p>
+                                    </div>
+                                    <div className="form-group" style={{ marginBottom: '20px' }}>
+                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>Category</label>
+                                        <select
+                                            value={smsTemplateFormData.category}
+                                            onChange={(e) => setSmsTemplateFormData({ ...smsTemplateFormData, category: e.target.value })}
+                                            style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px' }}
+                                        >
+                                            <option value="User Defined Message">User Defined Message</option>
+                                            <option value="Confirmation">Confirmation</option>
+                                            <option value="Rebooked">Rebooked</option>
+                                            <option value="Event Followup">Event Followup</option>
+                                            <option value="Cancellation">Cancellation</option>
+                                            <option value="Refund">Refund</option>
+                                            <option value="Event Reminder">Event Reminder</option>
+                                            <option value="Payment Request">Payment Request</option>
+                                            <option value="Abandon Cart">Abandon Cart</option>
+                                        </select>
+                                    </div>
+                                    <div className="form-group" style={{ marginBottom: '20px' }}>
+                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>Message</label>
+                                        <div style={{ marginBottom: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                            {['[First Name]', '[Last Name]', '[Full Name]', '[Company Name]', '[Booking ID]', '[Customer Portal Link]', '[Email]', '[Phone]', '[Experience Data]'].map((placeholder) => (
+                                                <button
+                                                    key={placeholder}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const textarea = document.querySelector(`textarea[data-sms-message-create]`);
+                                                        if (textarea) {
+                                                            const start = textarea.selectionStart;
+                                                            const end = textarea.selectionEnd;
+                                                            const text = smsTemplateFormData.message;
+                                                            const newText = text.substring(0, start) + placeholder + text.substring(end);
+                                                            setSmsTemplateFormData({ ...smsTemplateFormData, message: newText });
+                                                            setTimeout(() => {
+                                                                textarea.focus();
+                                                                textarea.setSelectionRange(start + placeholder.length, start + placeholder.length);
+                                                            }, 0);
+                                                        }
+                                                    }}
+                                                    style={{ 
+                                                        padding: '4px 8px', 
+                                                        fontSize: '11px', 
+                                                        backgroundColor: placeholder.includes('Company Name') || placeholder.includes('Customer Portal Link') || placeholder.includes('Experience Data') ? '#dbeafe' : '#f3f4f6', 
+                                                        color: placeholder.includes('Company Name') || placeholder.includes('Customer Portal Link') || placeholder.includes('Experience Data') ? '#1d4ed8' : '#6366f1',
+                                                        border: '1px solid #e5e7eb',
+                                                        borderRadius: '4px',
+                                                        cursor: 'pointer',
+                                                        whiteSpace: 'nowrap'
+                                                    }}
+                                                >
+                                                    {placeholder}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <textarea
+                                            data-sms-message-create
+                                            value={smsTemplateFormData.message}
+                                            onChange={(e) => setSmsTemplateFormData({ ...smsTemplateFormData, message: e.target.value })}
+                                            placeholder="Enter your SMS message here..."
+                                            required
+                                            rows={8}
+                                            style={{ 
+                                                width: '100%', 
+                                                padding: '12px', 
+                                                border: '1px solid #d1d5db', 
+                                                borderRadius: '6px', 
+                                                fontSize: '14px',
+                                                fontFamily: 'inherit',
+                                                resize: 'vertical',
+                                                lineHeight: '1.5'
+                                            }}
+                                        />
+                                        <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>
+                                            Click placeholder buttons above to insert dynamic data into your message.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Right Column - Mobile Preview */}
+                                <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+                                    {/* Mobile Device Preview */}
+                                    <div style={{ 
+                                        width: '320px',
+                                        maxWidth: '100%',
+                                        background: '#000',
+                                        borderRadius: '24px',
+                                        padding: '12px',
+                                        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)'
+                                    }}>
+                                        {/* Phone Screen */}
+                                        <div style={{
+                                            background: '#f5f5f5',
+                                            borderRadius: '20px',
+                                            padding: '8px',
+                                            minHeight: '500px'
+                                        }}>
+                                            {/* Status Bar */}
+                                            <div style={{
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
+                                                padding: '8px 12px',
+                                                fontSize: '10px',
+                                                color: '#000',
+                                                background: '#fff',
+                                                borderRadius: '12px 12px 0 0'
+                                            }}>
+                                                <span>9:41</span>
+                                                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '12px' }}>🔗</span>
+                                                    <span style={{ fontSize: '12px' }}>⌨️</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Message Preview */}
+                                            <div style={{
+                                                padding: '16px',
+                                                background: '#fff',
+                                                borderRadius: '0 0 12px 12px',
+                                                minHeight: '400px',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                justifyContent: 'flex-start'
+                                            }}>
+                                                {/* Message Bubble */}
+                                                <div style={{
+                                                    background: '#e5e7eb',
+                                                    borderRadius: '16px',
+                                                    padding: '12px 16px',
+                                                    marginBottom: '8px',
+                                                    maxWidth: '85%',
+                                                    alignSelf: 'flex-start',
+                                                    wordWrap: 'break-word',
+                                                    fontSize: '14px',
+                                                    lineHeight: '1.5',
+                                                    color: '#111827',
+                                                    whiteSpace: 'pre-wrap'
+                                                }}>
+                                                    {smsTemplateFormData.message || 'Your message will appear here...'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="form-actions" style={{ borderTop: '1px solid #e5e7eb', padding: '16px 24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-secondary"
+                                    onClick={() => {
+                                        setShowSmsTemplateForm(false);
+                                        setSmsTemplateFormData({
+                                            name: '',
+                                            message: '',
+                                            category: 'User Defined Message'
+                                        });
+                                    }}
+                                    style={{ padding: '8px 20px' }}
+                                >
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn btn-primary" style={{ padding: '8px 20px' }}>
+                                    Create Template
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit SMS Template Modal */}
+            {showEditSmsTemplateForm && selectedSmsTemplate && (
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: '1200px', width: '95%', maxHeight: '90vh', overflow: 'auto' }}>
+                        <div className="modal-header">
+                            <h3 style={{ margin: 0, fontSize: '24px', fontWeight: 600 }}>SMS Message Template</h3>
+                            <button
+                                className="close-btn"
+                                onClick={() => {
+                                    setShowEditSmsTemplateForm(false);
+                                    setSelectedSmsTemplate(null);
+                                    setSmsTemplateFormData({
+                                        name: '',
+                                        message: '',
+                                        category: 'User Defined Message'
+                                    });
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <form onSubmit={async (e) => {
+                            e.preventDefault();
+                            try {
+                                const response = await axios.put(`/api/sms-templates/${selectedSmsTemplate.id}`, smsTemplateFormData);
+                                if (response.data?.success) {
+                                    fetchSmsTemplates();
+                                    setShowEditSmsTemplateForm(false);
+                                    setSelectedSmsTemplate(null);
+                                    setSmsTemplateFormData({
+                                        name: '',
+                                        message: '',
+                                        category: 'User Defined Message'
+                                    });
+                                    alert('SMS template updated successfully!');
+                                }
+                            } catch (error) {
+                                alert('Error updating template: ' + (error.response?.data?.message || error.message));
+                            }
+                        }}>
+                            <div className="modal-body" style={{ display: 'flex', gap: '24px', padding: '24px' }}>
+                                {/* Left Column - Form */}
+                                <div style={{ flex: '0 0 350px' }}>
+                                    <div className="form-group" style={{ marginBottom: '20px' }}>
+                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>Name</label>
+                                        <input
+                                            type="text"
+                                            value={smsTemplateFormData.name}
+                                            onChange={(e) => setSmsTemplateFormData({ ...smsTemplateFormData, name: e.target.value })}
+                                            placeholder="Booking Confirmation SMS"
+                                            required
+                                            style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px' }}
+                                        />
+                                        <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>
+                                            This will help you identify this message when choosing from your list of messages. Not visible to the recipient.
+                                        </p>
+                                    </div>
+                                    <div className="form-group" style={{ marginBottom: '20px' }}>
+                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>Category</label>
+                                        <select
+                                            value={smsTemplateFormData.category}
+                                            onChange={(e) => setSmsTemplateFormData({ ...smsTemplateFormData, category: e.target.value })}
+                                            style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px' }}
+                                        >
+                                            <option value="User Defined Message">User Defined Message</option>
+                                            <option value="Confirmation">Confirmation</option>
+                                            <option value="Rebooked">Rebooked</option>
+                                            <option value="Event Followup">Event Followup</option>
+                                            <option value="Cancellation">Cancellation</option>
+                                            <option value="Refund">Refund</option>
+                                            <option value="Event Reminder">Event Reminder</option>
+                                            <option value="Payment Request">Payment Request</option>
+                                            <option value="Abandon Cart">Abandon Cart</option>
+                                        </select>
+                                    </div>
+                                    <div className="form-group" style={{ marginBottom: '20px' }}>
+                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>Message</label>
+                                        <div style={{ marginBottom: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                            {['[First Name]', '[Last Name]', '[Full Name]', '[Company Name]', '[Booking ID]', '[Customer Portal Link]', '[Email]', '[Phone]', '[Experience Data]'].map((placeholder) => (
+                                                <button
+                                                    key={placeholder}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const textarea = document.querySelector(`textarea[data-sms-message-edit]`);
+                                                        if (textarea) {
+                                                            const start = textarea.selectionStart;
+                                                            const end = textarea.selectionEnd;
+                                                            const text = smsTemplateFormData.message;
+                                                            const newText = text.substring(0, start) + placeholder + text.substring(end);
+                                                            setSmsTemplateFormData({ ...smsTemplateFormData, message: newText });
+                                                            setTimeout(() => {
+                                                                textarea.focus();
+                                                                textarea.setSelectionRange(start + placeholder.length, start + placeholder.length);
+                                                            }, 0);
+                                                        }
+                                                    }}
+                                                    style={{ 
+                                                        padding: '4px 8px', 
+                                                        fontSize: '11px', 
+                                                        backgroundColor: placeholder.includes('Company Name') || placeholder.includes('Customer Portal Link') || placeholder.includes('Experience Data') ? '#dbeafe' : '#f3f4f6', 
+                                                        color: placeholder.includes('Company Name') || placeholder.includes('Customer Portal Link') || placeholder.includes('Experience Data') ? '#1d4ed8' : '#6366f1',
+                                                        border: '1px solid #e5e7eb',
+                                                        borderRadius: '4px',
+                                                        cursor: 'pointer',
+                                                        whiteSpace: 'nowrap'
+                                                    }}
+                                                >
+                                                    {placeholder}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <textarea
+                                            data-sms-message-edit
+                                            value={smsTemplateFormData.message}
+                                            onChange={(e) => setSmsTemplateFormData({ ...smsTemplateFormData, message: e.target.value })}
+                                            placeholder="Enter your SMS message here..."
+                                            required
+                                            rows={8}
+                                            style={{ 
+                                                width: '100%', 
+                                                padding: '12px', 
+                                                border: '1px solid #d1d5db', 
+                                                borderRadius: '6px', 
+                                                fontSize: '14px',
+                                                fontFamily: 'inherit',
+                                                resize: 'vertical',
+                                                lineHeight: '1.5'
+                                            }}
+                                        />
+                                        <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>
+                                            Click placeholder buttons above to insert dynamic data into your message.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Right Column - Mobile Preview */}
+                                <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+                                    {/* Mobile Device Preview */}
+                                    <div style={{ 
+                                        width: '320px',
+                                        maxWidth: '100%',
+                                        background: '#000',
+                                        borderRadius: '24px',
+                                        padding: '12px',
+                                        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)'
+                                    }}>
+                                        {/* Phone Screen */}
+                                        <div style={{
+                                            background: '#f5f5f5',
+                                            borderRadius: '20px',
+                                            padding: '8px',
+                                            minHeight: '500px'
+                                        }}>
+                                            {/* Status Bar */}
+                                            <div style={{
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
+                                                padding: '8px 12px',
+                                                fontSize: '10px',
+                                                color: '#000',
+                                                background: '#fff',
+                                                borderRadius: '12px 12px 0 0'
+                                            }}>
+                                                <span>9:41</span>
+                                                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '12px' }}>🔗</span>
+                                                    <span style={{ fontSize: '12px' }}>⌨️</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Message Preview */}
+                                            <div style={{
+                                                padding: '16px',
+                                                background: '#fff',
+                                                borderRadius: '0 0 12px 12px',
+                                                minHeight: '400px',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                justifyContent: 'flex-start'
+                                            }}>
+                                                {/* Message Bubble */}
+                                                <div style={{
+                                                    background: '#e5e7eb',
+                                                    borderRadius: '16px',
+                                                    padding: '12px 16px',
+                                                    marginBottom: '8px',
+                                                    maxWidth: '85%',
+                                                    alignSelf: 'flex-start',
+                                                    wordWrap: 'break-word',
+                                                    fontSize: '14px',
+                                                    lineHeight: '1.5',
+                                                    color: '#111827',
+                                                    whiteSpace: 'pre-wrap'
+                                                }}>
+                                                    {smsTemplateFormData.message || 'Your message will appear here...'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="form-actions" style={{ borderTop: '1px solid #e5e7eb', padding: '16px 24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-secondary"
+                                    onClick={() => {
+                                        setShowEditSmsTemplateForm(false);
+                                        setSelectedSmsTemplate(null);
+                                        setSmsTemplateFormData({
+                                            name: '',
+                                            message: '',
+                                            category: 'User Defined Message'
+                                        });
+                                    }}
+                                    style={{ padding: '8px 20px' }}
+                                >
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn btn-primary" style={{ padding: '8px 20px' }}>
+                                    Update Template
                                 </button>
                             </div>
                         </form>
@@ -7656,8 +8253,7 @@ const Settings = () => {
                                         name: '',
                                         subject: '',
                                         body: getDefaultTemplateBody('Booking Confirmation'),
-                                        category: 'User Defined Message',
-                                        sms_enabled: false
+                                        category: 'User Defined Message'
                                     });
                                 }}
                             >
@@ -7677,7 +8273,6 @@ const Settings = () => {
                                         subject: '',
                                         body: '',
                                         category: 'User Defined Message',
-                                        sms_enabled: false
                                     });
                                     alert('Email template updated successfully!');
                                 }
@@ -7812,7 +8407,6 @@ const Settings = () => {
                                             subject: '',
                                             body: '',
                                             category: 'User Defined Message',
-                                            sms_enabled: false
                                         });
                                     }}
                                     style={{ padding: '8px 20px' }}

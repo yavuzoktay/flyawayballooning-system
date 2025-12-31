@@ -48,6 +48,7 @@ import MailOutlineIcon from '@mui/icons-material/MailOutline';
 import {
     getDefaultEmailTemplateContent,
     getDefaultTemplateMessageHtml,
+    replaceSmsPrompts,
     extractMessageFromTemplateBody,
     buildEmailHtml
 } from '../utils/emailTemplateUtils';
@@ -184,6 +185,7 @@ const Manifest = () => {
     const [emailLogs, setEmailLogs] = useState([]);
     const [emailLogsPollId, setEmailLogsPollId] = useState(null);
     const [emailTemplates, setEmailTemplates] = useState([]);
+    const [smsTemplates, setSmsTemplates] = useState([]);
     const [groupMessageModalOpen, setGroupMessageModalOpen] = useState(false);
     const [groupMessageForm, setGroupMessageForm] = useState({
         to: [],
@@ -220,7 +222,8 @@ const Manifest = () => {
 
     // SMS state
     const [smsModalOpen, setSmsModalOpen] = useState(false);
-    const [smsForm, setSmsForm] = useState({ to: '', message: '' });
+    const [smsForm, setSmsForm] = useState({ to: '', message: '', template: 'custom' });
+    const [smsPersonalNote, setSmsPersonalNote] = useState('');
     const [smsSending, setSmsSending] = useState(false);
     const [smsLogs, setSmsLogs] = useState([]);
     const [smsPollId, setSmsPollId] = useState(null);
@@ -411,9 +414,28 @@ const Manifest = () => {
         }
     };
 
+    // Fetch SMS templates from database
+    const fetchSmsTemplates = async () => {
+        try {
+            const response = await axios.get('/api/sms-templates');
+            if (response.data?.success) {
+                const templates = response.data.data || [];
+                console.log('📱 Fetched SMS templates:', templates);
+                setSmsTemplates(templates);
+            } else {
+                console.warn('⚠️ SMS templates API returned unsuccessful response');
+                setSmsTemplates([]);
+            }
+        } catch (error) {
+            console.error('❌ Error fetching SMS templates:', error);
+            setSmsTemplates([]);
+        }
+    };
+
     // Load email templates on mount
     useEffect(() => {
         fetchEmailTemplates();
+        fetchSmsTemplates();
     }, []);
 
     const selectedEmailTemplate = useMemo(() => {
@@ -987,18 +1009,131 @@ const Manifest = () => {
         })();
     };
 
+    const handleSmsBooking = () => {
+        if (!bookingDetail?.booking) return;
+        
+        const booking = bookingDetail.booking;
+        
+        setSelectedBookingForEmail(booking);
+        
+        console.log('📱 Opening SMS modal...');
+        console.log('📚 Available smsTemplates:', smsTemplates);
+        
+        const firstTemplate = smsTemplates.length > 0 ? smsTemplates[0] : null;
+        
+        let message = '';
+        let templateValue = 'custom';
+        
+        if (firstTemplate) {
+            templateValue = String(firstTemplate.id);
+            message = firstTemplate.message || '';
+            console.log('✅ SMS form populated with template:', {
+                messageLength: (message || '').length,
+                templateId: firstTemplate.id,
+                templateValue
+            });
+        } else {
+            message = `Hi ${booking.name || ''}, this is a message regarding your Fly Away Ballooning booking.`;
+            console.log('⚠️ No templates available, using fallback');
+        }
+        
+        setSmsForm({
+            to: normalizeUkPhone(booking.phone || ''),
+            message,
+            template: templateValue
+        });
+        
+        console.log('📝 Initial smsForm set:', {
+            to: normalizeUkPhone(booking.phone || ''),
+            message: message.substring(0, 50) + '...',
+            template: templateValue
+        });
+        
+        setSmsPersonalNote('');
+        setSmsModalOpen(true);
+        
+        // Fetch SMS logs
+        (async () => {
+            try {
+                const resp = await axios.get(`/api/bookingSms/${booking.id}`);
+                setSmsLogs(resp.data?.data || []);
+            } catch (err) {
+                console.error('Error fetching SMS logs:', err);
+            }
+        })();
+    };
+
+    const handleSmsTemplateChange = (templateValue) => {
+        console.log('🔄 SMS template changed to:', templateValue);
+        console.log('📚 Available templates:', smsTemplates);
+        console.log('📋 Current smsForm:', smsForm);
+        
+        if (!templateValue || templateValue === 'custom') {
+            setSmsForm(prev => ({ 
+                ...prev, 
+                template: 'custom', 
+                message: '' 
+            }));
+            return;
+        }
+        
+        const dbTemplate = smsTemplates.find(t => {
+            const templateId = String(t.id);
+            const selectedValue = String(templateValue);
+            const match = templateId === selectedValue;
+            console.log(`🔍 Comparing: ${templateId} === ${selectedValue} = ${match}`);
+            return match;
+        });
+        
+        console.log('🔍 Found template:', dbTemplate);
+        
+        if (dbTemplate) {
+            const newMessage = dbTemplate.message || '';
+            console.log('✅ Setting template message:', newMessage.substring(0, 50) + '...');
+            setSmsForm(prev => ({ 
+                ...prev, 
+                template: String(dbTemplate.id),
+                message: newMessage
+            }));
+            // Force re-render by clearing and setting again
+            setTimeout(() => {
+                setSmsForm(prev => ({ 
+                    ...prev, 
+                    template: String(dbTemplate.id),
+                    message: newMessage
+                }));
+            }, 0);
+        } else {
+            console.warn('⚠️ Template not found for value:', templateValue);
+            console.warn('⚠️ Available template IDs:', smsTemplates.map(t => String(t.id)));
+        }
+    };
+
     const handleSendSms = async () => {
         if (!smsForm.to || !smsForm.message) {
             alert('Please fill phone and message');
             return;
         }
         
+        // Normalize phone number to +44 format
+        const normalizedPhone = normalizeUkPhone(smsForm.to);
+        if (!normalizedPhone || !normalizedPhone.startsWith('+44')) {
+            alert('Please enter a valid UK phone number (will be converted to +44 format)');
+            return;
+        }
+        
+        // Combine template message with personal note
+        const finalMessage = smsPersonalNote 
+            ? `${smsForm.message}${smsForm.message ? '\n\n' : ''}${smsPersonalNote}`
+            : smsForm.message;
+        
         setSmsSending(true);
         try {
             const resp = await axios.post('/api/sendBookingSms', {
                 bookingId: selectedBookingForEmail?.id,
-                to: smsForm.to,
-                body: smsForm.message
+                to: normalizedPhone,
+                body: finalMessage,
+                templateId: smsForm.template !== 'custom' ? smsForm.template : null
             });
             
             if (resp.data?.success) {
@@ -4327,6 +4462,7 @@ const Manifest = () => {
                                                 <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleAddGuestClick}>Add Guest</Button>
                                                 <Button variant="contained" color="info" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d' }} onClick={handleCancelFlight}>Cancel Flight</Button>
                                                 <Button variant="contained" color="success" sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#28a745' }} onClick={handleEmailBooking}>Email</Button>
+                                                <Button variant="contained" color="info" sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#17a2b8' }} onClick={handleSmsBooking}>SMS</Button>
                                                 <Button
                                                     variant="contained"
                                                     color="secondary"
@@ -6080,39 +6216,188 @@ const Manifest = () => {
             </Dialog>
 
             {/* SMS Modal */}
-            <Dialog open={smsModalOpen} onClose={() => setSmsModalOpen(false)} maxWidth="sm" fullWidth>
-                <DialogTitle>
-                    Send SMS to Customer
+            <Dialog 
+                open={smsModalOpen} 
+                onClose={() => setSmsModalOpen(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle sx={{ color: '#1976d2', fontWeight: 600, fontSize: 24 }}>
+                    Send a SMS
                     {selectedBookingForEmail && (
-                        <Typography variant="subtitle2" color="textSecondary">
+                        <Typography variant="subtitle2" color="textSecondary" sx={{ mt: 0.5 }}>
                             Booking: {selectedBookingForEmail.name} ({selectedBookingForEmail.id})
                         </Typography>
                     )}
                 </DialogTitle>
                 <DialogContent>
-                    <Grid container spacing={2}>
+                    <Grid container spacing={2} sx={{ mt: 1 }}>
                         <Grid item xs={12}>
+                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
+                                Choose a template:
+                            </Typography>
+                            <FormControl fullWidth size="small">
+                                <Select
+                                    value={smsForm.template || 'custom'}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        console.log('📝 Select onChange triggered with value:', value);
+                                        handleSmsTemplateChange(value);
+                                    }}
+                                    displayEmpty
+                                    MenuProps={{
+                                        PaperProps: {
+                                            style: {
+                                                maxHeight: 300,
+                                            },
+                                        },
+                                    }}
+                                >
+                                    {smsTemplates.length === 0 ? (
+                                        <MenuItem value="custom">Custom Message</MenuItem>
+                                    ) : (
+                                        [
+                                            // Database SMS templates
+                                            ...smsTemplates.map((template) => (
+                                                <MenuItem key={template.id} value={String(template.id)}>
+                                                    {template.name}
+                                                </MenuItem>
+                                            )),
+                                            // Custom Message option (always available)
+                                            <MenuItem key="custom" value="custom">Custom Message</MenuItem>
+                                        ]
+                                    )}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12}>
+                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
+                                Message
+                            </Typography>
                             <TextField
                                 fullWidth
-                                label="To"
-                                value={smsForm.to}
-                                onChange={(e) => setSmsForm(prev => ({ ...prev, to: e.target.value }))}
-                                margin="normal"
+                                placeholder="Enter your SMS message here..."
+                                value={smsForm.message || ''}
+                                onChange={(e) => setSmsForm(prev => ({ ...prev, message: e.target.value }))}
+                                multiline
+                                rows={6}
+                                variant="outlined"
+                                sx={{ 
+                                    '& .MuiOutlinedInput-root': {
+                                        borderRadius: 2
+                                    }
+                                }}
                             />
                         </Grid>
                         <Grid item xs={12}>
+                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
+                                Add an optional, personalized note
+                            </Typography>
                             <TextField
                                 fullWidth
-                                label="Message"
+                                placeholder="Nice to speak with you today!"
+                                value={smsPersonalNote}
+                                onChange={(e) => setSmsPersonalNote(e.target.value)}
                                 multiline
                                 rows={4}
-                                value={smsForm.message}
-                                onChange={(e) => setSmsForm(prev => ({ ...prev, message: e.target.value }))}
-                                margin="normal"
+                                variant="outlined"
+                                sx={{ 
+                                    '& .MuiOutlinedInput-root': {
+                                        borderRadius: 2
+                                    }
+                                }}
                             />
                         </Grid>
+                        {/* SMS Preview - Mobile Device */}
                         <Grid item xs={12}>
-                            <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>SMS History</Typography>
+                            <Box sx={{ 
+                                border: '1px solid #e0e0e0', 
+                                borderRadius: 2, 
+                                p: 2,
+                                backgroundColor: '#f9f9f9',
+                                display: 'flex',
+                                justifyContent: 'center',
+                                alignItems: 'flex-start'
+                            }}>
+                                {/* Mobile Device Preview */}
+                                <Box sx={{ 
+                                    width: '320px',
+                                    maxWidth: '100%',
+                                    background: '#000',
+                                    borderRadius: '24px',
+                                    padding: '12px',
+                                    boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)'
+                                }}>
+                                    {/* Phone Screen */}
+                                    <Box sx={{
+                                        background: '#f5f5f5',
+                                        borderRadius: '20px',
+                                        padding: '8px',
+                                        minHeight: '400px'
+                                    }}>
+                                        {/* Status Bar */}
+                                        <Box sx={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            padding: '8px 12px',
+                                            fontSize: '10px',
+                                            color: '#000',
+                                            background: '#fff',
+                                            borderRadius: '12px 12px 0 0'
+                                        }}>
+                                            <span>9:41</span>
+                                            <Box sx={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                                <span style={{ fontSize: '12px' }}>🔗</span>
+                                                <span style={{ fontSize: '12px' }}>⌨️</span>
+                                            </Box>
+                                        </Box>
+
+                                        {/* Message Preview */}
+                                        <Box sx={{
+                                            padding: '16px',
+                                            background: '#fff',
+                                            borderRadius: '0 0 12px 12px',
+                                            minHeight: '300px',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            justifyContent: 'flex-start'
+                                        }}>
+                                            {/* Message Bubble */}
+                                            <Box sx={{
+                                                background: '#e5e7eb',
+                                                borderRadius: '16px',
+                                                padding: '12px 16px',
+                                                marginBottom: '8px',
+                                                maxWidth: '85%',
+                                                alignSelf: 'flex-start',
+                                                wordWrap: 'break-word',
+                                                fontSize: '14px',
+                                                lineHeight: '1.5',
+                                                color: '#111827',
+                                                whiteSpace: 'pre-wrap'
+                                            }}>
+                                                {(() => {
+                                                    const booking = selectedBookingForEmail || bookingDetail?.booking || {};
+                                                    const messageText = smsForm.message || '';
+                                                    const messageWithPrompts = replaceSmsPrompts(messageText, booking);
+                                                    const finalMessage = smsPersonalNote 
+                                                        ? `${messageWithPrompts}${messageWithPrompts ? '\n\n' : ''}${smsPersonalNote}`
+                                                        : messageWithPrompts;
+                                                    return finalMessage || 'Your message will appear here...';
+                                                })()}
+                                            </Box>
+                                        </Box>
+                                    </Box>
+                                </Box>
+                            </Box>
+                        </Grid>
+                        {/* SMS Logs */}
+                        <Grid item xs={12}>
+                            <Divider sx={{ my: 2 }} />
+                            <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
+                                Sent SMS
+                            </Typography>
                             {smsLogs.length === 0 ? (
                                 <Typography variant="body2">No SMS sent yet.</Typography>
                             ) : (
@@ -6138,10 +6423,26 @@ const Manifest = () => {
                         </Grid>
                     </Grid>
                 </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setSmsModalOpen(false)}>Cancel</Button>
-                    <Button onClick={handleSendSms} variant="contained" disabled={smsSending || !smsForm.to || !smsForm.message}>
-                        {smsSending ? 'Sending...' : 'Send SMS'}
+                <DialogActions sx={{ p: 3, justifyContent: 'flex-end' }}>
+                    <Button 
+                        onClick={handleSendSms}
+                        variant="contained"
+                        startIcon={<span>📱</span>}
+                        sx={{ 
+                            backgroundColor: '#17a2b8',
+                            px: 4,
+                            py: 1.5,
+                            borderRadius: 2,
+                            fontWeight: 600,
+                            textTransform: 'none',
+                            fontSize: 16,
+                            '&:hover': {
+                                backgroundColor: '#138496'
+                            }
+                        }}
+                        disabled={smsSending || !smsForm.to || !smsForm.message}
+                    >
+                        {smsSending ? 'Sending...' : 'Send'}
                     </Button>
                 </DialogActions>
             </Dialog>
