@@ -6548,6 +6548,23 @@ app.get('/api/getAllBookingData', (req, res) => {
             }
 
             // Ensure phone number includes country code
+            // Helper function to ensure phone has country code
+            const ensurePhoneWithCountryCode = (phoneValue, defaultCountryCode = '+44') => {
+                if (!phoneValue || phoneValue.trim() === '') return phoneValue;
+                phoneValue = phoneValue.trim();
+                // If phone already has country code (starts with +), return as is
+                if (phoneValue.startsWith('+')) {
+                    return phoneValue;
+                }
+                // Try to infer country code from phone pattern
+                // UK numbers: starts with 0 or 7 followed by 9 digits
+                if (phoneValue.startsWith('0') || /^7\d{9}$/.test(phoneValue)) {
+                    return '+44' + phoneValue.replace(/^0/, '');
+                }
+                // If no pattern matches, add default country code
+                return `${defaultCountryCode}${phoneValue}`;
+            };
+
             // Priority: 1) passenger table phone with country code, 2) booking phone with country code, 3) infer from pattern
             try {
                 // Always try to get phone from passenger table first (most reliable source)
@@ -6558,47 +6575,20 @@ app.get('/api/getAllBookingData', (req, res) => {
                 
                 if (passengerRows && passengerRows.length > 0 && passengerRows[0].phone) {
                     const passengerPhone = passengerRows[0].phone;
-                    // If passenger phone has country code, use it
-                    if (passengerPhone.startsWith('+')) {
-                        rest.phone = passengerPhone;
-                    } else {
-                        // If passenger phone doesn't have country code, check booking phone
-                        if (rest.phone && rest.phone.startsWith('+')) {
-                            // Booking phone has country code, use it
-                            // rest.phone already has country code, keep it
-                        } else {
-                            // Neither has country code, try to infer from pattern
-                            const phoneStr = String(passengerPhone || rest.phone || '').trim();
-                            if (phoneStr) {
-                                // UK numbers starting with 0 or 7
-                                if (phoneStr.startsWith('0') || /^7\d{9}$/.test(phoneStr)) {
-                                    rest.phone = '+44' + phoneStr.replace(/^0/, '');
-                                } else {
-                                    // For other numbers, use as is (might be international without +)
-                                    rest.phone = phoneStr;
-                                }
-                            }
-                        }
-                    }
-                } else if (rest.phone && !rest.phone.startsWith('+')) {
-                    // No passenger phone found, but booking phone exists without country code
-                    // Try to infer from pattern
-                    const phoneStr = String(rest.phone).trim();
-                    if (phoneStr.startsWith('0') || /^7\d{9}$/.test(phoneStr)) {
-                        rest.phone = '+44' + phoneStr.replace(/^0/, '');
-                    }
-                } else if (!rest.phone) {
+                    // Ensure passenger phone has country code
+                    rest.phone = ensurePhoneWithCountryCode(passengerPhone);
+                } else if (rest.phone) {
+                    // No passenger phone found, but booking phone exists - ensure it has country code
+                    rest.phone = ensurePhoneWithCountryCode(rest.phone);
+                } else {
                     // No phone found at all, keep it as null/empty
                     rest.phone = null;
                 }
             } catch (phoneErr) {
                 console.warn('Error checking passenger phone for country code:', phoneErr.message);
-                // Fallback: try to infer from pattern if query fails
-                if (rest.phone && !rest.phone.startsWith('+')) {
-                    const phoneStr = String(rest.phone).trim();
-                    if (phoneStr && (phoneStr.startsWith('0') || /^7\d{9}$/.test(phoneStr))) {
-                        rest.phone = '+44' + phoneStr.replace(/^0/, '');
-                    }
+                // Fallback: ensure booking phone has country code if query fails
+                if (rest.phone) {
+                    rest.phone = ensurePhoneWithCountryCode(rest.phone);
                 }
             }
 
@@ -9437,16 +9427,18 @@ app.get('/api/getAllVoucherData', (req, res) => {
 
                 // Ensure phone numbers include country code
                 // Helper function to add country code if missing
-                const ensurePhoneWithCountryCode = (phone) => {
-                    if (!phone) return phone;
+                const ensurePhoneWithCountryCode = (phone, defaultCountryCode = '+44') => {
+                    if (!phone || phone.trim() === '') return phone;
                     const phoneStr = String(phone).trim();
+                    // If phone already has country code (starts with +), return as is
                     if (phoneStr.startsWith('+')) return phoneStr;
-                    // If phone doesn't have country code, try to infer from common patterns
-                    // UK numbers starting with 0 or 7
+                    // Try to infer country code from phone pattern
+                    // UK numbers: starts with 0 or 7 followed by 9 digits
                     if (phoneStr.startsWith('0') || /^7\d{9}$/.test(phoneStr)) {
                         return '+44' + phoneStr.replace(/^0/, '');
                     }
-                    return phoneStr;
+                    // If no pattern matches, add default country code
+                    return `${defaultCountryCode}${phoneStr}`;
                 };
 
                 // Update phone numbers to include country code if missing
@@ -9918,9 +9910,22 @@ app.post('/api/createBooking', (req, res) => {
         const bookingEmail = mainPassenger.email || (passengerData.find(p => p.email && p.email.trim())?.email) || null;
         
         // Combine countryCode and phone for mainPassenger phone
-        const mainPassengerPhone = mainPassenger.countryCode && mainPassenger.phone
-            ? `${mainPassenger.countryCode}${mainPassenger.phone}`.trim()
-            : (mainPassenger.phone || null);
+        // Check if phone already has country code (starts with +)
+        let mainPassengerPhone = mainPassenger.phone || null;
+        if (mainPassengerPhone && !mainPassengerPhone.startsWith('+')) {
+            // Phone doesn't have country code, combine with countryCode if available
+            if (mainPassenger.countryCode) {
+                let countryCode = mainPassenger.countryCode;
+                // Ensure countryCode starts with + if it doesn't
+                if (countryCode && !countryCode.startsWith('+')) {
+                    countryCode = '+' + countryCode;
+                }
+                mainPassengerPhone = `${countryCode}${mainPassengerPhone}`.trim();
+            } else {
+                // If no countryCode in passengerData, use default UK code
+                mainPassengerPhone = `+44${mainPassengerPhone}`.trim();
+            }
+        }
         if (!bookingEmail) {
             console.warn('⚠️ [createBooking] No email found in passenger data for booking creation');
             console.warn('⚠️ [createBooking] Passenger data:', passengerData.map(p => ({ name: `${p.firstName} ${p.lastName}`, email: p.email })));
@@ -10858,6 +10863,34 @@ app.post('/api/createVoucher', (req, res) => {
         book_flight,
         flight_type
     });
+
+    // Helper function to ensure phone number has country code
+    const ensurePhoneWithCountryCode = (phoneValue, defaultCountryCode = '+44') => {
+        if (!phoneValue || phoneValue.trim() === '') return phoneValue;
+        phoneValue = phoneValue.trim();
+        // If phone already has country code (starts with +), return as is
+        if (phoneValue.startsWith('+')) {
+            return phoneValue;
+        }
+        // Try to get countryCode from passengerData if available
+        let countryCode = defaultCountryCode;
+        if (Array.isArray(passengerData) && passengerData.length > 0 && passengerData[0].countryCode) {
+            countryCode = passengerData[0].countryCode;
+        }
+        // Ensure countryCode starts with + if it doesn't
+        if (countryCode && !countryCode.startsWith('+')) {
+            countryCode = '+' + countryCode;
+        }
+        // Combine country code with phone
+        return `${countryCode}${phoneValue}`;
+    };
+
+    // Ensure phone and mobile have country codes
+    phone = ensurePhoneWithCountryCode(phone);
+    mobile = ensurePhoneWithCountryCode(mobile);
+    purchaser_phone = ensurePhoneWithCountryCode(purchaser_phone);
+    purchaser_mobile = ensurePhoneWithCountryCode(purchaser_mobile);
+    recipient_phone = ensurePhoneWithCountryCode(recipient_phone);
 
     // Processing voucher creation request
     console.log('=== BACKEND VOUCHER CREATION DEBUG ===');
