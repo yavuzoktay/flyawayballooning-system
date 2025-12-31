@@ -4287,7 +4287,7 @@ const Manifest = () => {
                                         <Box sx={{ mb: 2, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                                             <Box>
                                                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Current Booking</Typography>
-                                                <Typography><b>Activity:</b> {bookingDetail.booking.flight_type} - {bookingDetail.booking.location}</Typography>
+                                                <Typography><b>Activity:</b> {bookingDetail.booking.experience || bookingDetail.booking.flight_type || '-'} - {bookingDetail.booking.location}</Typography>
                                                 {bookingDetail.booking.status !== 'Cancelled' && (
                                                     <Typography><b>Booked For:</b> {bookingDetail.booking.flight_date ? (
                                                         <a
