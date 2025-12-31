@@ -6551,21 +6551,28 @@ app.get('/api/getAllBookingData', (req, res) => {
             // Helper function to ensure phone has country code
             const ensurePhoneWithCountryCode = (phoneValue, defaultCountryCode = '+44') => {
                 if (!phoneValue || phoneValue.trim() === '') return phoneValue;
-                phoneValue = phoneValue.trim();
+                phoneValue = String(phoneValue).trim();
                 // If phone already has country code (starts with +), return as is
                 if (phoneValue.startsWith('+')) {
                     return phoneValue;
                 }
                 // Try to infer country code from phone pattern
-                // UK numbers: starts with 0 or 7 followed by 9 digits
-                if (phoneValue.startsWith('0') || /^7\d{9}$/.test(phoneValue)) {
-                    return '+44' + phoneValue.replace(/^0/, '');
+                // UK numbers: starts with 0 or 7 followed by 9-10 digits (mobile numbers)
+                // Also handle 11-digit numbers starting with 0 (UK landline format)
+                if (phoneValue.startsWith('0')) {
+                    // Remove leading 0 and add +44
+                    return '+44' + phoneValue.substring(1);
+                }
+                // UK mobile: 7 followed by 9 digits (10 digits total)
+                if (/^7\d{9}$/.test(phoneValue)) {
+                    return '+44' + phoneValue;
                 }
                 // If no pattern matches, add default country code
                 return `${defaultCountryCode}${phoneValue}`;
             };
 
             // Priority: 1) passenger table phone with country code, 2) booking phone with country code, 3) infer from pattern
+            let finalPhone = rest.phone;
             try {
                 // Always try to get phone from passenger table first (most reliable source)
                 const [passengerRows] = await con.promise().query(
@@ -6575,28 +6582,37 @@ app.get('/api/getAllBookingData', (req, res) => {
                 
                 if (passengerRows && passengerRows.length > 0 && passengerRows[0].phone) {
                     const passengerPhone = passengerRows[0].phone;
+                    console.log(`[getAllBookingData] Booking ${rest.id}: Found passenger phone: ${passengerPhone}`);
                     // Ensure passenger phone has country code
-                    rest.phone = ensurePhoneWithCountryCode(passengerPhone);
+                    finalPhone = ensurePhoneWithCountryCode(passengerPhone);
+                    console.log(`[getAllBookingData] Booking ${rest.id}: Normalized phone: ${finalPhone}`);
                 } else if (rest.phone) {
                     // No passenger phone found, but booking phone exists - ensure it has country code
-                    rest.phone = ensurePhoneWithCountryCode(rest.phone);
+                    console.log(`[getAllBookingData] Booking ${rest.id}: Using booking phone: ${rest.phone}`);
+                    finalPhone = ensurePhoneWithCountryCode(rest.phone);
+                    console.log(`[getAllBookingData] Booking ${rest.id}: Normalized phone: ${finalPhone}`);
                 } else {
                     // No phone found at all, keep it as null/empty
-                    rest.phone = null;
+                    finalPhone = null;
+                    console.log(`[getAllBookingData] Booking ${rest.id}: No phone found`);
                 }
             } catch (phoneErr) {
                 console.warn('Error checking passenger phone for country code:', phoneErr.message);
                 // Fallback: ensure booking phone has country code if query fails
                 if (rest.phone) {
-                    rest.phone = ensurePhoneWithCountryCode(rest.phone);
+                    finalPhone = ensurePhoneWithCountryCode(rest.phone);
                 }
             }
+            
+            // Update rest.phone with the normalized phone number
+            rest.phone = finalPhone;
 
             // Determine assigned resource based on flight type and passenger count
             const assignedResource = getAssignedResource(rest.flight_type || rest.experience, rest.pax);
 
             return {
                 ...rest,
+                phone: rest.phone, // Ensure phone with country code is included
                 status: finalStatus,
                 voucher_type: finalVoucherType,
                 expires: expiresValue,
