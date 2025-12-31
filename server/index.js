@@ -5078,14 +5078,29 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     if (isGiftVoucher && !storeData.voucherData.gift_email_sent) {
                         try {
                             console.log('📧 Sending automatic Gift Voucher Confirmation email from webhook for voucher ID:', voucherId);
-                            sendAutomaticGiftVoucherConfirmationEmail(voucherId, {
+                            const contactOverride = {
                                 purchaser_email: storeData.voucherData.purchaser_email || storeData.voucherData.email,
                                 purchaser_name: storeData.voucherData.purchaser_name || storeData.voucherData.name,
                                 purchaser_phone: storeData.voucherData.phone || storeData.voucherData.mobile,
                                 purchaser_mobile: storeData.voucherData.mobile || storeData.voucherData.phone
-                            });
+                            };
+                            sendAutomaticGiftVoucherConfirmationEmail(voucherId, contactOverride);
                             // Mark that email was sent to prevent duplicate in fallback
                             storeData.voucherData.gift_email_sent = true;
+                            
+                            // Send automatic Gift Voucher Confirmation SMS
+                            console.log('========================================');
+                            console.log('📱 [WEBHOOK] SMS SEND PROCESS STARTING FOR GIFT VOUCHER');
+                            console.log('📱 [WEBHOOK] Voucher ID:', voucherId);
+                            console.log('📱 [WEBHOOK] Calling sendAutomaticGiftVoucherConfirmationSms...');
+                            console.log('========================================');
+                            
+                            try {
+                                sendAutomaticGiftVoucherConfirmationSms(voucherId, contactOverride);
+                                console.log('✅ [WEBHOOK] sendAutomaticGiftVoucherConfirmationSms function called successfully');
+                            } catch (smsError) {
+                                console.error('❌ [WEBHOOK] Error calling sendAutomaticGiftVoucherConfirmationSms:', smsError);
+                            }
                         } catch (emailErr) {
                             console.error('Error sending Gift Voucher Confirmation email from webhook:', emailErr?.message || emailErr);
                         }
@@ -10020,6 +10035,21 @@ app.post('/api/createBooking', (req, res) => {
                         console.error('❌ [createBooking] Error calling sendAutomaticBookingConfirmationEmail:', emailError);
                     }
 
+                    // Send automatic booking confirmation SMS for "Book Flight Date" bookings
+                    console.log('========================================');
+                    console.log('📱 [createBooking] SMS SEND PROCESS STARTING');
+                    console.log('📱 [createBooking] Booking ID:', bookingId);
+                    console.log('📱 [createBooking] Flight Type:', chooseFlightType);
+                    console.log('📱 [createBooking] Calling sendAutomaticBookingConfirmationSms...');
+                    console.log('========================================');
+                    
+                    try {
+                        sendAutomaticBookingConfirmationSms(bookingId);
+                        console.log('✅ [createBooking] sendAutomaticBookingConfirmationSms function called successfully');
+                    } catch (smsError) {
+                        console.error('❌ [createBooking] Error calling sendAutomaticBookingConfirmationSms:', smsError);
+                    }
+
                     res.status(201).json({ success: true, message: 'Booking created successfully!', bookingId: bookingId, created_at: createdAt });
                 });
             }
@@ -10631,12 +10661,28 @@ app.post('/api/createVoucher', (req, res) => {
                 res.status(201).json({ success: true, message: 'Voucher created successfully!', voucherId: result.insertId });
                 if ((voucher_type && voucher_type.toLowerCase().includes('gift')) || (book_flight && book_flight.toLowerCase().includes('gift'))) {
                     try {
-                        sendAutomaticGiftVoucherConfirmationEmail(result.insertId, {
+                        const contactOverride = {
                             purchaser_email: finalPurchaserEmail,
                             purchaser_name: finalPurchaserName,
                             purchaser_phone: finalPurchaserPhone,
                             purchaser_mobile: finalPurchaserMobile
-                        });
+                        };
+                        sendAutomaticGiftVoucherConfirmationEmail(result.insertId, contactOverride);
+                        
+                        // Send automatic Gift Voucher Confirmation SMS
+                        console.log('========================================');
+                        console.log('📱 [Gift Voucher] SMS SEND PROCESS STARTING');
+                        console.log('📱 [Gift Voucher] Voucher ID:', result.insertId);
+                        console.log('📱 [Gift Voucher] Phone:', finalPurchaserPhone || finalPurchaserMobile);
+                        console.log('📱 [Gift Voucher] Calling sendAutomaticGiftVoucherConfirmationSms...');
+                        console.log('========================================');
+                        
+                        try {
+                            sendAutomaticGiftVoucherConfirmationSms(result.insertId, contactOverride);
+                            console.log('✅ [Gift Voucher] sendAutomaticGiftVoucherConfirmationSms function called successfully');
+                        } catch (smsError) {
+                            console.error('❌ [Gift Voucher] Error calling sendAutomaticGiftVoucherConfirmationSms:', smsError);
+                        }
                     } catch (emailErr) {
                         console.error('Error sending automatic Gift Voucher Confirmation email:', emailErr?.message || emailErr);
                     }
@@ -10728,6 +10774,21 @@ app.post('/api/createVoucher', (req, res) => {
             // Send automatic booking confirmation email for Flight Voucher
             if (email) {
                 sendAutomaticBookingConfirmationEmail(bookingResult.insertId);
+            }
+            
+            // Send automatic booking confirmation SMS for Flight Voucher
+            console.log('========================================');
+            console.log('📱 [Flight Voucher] SMS SEND PROCESS STARTING');
+            console.log('📱 [Flight Voucher] Booking ID:', bookingResult.insertId);
+            console.log('📱 [Flight Voucher] Phone:', phone);
+            console.log('📱 [Flight Voucher] Calling sendAutomaticBookingConfirmationSms...');
+            console.log('========================================');
+            
+            try {
+                sendAutomaticBookingConfirmationSms(bookingResult.insertId);
+                console.log('✅ [Flight Voucher] sendAutomaticBookingConfirmationSms function called successfully');
+            } catch (smsError) {
+                console.error('❌ [Flight Voucher] Error calling sendAutomaticBookingConfirmationSms:', smsError);
             }
         });
     }
@@ -18008,10 +18069,10 @@ app.get('/api/email-templates', (req, res) => {
 
 // Create new email template
 app.post('/api/email-templates', (req, res) => {
-    const { name, subject, body, category, sms_enabled } = req.body;
+    const { name, subject, body, category } = req.body;
 
     const sql = 'INSERT INTO email_templates (name, subject, body, category, sms_enabled, edited, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())';
-    const values = [name, subject, body || '', category, sms_enabled ? 1 : 0, 0];
+    const values = [name, subject, body || '', category, 0, 0];
 
     con.query(sql, values, (err, result) => {
         if (err) {
@@ -18025,10 +18086,10 @@ app.post('/api/email-templates', (req, res) => {
 // Update email template
 app.put('/api/email-templates/:id', (req, res) => {
     const { id } = req.params;
-    const { name, subject, body, category, sms_enabled } = req.body;
+    const { name, subject, body, category } = req.body;
 
     const sql = 'UPDATE email_templates SET name = ?, subject = ?, body = ?, category = ?, sms_enabled = ?, edited = 1, updated_at = NOW() WHERE id = ?';
-    const values = [name, subject, body || '', category, sms_enabled ? 1 : 0, id];
+    const values = [name, subject, body || '', category, 0, id];
 
     con.query(sql, values, (err, result) => {
         if (err) {
@@ -18047,6 +18108,72 @@ app.delete('/api/email-templates/:id', (req, res) => {
         if (err) {
             console.error('Error deleting email template:', err);
             return res.status(500).json({ success: false, message: 'Error deleting email template' });
+        }
+        res.json({ success: true });
+    });
+});
+
+// SMS Templates endpoints
+// Get all SMS templates
+app.get('/api/sms-templates', (req, res) => {
+    con.query('SELECT * FROM sms_templates ORDER BY created_at DESC', (err, templates) => {
+        if (err) {
+            console.error('Error fetching SMS templates:', err);
+            return res.status(500).json({ success: false, message: 'Error fetching SMS templates' });
+        }
+        res.json({ success: true, data: templates });
+    });
+});
+
+// Create new SMS template
+app.post('/api/sms-templates', (req, res) => {
+    const { name, message, category } = req.body;
+
+    if (!name || !message) {
+        return res.status(400).json({ success: false, message: 'Name and message are required' });
+    }
+
+    const sql = 'INSERT INTO sms_templates (name, message, category, edited, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())';
+    const values = [name, message, category || 'User Defined Message', 0];
+
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error creating SMS template:', err);
+            return res.status(500).json({ success: false, message: 'Error creating SMS template' });
+        }
+        res.json({ success: true, id: result.insertId });
+    });
+});
+
+// Update SMS template
+app.put('/api/sms-templates/:id', (req, res) => {
+    const { id } = req.params;
+    const { name, message, category } = req.body;
+
+    if (!name || !message) {
+        return res.status(400).json({ success: false, message: 'Name and message are required' });
+    }
+
+    const sql = 'UPDATE sms_templates SET name = ?, message = ?, category = ?, edited = 1, updated_at = NOW() WHERE id = ?';
+    const values = [name, message, category || 'User Defined Message', id];
+
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error updating SMS template:', err);
+            return res.status(500).json({ success: false, message: 'Error updating SMS template' });
+        }
+        res.json({ success: true });
+    });
+});
+
+// Delete SMS template
+app.delete('/api/sms-templates/:id', (req, res) => {
+    const { id } = req.params;
+
+    con.query('DELETE FROM sms_templates WHERE id = ?', [id], (err, result) => {
+        if (err) {
+            console.error('Error deleting SMS template:', err);
+            return res.status(500).json({ success: false, message: 'Error deleting SMS template' });
         }
         res.json({ success: true });
     });
@@ -25698,17 +25825,169 @@ function ensureSmsLogsSchema(callback) {
 }
 
 // Send SMS
+// Helper function to replace SMS template placeholders with booking data (plain text, no HTML)
+function replaceSmsPrompts(text = '', booking = {}) {
+    if (!text) return text;
+    if (!booking || Object.keys(booking).length === 0) {
+        console.warn('⚠️ replaceSmsPrompts: booking is empty, placeholders will not be replaced');
+        return text;
+    }
+    
+    // Extract name parts from booking name - try multiple field names
+    const bookingName = booking.name || booking.customer_name || booking.booking_name || '';
+    console.log('🔍 replaceSmsPrompts - bookingName:', bookingName, 'from booking:', {
+        name: booking.name,
+        customer_name: booking.customer_name,
+        booking_name: booking.booking_name
+    });
+    
+    const nameParts = bookingName.trim().split(/\s+/).filter(part => part.length > 0);
+    const firstName = nameParts.length > 0 ? nameParts[0] : (bookingName || 'Guest');
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+    const fullName = bookingName || 'Guest';
+    
+    console.log('🔍 replaceSmsPrompts - extracted:', { firstName, lastName, fullName });
+    
+    // Company name - default to "Fly Away Ballooning"
+    const companyName = 'Fly Away Ballooning';
+    
+    let result = text;
+    
+    // Replace [First Name] (case-insensitive)
+    result = result.replace(/\[First Name\]/gi, firstName);
+    
+    // Replace [Last Name] (case-insensitive)
+    result = result.replace(/\[Last Name\]/gi, lastName);
+    
+    // Replace [Full Name] (case-insensitive)
+    result = result.replace(/\[Full Name\]/gi, fullName);
+    
+    // Replace [Company Name] (case-insensitive)
+    result = result.replace(/\[Company Name\]/gi, companyName);
+    
+    // Replace [Email] (case-insensitive)
+    result = result.replace(/\[Email\]/gi, booking.email || booking.customer_email || '');
+    
+    // Replace [Phone] (case-insensitive) - check both phone and mobile fields
+    result = result.replace(/\[Phone\]/gi, booking.phone || booking.mobile || booking.customer_phone || '');
+    
+    // Replace [Booking ID] (case-insensitive)
+    result = result.replace(/\[Booking ID\]/gi, booking.id ? String(booking.id) : '');
+    
+    // Replace [Customer Portal Link] (case-insensitive) - for SMS, just return the URL
+    const customerPortalLink = getCustomerPortalLink(booking);
+    result = result.replace(/\[Customer Portal Link\]/gi, customerPortalLink || '');
+    
+    // Replace [Flight Date] (case-insensitive)
+    const flightDate = booking.flight_date || booking.flightDate || '';
+    if (flightDate) {
+        try {
+            const formattedDate = formatDateTime(flightDate);
+            result = result.replace(/\[Flight Date\]/gi, formattedDate || flightDate);
+        } catch (e) {
+            result = result.replace(/\[Flight Date\]/gi, flightDate);
+        }
+    } else {
+        result = result.replace(/\[Flight Date\]/gi, '');
+    }
+    
+    // Replace [Location] (case-insensitive)
+    result = result.replace(/\[Location\]/gi, booking.location || '');
+    
+    // Replace [Voucher Code] (case-insensitive)
+    result = result.replace(/\[Voucher Code\]/gi, booking.voucher_code || booking.voucherCode || '');
+    
+    // Replace [Experience Data] (case-insensitive)
+    // Format: "01/02/2026 11:00" (DD/MM/YYYY HH:mm) - matches "Booked For" format
+    let experienceData = '';
+    const expFlightDate = booking.flight_date || booking.flightDate || '';
+    const expTimeSlot = booking.time_slot || booking.timeSlot || '';
+    
+    if (expFlightDate) {
+        try {
+            // Parse flight_date
+            const dateObj = new Date(expFlightDate);
+            
+            // Get time from time_slot if available, otherwise from flight_date
+            let timeStr = '';
+            if (expTimeSlot) {
+                // time_slot format: "HH:mm" or "HH:mm:ss"
+                timeStr = expTimeSlot.split(':').slice(0, 2).join(':');
+            } else if (expFlightDate.includes(' ') || expFlightDate.includes('T')) {
+                // Extract time from flight_date if it contains time
+                const timeMatch = expFlightDate.match(/(\d{1,2}):(\d{2})/);
+                if (timeMatch) {
+                    timeStr = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
+                }
+            }
+            
+            // Format date as DD/MM/YYYY
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const year = dateObj.getFullYear();
+            const formattedDate = `${day}/${month}/${year}`;
+            
+            // Combine date and time
+            if (timeStr) {
+                experienceData = `${formattedDate} ${timeStr}`;
+            } else {
+                experienceData = formattedDate;
+            }
+        } catch (e) {
+            // Fallback: use raw flight_date if parsing fails
+            experienceData = expFlightDate;
+        }
+    }
+    result = result.replace(/\[Experience Data\]/gi, experienceData);
+    
+    return result;
+}
+
 app.post('/api/sendBookingSms', async (req, res) => {
     try {
         const { bookingId, to, body } = req.body;
         if (!to || !body) return res.status(400).json({ success: false, message: 'to and body required' });
 
+        // Fetch booking data to replace placeholders
+        let booking = {};
+        if (bookingId) {
+            try {
+                // Use all_booking table (not bookings) - this is the correct table name
+                const bookingQuery = `SELECT * FROM all_booking WHERE id = ?`;
+                const [bookingRows] = await con.promise().query(bookingQuery, [bookingId]);
+                if (bookingRows && bookingRows.length > 0) {
+                    booking = bookingRows[0];
+                    console.log('📋 Fetched booking for SMS:', {
+                        id: booking.id,
+                        name: booking.name,
+                        customer_name: booking.customer_name,
+                        email: booking.email,
+                        phone: booking.phone || booking.mobile
+                    });
+                } else {
+                    console.warn('⚠️ No booking found with id:', bookingId);
+                }
+            } catch (err) {
+                console.error('❌ Error fetching booking data for placeholder replacement:', err.message, err.stack);
+            }
+        } else {
+            console.warn('⚠️ No bookingId provided for SMS placeholder replacement');
+        }
+        
+        // Replace placeholders in SMS body
+        const bodyWithPrompts = replaceSmsPrompts(body, booking);
+        console.log('📝 SMS body before replacement:', body.substring(0, 100));
+        console.log('📝 SMS body after replacement:', bodyWithPrompts.substring(0, 100));
+
         const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, TWILIO_MESSAGING_SERVICE_SID } = process.env;
-        if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || (!TWILIO_FROM_NUMBER && !TWILIO_MESSAGING_SERVICE_SID)) {
+        // Validation: Need account SID and auth token. For sender, we can use:
+        // 1. TWILIO_FROM_NUMBER (purchased phone number)
+        // 2. TWILIO_MESSAGING_SERVICE_SID (messaging service with FLYAWAY configured)
+        // 3. FLYAWAY directly (alphanumeric sender ID - only works on paid accounts)
+        if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
             const missing = [
                 !TWILIO_ACCOUNT_SID ? 'TWILIO_ACCOUNT_SID' : null,
-                !TWILIO_AUTH_TOKEN ? 'TWILIO_AUTH_TOKEN' : null,
-                (!TWILIO_FROM_NUMBER && !TWILIO_MESSAGING_SERVICE_SID) ? 'TWILIO_FROM_NUMBER or TWILIO_MESSAGING_SERVICE_SID' : null
+                !TWILIO_AUTH_TOKEN ? 'TWILIO_AUTH_TOKEN' : null
             ].filter(Boolean).join(', ');
             console.error('Twilio not configured. Missing:', missing);
             return res.status(500).json({ success: false, message: `Twilio not configured: missing ${missing}` });
@@ -25717,19 +25996,52 @@ app.post('/api/sendBookingSms', async (req, res) => {
         const client = Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
         const createParams = {
             to,
-            body,
+            body: bodyWithPrompts, // Use body with replaced placeholders
             statusCallback: process.env.TWILIO_STATUS_CALLBACK_URL || undefined
         };
-        if (TWILIO_MESSAGING_SERVICE_SID) {
-            createParams.messagingServiceSid = TWILIO_MESSAGING_SERVICE_SID;
+        
+        // Priority order for sender (FLYAWAY is preferred for paid accounts):
+        // 1. TWILIO_MESSAGING_SERVICE_SID (requires paid account, FLYAWAY should be configured in the service)
+        // 2. FLYAWAY directly (alphanumeric sender ID - only works on paid accounts)
+        // 3. TWILIO_FROM_NUMBER (fallback - only if explicitly set and not empty)
+        
+        // Check if TWILIO_FROM_NUMBER exists and is not empty
+        const hasFromNumber = TWILIO_FROM_NUMBER && typeof TWILIO_FROM_NUMBER === 'string' && TWILIO_FROM_NUMBER.trim() !== '';
+        const hasMessagingService = TWILIO_MESSAGING_SERVICE_SID && typeof TWILIO_MESSAGING_SERVICE_SID === 'string' && TWILIO_MESSAGING_SERVICE_SID.trim() !== '';
+        
+        console.log('📱 Twilio sender configuration check:', {
+            hasFromNumber,
+            hasMessagingService,
+            fromNumberValue: TWILIO_FROM_NUMBER,
+            messagingServiceValue: TWILIO_MESSAGING_SERVICE_SID ? 'SET' : 'NOT SET'
+        });
+        
+        if (hasMessagingService) {
+            // Use Messaging Service (requires paid account, FLYAWAY should be configured in the service)
+            createParams.messagingServiceSid = TWILIO_MESSAGING_SERVICE_SID.trim();
+            console.log('📱 Using TWILIO_MESSAGING_SERVICE_SID:', TWILIO_MESSAGING_SERVICE_SID);
+        } else if (!hasFromNumber) {
+            // Use FLYAWAY directly (only works on paid accounts)
+            // Note: This requires paid account with proper alphanumeric sender ID support
+            createParams.from = 'FLYAWAY';
+            console.log('📱 Using FLYAWAY as alphanumeric sender ID (paid account required)');
         } else {
-            createParams.from = TWILIO_FROM_NUMBER;
+            // Fallback: Use purchased phone number (works on trial and paid accounts)
+            createParams.from = TWILIO_FROM_NUMBER.trim();
+            console.log('📱 Using TWILIO_FROM_NUMBER (fallback):', TWILIO_FROM_NUMBER);
         }
+        
+        console.log('📱 Sending SMS via Twilio:', {
+            to,
+            from: createParams.from || `MessagingService:${createParams.messagingServiceSid}`,
+            bodyLength: body.length
+        });
+        
         const msg = await client.messages.create(createParams);
 
         ensureSmsLogsSchema(() => {
             const sql = `INSERT INTO sms_logs (booking_id, to_number, body, status, sid, sent_at) VALUES (?, ?, ?, ?, ?, NOW())`;
-            con.query(sql, [bookingId || null, to, body, msg.status || 'queued', msg.sid], (err) => {
+            con.query(sql, [bookingId || null, to, bodyWithPrompts, msg.status || 'queued', msg.sid], (err) => {
                 if (err) console.error('Error logging sms:', err);
             });
         });
@@ -25740,6 +26052,350 @@ app.post('/api/sendBookingSms', async (req, res) => {
         res.status(500).json({ success: false, message: e.message });
     }
 });
+
+// Helper function to normalize UK phone numbers to +44 format
+function normalizeUkPhone(raw) {
+    if (!raw) return '';
+    let s = String(raw).trim();
+    // Replace whitespace, dashes, parentheses
+    s = s.replace(/[\s\-()]/g, '');
+    // Convert leading 00 to +
+    if (s.startsWith('00')) s = '+' + s.slice(2);
+    // If already E.164
+    if (s.startsWith('+')) return s;
+    // If leading 0 assume UK national format
+    if (s.startsWith('0')) {
+        return '+44' + s.slice(1);
+    }
+    // If 10-11 digits and likely UK mobile (starts with 7)
+    if (/^7\d{8,9}$/.test(s)) return '+44' + s;
+    return s; // fallback - leave as is
+}
+
+// Automatic SMS sending function (similar to sendAutomaticBookingConfirmationEmail)
+async function sendAutomaticBookingConfirmationSms(bookingId) {
+    console.log('========================================');
+    console.log('📱 [sendAutomaticBookingConfirmationSms] FUNCTION CALLED');
+    console.log('📱 [sendAutomaticBookingConfirmationSms] Booking ID:', bookingId);
+    console.log('📱 [sendAutomaticBookingConfirmationSms] Timestamp:', new Date().toISOString());
+    console.log('========================================');
+
+    try {
+        // Check Twilio configuration
+        const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = process.env;
+        if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
+            console.warn('⚠️ [sendAutomaticBookingConfirmationSms] Twilio not configured, skipping SMS');
+            return;
+        }
+
+        // Fetch booking details
+        const bookingQuery = `SELECT * FROM all_booking WHERE id = ?`;
+        
+        con.query(bookingQuery, [bookingId], async (err, bookingRows) => {
+            if (err) {
+                console.error('❌ [sendAutomaticBookingConfirmationSms] Error fetching booking:', err);
+                return;
+            }
+
+            if (!bookingRows || bookingRows.length === 0) {
+                console.warn('⚠️ [sendAutomaticBookingConfirmationSms] Booking not found:', bookingId);
+                return;
+            }
+
+            const booking = bookingRows[0];
+            
+            // Determine booking type and template name
+            const flightType = booking.flight_type || '';
+            const flightTypeLower = flightType.toLowerCase();
+            let templateName = '';
+            let shouldSendSms = false;
+            
+            if (flightTypeLower.includes('book flight date')) {
+                templateName = 'Booking Confirmation SMS';
+                shouldSendSms = true;
+            } else if (flightTypeLower.includes('buy flight voucher') || flightTypeLower.includes('flight voucher')) {
+                templateName = 'Flight Voucher Confirmation SMS';
+                shouldSendSms = true;
+            }
+            
+            if (!shouldSendSms) {
+                console.log('⏭️ [sendAutomaticBookingConfirmationSms] Skipping SMS - not a "Book Flight Date" or "Buy Flight Voucher" booking. flight_type:', flightType);
+                return;
+            }
+
+            // Get phone number from booking
+            const phoneNumber = booking.phone || booking.mobile || '';
+            if (!phoneNumber || !phoneNumber.trim()) {
+                console.warn('⚠️ [sendAutomaticBookingConfirmationSms] No phone number found for booking:', bookingId);
+                return;
+            }
+
+            // Normalize phone number to +44 format
+            const normalizedPhone = normalizeUkPhone(phoneNumber);
+            if (!normalizedPhone || !normalizedPhone.startsWith('+44')) {
+                console.warn('⚠️ [sendAutomaticBookingConfirmationSms] Invalid UK phone number:', phoneNumber, 'normalized:', normalizedPhone);
+                return;
+            }
+
+            console.log('📋 [sendAutomaticBookingConfirmationSms] Booking found:', {
+                id: booking.id,
+                name: booking.name,
+                phone: phoneNumber,
+                normalizedPhone: normalizedPhone,
+                flight_type: booking.flight_type
+            });
+
+            // Fetch SMS template based on booking type
+            const templateQuery = `SELECT * FROM sms_templates WHERE name = ? LIMIT 1`;
+            con.query(templateQuery, [templateName], async (templateErr, templateRows) => {
+                if (templateErr) {
+                    console.error('❌ [sendAutomaticBookingConfirmationSms] Error fetching SMS template:', templateErr);
+                    return;
+                }
+
+                if (!templateRows || templateRows.length === 0) {
+                    console.warn(`⚠️ [sendAutomaticBookingConfirmationSms] SMS template "${templateName}" not found`);
+                    return;
+                }
+
+                const template = templateRows[0];
+                console.log('📝 [sendAutomaticBookingConfirmationSms] Template found:', {
+                    id: template.id,
+                    name: template.name,
+                    messageLength: template.message?.length || 0
+                });
+
+                // Replace placeholders in template message
+                const messageWithPrompts = replaceSmsPrompts(template.message || '', booking);
+                console.log('📝 [sendAutomaticBookingConfirmationSms] Message after placeholder replacement:', messageWithPrompts.substring(0, 100) + '...');
+
+                // Send SMS using existing sendBookingSms logic
+                try {
+                    const client = Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+                    const { TWILIO_FROM_NUMBER, TWILIO_MESSAGING_SERVICE_SID } = process.env;
+                    
+                    const createParams = {
+                        to: normalizedPhone,
+                        body: messageWithPrompts,
+                        statusCallback: process.env.TWILIO_STATUS_CALLBACK_URL || undefined
+                    };
+                    
+                    // Priority order for sender
+                    const hasFromNumber = TWILIO_FROM_NUMBER && typeof TWILIO_FROM_NUMBER === 'string' && TWILIO_FROM_NUMBER.trim() !== '';
+                    const hasMessagingService = TWILIO_MESSAGING_SERVICE_SID && typeof TWILIO_MESSAGING_SERVICE_SID === 'string' && TWILIO_MESSAGING_SERVICE_SID.trim() !== '';
+                    
+                    if (hasMessagingService) {
+                        createParams.messagingServiceSid = TWILIO_MESSAGING_SERVICE_SID.trim();
+                    } else if (!hasFromNumber) {
+                        createParams.from = 'FLYAWAY';
+                    } else {
+                        createParams.from = TWILIO_FROM_NUMBER.trim();
+                    }
+                    
+                    console.log('📱 [sendAutomaticBookingConfirmationSms] Sending SMS via Twilio:', {
+                        to: normalizedPhone,
+                        from: createParams.from || `MessagingService:${createParams.messagingServiceSid}`,
+                        bodyLength: messageWithPrompts.length
+                    });
+                    
+                    const msg = await client.messages.create(createParams);
+                    
+                    // Log SMS to database
+                    ensureSmsLogsSchema(() => {
+                        const sql = `INSERT INTO sms_logs (booking_id, to_number, body, status, sid, sent_at) VALUES (?, ?, ?, ?, ?, NOW())`;
+                        con.query(sql, [bookingId, normalizedPhone, messageWithPrompts, msg.status || 'queued', msg.sid], (logErr) => {
+                            if (logErr) {
+                                console.error('❌ [sendAutomaticBookingConfirmationSms] Error logging SMS:', logErr);
+                            } else {
+                                console.log('✅ [sendAutomaticBookingConfirmationSms] SMS logged to database');
+                            }
+                        });
+                    });
+                    
+                    console.log('✅ [sendAutomaticBookingConfirmationSms] SMS sent successfully:', {
+                        sid: msg.sid,
+                        status: msg.status
+                    });
+                } catch (smsError) {
+                    console.error('❌ [sendAutomaticBookingConfirmationSms] Error sending SMS:', smsError);
+                    // Don't throw - SMS failure shouldn't break booking creation
+                }
+            });
+        });
+    } catch (error) {
+        console.error('❌ [sendAutomaticBookingConfirmationSms] Error in automatic SMS function:', error);
+        // Don't throw error - SMS failure shouldn't break booking creation
+    }
+}
+
+// Automatic SMS sending function for Gift Vouchers (similar to sendAutomaticGiftVoucherConfirmationEmail)
+async function sendAutomaticGiftVoucherConfirmationSms(voucherId, purchasingContactOverride = {}) {
+    console.log('========================================');
+    console.log('📱 [sendAutomaticGiftVoucherConfirmationSms] FUNCTION CALLED');
+    console.log('📱 [sendAutomaticGiftVoucherConfirmationSms] Voucher ID:', voucherId);
+    console.log('📱 [sendAutomaticGiftVoucherConfirmationSms] Timestamp:', new Date().toISOString());
+    console.log('========================================');
+
+    try {
+        // Check Twilio configuration
+        const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = process.env;
+        if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
+            console.warn('⚠️ [sendAutomaticGiftVoucherConfirmationSms] Twilio not configured, skipping SMS');
+            return;
+        }
+
+        // Fetch voucher details from all_vouchers table
+        const voucherQuery = `SELECT * FROM all_vouchers WHERE id = ?`;
+        
+        con.query(voucherQuery, [voucherId], async (err, voucherRows) => {
+            if (err) {
+                console.error('❌ [sendAutomaticGiftVoucherConfirmationSms] Error fetching voucher:', err);
+                return;
+            }
+
+            if (!voucherRows || voucherRows.length === 0) {
+                console.warn('⚠️ [sendAutomaticGiftVoucherConfirmationSms] Voucher not found:', voucherId);
+                return;
+            }
+
+            const voucher = voucherRows[0];
+            
+            // Only send SMS for Gift Vouchers
+            const bookFlight = voucher.book_flight || '';
+            const voucherType = voucher.voucher_type || '';
+            const isGiftVoucher = bookFlight.toLowerCase().includes('gift') || voucherType.toLowerCase().includes('gift');
+            
+            if (!isGiftVoucher) {
+                console.log('⏭️ [sendAutomaticGiftVoucherConfirmationSms] Skipping SMS - not a Gift Voucher. book_flight:', bookFlight, 'voucher_type:', voucherType);
+                return;
+            }
+
+            // Get phone number from purchaser fields (Gift Voucher uses purchaser_phone)
+            const phoneNumber = purchasingContactOverride.purchaser_phone || 
+                               purchasingContactOverride.purchaser_mobile ||
+                               voucher.purchaser_phone || 
+                               voucher.purchaser_mobile || 
+                               voucher.phone || 
+                               voucher.mobile || '';
+            
+            if (!phoneNumber || !phoneNumber.trim()) {
+                console.warn('⚠️ [sendAutomaticGiftVoucherConfirmationSms] No phone number found for voucher:', voucherId);
+                return;
+            }
+
+            // Normalize phone number to +44 format
+            const normalizedPhone = normalizeUkPhone(phoneNumber);
+            if (!normalizedPhone || !normalizedPhone.startsWith('+44')) {
+                console.warn('⚠️ [sendAutomaticGiftVoucherConfirmationSms] Invalid UK phone number:', phoneNumber, 'normalized:', normalizedPhone);
+                return;
+            }
+
+            console.log('📋 [sendAutomaticGiftVoucherConfirmationSms] Voucher found:', {
+                id: voucher.id,
+                name: voucher.name,
+                purchaser_name: voucher.purchaser_name,
+                purchaser_phone: voucher.purchaser_phone,
+                phone: phoneNumber,
+                normalizedPhone: normalizedPhone,
+                book_flight: voucher.book_flight
+            });
+
+            // Fetch "Gift Voucher Confirmation SMS" template
+            const templateQuery = `SELECT * FROM sms_templates WHERE name = 'Gift Voucher Confirmation SMS' LIMIT 1`;
+            con.query(templateQuery, async (templateErr, templateRows) => {
+                if (templateErr) {
+                    console.error('❌ [sendAutomaticGiftVoucherConfirmationSms] Error fetching SMS template:', templateErr);
+                    return;
+                }
+
+                if (!templateRows || templateRows.length === 0) {
+                    console.warn('⚠️ [sendAutomaticGiftVoucherConfirmationSms] SMS template "Gift Voucher Confirmation SMS" not found');
+                    return;
+                }
+
+                const template = templateRows[0];
+                console.log('📝 [sendAutomaticGiftVoucherConfirmationSms] Template found:', {
+                    id: template.id,
+                    name: template.name,
+                    messageLength: template.message?.length || 0
+                });
+
+                // Prepare booking-like object for placeholder replacement
+                // For Gift Vouchers, use purchaser info for placeholders
+                const bookingLikeObject = {
+                    id: voucher.id,
+                    name: voucher.purchaser_name || voucher.name || '',
+                    customer_name: voucher.purchaser_name || voucher.name || '',
+                    email: voucher.purchaser_email || voucher.email || '',
+                    phone: voucher.purchaser_phone || voucher.purchaser_mobile || voucher.phone || voucher.mobile || '',
+                    location: voucher.preferred_location || '',
+                    flight_date: voucher.recipient_gift_date || '',
+                    voucher_code: voucher.voucher_ref || voucher.voucher_code || ''
+                };
+
+                // Replace placeholders in template message
+                const messageWithPrompts = replaceSmsPrompts(template.message || '', bookingLikeObject);
+                console.log('📝 [sendAutomaticGiftVoucherConfirmationSms] Message after placeholder replacement:', messageWithPrompts.substring(0, 100) + '...');
+
+                // Send SMS using existing sendBookingSms logic
+                try {
+                    const client = Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+                    const { TWILIO_FROM_NUMBER, TWILIO_MESSAGING_SERVICE_SID } = process.env;
+                    
+                    const createParams = {
+                        to: normalizedPhone,
+                        body: messageWithPrompts,
+                        statusCallback: process.env.TWILIO_STATUS_CALLBACK_URL || undefined
+                    };
+                    
+                    // Priority order for sender
+                    const hasFromNumber = TWILIO_FROM_NUMBER && typeof TWILIO_FROM_NUMBER === 'string' && TWILIO_FROM_NUMBER.trim() !== '';
+                    const hasMessagingService = TWILIO_MESSAGING_SERVICE_SID && typeof TWILIO_MESSAGING_SERVICE_SID === 'string' && TWILIO_MESSAGING_SERVICE_SID.trim() !== '';
+                    
+                    if (hasMessagingService) {
+                        createParams.messagingServiceSid = TWILIO_MESSAGING_SERVICE_SID.trim();
+                    } else if (!hasFromNumber) {
+                        createParams.from = 'FLYAWAY';
+                    } else {
+                        createParams.from = TWILIO_FROM_NUMBER.trim();
+                    }
+                    
+                    console.log('📱 [sendAutomaticGiftVoucherConfirmationSms] Sending SMS via Twilio:', {
+                        to: normalizedPhone,
+                        from: createParams.from || `MessagingService:${createParams.messagingServiceSid}`,
+                        bodyLength: messageWithPrompts.length
+                    });
+                    
+                    const msg = await client.messages.create(createParams);
+                    
+                    // Log SMS to database (voucher ID instead of booking ID)
+                    ensureSmsLogsSchema(() => {
+                        const sql = `INSERT INTO sms_logs (booking_id, to_number, body, status, sid, sent_at) VALUES (?, ?, ?, ?, ?, NOW())`;
+                        // Use null for booking_id since this is a voucher, not a booking
+                        con.query(sql, [null, normalizedPhone, messageWithPrompts, msg.status || 'queued', msg.sid], (logErr) => {
+                            if (logErr) {
+                                console.error('❌ [sendAutomaticGiftVoucherConfirmationSms] Error logging SMS:', logErr);
+                            } else {
+                                console.log('✅ [sendAutomaticGiftVoucherConfirmationSms] SMS logged to database');
+                            }
+                        });
+                    });
+                    
+                    console.log('✅ [sendAutomaticGiftVoucherConfirmationSms] SMS sent successfully:', {
+                        sid: msg.sid,
+                        status: msg.status
+                    });
+                } catch (smsError) {
+                    console.error('❌ [sendAutomaticGiftVoucherConfirmationSms] Error sending SMS:', smsError);
+                    // Don't throw - SMS failure shouldn't break voucher creation
+                }
+            });
+        });
+    } catch (error) {
+        console.error('❌ [sendAutomaticGiftVoucherConfirmationSms] Error in automatic SMS function:', error);
+        // Don't throw error - SMS failure shouldn't break voucher creation
+    }
+}
 
 // Twilio status callback webhook
 app.post('/api/twilio/sms-status', (req, res) => {
