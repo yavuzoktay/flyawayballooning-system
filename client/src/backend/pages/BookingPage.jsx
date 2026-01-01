@@ -725,8 +725,16 @@ const BookingPage = () => {
         const stripeChargeId = selectedPaymentForRefund.stripe_charge_id || selectedPaymentForRefund.stripe_payment_intent_id;
         
         // Check if this is a synthetic payment (voucher payment entry)
-        if (String(paymentId || '').startsWith('voucher_') || !stripeChargeId) {
+        // Allow refunds for voucher payments if they have voucher_id or voucher_ref
+        if (String(paymentId || '').startsWith('voucher_')) {
             alert('This payment cannot be refunded through this method. Please contact support for voucher refunds.');
+            return;
+        }
+        
+        // For voucher payments, allow refund even without stripe charge ID if voucher_id or voucher_ref exists
+        // For booking payments, require stripe charge ID
+        if (!stripeChargeId && !voucherId && !voucherRef) {
+            alert('This payment cannot be refunded. Missing required payment information.');
             return;
         }
         
@@ -7219,7 +7227,7 @@ setBookingDetail(finalVoucherDetail);
                                                      // Exclude synthetic payments (string IDs like "voucher_123")
                                                      !String(payment.id || '').startsWith('voucher_') && 
                                                      (payment.booking_id || payment.voucher_id || payment.voucher_ref) && 
-                                                     (payment.stripe_charge_id || payment.stripe_payment_intent_id) && (
+                                                     (payment.stripe_charge_id || payment.stripe_payment_intent_id || payment.amount > 0) && (
                                                         <Button 
                                                             size="small" 
                                                             variant="outlined"

@@ -8130,7 +8130,7 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
         } else if (hasRealPaymentAfterSync) {
             console.log('✅ Found real payment history with stripe_charge_id - refund button will be available');
         }
-
+        
         // Method 4: REMOVED - Linked booking payment history was too broad
         // This method was fetching ALL payments from a booking that uses the voucher code,
         // which could include payments from other transactions or multiple payments for the same booking
@@ -10611,6 +10611,34 @@ app.post('/api/createBooking', (req, res) => {
                         });
                     }
                 });
+                
+                // Update voucher's booking_id to point to the new booking
+                // This ensures "Related Booking" information is preserved in Flight Voucher Details
+                if (voucher_code) {
+                    const updateVoucherBookingIdSql = `
+                        UPDATE all_vouchers 
+                        SET booking_id = ? 
+                        WHERE voucher_ref = ? OR voucher_code = ?
+                    `;
+                    
+                    con.query(updateVoucherBookingIdSql, [bookingId, voucher_code, voucher_code], (voucherUpdateErr, voucherUpdateResult) => {
+                        if (voucherUpdateErr) {
+                            // Check if booking_id column exists
+                            if (voucherUpdateErr.code === 'ER_BAD_FIELD_ERROR') {
+                                console.log('ℹ️ booking_id column does not exist in all_vouchers table');
+                            } else {
+                                console.error('❌ Error updating voucher booking_id during rebook:', voucherUpdateErr);
+                            }
+                        } else {
+                            console.log('✅ Voucher booking_id updated successfully:', {
+                                voucher_code: voucher_code,
+                                oldBookingId: rebook_from_booking_id,
+                                newBookingId: bookingId,
+                                affectedRows: voucherUpdateResult.affectedRows
+                            });
+                        }
+                    });
+                }
             }
 
             // If this booking was created via a rebook operation, previous history entries
