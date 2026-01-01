@@ -125,28 +125,48 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
     };
 
     return (
-        <div style={{ padding: "20px", background: "#f9f9f9", borderRadius: "20px" }}>
+        <div style={{ padding: "20px", background: "#f9f9f9", borderRadius: "20px" }} className="date-range-selector-container">
             <h2 style={{ fontFamily: "Gilroy Semi Bold" }}>Date Range Selector</h2>
 
             {/* Date Inputs */}
-            <div>
-                <label>
+            <div style={{
+                display: 'flex',
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: '10px',
+                alignItems: 'center'
+            }} className="date-inputs-container">
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: '1 1 auto', minWidth: '120px' }}>
                     Start Date:
                     <input
                         type="date"
                         value={startDate}
                         onChange={(e) => setStartDate(e.target.value)}
+                        style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
                     />
                 </label>
-                <label style={{ marginLeft: "10px" }}>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: '1 1 auto', minWidth: '120px' }}>
                     End Date:
                     <input
                         type="date"
                         value={endDate}
                         onChange={(e) => setEndDate(e.target.value)}
+                        style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
                     />
                 </label>
-                <button onClick={handleFilter} style={{ marginLeft: "10px", background: "#3274b4", color: "#FFF", border: "1px solid #3274b4", cursor: "pointer" }}>
+                <button 
+                    onClick={handleFilter} 
+                    style={{ 
+                        background: "#3274b4", 
+                        color: "#FFF", 
+                        border: "1px solid #3274b4", 
+                        cursor: "pointer",
+                        padding: '8px 16px',
+                        borderRadius: '4px',
+                        alignSelf: 'flex-end',
+                        whiteSpace: 'nowrap'
+                    }}
+                >
                     Filter
                 </button>
             </div>
@@ -154,46 +174,103 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
             {/* Quick Links */}
             <div style={{ marginTop: "20px" }} className="filter-range-btns">
                 <h3 style={{ fontFamily: "Gilroy Light" }}>Quick Links</h3>
-                <button onClick={quickLinks.allTime} style={{ marginRight: "10px" }}>All Time</button>
-                <button onClick={quickLinks.last12Months} style={{ marginRight: "10px" }}>Last 12 Months</button>
-                <button onClick={quickLinks.quarter1} style={{ marginRight: "10px" }}>Q1</button>
-                <button onClick={quickLinks.quarter2} style={{ marginRight: "10px" }}>Q2</button>
-                <button onClick={quickLinks.quarter3} style={{ marginRight: "10px" }}>Q3</button>
-                <button onClick={quickLinks.quarter4} style={{ marginRight: "10px" }}>Q4</button>
+                <div style={{ 
+                    display: 'flex', 
+                    flexWrap: 'wrap', 
+                    gap: '8px',
+                    marginTop: '10px'
+                }}>
+                    <button onClick={quickLinks.allTime} style={{ 
+                        marginRight: "10px",
+                        padding: '8px 12px',
+                        borderRadius: '4px',
+                        border: '1px solid #ccc',
+                        background: '#fff',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap'
+                    }}>All Time</button>
+                    <button onClick={quickLinks.last12Months} style={{ 
+                        marginRight: "10px",
+                        padding: '8px 12px',
+                        borderRadius: '4px',
+                        border: '1px solid #ccc',
+                        background: '#fff',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap'
+                    }}>Last 12 Months</button>
+                    <button onClick={quickLinks.quarter1} style={{ 
+                        marginRight: "10px",
+                        padding: '8px 12px',
+                        borderRadius: '4px',
+                        border: '1px solid #ccc',
+                        background: '#fff',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap'
+                    }}>Q1</button>
+                    <button onClick={quickLinks.quarter2} style={{ 
+                        marginRight: "10px",
+                        padding: '8px 12px',
+                        borderRadius: '4px',
+                        border: '1px solid #ccc',
+                        background: '#fff',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap'
+                    }}>Q2</button>
+                    <button onClick={quickLinks.quarter3} style={{ 
+                        marginRight: "10px",
+                        padding: '8px 12px',
+                        borderRadius: '4px',
+                        border: '1px solid #ccc',
+                        background: '#fff',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap'
+                    }}>Q3</button>
+                    <button onClick={quickLinks.quarter4} style={{ 
+                        marginRight: "10px",
+                        padding: '8px 12px',
+                        borderRadius: '4px',
+                        border: '1px solid #ccc',
+                        background: '#fff',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap'
+                    }}>Q4</button>
+                </div>
             </div>
 
             {/* Display Filtered Data */}
             <div style={{ marginTop: "20px" }}>
                 <div className="home-filter-data-wrap">
-                    <div style={{ display: 'flex', flexDirection: 'row', width: '100%', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'row', width: '100%', alignItems: 'center' }} className="totals-container">
                         <div className="home-filter-data-table" style={{ flex: 1 }}>
                             <h3 style={{ fontFamily: "Gilroy Light" }}>Totals:</h3>
                             {Object.keys(summary).length > 0 ? (
-                                <table border="1" style={{ width: "100%", background: "#FFF", marginTop: "10px", borderCollapse: "collapse" }}>
-                                    <thead style={{ background: "#3274b4", color: "#FFF" }}>
-                                        <tr>
-                                            <th>Pax Flown</th>
-                                            <th>Flights Completed</th>
-                                            <th>Sales</th>
-                                            <th>Total Liability</th>
-                                            <th>VAT</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td style={{ textAlign: "center", padding: "8px" }}>{summary.totalPax}</td>
-                                            <td style={{ textAlign: "center", padding: "8px" }}>£{summary.completedFlights}</td>
-                                            <td style={{ textAlign: "center", padding: "8px" }}>£{summary.totalSales.toFixed(2)}</td>
-                                            <td style={{ textAlign: "center", padding: "8px" }}>£{summary.totalLiability.toFixed(2)}</td>
-                                            <td style={{ textAlign: "center", padding: "8px" }}>£{summary.totalVAT.toFixed(2)}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                                <div style={{ overflowX: 'auto', width: '100%' }} className="totals-table-wrapper">
+                                    <table border="1" style={{ width: "100%", background: "#FFF", marginTop: "10px", borderCollapse: "collapse", minWidth: '500px' }} className="totals-table">
+                                        <thead style={{ background: "#3274b4", color: "#FFF" }}>
+                                            <tr>
+                                                <th style={{ padding: "8px", fontSize: "14px", whiteSpace: "nowrap" }}>Pax Flown</th>
+                                                <th style={{ padding: "8px", fontSize: "14px", whiteSpace: "nowrap" }}>Flights Completed</th>
+                                                <th style={{ padding: "8px", fontSize: "14px", whiteSpace: "nowrap" }}>Sales</th>
+                                                <th style={{ padding: "8px", fontSize: "14px", whiteSpace: "nowrap" }}>Total Liability</th>
+                                                <th style={{ padding: "8px", fontSize: "14px", whiteSpace: "nowrap" }}>VAT</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td style={{ textAlign: "center", padding: "8px", fontSize: "14px" }}>{summary.totalPax}</td>
+                                                <td style={{ textAlign: "center", padding: "8px", fontSize: "14px" }}>£{summary.completedFlights}</td>
+                                                <td style={{ textAlign: "center", padding: "8px", fontSize: "14px" }}>£{summary.totalSales.toFixed(2)}</td>
+                                                <td style={{ textAlign: "center", padding: "8px", fontSize: "14px" }}>£{summary.totalLiability.toFixed(2)}</td>
+                                                <td style={{ textAlign: "center", padding: "8px", fontSize: "14px" }}>£{summary.totalVAT.toFixed(2)}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             ) : (
                                 <p>No data found for the selected range.</p>
                             )}
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 180, marginLeft: 32, marginTop: 38 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 180, marginLeft: 32, marginTop: 38 }} className="manual-booking-button-container">
                             <a
                                 href="https://flyawayballooning-book.com"
                                 target="_blank"

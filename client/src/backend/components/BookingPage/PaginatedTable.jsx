@@ -368,8 +368,8 @@ const PaginatedTable = ({
                 </div>
             )}
             
-            <div style={{ width: '100%', overflowX: 'auto' }}>
-            <table border="1" style={{ width: "100%", background: "#FFF", marginTop: "10px", borderCollapse: "collapse", tableLayout: "fixed" }}>
+            <div style={{ width: '100%', overflowX: 'auto' }} className="paginated-table-wrapper">
+            <table border="1" style={{ width: "100%", background: "#FFF", marginTop: "10px", borderCollapse: "collapse", tableLayout: "fixed" }} className="booking-table">
                 <colgroup>
                     {selectable && <col style={{ width: '40px', minWidth: '40px', maxWidth: '40px' }} />}
                     {columns.map((col) => {
@@ -743,7 +743,7 @@ const PaginatedTable = ({
             </div>
 
             {/* Loading indicator and results info */}
-            <div style={{ marginTop: "20px", textAlign: "center", padding: "10px" }}>
+            <div style={{ marginTop: "20px", textAlign: "center", padding: "10px" }} className="pagination-info">
                 <div style={{ color: "#666", marginBottom: "10px" }}>
                     Showing {visibleCount} of {data.length} results
                 </div>

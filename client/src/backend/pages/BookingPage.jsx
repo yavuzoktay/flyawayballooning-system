@@ -1,7 +1,7 @@
 import axios from "axios";
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import PaginatedTable from "../components/BookingPage/PaginatedTable";
-import { Container, FormControl, InputLabel, MenuItem, OutlinedInput, Select, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Grid, Typography, Box, Divider, IconButton, Table, TableHead, TableRow, TableCell, TableBody, FormControlLabel, Switch, FormGroup, Checkbox, Chip, InputAdornment } from "@mui/material";
+import { Container, FormControl, InputLabel, MenuItem, OutlinedInput, Select, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Grid, Typography, Box, Divider, IconButton, Table, TableHead, TableRow, TableCell, TableBody, TableContainer, FormControlLabel, Switch, FormGroup, Checkbox, Chip, InputAdornment } from "@mui/material";
 import dayjs from 'dayjs';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -4498,9 +4498,9 @@ setBookingDetail(finalVoucherDetail);
                     </h2>
                     <hr />
                 </div>
-                <div style={{ padding: "50px", background: "#f9f9f9", borderRadius: "20px" }}>
+                <div style={{ padding: "50px", background: "#f9f9f9", borderRadius: "20px" }} className="booking-page-content">
                     {/* Tabs */}
-                    <div style={{ marginBottom: "20px" }}>
+                    <div style={{ marginBottom: "20px" }} className="booking-page-tabs">
                         <button
                             onClick={() => handleTabChange("bookings")}
                             style={{
@@ -6684,9 +6684,10 @@ setBookingDetail(finalVoucherDetail);
                                             <Divider sx={{ my: 2 }} />
                                             {/* HISTORY SECTION - Only for bookings, not vouchers */}
                                             {activeTab !== 'vouchers' && (
-                                            <Box sx={{ background: '#e0e0e0', borderRadius: 2, p: 2, mt: 2, mb: 2 }}>
+                                            <Box sx={{ background: '#e0e0e0', borderRadius: 2, p: 2, mt: 2, mb: 2 }} className="booking-history-section">
                                                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>History</Typography>
-                                                <Table>
+                                                <TableContainer component={Box} className="booking-history-table-container">
+                                                <Table className="booking-history-table">
                                                     <TableHead>
                                                         <TableRow>
                                                             <TableCell>Booking Date</TableCell>
@@ -6711,6 +6712,7 @@ setBookingDetail(finalVoucherDetail);
                                                         )}
                                                     </TableBody>
                                                 </Table>
+                                                </TableContainer>
                                             </Box>
                                             )}
                                         </Box>
@@ -7395,7 +7397,7 @@ setBookingDetail(finalVoucherDetail);
                         fontWeight: 700,
                         fontSize: 20
                     }}>
-                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                        <Typography component="span" sx={{ fontWeight: 700 }}>
                             Refund Credit Card Charge
                         </Typography>
                         <IconButton

@@ -355,7 +355,7 @@ const ActivityList = ({ activity }) => {
 
     return (
         <div className="activity-list-wrap">
-            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 16 }} className="activity-create-button-wrap">
                 <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpen} sx={{ backgroundColor: '#1976d2', color: 'white' }}>
                     CREATE
                 </Button>
@@ -708,8 +708,8 @@ const ActivityList = ({ activity }) => {
             </Dialog>
 
             {/* Activity Table */}
-            <TableContainer component={Paper} style={{ marginTop: "0px" }}>
-                <Table>
+            <TableContainer component={Paper} style={{ marginTop: "0px" }} className="activity-table-container">
+                <Table className="activity-table">
                     <TableHead>
                         <TableRow>
                             <TableCell>S. No.</TableCell>
