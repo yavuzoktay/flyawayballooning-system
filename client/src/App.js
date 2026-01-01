@@ -11,6 +11,7 @@ import Activity from './backend/pages/Activity';
 import SpecificActivity from './backend/pages/SpecificActivity';
 import ActivityAvailabilitiesPage from './backend/components/ActivityPage/ActivityAvailabilitiesPage';
 import Settings from './backend/pages/Settings';
+import Logs from './backend/pages/Logs';
 import Login from './backend/pages/Login';
 import CustomerPortal from './backend/pages/CustomerPortal';
 
@@ -53,6 +54,7 @@ function App() {
                 <Route path="/activity" element={<Activity />} />
                 <Route path="/specificActivity/:id" element={<SpecificActivity />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/logs" element={<Logs />} />
                 <Route path="/activity/:id/availabilities" element={<ActivityAvailabilitiesPage />} />
             </Route>
           </Routes>

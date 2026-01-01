@@ -127,6 +127,7 @@ const Header = () => {
     { label: 'Manifest', path: '/manifest' },
     { label: 'Activity', path: '/activity' },
     { label: 'Settings', path: '/settings' },
+    { label: 'Logs', path: '/logs' },
   ];
 
   return (
