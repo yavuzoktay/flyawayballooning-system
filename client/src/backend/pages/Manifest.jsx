@@ -1183,49 +1183,109 @@ const Manifest = () => {
     const [availabilities, setAvailabilities] = useState([]);
     const [locationToActivityId, setLocationToActivityId] = useState({});
     const [nameToActivityId, setNameToActivityId] = useState({});
+    const activitiesCacheRef = React.useRef(null);
+    const availabilitiesCacheRef = React.useRef({}); // Cache by date: { '2026-03-04': [...availabilities] }
+    const lastFetchDateRef = React.useRef(null);
     
-    // Fetch availabilities for the selected date and location
-    const fetchAllAvailabilities = async () => {
+    // Fetch activities only once (cache them)
+    const fetchActivities = async () => {
+        if (activitiesCacheRef.current) {
+            // Use cached activities
+            const activities = activitiesCacheRef.current;
+            const map = activities.reduce((acc, a) => { if (a.location) acc[a.location] = a.id; return acc; }, {});
+            setLocationToActivityId(map);
+            const nameMap = activities.reduce((acc, a) => { if (a.activity_name) acc[a.activity_name] = a.id; return acc; }, {});
+            setNameToActivityId(nameMap);
+            return activities;
+        }
+        
         try {
-            // Use activitiesForRebook to ensure location is provided
             const activitiesRes = await axios.get('/api/activitiesForRebook');
             if (activitiesRes.data.success && Array.isArray(activitiesRes.data.data)) {
                 const activities = activitiesRes.data.data;
+                activitiesCacheRef.current = activities; // Cache activities
                 const map = activities.reduce((acc, a) => { if (a.location) acc[a.location] = a.id; return acc; }, {});
                 setLocationToActivityId(map);
                 const nameMap = activities.reduce((acc, a) => { if (a.activity_name) acc[a.activity_name] = a.id; return acc; }, {});
                 setNameToActivityId(nameMap);
-
-                let allAvailabilities = [];
-                for (const act of activities) {
-                    try {
-                        const availRes = await axios.get(`/api/activity/${act.id}/availabilities`);
-                        if (availRes.data.success && Array.isArray(availRes.data.data)) {
-                            const withMeta = availRes.data.data.map(avail => ({
-                                ...avail,
-                                activity_id: act.id,
-                                location: act.location,
-                                activity_name: act.activity_name,
-                                flight_type: act.flight_type,
-                                capacity: avail.capacity
-                            }));
-                            allAvailabilities = allAvailabilities.concat(withMeta);
-                        }
-                    } catch (error) {
-                        console.error(`Error fetching availabilities for activity ${act.id}:`, error);
-                    }
-                }
-                console.log('All availabilities loaded:', allAvailabilities);
-                setAvailabilities(allAvailabilities);
+                return activities;
             }
         } catch (error) {
             console.error('Error fetching activities:', error);
         }
+        return [];
     };
     
+    // Fetch availabilities ONLY for the selected date
+    const fetchAvailabilitiesForDate = async (date) => {
+        if (!date) return;
+        
+        // Check cache first
+        if (availabilitiesCacheRef.current[date]) {
+            console.log('Using cached availabilities for date:', date);
+            setAvailabilities(availabilitiesCacheRef.current[date]);
+            return;
+        }
+        
+        // Don't refetch if we just fetched this date
+        if (lastFetchDateRef.current === date) {
+            return;
+        }
+        
+        lastFetchDateRef.current = date;
+        
+        try {
+            const activities = await fetchActivities();
+            if (activities.length === 0) return;
+            
+            let allAvailabilities = [];
+            // Only fetch availabilities for the selected date
+            for (const act of activities) {
+                try {
+                    // Fetch availabilities with date filter if API supports it, otherwise filter client-side
+                    const availRes = await axios.get(`/api/activity/${act.id}/availabilities`, {
+                        params: { date: date } // Pass date as query parameter
+                    });
+                    if (availRes.data.success && Array.isArray(availRes.data.data)) {
+                        // Filter by date on client side if API doesn't support date filter
+                        const filteredAvailabilities = availRes.data.data.filter(avail => {
+                            const availDate = avail.date ? dayjs(avail.date).format('YYYY-MM-DD') : null;
+                            return availDate === date;
+                        });
+                        
+                        const withMeta = filteredAvailabilities.map(avail => ({
+                            ...avail,
+                            activity_id: act.id,
+                            location: act.location,
+                            activity_name: act.activity_name,
+                            flight_type: act.flight_type,
+                            capacity: avail.capacity
+                        }));
+                        allAvailabilities = allAvailabilities.concat(withMeta);
+                    }
+                } catch (error) {
+                    console.error(`Error fetching availabilities for activity ${act.id}:`, error);
+                }
+            }
+            console.log(`Availabilities loaded for date ${date}:`, allAvailabilities.length, 'slots');
+            availabilitiesCacheRef.current[date] = allAvailabilities; // Cache by date
+            setAvailabilities(allAvailabilities);
+        } catch (error) {
+            console.error('Error fetching availabilities:', error);
+        }
+    };
+    
+    // Fetch activities only once on mount
     useEffect(() => {
-        fetchAllAvailabilities();
-    }, [flights, selectedDate, activity]);
+        fetchActivities();
+    }, []); // Only on mount
+    
+    // Fetch availabilities only when selectedDate changes
+    useEffect(() => {
+        if (selectedDate) {
+            fetchAvailabilitiesForDate(selectedDate);
+        }
+    }, [selectedDate]); // Only when selectedDate changes
 
     // Hatalı veri durumunu kontrol et
     useEffect(() => {
@@ -1249,13 +1309,24 @@ const Manifest = () => {
                     .reduce((sum, p) => sum + parseFloat(p.weight || 0), 0),
             }));
             // Normalize activity id for each flight to ensure crew assignment payload is valid
-            const normalized = combinedFlights.map(f => ({
-                ...f,
-                activity_id: f.activity_id ?? f.activityId ?? f.activityID ?? (f.activity && (f.activity.id ?? f.activity.activity_id)) ?? null
-            }));
+            // If activity_id is null, try to find it from location using locationToActivityId map
+            const normalized = combinedFlights.map(f => {
+                let activityId = f.activity_id ?? f.activityId ?? f.activityID ?? (f.activity && (f.activity.id ?? f.activity.activity_id)) ?? null;
+                
+                // If activity_id is still null and we have location, try to find it from locationToActivityId map
+                if (!activityId && f.location && locationToActivityId[f.location]) {
+                    activityId = locationToActivityId[f.location];
+                    console.log(`Found activity_id ${activityId} for location ${f.location} (booking ${f.id})`);
+                }
+                
+                return {
+                    ...f,
+                    activity_id: activityId
+                };
+            });
             setFlights(normalized);
         }
-    }, [booking, passenger, bookingLoading, passengerLoading]);
+    }, [booking, passenger, bookingLoading, passengerLoading, locationToActivityId]);
 
     const handleDateChange = (e) => {
         const newDate = e.target.value;
@@ -1521,87 +1592,105 @@ const Manifest = () => {
     };
     const historyRows = buildDisplayedHistoryRows();
 
-    // Function to automatically update flight status based on passenger count
+    // Debounce timer for auto-update status
+    const autoUpdateStatusTimersRef = React.useRef({});
+    
+    // Function to automatically update flight status based on passenger count (with debounce)
     const autoUpdateFlightStatus = async (flight) => {
         if (!flight) return;
         if (flight.status === 'Cancelled') {
             console.log('autoUpdateFlightStatus - Skipping cancelled flight', flight.id);
             return;
         }
-        try {
-            // Calculate total passengers for this flight group
-            const totalPassengers = flights.filter(f => 
-                f.flight_date === flight.flight_date && 
-                f.location === flight.location && 
-                f.flight_type === flight.flight_type &&
-                f.time_slot === flight.time_slot
-            ).reduce((sum, f) => sum + (f.passengers ? f.passengers.length : 0), 0);
-            
-            // Get capacity from activity
-            const maxCapacity = activity.find((a) => a.id == flight.activity_id)?.capacity || 0;
-            
-            console.log(`autoUpdateFlightStatus - Flight ${flight.id}: passengers ${totalPassengers}/${maxCapacity}, current status: ${getFlightStatus(flight)}`);
-            
-            // Eğer total passengers capacity'yi geçiyorsa, otomatik olarak flight'ı kapat
-            if (totalPassengers >= maxCapacity && maxCapacity > 0) {
-                const currentStatus = getFlightStatus(flight);
-                if (currentStatus === "Open") {
-                    console.log(`Auto-closing flight: ${flight.id} - passengers: ${totalPassengers}/${maxCapacity}`);
-                    
-                    // Update the flight status to Closed
-                    await axios.patch('/api/updateManifestStatus', {
-                        booking_id: flight.id,
-                        old_status: 'Open',
-                        new_status: 'Closed',
-                        flight_date: flight.flight_date,
-                        location: flight.location,
-                        total_pax: totalPassengers
-                    });
-                    
-                    // Update local state
-                    setFlights(prevFlights => prevFlights.map(f =>
-                        f.flight_date === flight.flight_date && 
-                        f.location === flight.location && 
-                        f.flight_type === flight.flight_type &&
-                        f.time_slot === flight.time_slot
-                            ? { ...f, manual_status_override: 0 } // 0 = Closed
-                            : f
-                    ));
-                    
-                    console.log(`Flight ${flight.id} status updated to Closed`);
-                }
-            } else if (totalPassengers < maxCapacity && maxCapacity > 0) {
-                // Eğer total passengers capacity'nin altındaysa ve status "Closed" ise, "Open" yapılabilir
-                const currentStatus = getFlightStatus(flight);
-                if (currentStatus === "Closed" && flight.manual_status_override === 0) {
-                    console.log(`Auto-opening flight: ${flight.id} - passengers: ${totalPassengers}/${maxCapacity}`);
-                    
-                    // Update the flight status to Open
-                    await axios.patch('/api/updateManifestStatus', {
-                        booking_id: flight.id,
-                        old_status: 'Closed',
-                        new_status: 'Open',
-                        flight_date: flight.flight_date,
-                        location: flight.location,
-                        total_pax: totalPassengers
-                    });
-                    
-                    // Update local state
-                    setFlights(prevFlights => prevFlights.map(f =>
-                        f.flight_date === flight.flight_date && 
-                        f.location === flight.location && 
-                        f.flight_type === flight.flight_type &&
-                        f.time_slot === flight.time_slot
-                            ? { ...f, manual_status_override: 1 } // 1 = Open
-                            : f
-                    ));
-                    
-                    console.log(`Flight ${flight.id} status updated to Open`);
-                }
-            }
-        } catch (error) {
-            console.error('Error auto-updating flight status:', error);
+        
+        // Create a unique key for this flight group
+        const flightKey = `${flight.flight_date}_${flight.location}_${flight.flight_type}_${flight.time_slot}`;
+        
+        // Clear existing timer for this flight group
+        if (autoUpdateStatusTimersRef.current[flightKey]) {
+            clearTimeout(autoUpdateStatusTimersRef.current[flightKey]);
         }
+        
+        // Debounce: wait 500ms before actually updating
+        autoUpdateStatusTimersRef.current[flightKey] = setTimeout(async () => {
+            try {
+                // Calculate total passengers for this flight group
+                const totalPassengers = flights.filter(f => 
+                    f.flight_date === flight.flight_date && 
+                    f.location === flight.location && 
+                    f.flight_type === flight.flight_type &&
+                    f.time_slot === flight.time_slot
+                ).reduce((sum, f) => sum + (f.passengers ? f.passengers.length : 0), 0);
+                
+                // Get capacity from activity
+                const maxCapacity = activity.find((a) => a.id == flight.activity_id)?.capacity || 0;
+                
+                console.log(`autoUpdateFlightStatus - Flight ${flight.id}: passengers ${totalPassengers}/${maxCapacity}, current status: ${getFlightStatus(flight)}`);
+                
+                // Eğer total passengers capacity'yi geçiyorsa, otomatik olarak flight'ı kapat
+                if (totalPassengers >= maxCapacity && maxCapacity > 0) {
+                    const currentStatus = getFlightStatus(flight);
+                    if (currentStatus === "Open") {
+                        console.log(`Auto-closing flight: ${flight.id} - passengers: ${totalPassengers}/${maxCapacity}`);
+                        
+                        // Update the flight status to Closed
+                        await axios.patch('/api/updateManifestStatus', {
+                            booking_id: flight.id,
+                            old_status: 'Open',
+                            new_status: 'Closed',
+                            flight_date: flight.flight_date,
+                            location: flight.location,
+                            total_pax: totalPassengers
+                        });
+                        
+                        // Update local state
+                        setFlights(prevFlights => prevFlights.map(f =>
+                            f.flight_date === flight.flight_date && 
+                            f.location === flight.location && 
+                            f.flight_type === flight.flight_type &&
+                            f.time_slot === flight.time_slot
+                                ? { ...f, manual_status_override: 0 } // 0 = Closed
+                                : f
+                        ));
+                        
+                        console.log(`Flight ${flight.id} status updated to Closed`);
+                    }
+                } else if (totalPassengers < maxCapacity && maxCapacity > 0) {
+                    // Eğer total passengers capacity'nin altındaysa ve status "Closed" ise, "Open" yapılabilir
+                    const currentStatus = getFlightStatus(flight);
+                    if (currentStatus === "Closed" && flight.manual_status_override === 0) {
+                        console.log(`Auto-opening flight: ${flight.id} - passengers: ${totalPassengers}/${maxCapacity}`);
+                        
+                        // Update the flight status to Open
+                        await axios.patch('/api/updateManifestStatus', {
+                            booking_id: flight.id,
+                            old_status: 'Closed',
+                            new_status: 'Open',
+                            flight_date: flight.flight_date,
+                            location: flight.location,
+                            total_pax: totalPassengers
+                        });
+                        
+                        // Update local state
+                        setFlights(prevFlights => prevFlights.map(f =>
+                            f.flight_date === flight.flight_date && 
+                            f.location === flight.location && 
+                            f.flight_type === flight.flight_type &&
+                            f.time_slot === flight.time_slot
+                                ? { ...f, manual_status_override: 1 } // 1 = Open
+                                : f
+                        ));
+                        
+                        console.log(`Flight ${flight.id} status updated to Open`);
+                    }
+                }
+            } catch (error) {
+                console.error('Error auto-updating flight status:', error);
+            } finally {
+                // Clean up timer
+                delete autoUpdateStatusTimersRef.current[flightKey];
+            }
+        }, 500); // 500ms debounce
     };
 
     const toggleFlightStatus = async (flightId) => {
@@ -2404,8 +2493,12 @@ const Manifest = () => {
                 await pessangerHook.refetch();
             }
             
-            // Refresh availabilities
-            await fetchAllAvailabilities();
+            // Refresh availabilities for selected date only
+            if (selectedDate) {
+                // Clear cache for this date to force refresh
+                delete availabilitiesCacheRef.current[selectedDate];
+                await fetchAvailabilitiesForDate(selectedDate);
+            }
             
             // Force re-render by updating flights state
             setTimeout(() => {
@@ -2757,49 +2850,42 @@ const Manifest = () => {
       });
     }, [bookingModalPax]);
 
-    // Auto-update flight statuses when flights data changes
+    // Auto-update flight statuses when flights data changes (only for selected date)
     useEffect(() => {
-        if (flights.length > 0 && activity.length > 0) {
-            console.log('Flights or activity changed, checking for auto-status updates');
+        if (flights.length > 0 && activity.length > 0 && selectedDate) {
+            // Only process flights for the selected date
+            const flightsForDate = flights.filter(flight => 
+                flight.flight_date && flight.flight_date.substring(0, 10) === selectedDate
+            );
+            
+            if (flightsForDate.length === 0) return;
+            
+            console.log(`Auto-status updates for date ${selectedDate}: ${flightsForDate.length} flights`);
+            
             // Group flights by normalized location, type, and time
             const flightGroups = {};
-            flights.forEach(flight => {
+            flightsForDate.forEach(flight => {
                 const loc = normalizeText(flight.location);
                 const type = normalizeText(flight.flight_type);
                 const time = normalizeTime(flight);
                 const key = `${loc}||${type}||${time}`;
                 (flightGroups[key] = flightGroups[key] || []).push(flight);
             });
+            
+            // Only update status for unique flight groups (avoid duplicate calls)
+            const processedGroups = new Set();
             Object.values(flightGroups).forEach(groupFlights => {
                 if (groupFlights.length > 0) {
                     const firstFlight = groupFlights[0];
-                    autoUpdateFlightStatus(firstFlight);
+                    const groupKey = `${firstFlight.flight_date}_${firstFlight.location}_${firstFlight.flight_type}_${firstFlight.time_slot}`;
+                    if (!processedGroups.has(groupKey)) {
+                        processedGroups.add(groupKey);
+                        autoUpdateFlightStatus(firstFlight);
+                    }
                 }
             });
         }
-    }, [flights, activity]);
-
-    // Auto-update flight statuses when availabilities change
-    useEffect(() => {
-        if (availabilities.length > 0 && flights.length > 0) {
-            console.log('Availabilities changed, checking for auto-status updates');
-            // Group flights by normalized location, type, and time
-            const flightGroups = {};
-            flights.forEach(flight => {
-                const loc = normalizeText(flight.location);
-                const type = normalizeText(flight.flight_type);
-                const time = normalizeTime(flight);
-                const key = `${loc}||${type}||${time}`;
-                (flightGroups[key] = flightGroups[key] || []).push(flight);
-            });
-            Object.values(flightGroups).forEach(groupFlights => {
-                if (groupFlights.length > 0) {
-                    const firstFlight = groupFlights[0];
-                    autoUpdateFlightStatus(firstFlight);
-                }
-            });
-        }
-    }, [availabilities, flights]);
+    }, [flights, activity, selectedDate]); // Added selectedDate dependency
 
     useEffect(() => {
       const normalizeType = (t) => t.replace(' Flight', '').trim().toLowerCase();
@@ -3122,25 +3208,56 @@ const Manifest = () => {
             return;
         }
         
-        console.log('Saving crew assignment:', { activityId, date, time, crewId });
+        // Validate and normalize activityId
+        if (activityId === null || activityId === undefined) {
+            console.error('Invalid activityId for crew assignment:', activityId);
+            alert('Error: Activity ID is missing. Please refresh the page and try again.');
+            return;
+        }
+        
+        // Normalize activityId to integer
+        const normalizedActivityId = typeof activityId === 'string' 
+            ? (activityId.trim() === '' ? null : parseInt(activityId, 10))
+            : activityId;
+        
+        // Check if normalizedActivityId is valid
+        if (normalizedActivityId === null || normalizedActivityId === undefined || isNaN(normalizedActivityId)) {
+            console.error('Invalid normalized activityId for crew assignment:', normalizedActivityId, 'original:', activityId);
+            alert('Error: Invalid Activity ID. Please refresh the page and try again.');
+            return;
+        }
+        
+        // Convert empty string or "0" to null, and convert string ID to integer
+        const normalizedCrewId = (crewId === '' || crewId === '0' || crewId === null || crewId === undefined) 
+            ? null 
+            : (typeof crewId === 'string' ? parseInt(crewId, 10) : crewId);
+        
+        // If crewId is provided, validate it's a number
+        if (normalizedCrewId !== null && (isNaN(normalizedCrewId) || normalizedCrewId <= 0)) {
+            console.error('Invalid crewId for crew assignment:', normalizedCrewId, 'original:', crewId);
+            alert('Error: Invalid Crew ID. Please select a valid crew member.');
+            return;
+        }
+        
+        console.log('Saving crew assignment:', { activityId: normalizedActivityId, date, time, crewId: normalizedCrewId });
         
         try {
-            console.log('Saving crew assignment for:', { activityId, date, time, crewId });
+            console.log('Saving crew assignment for:', { activityId: normalizedActivityId, date, time, crewId: normalizedCrewId });
             
             const response = await axios.post('/api/crew-assignment', { 
-                activity_id: activityId, 
+                activity_id: normalizedActivityId, 
                 date, 
                 time, 
-                crew_id: crewId 
+                crew_id: normalizedCrewId 
             });
             console.log('Crew assignment saved:', response.data);
             
-            const slotKeyValue = slotKey(activityId, date, time.substring(0,5));
-            console.log('Updating local state with key:', slotKeyValue, 'value:', crewId);
+            const slotKeyValue = slotKey(normalizedActivityId, date, time.substring(0,5));
+            console.log('Updating local state with key:', slotKeyValue, 'value:', normalizedCrewId);
             
             // Update local state immediately for instant feedback
             setCrewAssignmentsBySlot(prev => {
-                const updated = { ...prev, [slotKeyValue]: crewId };
+                const updated = { ...prev, [slotKeyValue]: normalizedCrewId };
                 console.log('Updated crew assignments:', updated);
                 return updated;
             });
@@ -3148,15 +3265,16 @@ const Manifest = () => {
             // Show success message
             console.log('Crew assignment saved successfully!');
             
-            // Get crew member details and send email
+            // Get crew member details and send email (only if crew is assigned)
             let emailSent = false;
             let emailErrorMsg = '';
-            try {
-                console.log('📧 Starting email send process for crew ID:', crewId);
-                console.log('📧 Available email templates:', emailTemplates.map(t => t.name));
-                
-                // Fetch crew member details
-                const crewResponse = await axios.get(`/api/crew/${crewId}`);
+            if (normalizedCrewId) {
+                try {
+                    console.log('📧 Starting email send process for crew ID:', normalizedCrewId);
+                    console.log('📧 Available email templates:', emailTemplates.map(t => t.name));
+                    
+                    // Fetch crew member details
+                    const crewResponse = await axios.get(`/api/crew/${normalizedCrewId}`);
                 const crewMember = crewResponse.data?.data;
                 console.log('📧 Crew member data:', { 
                     id: crewMember?.id, 
@@ -3238,15 +3356,16 @@ const Manifest = () => {
                     emailErrorMsg = crewMember ? 'Crew member email not found' : 'Crew member not found';
                     console.warn('⚠️', emailErrorMsg);
                 }
-            } catch (emailError) {
-                emailErrorMsg = emailError.response?.data?.message || emailError.message || 'Unknown error';
-                console.error('❌ Error sending crew management email:', emailError);
-                console.error('Error details:', {
-                    message: emailError.message,
-                    response: emailError.response?.data,
-                    status: emailError.response?.status
-                });
-                // Don't fail the crew assignment if email fails
+                } catch (emailError) {
+                    emailErrorMsg = emailError.response?.data?.message || emailError.message || 'Unknown error';
+                    console.error('❌ Error sending crew management email:', emailError);
+                    console.error('Error details:', {
+                        message: emailError.message,
+                        response: emailError.response?.data,
+                        status: emailError.response?.status
+                    });
+                    // Don't fail the crew assignment if email fails
+                }
             }
             
             // Also refresh from server to ensure consistency
@@ -3278,25 +3397,56 @@ const Manifest = () => {
             return;
         }
         
-        console.log('Saving pilot assignment:', { activityId, date, time, pilotId });
+        // Validate and normalize activityId
+        if (activityId === null || activityId === undefined) {
+            console.error('Invalid activityId for pilot assignment:', activityId);
+            alert('Error: Activity ID is missing. Please refresh the page and try again.');
+            return;
+        }
+        
+        // Normalize activityId to integer
+        const normalizedActivityId = typeof activityId === 'string' 
+            ? (activityId.trim() === '' ? null : parseInt(activityId, 10))
+            : activityId;
+        
+        // Check if normalizedActivityId is valid
+        if (normalizedActivityId === null || normalizedActivityId === undefined || isNaN(normalizedActivityId)) {
+            console.error('Invalid normalized activityId for pilot assignment:', normalizedActivityId, 'original:', activityId);
+            alert('Error: Invalid Activity ID. Please refresh the page and try again.');
+            return;
+        }
+        
+        // Convert empty string or "0" to null, and convert string ID to integer
+        const normalizedPilotId = (pilotId === '' || pilotId === '0' || pilotId === null || pilotId === undefined) 
+            ? null 
+            : (typeof pilotId === 'string' ? parseInt(pilotId, 10) : pilotId);
+        
+        // If pilotId is provided, validate it's a number
+        if (normalizedPilotId !== null && (isNaN(normalizedPilotId) || normalizedPilotId <= 0)) {
+            console.error('Invalid pilotId for pilot assignment:', normalizedPilotId, 'original:', pilotId);
+            alert('Error: Invalid Pilot ID. Please select a valid pilot.');
+            return;
+        }
+        
+        console.log('Saving pilot assignment:', { activityId: normalizedActivityId, date, time, pilotId: normalizedPilotId });
         
         try {
-            console.log('Saving pilot assignment for:', { activityId, date, time, pilotId });
+            console.log('Saving pilot assignment for:', { activityId: normalizedActivityId, date, time, pilotId: normalizedPilotId });
             
             const response = await axios.post('/api/pilot-assignment', { 
-                activity_id: activityId, 
+                activity_id: normalizedActivityId, 
                 date, 
                 time, 
-                pilot_id: pilotId 
+                pilot_id: normalizedPilotId 
             });
             console.log('Pilot assignment saved:', response.data);
             
-            const slotKeyValue = slotKey(activityId, date, time.substring(0,5));
-            console.log('Updating local state with key:', slotKeyValue, 'value:', pilotId);
+            const slotKeyValue = slotKey(normalizedActivityId, date, time.substring(0,5));
+            console.log('Updating local state with key:', slotKeyValue, 'value:', normalizedPilotId);
             
             // Update local state immediately for instant feedback
             setPilotAssignmentsBySlot(prev => {
-                const updated = { ...prev, [slotKeyValue]: pilotId };
+                const updated = { ...prev, [slotKeyValue]: normalizedPilotId };
                 console.log('Updated pilot assignments:', updated);
                 return updated;
             });
@@ -3805,7 +3955,19 @@ const Manifest = () => {
                                     activity_id: activityIdForSlot, 
                                     flight_date: first.flight_date,
                                     date_part: (first.flight_date||'').substring(0,10),
-                                    time_part: (first.flight_date||'').substring(11,16)
+                                    time_part: (first.flight_date||'').substring(11,16),
+                                    fullFlight: first
+                                });
+                            }
+                            
+                            // Check if activityId is valid
+                            const isActivityIdValid = activityIdForSlot !== null && activityIdForSlot !== undefined && !isNaN(activityIdForSlot);
+                            
+                            if (!isActivityIdValid) {
+                                console.error('Invalid activityId for flight:', { 
+                                    flightId: first.id, 
+                                    activityId: activityIdForSlot,
+                                    flight: first 
                                 });
                             }
                             
@@ -3815,9 +3977,15 @@ const Manifest = () => {
                                         native
                                         value={currentCrewId || ''}
                                         onChange={(e) => handleCrewChange(activityIdForSlot, first.flight_date, e.target.value)}
-                                        sx={{ minWidth: 200, mr: 1, background: '#fff' }}
+                                        disabled={!isActivityIdValid}
+                                        sx={{ 
+                                            minWidth: 200, 
+                                            mr: 1, 
+                                            background: isActivityIdValid ? '#fff' : '#f3f4f6',
+                                            opacity: isActivityIdValid ? 1 : 0.6
+                                        }}
                                     >
-                                        <option value="">Crew Selection</option>
+                                        <option value="">{isActivityIdValid ? 'Crew Selection' : 'Activity ID Missing'}</option>
                                         {crewList.map(c => (
                                             <option key={c.id} value={c.id}>{`${c.first_name} ${c.last_name}`}</option>
                                         ))}
@@ -3858,15 +4026,32 @@ const Manifest = () => {
                             const slotKeyValue = slotKey(activityIdForSlot, (first.flight_date||'').substring(0,10), (first.flight_date||'').substring(11,16));
                             const currentPilotId = pilotAssignmentsBySlot[slotKeyValue];
                             
+                            // Check if activityId is valid
+                            const isActivityIdValid = activityIdForSlot !== null && activityIdForSlot !== undefined && !isNaN(activityIdForSlot);
+                            
+                            if (!isActivityIdValid) {
+                                console.error('Invalid activityId for pilot flight:', { 
+                                    flightId: first.id, 
+                                    activityId: activityIdForSlot,
+                                    flight: first 
+                                });
+                            }
+                            
                             return (
                                 <>
                                     <Select
                                         native
                                         value={currentPilotId || ''}
                                         onChange={(e) => handlePilotChange(activityIdForSlot, first.flight_date, e.target.value)}
-                                        sx={{ minWidth: 200, mr: 1, background: '#fff' }}
+                                        disabled={!isActivityIdValid}
+                                        sx={{ 
+                                            minWidth: 200, 
+                                            mr: 1, 
+                                            background: isActivityIdValid ? '#fff' : '#f3f4f6',
+                                            opacity: isActivityIdValid ? 1 : 0.6
+                                        }}
                                     >
-                                        <option value="">Pilot Selection</option>
+                                        <option value="">{isActivityIdValid ? 'Pilot Selection' : 'Activity ID Missing'}</option>
                                         {pilotList.map(p => (
                                             <option key={p.id} value={p.id}>{`${p.first_name} ${p.last_name}`}</option>
                                         ))}

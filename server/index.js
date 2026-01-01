@@ -23216,16 +23216,49 @@ app.get('/api/crew-assignments', (req, res) => {
 // Upsert crew assignment for a slot
 app.post('/api/crew-assignment', (req, res) => {
     const { activity_id, date, time, crew_id } = req.body;
-    if (!activity_id || !date || !time) {
-        return res.status(400).json({ success: false, message: 'activity_id, date, time are required' });
+    
+    // Validate required fields
+    if (activity_id === null || activity_id === undefined || activity_id === '') {
+        return res.status(400).json({ success: false, message: 'activity_id is required' });
+    }
+    if (!date || !time) {
+        return res.status(400).json({ success: false, message: 'date and time are required' });
     }
 
-    console.log('Saving crew assignment:', { activity_id, date, time, crew_id });
+    // Normalize activity_id to integer
+    const normalizedActivityId = typeof activity_id === 'string' 
+        ? (activity_id.trim() === '' ? null : parseInt(activity_id, 10))
+        : activity_id;
+    
+    // Validate normalized activity_id
+    if (normalizedActivityId === null || normalizedActivityId === undefined || isNaN(normalizedActivityId) || normalizedActivityId <= 0) {
+        console.error('Invalid activity_id received:', { original: activity_id, normalized: normalizedActivityId, body: req.body });
+        return res.status(400).json({ 
+            success: false, 
+            message: `Invalid activity_id: ${activity_id}. Expected a positive integer.` 
+        });
+    }
+    
+    // Normalize crew_id: convert empty string to null, and ensure integer type
+    const normalizedCrewId = (crew_id === '' || crew_id === null || crew_id === undefined) 
+        ? null 
+        : (typeof crew_id === 'string' ? parseInt(crew_id, 10) : crew_id);
+    
+    // If crew_id is provided, validate it's a valid number
+    if (normalizedCrewId !== null && (isNaN(normalizedCrewId) || normalizedCrewId <= 0)) {
+        console.error('Invalid crew_id received:', { original: crew_id, normalized: normalizedCrewId });
+        return res.status(400).json({ 
+            success: false, 
+            message: `Invalid crew_id: ${crew_id}. Expected a positive integer or null.` 
+        });
+    }
+
+    console.log('Saving crew assignment:', { activity_id: normalizedActivityId, date, time, crew_id: normalizedCrewId });
 
     // If crew_id is null, delete the assignment
-    if (crew_id === null || crew_id === undefined) {
+    if (normalizedCrewId === null || normalizedCrewId === undefined) {
         const deleteSql = 'DELETE FROM flight_crew_assignments WHERE activity_id = ? AND date = ? AND time = ?';
-        con.query(deleteSql, [activity_id, date, time], (err, result) => {
+        con.query(deleteSql, [normalizedActivityId, date, time], (err, result) => {
             if (err) {
                 console.error('Error deleting crew assignment:', err);
                 return res.status(500).json({ success: false, message: 'Database error', error: err.message });
@@ -23234,7 +23267,7 @@ app.post('/api/crew-assignment', (req, res) => {
             res.json({
                 success: true,
                 message: 'Crew assignment cleared',
-                data: { activity_id, date, time, crew_id: null }
+                data: { activity_id: normalizedActivityId, date, time, crew_id: null }
             });
         });
         return;
@@ -23242,7 +23275,7 @@ app.post('/api/crew-assignment', (req, res) => {
 
     // Validate that the crew member exists
     const validateCrewSql = 'SELECT id FROM crew WHERE id = ? AND is_active = 1';
-    con.query(validateCrewSql, [crew_id], (validateErr, validateResult) => {
+    con.query(validateCrewSql, [normalizedCrewId], (validateErr, validateResult) => {
         if (validateErr) {
             console.error('Error validating crew member:', validateErr);
             return res.status(500).json({ success: false, message: 'Database error', error: validateErr.message });
@@ -23258,7 +23291,7 @@ app.post('/api/crew-assignment', (req, res) => {
             ON DUPLICATE KEY UPDATE crew_id = VALUES(crew_id), updated_at = CURRENT_TIMESTAMP
         `;
 
-        con.query(sql, [activity_id, date, time, crew_id], (err, result) => {
+        con.query(sql, [normalizedActivityId, date, time, normalizedCrewId], (err, result) => {
             if (err) {
                 console.error('Error upserting crew assignment:', err);
                 return res.status(500).json({ success: false, message: 'Database error', error: err.message });
@@ -23269,7 +23302,7 @@ app.post('/api/crew-assignment', (req, res) => {
             res.json({
                 success: true,
                 message: 'Crew assignment saved',
-                data: { activity_id, date, time, crew_id }
+                data: { activity_id: normalizedActivityId, date, time, crew_id: normalizedCrewId }
             });
         });
     });
@@ -23304,16 +23337,49 @@ app.get('/api/pilot-assignments', (req, res) => {
 // Upsert pilot assignment for a slot
 app.post('/api/pilot-assignment', (req, res) => {
     const { activity_id, date, time, pilot_id } = req.body;
-    if (!activity_id || !date || !time) {
-        return res.status(400).json({ success: false, message: 'activity_id, date, time are required' });
+    
+    // Validate required fields
+    if (activity_id === null || activity_id === undefined || activity_id === '') {
+        return res.status(400).json({ success: false, message: 'activity_id is required' });
+    }
+    if (!date || !time) {
+        return res.status(400).json({ success: false, message: 'date and time are required' });
     }
 
-    console.log('Saving pilot assignment:', { activity_id, date, time, pilot_id });
+    // Normalize activity_id to integer
+    const normalizedActivityId = typeof activity_id === 'string' 
+        ? (activity_id.trim() === '' ? null : parseInt(activity_id, 10))
+        : activity_id;
+    
+    // Validate normalized activity_id
+    if (normalizedActivityId === null || normalizedActivityId === undefined || isNaN(normalizedActivityId) || normalizedActivityId <= 0) {
+        console.error('Invalid activity_id received:', { original: activity_id, normalized: normalizedActivityId, body: req.body });
+        return res.status(400).json({ 
+            success: false, 
+            message: `Invalid activity_id: ${activity_id}. Expected a positive integer.` 
+        });
+    }
+    
+    // Normalize pilot_id: convert empty string to null, and ensure integer type
+    const normalizedPilotId = (pilot_id === '' || pilot_id === null || pilot_id === undefined) 
+        ? null 
+        : (typeof pilot_id === 'string' ? parseInt(pilot_id, 10) : pilot_id);
+    
+    // If pilot_id is provided, validate it's a valid number
+    if (normalizedPilotId !== null && (isNaN(normalizedPilotId) || normalizedPilotId <= 0)) {
+        console.error('Invalid pilot_id received:', { original: pilot_id, normalized: normalizedPilotId });
+        return res.status(400).json({ 
+            success: false, 
+            message: `Invalid pilot_id: ${pilot_id}. Expected a positive integer or null.` 
+        });
+    }
+
+    console.log('Saving pilot assignment:', { activity_id: normalizedActivityId, date, time, pilot_id: normalizedPilotId });
 
     // If pilot_id is null, delete the assignment
-    if (pilot_id === null || pilot_id === undefined) {
+    if (normalizedPilotId === null || normalizedPilotId === undefined) {
         const deleteSql = 'DELETE FROM flight_pilot_assignments WHERE activity_id = ? AND date = ? AND time = ?';
-        con.query(deleteSql, [activity_id, date, time], (err, result) => {
+        con.query(deleteSql, [normalizedActivityId, date, time], (err, result) => {
             if (err) {
                 console.error('Error deleting pilot assignment:', err);
                 return res.status(500).json({ success: false, message: 'Database error', error: err.message });
@@ -23322,7 +23388,7 @@ app.post('/api/pilot-assignment', (req, res) => {
             res.json({
                 success: true,
                 message: 'Pilot assignment cleared',
-                data: { activity_id, date, time, pilot_id: null }
+                data: { activity_id: normalizedActivityId, date, time, pilot_id: null }
             });
         });
         return;
@@ -23330,7 +23396,7 @@ app.post('/api/pilot-assignment', (req, res) => {
 
     // Validate that the pilot exists
     const validatePilotSql = 'SELECT id FROM pilots WHERE id = ? AND is_active = 1';
-    con.query(validatePilotSql, [pilot_id], (validateErr, validateResult) => {
+    con.query(validatePilotSql, [normalizedPilotId], (validateErr, validateResult) => {
         if (validateErr) {
             console.error('Error validating pilot:', validateErr);
             return res.status(500).json({ success: false, message: 'Database error', error: validateErr.message });
@@ -23346,7 +23412,7 @@ app.post('/api/pilot-assignment', (req, res) => {
             ON DUPLICATE KEY UPDATE pilot_id = VALUES(pilot_id), updated_at = CURRENT_TIMESTAMP
         `;
 
-        con.query(sql, [activity_id, date, time, pilot_id], (err, result) => {
+        con.query(sql, [normalizedActivityId, date, time, normalizedPilotId], (err, result) => {
             if (err) {
                 console.error('Error upserting pilot assignment:', err);
                 return res.status(500).json({ success: false, message: 'Database error', error: err.message });
@@ -23357,7 +23423,7 @@ app.post('/api/pilot-assignment', (req, res) => {
             res.json({
                 success: true,
                 message: 'Pilot assignment saved',
-                data: { activity_id, date, time, pilot_id }
+                data: { activity_id: normalizedActivityId, date, time, pilot_id: normalizedPilotId }
             });
         });
     });

@@ -14,12 +14,24 @@ import {
   useTheme,
   useMediaQuery,
   Container,
+  BottomNavigation,
+  BottomNavigationAction,
+  Badge,
 } from '@mui/material';
-import { Menu as MenuIcon, Search as SearchIcon } from '@mui/icons-material';
+import { 
+  Menu as MenuIcon, 
+  Search as SearchIcon,
+  Home as HomeIcon,
+  Description as BookingIcon,
+  List as ManifestIcon,
+  CalendarMonth as ActivityIcon,
+  Settings as SettingsIcon,
+  History as LogsIcon,
+} from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-const Header = () => {
+const Header = ({ onMenuClick: externalOnMenuClick, onNotificationsChange }) => {
   const [activeMenuItem, setActiveMenuItem] = useState('Home'); // Track active menu
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [hasNewBookings, setHasNewBookings] = useState(false);
@@ -41,6 +53,11 @@ const Header = () => {
     
     navigate(path); // Navigate to the corresponding path
     setDrawerOpen(false); // Close drawer (for mobile)
+    
+    // Call external handler if provided (for bottom nav)
+    if (externalOnMenuClick) {
+      externalOnMenuClick(menuItem, path);
+    }
   };
 
   const handleDrawerToggle = () => {
@@ -70,19 +87,28 @@ const Header = () => {
       const currentVoucherIds = currentVouchers.map(v => v.id).filter(id => id != null);
 
       // Check for new bookings
+      let newBookingsFlag = false;
       if (lastViewedBookings.length > 0) {
         const newBookings = currentBookingIds.filter(id => !lastViewedBookings.includes(id));
-        setHasNewBookings(newBookings.length > 0);
+        newBookingsFlag = newBookings.length > 0;
+        setHasNewBookings(newBookingsFlag);
       } else {
         setHasNewBookings(false);
       }
 
       // Check for new vouchers
+      let newVouchersFlag = false;
       if (lastViewedVouchers.length > 0) {
         const newVouchers = currentVoucherIds.filter(id => !lastViewedVouchers.includes(id));
-        setHasNewVouchers(newVouchers.length > 0);
+        newVouchersFlag = newVouchers.length > 0;
+        setHasNewVouchers(newVouchersFlag);
       } else {
         setHasNewVouchers(false);
+      }
+      
+      // Notify parent component about notification state changes
+      if (onNotificationsChange) {
+        onNotificationsChange(newBookingsFlag, newVouchersFlag);
       }
 
       // If markAsViewed is true, update localStorage (mark all current items as viewed)
@@ -91,6 +117,15 @@ const Header = () => {
         localStorage.setItem('lastViewedVoucherIds', JSON.stringify(currentVoucherIds));
         setHasNewBookings(false);
         setHasNewVouchers(false);
+        // Notify parent that notifications are cleared
+        if (onNotificationsChange) {
+          onNotificationsChange(false, false);
+        }
+      } else {
+        // Notify parent component about notification state changes
+        if (onNotificationsChange) {
+          onNotificationsChange(newBookingsFlag, newVouchersFlag);
+        }
       }
     } catch (error) {
       console.error('Error checking new bookings/vouchers:', error);
@@ -113,6 +148,15 @@ const Header = () => {
     return () => clearInterval(interval);
   }, []);
 
+  const menuItems = [
+    { label: 'Home', path: '/', icon: <HomeIcon /> },
+    { label: 'Booking', path: '/booking', icon: <BookingIcon /> },
+    { label: 'Manifest', path: '/manifest', icon: <ManifestIcon /> },
+    { label: 'Activity', path: '/activity', icon: <ActivityIcon /> },
+    { label: 'Settings', path: '/settings', icon: <SettingsIcon /> },
+    { label: 'Logs', path: '/logs', icon: <LogsIcon /> },
+  ];
+
   // When user navigates to Booking page, mark as viewed
   useEffect(() => {
     if (location.pathname === '/booking') {
@@ -121,14 +165,13 @@ const Header = () => {
     }
   }, [location.pathname]);
 
-  const menuItems = [
-    { label: 'Home', path: '/' },
-    { label: 'Booking', path: '/booking' },
-    { label: 'Manifest', path: '/manifest' },
-    { label: 'Activity', path: '/activity' },
-    { label: 'Settings', path: '/settings' },
-    { label: 'Logs', path: '/logs' },
-  ];
+  // Update active menu item based on current pathname
+  useEffect(() => {
+    const currentItem = menuItems.find(item => item.path === location.pathname);
+    if (currentItem) {
+      setActiveMenuItem(currentItem.label);
+    }
+  }, [location.pathname]);
 
   return (
     <>
@@ -172,44 +215,7 @@ const Header = () => {
             {/* Right: Menu Items */}
             {isMobile ? (
               <Grid item>
-                <IconButton color="inherit" onClick={handleDrawerToggle}>
-                  <MenuIcon />
-                </IconButton>
-                <Drawer anchor="right" open={drawerOpen} onClose={handleDrawerToggle}>
-                  <div className="mob-header-nav-wrap">
-                    <List>
-                      {menuItems.map((item, index) => (
-                        <ListItem
-                          button
-                          key={index}
-                          onClick={() => handleMenuClick(item.label, item.path)}
-                          selected={activeMenuItem === item.label}
-                          sx={{ position: 'relative' }}
-                        >
-                          <ListItemText primary={item.label} sx={{ color: '#000' }} />
-                          {/* Show notification badge for Booking menu item */}
-                          {item.label === 'Booking' && (hasNewBookings || hasNewVouchers) && (
-                            <span style={{
-                              position: "absolute",
-                              top: "12px",
-                              right: "16px",
-                              width: "12px",
-                              height: "12px",
-                              background: "#ff0000",
-                              borderRadius: "50%",
-                              border: "2px solid white",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              animation: "pulse 2s infinite"
-                            }}>
-                            </span>
-                          )}
-                        </ListItem>
-                      ))}
-                    </List>
-                  </div>
-                </Drawer>
+                {/* Mobile: Remove drawer menu button, bottom navigation will handle navigation */}
               </Grid>
             ) : (
               <Grid item>
@@ -273,6 +279,103 @@ const Header = () => {
       </Container>
     </AppBar>
     </>
+  );
+};
+
+// Bottom Navigation Component for Mobile
+export const BottomNav = ({ hasNewBookings, hasNewVouchers, onMenuClick }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const menuItems = [
+    { label: 'Home', path: '/', icon: <HomeIcon /> },
+    { label: 'Booking', path: '/booking', icon: <BookingIcon /> },
+    { label: 'Manifest', path: '/manifest', icon: <ManifestIcon /> },
+    { label: 'Activity', path: '/activity', icon: <ActivityIcon /> },
+    { label: 'Settings', path: '/settings', icon: <SettingsIcon /> },
+    { label: 'Logs', path: '/logs', icon: <LogsIcon /> },
+  ];
+
+  const handleChange = (event, newValue) => {
+    const selectedItem = menuItems.find(item => item.path === newValue);
+    if (selectedItem) {
+      navigate(selectedItem.path);
+      if (onMenuClick) {
+        onMenuClick(selectedItem.label, selectedItem.path);
+      }
+    }
+  };
+
+  const getCurrentValue = () => {
+    const currentItem = menuItems.find(item => item.path === location.pathname);
+    return currentItem ? currentItem.path : '/';
+  };
+
+  if (!isMobile) {
+    return null; // Don't show on desktop
+  }
+
+  return (
+    <BottomNavigation
+      value={getCurrentValue()}
+      onChange={handleChange}
+      showLabels
+      sx={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 1000,
+        backgroundColor: '#1e3a8a', // Dark blue background
+        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+        height: '70px',
+        '& .MuiBottomNavigationAction-root': {
+          color: 'rgba(255, 255, 255, 0.7)',
+          minWidth: '60px',
+          maxWidth: '80px',
+          padding: '6px 4px',
+          '&.Mui-selected': {
+            color: '#ffffff',
+          },
+        },
+        '& .MuiBottomNavigationAction-label': {
+          fontSize: '0.65rem',
+          marginTop: '4px',
+          fontWeight: 500,
+          '&.Mui-selected': {
+            fontSize: '0.65rem',
+          },
+        },
+      }}
+    >
+      {menuItems.map((item, index) => (
+        <BottomNavigationAction
+          key={index}
+          label={item.label}
+          value={item.path}
+          icon={
+            item.label === 'Booking' && (hasNewBookings || hasNewVouchers) ? (
+              <Badge
+                badgeContent=""
+                color="error"
+                variant="dot"
+                sx={{
+                  '& .MuiBadge-badge': {
+                    animation: 'pulse 2s infinite',
+                  },
+                }}
+              >
+                {item.icon}
+              </Badge>
+            ) : (
+              item.icon
+            )
+          }
+        />
+      ))}
+    </BottomNavigation>
   );
 };
 
