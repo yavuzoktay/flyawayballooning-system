@@ -5248,7 +5248,7 @@ setBookingDetail(finalVoucherDetail);
                                                                 <IconButton size="small" onClick={() => handleEditClick('name', v.name)}><EditIcon fontSize="small" /></IconButton>
                                                             </>
                                                         )}</Typography>
-                                                        {/* Phone field - show purchaser_phone for Gift Vouchers, mobile for others */}
+                                                        {/* Phone field - show purchaser_phone for Gift Vouchers, booking_phone for Flight Vouchers */}
                                                         <Typography><b>Phone:</b> {editField === 'mobile' ? (
                                                             <>
                                                                 <input 
@@ -5262,8 +5262,8 @@ setBookingDetail(finalVoucherDetail);
                                                             </>
                                                         ) : (
                                                             <>
-                                                                {v.book_flight === "Gift Voucher" ? (v.purchaser_phone || v.phone || '-') : (v.mobile || '-')}
-                                                                <IconButton size="small" onClick={() => handleEditClick('mobile', v.book_flight === "Gift Voucher" ? (v.purchaser_phone || v.phone) : v.mobile)}><EditIcon fontSize="small" /></IconButton>
+                                                                {v.book_flight === "Gift Voucher" ? (v.purchaser_phone || v.phone || '-') : (v.booking_phone || v.phone || v.mobile || '-')}
+                                                                <IconButton size="small" onClick={() => handleEditClick('mobile', v.book_flight === "Gift Voucher" ? (v.purchaser_phone || v.phone) : (v.booking_phone || v.phone || v.mobile))}><EditIcon fontSize="small" /></IconButton>
                                                             </>
                                                         )}</Typography>
                                                         {/* Remove explicit Mobile row from Voucher Details popups */}

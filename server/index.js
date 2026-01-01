@@ -9773,6 +9773,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
 
                 // Update phone numbers to include country code if missing
                 const phoneWithCode = ensurePhoneWithCountryCode(row.phone);
+                const mobileWithCode = ensurePhoneWithCountryCode(row.mobile);
                 const purchaserPhoneWithCode = ensurePhoneWithCountryCode(row.purchaser_phone || row.phone);
                 const recipientPhoneWithCode = ensurePhoneWithCountryCode(row.recipient_phone);
                 const bookingPhoneWithCode = ensurePhoneWithCountryCode(row.booking_phone);
@@ -9787,6 +9788,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     actual_voucher_type: row.actual_voucher_type ?? '', // New field for actual voucher type
                     email: row.email ?? '',
                     phone: phoneWithCode ?? '',
+                    mobile: mobileWithCode ?? '', // Add country code to mobile field
                     // Purchaser information fields
                     purchaser_name: row.purchaser_name ?? row.name ?? '',
                     purchaser_email: row.purchaser_email ?? row.email ?? '',
