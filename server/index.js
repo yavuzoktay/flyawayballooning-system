@@ -5120,6 +5120,20 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                             };
                             console.log('📧 [WEBHOOK] Contact override data:', JSON.stringify(contactOverride));
                             await sendAutomaticFlightVoucherConfirmationEmail(voucherId, contactOverride);
+                            
+                            // Send automatic Flight Voucher Confirmation SMS
+                            console.log('========================================');
+                            console.log('📱 [WEBHOOK] SMS SEND PROCESS STARTING FOR FLIGHT VOUCHER');
+                            console.log('📱 [WEBHOOK] Voucher ID:', voucherId);
+                            console.log('📱 [WEBHOOK] Calling sendAutomaticFlightVoucherConfirmationSms...');
+                            console.log('========================================');
+                            
+                            try {
+                                sendAutomaticFlightVoucherConfirmationSms(voucherId, contactOverride);
+                                console.log('✅ [WEBHOOK] sendAutomaticFlightVoucherConfirmationSms function called successfully');
+                            } catch (smsError) {
+                                console.error('❌ [WEBHOOK] Error calling sendAutomaticFlightVoucherConfirmationSms:', smsError);
+                            }
                         } catch (emailErr) {
                             console.error('❌ [WEBHOOK] Error sending Flight Voucher Confirmation email from webhook:', emailErr?.message || emailErr);
                             console.error('❌ [WEBHOOK] Error stack:', emailErr?.stack);
@@ -11702,11 +11716,26 @@ app.post('/api/createVoucher', (req, res) => {
                 sendAutomaticBookingConfirmationEmail(bookingResult.insertId);
             }
             
-            // Send automatic booking confirmation SMS for Flight Voucher
+            // Send automatic Flight Voucher Confirmation SMS
             console.log('========================================');
             console.log('📱 [Flight Voucher] SMS SEND PROCESS STARTING');
-            console.log('📱 [Flight Voucher] Booking ID:', bookingResult.insertId);
+            console.log('📱 [Flight Voucher] Voucher ID:', result.insertId);
             console.log('📱 [Flight Voucher] Phone:', phone);
+            console.log('📱 [Flight Voucher] Calling sendAutomaticFlightVoucherConfirmationSms...');
+            console.log('========================================');
+            
+            try {
+                const contactOverride = {
+                    purchaser_email: email,
+                    purchaser_name: name,
+                    purchaser_phone: phone,
+                    purchaser_mobile: mobile
+                };
+                sendAutomaticFlightVoucherConfirmationSms(result.insertId, contactOverride);
+                console.log('✅ [Flight Voucher] sendAutomaticFlightVoucherConfirmationSms function called successfully');
+            } catch (smsError) {
+                console.error('❌ [Flight Voucher] Error calling sendAutomaticFlightVoucherConfirmationSms:', smsError);
+            }
             console.log('📱 [Flight Voucher] Calling sendAutomaticBookingConfirmationSms...');
             console.log('========================================');
             
@@ -24477,7 +24506,91 @@ function buildEmailLayout({ subject, headline = '', heroImage, highlightHtml = '
 
     const responsiveStyles = `
     <style>
-        @media only screen and (max-width: 520px) {
+        @media only screen and (max-width: 600px) {
+            /* Main container adjustments */
+            body {
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            
+            /* Outer table padding */
+            table[role="presentation"] {
+                width: 100% !important;
+            }
+            
+            /* Center cell padding - reduced for mobile */
+            td[align="center"] {
+                padding: 16px 8px !important;
+            }
+            
+            /* Main content table */
+            table[role="presentation"][width="100%"] {
+                max-width: 100% !important;
+                border-radius: 16px !important;
+            }
+            
+            /* Content padding - reduced for mobile */
+            td[style*="padding:32px"] {
+                padding: 24px 16px !important;
+            }
+            
+            /* Headline font size - smaller for mobile */
+            div[style*="font-size:26px"] {
+                font-size: 22px !important;
+                line-height: 1.3 !important;
+                margin-bottom: 16px !important;
+            }
+            
+            /* Body text - optimized for mobile */
+            div[style*="font-size:16px"][style*="line-height:1.7"] {
+                font-size: 15px !important;
+                line-height: 1.6 !important;
+            }
+            
+            /* Highlight section - mobile optimized */
+            div[style*="background:#e8e7ff"] {
+                padding: 12px 14px !important;
+                font-size: 14px !important;
+                line-height: 1.5 !important;
+                border-radius: 8px !important;
+                margin-bottom: 20px !important;
+            }
+            
+            /* Signature - mobile optimized */
+            div[style*="font-size:16px"][style*="line-height:1.6"][style*="color:#1f2937"] {
+                font-size: 15px !important;
+                line-height: 1.5 !important;
+            }
+            
+            /* Footer links - stack vertically on mobile */
+            div[style*="margin-top:32px"] {
+                margin-top: 24px !important;
+            }
+            
+            a[style*="font-size:14px"] {
+                font-size: 13px !important;
+                display: block !important;
+                margin: 8px 0 !important;
+                text-align: center !important;
+            }
+            
+            /* Hero image - mobile optimized (preserve aspect ratio and quality) */
+            img[alt="Fly Away Ballooning"] {
+                min-height: auto !important;
+                max-height: none !important;
+                height: auto !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                object-fit: contain !important;
+                object-position: center !important;
+                border-radius: 16px 16px 0 0 !important;
+                -webkit-backface-visibility: hidden !important;
+                backface-visibility: hidden !important;
+                image-rendering: -webkit-optimize-contrast !important;
+                image-rendering: crisp-edges !important;
+            }
+            
+            /* Receipt table - mobile responsive */
             .receipt-table,
             .receipt-table tbody,
             .receipt-table tr,
@@ -24508,9 +24621,56 @@ function buildEmailLayout({ subject, headline = '', heroImage, highlightHtml = '
                 color: #94a3b8;
                 display: block;
                 margin-bottom: 4px;
+                font-size: 11px !important;
             }
             .receipt-summary {
                 text-align: left !important;
+            }
+            
+            /* Paragraphs - mobile optimized */
+            p {
+                font-size: 15px !important;
+                line-height: 1.6 !important;
+                margin: 0 0 14px !important;
+            }
+            
+            /* Images in content - responsive (preserve quality) */
+            img {
+                max-width: 100% !important;
+                height: auto !important;
+                object-fit: contain !important;
+                image-rendering: -webkit-optimize-contrast !important;
+                image-rendering: crisp-edges !important;
+            }
+            
+            /* Tables in content - responsive */
+            table {
+                width: 100% !important;
+                max-width: 100% !important;
+                font-size: 14px !important;
+            }
+            
+            /* Links - mobile friendly */
+            a {
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+            }
+            
+            /* Strong and bold text */
+            strong, b {
+                font-weight: 600 !important;
+            }
+            
+            /* Lists - mobile optimized */
+            ul, ol {
+                padding-left: 20px !important;
+                margin: 0 0 14px !important;
+            }
+            
+            li {
+                font-size: 15px !important;
+                line-height: 1.6 !important;
+                margin-bottom: 8px !important;
             }
         }
     </style>
@@ -24543,7 +24703,7 @@ function buildEmailLayout({ subject, headline = '', heroImage, highlightHtml = '
                                         </v:textbox>
                                         </v:rect>
                                         <![endif]-->
-                                        <img src="${heroImageUrl}" alt="Fly Away Ballooning" width="640" style="width:100%; height:auto; min-height:220px; display:block; border:0; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; background-color:#ffffff; vertical-align:top; object-fit:cover; object-position:center; border-radius:24px 24px 0 0;" />
+                                        <img src="${heroImageUrl}" alt="Fly Away Ballooning" width="640" style="width:100%; max-width:100%; height:auto; min-height:220px; display:block; margin:0 auto; border:0; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; background-color:#ffffff; vertical-align:top; object-fit:contain; object-position:center; border-radius:24px 24px 0 0;" />
                                     </td>
                                 </tr>
                             </table>
@@ -24551,14 +24711,15 @@ function buildEmailLayout({ subject, headline = '', heroImage, highlightHtml = '
                     </tr>
                     <tr>
                         <td style="padding:32px;">
-                            ${headline ? `<div style="font-size:26px; line-height:1.35; font-weight:700; color:#111827; margin-bottom:20px;">${escapeHtml(headline)}</div>` : ''}
+                            ${headline ? `<div style="font-size:26px; line-height:1.35; font-weight:700; color:#111827; margin-bottom:20px; word-wrap:break-word;">${escapeHtml(headline)}</div>` : ''}
                             ${highlightSection}
-                            <div style="font-size:16px; line-height:1.7; color:#1f2937;">
+                            <div style="font-size:16px; line-height:1.7; color:#1f2937; word-wrap:break-word;">
                                 ${bodyHtml}
                             </div>
-                            <div style="font-size:16px; line-height:1.7; color:#1f2937; margin-top:24px;">
+                            <div style="font-size:16px; line-height:1.7; color:#1f2937; margin-top:24px; word-wrap:break-word;">
                                 ${signatureHtml}
                             </div>
+                            ${footerHtml}
                         </td>
                     </tr>
                 </table>
@@ -27723,6 +27884,173 @@ async function sendAutomaticBookingConfirmationSms(bookingId) {
     } catch (error) {
         console.error('❌ [sendAutomaticBookingConfirmationSms] Error in automatic SMS function:', error);
         // Don't throw error - SMS failure shouldn't break booking creation
+    }
+}
+
+// Send automatic Flight Voucher Confirmation SMS
+async function sendAutomaticFlightVoucherConfirmationSms(voucherId, purchasingContactOverride = {}) {
+    console.log('========================================');
+    console.log('📱 [sendAutomaticFlightVoucherConfirmationSms] FUNCTION CALLED');
+    console.log('📱 [sendAutomaticFlightVoucherConfirmationSms] Voucher ID:', voucherId);
+    console.log('📱 [sendAutomaticFlightVoucherConfirmationSms] Timestamp:', new Date().toISOString());
+    console.log('========================================');
+
+    try {
+        // Check Twilio configuration
+        const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = process.env;
+        if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
+            console.warn('⚠️ [sendAutomaticFlightVoucherConfirmationSms] Twilio not configured, skipping SMS');
+            return;
+        }
+
+        // Fetch voucher details from all_vouchers table
+        const voucherQuery = `SELECT * FROM all_vouchers WHERE id = ?`;
+        
+        con.query(voucherQuery, [voucherId], async (err, voucherRows) => {
+            if (err) {
+                console.error('❌ [sendAutomaticFlightVoucherConfirmationSms] Error fetching voucher:', err);
+                return;
+            }
+
+            if (!voucherRows || voucherRows.length === 0) {
+                console.warn('⚠️ [sendAutomaticFlightVoucherConfirmationSms] Voucher not found:', voucherId);
+                return;
+            }
+
+            const voucher = voucherRows[0];
+            
+            // Only send SMS for Flight Vouchers
+            const bookFlight = voucher.book_flight || '';
+            const voucherType = voucher.voucher_type || '';
+            const bookFlightLower = bookFlight.toLowerCase();
+            const isFlightVoucher = bookFlightLower.includes('flight voucher') || 
+                                   (voucherType && !voucherType.toLowerCase().includes('gift') && voucherType.toLowerCase().includes('flight'));
+            
+            if (!isFlightVoucher) {
+                console.log('⏭️ [sendAutomaticFlightVoucherConfirmationSms] Skipping SMS - not a Flight Voucher. book_flight:', bookFlight, 'voucher_type:', voucherType);
+                return;
+            }
+
+            // Get phone number from voucher (Flight Voucher uses phone/mobile fields)
+            const phoneNumber = purchasingContactOverride.purchaser_phone || 
+                               purchasingContactOverride.purchaser_mobile ||
+                               voucher.phone || 
+                               voucher.mobile || '';
+            
+            if (!phoneNumber || !phoneNumber.trim()) {
+                console.warn('⚠️ [sendAutomaticFlightVoucherConfirmationSms] No phone number found for voucher:', voucherId);
+                return;
+            }
+
+            // Clean phone number (keep international format)
+            const normalizedPhone = cleanPhoneNumber(phoneNumber);
+            if (!normalizedPhone || !normalizedPhone.startsWith('+')) {
+                console.warn('⚠️ [sendAutomaticFlightVoucherConfirmationSms] Invalid international phone number:', phoneNumber, 'cleaned:', normalizedPhone);
+                return;
+            }
+
+            console.log('📋 [sendAutomaticFlightVoucherConfirmationSms] Voucher found:', {
+                id: voucher.id,
+                name: voucher.name,
+                phone: phoneNumber,
+                normalizedPhone: normalizedPhone,
+                book_flight: voucher.book_flight,
+                voucher_ref: voucher.voucher_ref
+            });
+
+            // Fetch "Flight Voucher Confirmation SMS" template
+            const templateQuery = `SELECT * FROM sms_templates WHERE name = 'Flight Voucher Confirmation SMS' LIMIT 1`;
+            con.query(templateQuery, async (templateErr, templateRows) => {
+                if (templateErr) {
+                    console.error('❌ [sendAutomaticFlightVoucherConfirmationSms] Error fetching SMS template:', templateErr);
+                    return;
+                }
+
+                if (!templateRows || templateRows.length === 0) {
+                    console.warn('⚠️ [sendAutomaticFlightVoucherConfirmationSms] SMS template "Flight Voucher Confirmation SMS" not found');
+                    return;
+                }
+
+                const template = templateRows[0];
+                console.log('📝 [sendAutomaticFlightVoucherConfirmationSms] Template found:', {
+                    id: template.id,
+                    name: template.name,
+                    messageLength: template.message?.length || 0
+                });
+
+                // Prepare voucher-like object for placeholder replacement
+                const voucherLikeObject = {
+                    id: voucher.id,
+                    name: voucher.name || voucher.purchaser_name || '',
+                    customer_name: voucher.name || voucher.purchaser_name || '',
+                    email: voucher.email || voucher.purchaser_email || '',
+                    phone: phoneNumber,
+                    location: voucher.preferred_location || '',
+                    flight_date: '',
+                    voucher_code: voucher.voucher_ref || voucher.voucher_code || ''
+                };
+
+                // Replace placeholders in template message
+                const messageWithPrompts = replaceSmsPrompts(template.message || '', voucherLikeObject);
+                console.log('📝 [sendAutomaticFlightVoucherConfirmationSms] Message after placeholder replacement:', messageWithPrompts.substring(0, 100) + '...');
+
+                // Send SMS using Twilio
+                try {
+                    const client = Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+                    const { TWILIO_FROM_NUMBER, TWILIO_MESSAGING_SERVICE_SID } = process.env;
+                    
+                    const createParams = {
+                        to: normalizedPhone,
+                        body: messageWithPrompts,
+                        statusCallback: process.env.TWILIO_STATUS_CALLBACK_URL || undefined
+                    };
+                    
+                    // Priority order for sender
+                    const hasFromNumber = TWILIO_FROM_NUMBER && typeof TWILIO_FROM_NUMBER === 'string' && TWILIO_FROM_NUMBER.trim() !== '';
+                    const hasMessagingService = TWILIO_MESSAGING_SERVICE_SID && typeof TWILIO_MESSAGING_SERVICE_SID === 'string' && TWILIO_MESSAGING_SERVICE_SID.trim() !== '';
+                    
+                    if (hasMessagingService) {
+                        createParams.messagingServiceSid = TWILIO_MESSAGING_SERVICE_SID.trim();
+                    } else if (!hasFromNumber) {
+                        createParams.from = 'FLYAWAY';
+                    } else {
+                        createParams.from = TWILIO_FROM_NUMBER.trim();
+                    }
+                    
+                    console.log('📱 [sendAutomaticFlightVoucherConfirmationSms] Sending SMS via Twilio:', {
+                        to: normalizedPhone,
+                        from: createParams.from || `MessagingService:${createParams.messagingServiceSid}`,
+                        bodyLength: messageWithPrompts.length
+                    });
+                    
+                    const msg = await client.messages.create(createParams);
+                    
+                    // Log SMS to database (voucher ID instead of booking ID)
+                    ensureSmsLogsSchema(() => {
+                        const sql = `INSERT INTO sms_logs (booking_id, to_number, body, status, sid, sent_at) VALUES (?, ?, ?, ?, ?, NOW())`;
+                        // Use null for booking_id since this is a voucher, not a booking
+                        con.query(sql, [null, normalizedPhone, messageWithPrompts, msg.status || 'queued', msg.sid], (logErr) => {
+                            if (logErr) {
+                                console.error('❌ [sendAutomaticFlightVoucherConfirmationSms] Error logging SMS:', logErr);
+                            } else {
+                                console.log('✅ [sendAutomaticFlightVoucherConfirmationSms] SMS logged to database');
+                            }
+                        });
+                    });
+                    
+                    console.log('✅ [sendAutomaticFlightVoucherConfirmationSms] SMS sent successfully:', {
+                        sid: msg.sid,
+                        status: msg.status
+                    });
+                } catch (smsError) {
+                    console.error('❌ [sendAutomaticFlightVoucherConfirmationSms] Error sending SMS:', smsError);
+                    // Don't throw - SMS failure shouldn't break voucher creation
+                }
+            });
+        });
+    } catch (error) {
+        console.error('❌ [sendAutomaticFlightVoucherConfirmationSms] Error in automatic SMS function:', error);
+        // Don't throw error - SMS failure shouldn't break voucher creation
     }
 }
 
