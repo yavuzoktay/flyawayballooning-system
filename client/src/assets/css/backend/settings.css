@@ -1257,13 +1257,25 @@
 /* Responsive Design */
 @media (max-width: 768px) {
     .settings-container {
-        padding: 16px;
+        padding: 12px !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        overflow-x: hidden !important;
+        box-sizing: border-box !important;
     }
     
     .settings-header {
         flex-direction: column;
         gap: 16px;
         align-items: stretch;
+        padding: 0 0 12px 0 !important;
+        margin-bottom: 20px !important;
+    }
+    
+    .settings-content {
+        padding: 0 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
     
     .voucher-codes-grid {
@@ -1271,9 +1283,12 @@
     }
     
     .voucher-codes-table-container {
-        overflow-x: auto;
-        margin: 0 -16px;
-        padding: 0 16px;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
     
     .voucher-codes-table {
@@ -1286,9 +1301,12 @@
     }
     
     .experiences-table-container {
-        overflow-x: auto;
-        margin: 0 -16px;
-        padding: 0 16px;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
     
     .experiences-table {
@@ -1297,15 +1315,21 @@
     }
     
     .add-to-booking-table-container {
-        overflow-x: auto;
-        margin: 0 -16px;
-        padding: 0 16px;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
     
     .private-charter-voucher-types-table-container {
-        overflow-x: auto;
-        margin: 0 -16px;
-        padding: 0 16px;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
     
     .private-charter-voucher-types-table {
@@ -1314,9 +1338,12 @@
     }
     
     .crew-table-container {
-        overflow-x: auto;
-        margin: 0 -16px;
-        padding: 0 16px;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
     
     .crew-table {
@@ -1330,9 +1357,12 @@
     }
     
     .voucher-types-table-container {
-        overflow-x: auto;
-        margin: 0 -16px;
-        padding: 0 16px;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
     
     .voucher-types-table {
@@ -1341,9 +1371,12 @@
     }
     
     .additional-info-table-container {
-        overflow-x: auto;
-        margin: 0 -16px;
-        padding: 0 16px;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
     
     .additional-info-table {
@@ -1352,9 +1385,12 @@
     }
     
     .terms-table-container {
-        overflow-x: auto;
-        margin: 0 -16px;
-        padding: 0 16px;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
     
     .terms-table {
@@ -1388,6 +1424,141 @@
     
     .voucher-actions {
         justify-content: center;
+    }
+
+    /* Card Header - Stack on mobile */
+    .card-header {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 15px !important;
+        padding: 15px !important;
+    }
+
+    .card-header > div:first-child {
+        width: 100% !important;
+    }
+
+    .card-header > div:last-child {
+        width: 100% !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+    }
+
+    /* Create Buttons - Full width on mobile */
+    .card-header button {
+        width: 100% !important;
+        min-width: auto !important;
+        margin: 0 !important;
+    }
+
+    /* Stats Section - Stack on mobile */
+    .voucher-stats,
+    .experiences-stats {
+        flex-direction: column !important;
+        gap: 15px !important;
+        padding: 15px !important;
+    }
+
+    .voucher-stats > div,
+    .experiences-stats > div {
+        width: 100% !important;
+        padding: 10px !important;
+    }
+
+    /* Tab Navigation - Stack on mobile */
+    .voucher-tabs {
+        flex-direction: column !important;
+        gap: 8px !important;
+    }
+
+    .voucher-tabs button {
+        width: 100% !important;
+    }
+
+    /* Table Headers - Smaller on mobile */
+    .voucher-codes-table th,
+    .experiences-table th,
+    .add-to-booking-table th,
+    .voucher-types-table th,
+    .private-charter-voucher-types-table th,
+    .additional-info-table th,
+    .terms-table th {
+        padding: 10px 6px !important;
+        font-size: 10px !important;
+    }
+
+    /* Table Cells - Smaller on mobile */
+    .voucher-codes-table td,
+    .experiences-table td,
+    .add-to-booking-table td,
+    .voucher-types-table td,
+    .private-charter-voucher-types-table td,
+    .additional-info-table td,
+    .terms-table td {
+        padding: 10px 6px !important;
+        font-size: 11px !important;
+    }
+
+    /* Code Badge - Smaller on mobile */
+    .code-badge {
+        font-size: 10px !important;
+        padding: 6px 12px !important;
+        min-width: 60px !important;
+    }
+
+    /* Action Buttons - Smaller on mobile */
+    .action-buttons {
+        display: flex !important;
+        gap: 4px !important;
+        flex-wrap: wrap !important;
+    }
+
+    .action-buttons button {
+        padding: 6px !important;
+        min-width: auto !important;
+    }
+
+    /* Settings Header - Smaller on mobile */
+    .settings-header h1 {
+        font-size: 22px !important;
+    }
+
+    /* Settings Card - Less padding on mobile */
+    .settings-card {
+        padding: 15px !important;
+        margin-bottom: 20px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Card Header - Ensure proper padding */
+    .card-header {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* All sections should have proper padding */
+    .settings-content > div {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Prevent horizontal scroll on entire page */
+    body {
+        overflow-x: hidden !important;
+    }
+
+    html {
+        overflow-x: hidden !important;
+    }
+
+    #root {
+        overflow-x: hidden !important;
     }
 }
 

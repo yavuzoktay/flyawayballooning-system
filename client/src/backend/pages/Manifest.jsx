@@ -269,7 +269,23 @@ const Manifest = () => {
             return;
         }
 
-        const firstTemplate = emailTemplates.length > 0 ? emailTemplates[0].id : 'custom';
+        // For cancel mode, find "Passenger Rescheduling Information" template
+        // For message mode, find "To Be Updated" template
+        let selectedTemplate = 'custom';
+        if (mode === 'cancel') {
+            const reschedulingTemplate = emailTemplates.find(
+                t => t.name === 'Passenger Rescheduling Information'
+            );
+            selectedTemplate = reschedulingTemplate ? reschedulingTemplate.id : (emailTemplates.length > 0 ? emailTemplates[0].id : 'custom');
+        } else if (mode === 'message') {
+            const toBeUpdatedTemplate = emailTemplates.find(
+                t => t.name === 'To Be Updated'
+            );
+            selectedTemplate = toBeUpdatedTemplate ? toBeUpdatedTemplate.id : (emailTemplates.length > 0 ? emailTemplates[0].id : 'custom');
+        } else {
+            selectedTemplate = emailTemplates.length > 0 ? emailTemplates[0].id : 'custom';
+        }
+
         const primaryBooking = globalMenuGroupFlights[0] || null;
 
         setGroupActionMode(mode);
@@ -279,13 +295,13 @@ const Manifest = () => {
             to: recipients,
             subject: '',
             message: '',
-            template: firstTemplate
+            template: selectedTemplate
         });
         setGroupPersonalNote('');
         setGroupMessageModalOpen(true);
 
-        if (firstTemplate && emailTemplates.length > 0) {
-            setTimeout(() => handleGroupTemplateChange(firstTemplate), 0);
+        if (selectedTemplate && emailTemplates.length > 0) {
+            setTimeout(() => handleGroupTemplateChange(selectedTemplate), 0);
         }
     };
 
@@ -3355,7 +3371,7 @@ const Manifest = () => {
                         
                         {/* Debug info for crew assignments - removed for production */}
                         {/* Intentionally hidden */}
-                        <Box display="flex" alignItems="center" gap={2}>
+                        <Box display="flex" alignItems="center" gap={2} className="manifest-date-selector">
                             <IconButton onClick={() => {
                                 const newDate = dayjs(selectedDate).subtract(1, 'day').format('YYYY-MM-DD');
                                 console.log('Date navigation: going back to', newDate);
@@ -3725,9 +3741,9 @@ const Manifest = () => {
                                 displayFlightTime = dayjs(timePart, 'HH:mm').format('HH:mm');
                             }
                             return (
-                                <Card key={groupKey} sx={{ marginBottom: 2 }}>
+                                <Card key={groupKey} sx={{ marginBottom: 2 }} className="manifest-flight-card">
                                     <CardContent>
-                                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} className="manifest-flight-header">
                                             <Box display="flex" flexDirection="column" alignItems="flex-start">
                                                 {/* Section başlığında activityName ve flight time birlikte gösterilecek */}
                                                 {/* Check if any booking in this group has Proposal Flight voucher type */}
@@ -3745,7 +3761,7 @@ const Manifest = () => {
                                                         <Typography variant="h6">{activityName}{titleSuffix}{bookingIdSuffix} - Flight Time: {displayFlightTime}</Typography>
                                                     );
                                                 })()}
-                                                <Box display="flex" alignItems="center" gap={3} mt={1}>
+                                                <Box display="flex" alignItems="center" gap={3} mt={1} className="manifest-flight-details">
                                                     <Typography>Pax Booked: {paxBookedDisplay} / {paxTotalDisplay}</Typography>
                                                     <Typography>Balloon Resource: {balloonResource}</Typography>
                                                     <Typography>Status: <span
@@ -3755,7 +3771,7 @@ const Manifest = () => {
                                                     <Typography>Type: {first.flight_type}</Typography>
                                                 </Box>
                                             </Box>
-                                            <Box display="flex" alignItems="center" gap={1}>
+                                            <Box display="flex" alignItems="center" gap={1} className="manifest-flight-actions">
                                                 {/* Sold Out Badge - Show when flight is fully booked */}
                                                 {paxBookedDisplay === paxTotalDisplay && (
                                                     <Box sx={{
@@ -3902,8 +3918,8 @@ const Manifest = () => {
                                             </Menu>
                                         </Box>
                                         <Divider sx={{ marginY: 2 }} />
-                                        <TableContainer component={Paper} sx={{ marginTop: 2 }}>
-                                            <Table>
+                                        <TableContainer component={Paper} sx={{ marginTop: 2 }} className="manifest-table-container">
+                                            <Table className="manifest-table">
                                                 <TableHead sx={{ marginTop: 2, background: "#d3d3d3", color: "#000" }}>
                                                     <TableRow>
                                                         <TableCell>Booking ID</TableCell>
@@ -4775,9 +4791,10 @@ const Manifest = () => {
                                         )}
                                         <Divider sx={{ my: 2 }} />
                                         {/* HISTORY SECTION - visually separated */}
-                                        <Box sx={{ background: '#e0e0e0', borderRadius: 2, p: 2, mt: 2, mb: 2 }}>
+                                        <Box sx={{ background: '#e0e0e0', borderRadius: 2, p: 2, mt: 2, mb: 2 }} className="booking-history-section">
                                             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>History</Typography>
-                                            <Table>
+                                            <TableContainer component={Box} className="booking-history-table-container">
+                                            <Table className="booking-history-table">
                                                 <TableHead>
                                                     <TableRow>
                                                         <TableCell>Booking Date</TableCell>
@@ -4802,6 +4819,7 @@ const Manifest = () => {
                                                     )}
                                                 </TableBody>
                                             </Table>
+                                            </TableContainer>
                                         </Box>
                                     </Box>
                                 </Grid>
@@ -5494,7 +5512,7 @@ const Manifest = () => {
                     fontWeight: 700,
                     fontSize: 20
                 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    <Typography component="span" sx={{ fontWeight: 700 }}>
                         Refund Credit Card Charge
                     </Typography>
                     <IconButton
@@ -5858,7 +5876,7 @@ const Manifest = () => {
                 fullWidth
             >
                 <DialogTitle sx={{ fontWeight: 700, fontSize: 24 }}>
-                    Send Message to Guests
+                    {groupActionMode === 'cancel' ? 'Cancel All Guests' : 'Send Message to Guests'}
                     {groupSelectedBookings.length > 0 && (
                         <Typography variant="subtitle2" color="textSecondary" sx={{ mt: 0.5 }}>
                             {groupSelectedBookings.length} booking(s)

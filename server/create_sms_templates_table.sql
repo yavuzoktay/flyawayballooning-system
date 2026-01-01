@@ -21,3 +21,4 @@ INSERT INTO sms_templates (name, message, category, edited) VALUES
 ('Upcoming Flight Reminder SMS', 'Hi [First Name], this is a reminder that your flight is coming up soon! Please check your email for details. Thank you, [Company Name] 🎈', 'Event Reminder', 0)
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
+

@@ -707,6 +707,9 @@ const CustomerPortal = () => {
                                     const now = dayjs();
                                     const isFlightDatePassed = flightDate ? flightDate.isBefore(now, 'day') : false;
                                     
+                                    // Calculate hours until flight for 120-hour rule
+                                    const hoursUntilFlight = flightDate ? flightDate.diff(now, 'hour') : 999999;
+                                    
                                     // Check if expiry date has passed (compare by day to avoid time-of-day edge cases)
                                     const expiryDate = bookingData.expires ? dayjs(bookingData.expires) : null;
                                     const isExpired = expiryDate ? expiryDate.isBefore(now, 'day') : false;
@@ -716,7 +719,7 @@ const CustomerPortal = () => {
                                     const bookFlight = (bookingData.book_flight || '').toString().trim().toLowerCase();
                                     const isFlightVoucher = bookingData.is_flight_voucher || bookFlight === 'flight voucher';
                                     const shouldApplyRedeemedCheck = isFlightVoucher;
-                                    const isDisabled = changingLocation || isFlightDatePassed || isFullyRefunded || (isVoucherRedeemed && shouldApplyRedeemedCheck) || isExpired;
+                                    const isDisabled = changingLocation || isFlightDatePassed || isFullyRefunded || (isVoucherRedeemed && shouldApplyRedeemedCheck) || isExpired || hoursUntilFlight <= 120;
                                     
                                     return (
                                         <Tooltip
@@ -729,7 +732,9 @@ const CustomerPortal = () => {
                                                             ? "Full refund has been processed. Location cannot be changed."
                                                             : isFlightDatePassed
                                                                 ? "Flight date has passed. Location cannot be changed."
-                                                                : ""
+                                                                : hoursUntilFlight <= 120
+                                                                    ? "Less than 120 hours remaining until your flight"
+                                                                    : ""
                                             }
                                             arrow
                                         >
@@ -850,6 +855,9 @@ const CustomerPortal = () => {
                                     const now = dayjs();
                                     const isFlightDatePassed = flightDate ? flightDate.isBefore(now, 'day') : false;
                                     
+                                    // Calculate hours until flight for 120-hour rule
+                                    const hoursUntilFlight = flightDate ? flightDate.diff(now, 'hour') : 999999;
+                                    
                                     // Check if expiry date has passed (compare by day to avoid time-of-day edge cases)
                                     const expiryDate = bookingData.expires ? dayjs(bookingData.expires) : null;
                                     const isExpired = expiryDate ? expiryDate.isBefore(now, 'day') : false;
@@ -859,7 +867,7 @@ const CustomerPortal = () => {
                                     const bookFlight = (bookingData.book_flight || '').toString().trim().toLowerCase();
                                     const isFlightVoucher = bookingData.is_flight_voucher || bookFlight === 'flight voucher';
                                     const shouldApplyRedeemedCheck = isFlightVoucher;
-                                    const isDisabled = extendingVoucher || isFlightDatePassed;
+                                    const isDisabled = extendingVoucher || isFlightDatePassed || hoursUntilFlight <= 120;
                                     
                                     const isExtendDisabled = isDisabled || isFullyRefunded || (isVoucherRedeemed && shouldApplyRedeemedCheck) || isExpired;
                                     
@@ -872,9 +880,11 @@ const CustomerPortal = () => {
                                                         ? "Voucher has been redeemed. Voucher cannot be extended."
                                                         : isFullyRefunded
                                                             ? "Full refund has been processed. Voucher cannot be extended."
-                                                            : isDisabled
-                                                                ? "Voucher cannot be extended"
-                                                                : ""
+                                                            : isFlightDatePassed
+                                                                ? "Flight date has passed. Voucher cannot be extended."
+                                                                : hoursUntilFlight <= 120
+                                                                    ? "Less than 120 hours remaining until your flight"
+                                                                    : ""
                                             }
                                             arrow
                                         >

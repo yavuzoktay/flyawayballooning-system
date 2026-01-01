@@ -7211,11 +7211,45 @@ app.get('/api/getAllBookingData', (req, res) => {
 
         console.log(`Fetched ${result.length} bookings with additional information`);
 
+        // Final normalization: Ensure all phone numbers have country codes before sending response
+        const ensurePhoneWithCountryCode = (phoneValue, defaultCountryCode = '+44') => {
+            if (!phoneValue || phoneValue.trim() === '') return phoneValue;
+            phoneValue = String(phoneValue).trim();
+            // If phone already has country code (starts with +), return as is
+            if (phoneValue.startsWith('+')) {
+                return phoneValue;
+            }
+            // Try to infer country code from phone pattern
+            // UK numbers: starts with 0 or 7 followed by 9-10 digits (mobile numbers)
+            if (phoneValue.startsWith('0')) {
+                // Remove leading 0 and add +44
+                return '+44' + phoneValue.substring(1);
+            }
+            // UK mobile: 7 followed by 9 digits (10 digits total)
+            if (/^7\d{9}$/.test(phoneValue)) {
+                return '+44' + phoneValue;
+            }
+            // If no pattern matches, add default country code
+            return `${defaultCountryCode}${phoneValue}`;
+        };
+
+        // Normalize phone numbers for all bookings one final time
+        enriched.forEach(booking => {
+            if (booking.phone) {
+                const normalizedPhone = ensurePhoneWithCountryCode(booking.phone);
+                if (normalizedPhone !== booking.phone) {
+                    console.log(`[getAllBookingData] Final normalization: Booking ${booking.id} phone ${booking.phone} -> ${normalizedPhone}`);
+                    booking.phone = normalizedPhone;
+                }
+            }
+        });
+
         // Debug: Log what we're returning
         console.log('getAllBookingData - Returning bookings with additional info:', {
             totalBookings: enriched.length,
             sampleBooking: enriched[0] ? {
                 id: enriched[0].id,
+                phone: enriched[0].phone,
                 hasAdditionalInfo: !!enriched[0].additional_information,
                 questionsCount: enriched[0].additional_information?.questions?.length || 0,
                 answersCount: enriched[0].additional_information?.answers?.length || 0
@@ -8292,6 +8326,199 @@ app.post('/api/sync-payment-history/:bookingId', async (req, res) => {
 });
 
 // Refund payment endpoint
+// Helper function to check if booking is fully refunded and update status to Cancelled
+function checkAndUpdateBookingStatus(bookingId) {
+    if (!bookingId) return;
+    
+    // Get all payment history for this booking
+    const paymentHistorySql = `
+        SELECT amount, payment_status
+        FROM payment_history
+        WHERE booking_id = ?
+        ORDER BY created_at ASC
+    `;
+    
+    con.query(paymentHistorySql, [bookingId], (err, paymentHistory) => {
+        if (err) {
+            console.error('Error fetching payment history for booking status check:', err);
+            return;
+        }
+        
+        // Calculate total payments and total refunds
+        let totalPayments = 0;
+        let totalRefunds = 0;
+        
+        paymentHistory.forEach(payment => {
+            const amount = parseFloat(payment.amount || 0);
+            if (payment.payment_status === 'refunded' || amount < 0) {
+                // Refund (negative amount or refunded status)
+                totalRefunds += Math.abs(amount);
+            } else if (payment.payment_status === 'succeeded' && amount > 0) {
+                // Payment (positive amount with succeeded status)
+                totalPayments += amount;
+            }
+        });
+        
+        // Check if fully refunded (total refunds >= total payments)
+        // Only update status if we have actual payment data
+        if (paymentHistory.length > 0 && totalPayments > 0 && totalRefunds >= totalPayments) {
+            // Update booking status to Cancelled
+            const updateStatusSql = `
+                UPDATE all_booking
+                SET status = 'Cancelled'
+                WHERE id = ? AND status != 'Cancelled'
+            `;
+            
+            con.query(updateStatusSql, [bookingId], (updateErr, updateResult) => {
+                if (updateErr) {
+                    console.error('Error updating booking status to Cancelled:', updateErr);
+                } else if (updateResult.affectedRows > 0) {
+                    console.log(`✅ Booking ${bookingId} status updated to Cancelled (fully refunded)`, {
+                        bookingId,
+                        totalPayments,
+                        totalRefunds
+                    });
+                }
+            });
+        }
+    });
+}
+
+// Helper function to check if voucher is fully refunded and update status to Cancelled
+function checkAndUpdateVoucherStatus(voucherId, voucherRef) {
+    if (!voucherId && !voucherRef) return;
+    
+    // Get all payment history for this voucher
+    let paymentHistorySql = '';
+    let queryParams = [];
+    
+    if (voucherId) {
+        paymentHistorySql = `
+            SELECT amount, payment_status
+            FROM payment_history
+            WHERE voucher_id = ?
+            ORDER BY created_at ASC
+        `;
+        queryParams = [voucherId];
+    } else if (voucherRef) {
+        paymentHistorySql = `
+            SELECT amount, payment_status
+            FROM payment_history
+            WHERE voucher_ref = ?
+            ORDER BY created_at ASC
+        `;
+        queryParams = [voucherRef];
+    }
+    
+    con.query(paymentHistorySql, queryParams, (err, paymentHistory) => {
+        if (err) {
+            console.error('Error fetching payment history for voucher status check:', err);
+            return;
+        }
+        
+        // Calculate total payments and total refunds
+        let totalPayments = 0;
+        let totalRefunds = 0;
+        
+        paymentHistory.forEach(payment => {
+            const amount = parseFloat(payment.amount || 0);
+            if (payment.payment_status === 'refunded' || amount < 0) {
+                // Refund (negative amount or refunded status)
+                totalRefunds += Math.abs(amount);
+            } else if (payment.payment_status === 'succeeded' && amount > 0) {
+                // Payment (positive amount with succeeded status)
+                totalPayments += amount;
+            }
+        });
+        
+        // Check if fully refunded (total refunds >= total payments)
+        // Only update status if we have actual payment data
+        if (paymentHistory.length > 0 && totalPayments > 0 && totalRefunds >= totalPayments) {
+            // First, try to find linked booking and update its status
+            let findBookingSql = '';
+            let findBookingParams = [];
+            
+            if (voucherId) {
+                findBookingSql = `
+                    SELECT id FROM all_booking
+                    WHERE voucher_code IN (
+                        SELECT voucher_ref FROM all_vouchers WHERE id = ?
+                    )
+                    LIMIT 1
+                `;
+                findBookingParams = [voucherId];
+            } else if (voucherRef) {
+                findBookingSql = `
+                    SELECT id FROM all_booking
+                    WHERE voucher_code = ?
+                    LIMIT 1
+                `;
+                findBookingParams = [voucherRef];
+            }
+            
+            con.query(findBookingSql, findBookingParams, (findErr, bookingResults) => {
+                if (!findErr && bookingResults && bookingResults.length > 0) {
+                    // Update linked booking status to Cancelled
+                    const bookingId = bookingResults[0].id;
+                    const updateBookingStatusSql = `
+                        UPDATE all_booking
+                        SET status = 'Cancelled'
+                        WHERE id = ? AND status != 'Cancelled'
+                    `;
+                    
+                    con.query(updateBookingStatusSql, [bookingId], (updateErr, updateResult) => {
+                        if (updateErr) {
+                            console.error('Error updating linked booking status to Cancelled:', updateErr);
+                        } else if (updateResult.affectedRows > 0) {
+                            console.log(`✅ Linked booking ${bookingId} status updated to Cancelled (voucher fully refunded)`, {
+                                voucherId,
+                                voucherRef,
+                                bookingId,
+                                totalPayments,
+                                totalRefunds
+                            });
+                        }
+                    });
+                }
+                
+                // Also update voucher's redeemed status to indicate cancellation
+                // Note: This is a fallback if no linked booking is found
+                let updateVoucherSql = '';
+                let updateVoucherParams = [];
+                
+                if (voucherId) {
+                    updateVoucherSql = `
+                        UPDATE all_vouchers
+                        SET redeemed = 'Cancelled'
+                        WHERE id = ? AND redeemed != 'Cancelled'
+                    `;
+                    updateVoucherParams = [voucherId];
+                } else if (voucherRef) {
+                    updateVoucherSql = `
+                        UPDATE all_vouchers
+                        SET redeemed = 'Cancelled'
+                        WHERE voucher_ref = ? AND redeemed != 'Cancelled'
+                    `;
+                    updateVoucherParams = [voucherRef];
+                }
+                
+                con.query(updateVoucherSql, updateVoucherParams, (updateErr, updateResult) => {
+                    if (updateErr) {
+                        console.error('Error updating voucher status to Cancelled:', updateErr);
+                    } else if (updateResult.affectedRows > 0) {
+                        console.log(`✅ Voucher ${voucherId || voucherRef} status updated to Cancelled (fully refunded)`, {
+                            voucherId,
+                            voucherRef,
+                            totalPayments,
+                            totalRefunds
+                        });
+                    }
+                });
+            });
+        }
+    });
+}
+
 app.post('/api/refund-payment', async (req, res) => {
     try {
         const { paymentId, bookingId, voucherId, voucherRef, amount, comment, stripeChargeId } = req.body;
@@ -8419,7 +8646,7 @@ app.post('/api/refund-payment', async (req, res) => {
                     const refundAmountDecimal = (refundAmount / 100).toFixed(2);
                     
                     // Update paid amount - either booking or voucher
-                    const saveRefundRecord = () => {
+                    const saveRefundRecord = (callback) => {
                         con.query(
                             refundSql,
                             [
@@ -8471,6 +8698,8 @@ app.post('/api/refund-payment', async (req, res) => {
                                                     console.error('Error saving refund to database:', insertErr2);
                                                 } else {
                                                     console.log(`✅ Refund record saved to payment_history`);
+                                                    // Call callback after successful insert
+                                                    if (callback) callback();
                                                 }
                                             }
                                         );
@@ -8479,6 +8708,8 @@ app.post('/api/refund-payment', async (req, res) => {
                                     }
                                 } else {
                                     console.log(`✅ Refund record saved to payment_history`);
+                                    // Call callback after successful insert
+                                    if (callback) callback();
                                 }
                             }
                         );
@@ -8505,7 +8736,14 @@ app.post('/api/refund-payment', async (req, res) => {
                                     refundAmount: refundAmountDecimal
                                 });
                             }
-                                saveRefundRecord();
+                                // Save refund record and check status after refund is saved
+                                saveRefundRecord(() => {
+                                    // Check if fully refunded and update status to Cancelled
+                                    // Use setTimeout to ensure refund record is committed to database
+                                    setTimeout(() => {
+                                        checkAndUpdateBookingStatus(bookingId);
+                                    }, 100);
+                                });
                             }
                         );
                     } else if (voucherId || voucherRef) {
@@ -8529,7 +8767,14 @@ app.post('/api/refund-payment', async (req, res) => {
                                         refundAmount: refundAmountDecimal
                                     });
                                 }
-                                saveRefundRecord();
+                                // Save refund record and check status after refund is saved
+                                saveRefundRecord(() => {
+                                    // Check if fully refunded and update status to Cancelled
+                                    // Use setTimeout to ensure refund record is committed to database
+                                    setTimeout(() => {
+                                        checkAndUpdateVoucherStatus(voucherId, voucherRef);
+                                    }, 100);
+                                });
                             }
                         );
                     } else {
@@ -9928,18 +10173,25 @@ app.post('/api/createBooking', (req, res) => {
         // Combine countryCode and phone for mainPassenger phone
         // Check if phone already has country code (starts with +)
         let mainPassengerPhone = mainPassenger.phone || null;
-        if (mainPassengerPhone && !mainPassengerPhone.startsWith('+')) {
-            // Phone doesn't have country code, combine with countryCode if available
-            if (mainPassenger.countryCode) {
-                let countryCode = mainPassenger.countryCode;
-                // Ensure countryCode starts with + if it doesn't
-                if (countryCode && !countryCode.startsWith('+')) {
-                    countryCode = '+' + countryCode;
+        if (mainPassengerPhone) {
+            mainPassengerPhone = String(mainPassengerPhone).trim();
+            if (!mainPassengerPhone.startsWith('+')) {
+                // Phone doesn't have country code, combine with countryCode if available
+                if (mainPassenger.countryCode) {
+                    let countryCode = String(mainPassenger.countryCode).trim();
+                    // Ensure countryCode starts with + if it doesn't
+                    if (countryCode && !countryCode.startsWith('+')) {
+                        countryCode = '+' + countryCode;
+                    }
+                    mainPassengerPhone = `${countryCode}${mainPassengerPhone}`.trim();
+                    console.log(`[createBooking] Combined phone with countryCode: ${mainPassengerPhone}`);
+                } else {
+                    // If no countryCode in passengerData, use default UK code
+                    mainPassengerPhone = `+44${mainPassengerPhone}`.trim();
+                    console.log(`[createBooking] Added default +44 to phone: ${mainPassengerPhone}`);
                 }
-                mainPassengerPhone = `${countryCode}${mainPassengerPhone}`.trim();
             } else {
-                // If no countryCode in passengerData, use default UK code
-                mainPassengerPhone = `+44${mainPassengerPhone}`.trim();
+                console.log(`[createBooking] Phone already has country code: ${mainPassengerPhone}`);
             }
         }
         if (!bookingEmail) {
@@ -10480,11 +10732,26 @@ app.post('/api/createBooking', (req, res) => {
                     // If phone already starts with +, it's already combined (from frontend), use it as is
                     // Otherwise, combine countryCode and phone
                     let passengerPhone = p.phone || null;
-                    if (passengerPhone && !passengerPhone.startsWith('+')) {
-                        // Phone doesn't have country code, combine with countryCode if available
-                        passengerPhone = p.countryCode && p.phone
-                            ? `${p.countryCode}${p.phone}`.trim()
-                            : (p.phone || null);
+                    if (passengerPhone) {
+                        passengerPhone = String(passengerPhone).trim();
+                        if (!passengerPhone.startsWith('+')) {
+                            // Phone doesn't have country code, combine with countryCode if available
+                            if (p.countryCode) {
+                                let countryCode = String(p.countryCode).trim();
+                                // Ensure countryCode starts with + if it doesn't
+                                if (countryCode && !countryCode.startsWith('+')) {
+                                    countryCode = '+' + countryCode;
+                                }
+                                passengerPhone = `${countryCode}${passengerPhone}`.trim();
+                                console.log(`[createBooking] Passenger phone combined with countryCode: ${passengerPhone}`);
+                            } else {
+                                // If no countryCode, use default UK code
+                                passengerPhone = `+44${passengerPhone}`.trim();
+                                console.log(`[createBooking] Passenger phone added default +44: ${passengerPhone}`);
+                            }
+                        } else {
+                            console.log(`[createBooking] Passenger phone already has country code: ${passengerPhone}`);
+                        }
                     }
                     
                     return [

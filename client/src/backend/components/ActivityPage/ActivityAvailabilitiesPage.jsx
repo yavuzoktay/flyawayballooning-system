@@ -409,19 +409,20 @@ const ActivityAvailabilitiesPage = () => {
 
 
     return (
-        <Container maxWidth="lg" style={{ marginTop: 40 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <Container maxWidth="lg" style={{ marginTop: 40 }} className="availabilities-page-container">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }} className="availabilities-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }} className="availabilities-title-section">
                     <Button 
                         variant="outlined" 
                         onClick={() => navigate(-1)}
                         sx={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                        className="availabilities-back-button"
                     >
                         &larr; Back
                     </Button>
-                    <h2 style={{ margin: 0 }}>Availabilities{activityName ? ` - ${activityName}` : ''}</h2>
+                    <h2 style={{ margin: 0 }} className="availabilities-title">Availabilities{activityName ? ` - ${activityName}` : ''}</h2>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} className="availabilities-actions">
                     <Button
                         variant="contained"
                         color="error"
@@ -489,7 +490,8 @@ const ActivityAvailabilitiesPage = () => {
                     </Typography>
                 </Box>
             ) : (
-            <Table>
+            <div className="availabilities-table-wrapper" style={{ overflowX: 'auto', width: '100%' }}>
+            <Table className="availabilities-table">
                 <TableHead>
                     <TableRow>
                         <TableCell padding="checkbox">
@@ -629,6 +631,7 @@ const ActivityAvailabilitiesPage = () => {
                     ))}
                 </TableBody>
             </Table>
+            </div>
             )}
             <CreateAvailabilitiesModal open={modalOpen} onClose={() => setModalOpen(false)} activityName={activityName} activityId={id} onCreated={() => {
                 axios.get(`/api/activity/${id}/availabilities`).then(res => {
