@@ -1685,6 +1685,8 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
     finalVoucherDetail.voucher.paid = voucherItem.paid || finalVoucherDetail.voucher.paid;
     // Copy booking_id from getAllVoucherData (linked booking for payment history)
     finalVoucherDetail.voucher.booking_id = voucherItem.booking_id || finalVoucherDetail.voucher.booking_id;
+    // Copy booking_phone from getAllVoucherData (for Personal Details phone display)
+    finalVoucherDetail.voucher.booking_phone = voucherItem.booking_phone || finalVoucherDetail.voucher.booking_phone;
     
     // Copy additional information data from getAllVoucherData
     if (voucherItem.additional_information) {
