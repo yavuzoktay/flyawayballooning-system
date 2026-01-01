@@ -27,7 +27,6 @@ const BookingPage = () => {
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     
     const [activeTab, setActiveTab] = useState("bookings");
-    const [showMobileSearch, setShowMobileSearch] = useState(false);
     const [booking, setBooking] = useState([]);
     const [dateRequested, setDateRequested] = useState([]);
     const [filteredData, setFilteredData] = useState([]);
@@ -4658,32 +4657,70 @@ setBookingDetail(finalVoucherDetail);
                                         gap: isMobile ? 4 : 8,
                                         flexWrap: isMobile ? 'wrap' : 'nowrap'
                                     }}>
-                                        {/* Export Button - Icon on mobile */}
+                                        {/* Export Button - Input-like on mobile */}
                                         {isMobile ? (
-                                            <IconButton
-                                                color="primary"
+                                            <OutlinedInput
+                                                readOnly
                                                 onClick={handleExportCSV}
+                                                value="Export"
+                                                sx={{
+                                                    cursor: 'pointer',
+                                                    height: '32px',
+                                                    fontSize: 12,
+                                                    '& input': {
+                                                        cursor: 'pointer',
+                                                        textAlign: 'center',
+                                                        padding: '8px 12px'
+                                                    },
+                                                    '& fieldset': {
+                                                        borderColor: 'primary.main'
+                                                    },
+                                                    '&:hover fieldset': {
+                                                        borderColor: 'primary.dark'
+                                                    }
+                                                }}
                                                 size="small"
-                                                sx={{ border: '1px solid', borderColor: 'primary.main' }}
-                                            >
-                                                <FileDownloadIcon fontSize="small" />
-                                            </IconButton>
+                                                startAdornment={
+                                                    <InputAdornment position="start">
+                                                        <FileDownloadIcon fontSize="small" color="primary" />
+                                                    </InputAdornment>
+                                                }
+                                            />
                                         ) : (
                                             <Button variant="outlined" color="primary" onClick={handleExportCSV} style={{ height: 40 }}>
                                                 Export
                                             </Button>
                                         )}
                                         
-                                        {/* Filter Button - Icon on mobile */}
+                                        {/* Filter Button - Input-like on mobile */}
                                         {isMobile ? (
-                                            <IconButton
-                                                color="secondary"
+                                            <OutlinedInput
+                                                readOnly
                                                 onClick={() => setFilterDialogOpen(true)}
+                                                value="Filter"
+                                                sx={{
+                                                    cursor: 'pointer',
+                                                    height: '32px',
+                                                    fontSize: 12,
+                                                    '& input': {
+                                                        cursor: 'pointer',
+                                                        textAlign: 'center',
+                                                        padding: '8px 12px'
+                                                    },
+                                                    '& fieldset': {
+                                                        borderColor: 'secondary.main'
+                                                    },
+                                                    '&:hover fieldset': {
+                                                        borderColor: 'secondary.dark'
+                                                    }
+                                                }}
                                                 size="small"
-                                                sx={{ border: '1px solid', borderColor: 'secondary.main' }}
-                                            >
-                                                <FilterListIcon fontSize="small" />
-                                            </IconButton>
+                                                startAdornment={
+                                                    <InputAdornment position="start">
+                                                        <FilterListIcon fontSize="small" color="secondary" />
+                                                    </InputAdornment>
+                                                }
+                                            />
                                         ) : (
                                             <Button
                                                 variant="outlined"
@@ -4732,42 +4769,29 @@ setBookingDetail(finalVoucherDetail);
                                             Bulk SMS
                                         </Button>
                                         
-                                        {/* Search Input - Icon button on mobile, full input on desktop */}
+                                        {/* Search Input - Input-like on mobile, full input on desktop */}
                                         {isMobile ? (
-                                            <>
-                                                <IconButton
-                                                    color="default"
-                                                    size="small"
-                                                    onClick={() => setShowMobileSearch(!showMobileSearch)}
-                                                    sx={{ border: '1px solid', borderColor: 'divider' }}
-                                                >
-                                                    <SearchIcon fontSize="small" />
-                                                </IconButton>
-                                                {showMobileSearch && (
-                                                    <OutlinedInput
-                                                        placeholder="Search..."
-                                                        value={filters.search}
-                                                        onChange={(e) => handleFilterChange("search", e.target.value)}
-                                                        autoFocus
-                                                        sx={{ 
-                                                            fontSize: 12,
-                                                            flex: 1,
-                                                            minWidth: 120,
-                                                            '& input::placeholder': { fontSize: 12 },
-                                                            height: '32px',
-                                                            '& .MuiOutlinedInput-input': {
-                                                                padding: '8px 12px'
-                                                            }
-                                                        }}
-                                                        size="small"
-                                                        startAdornment={
-                                                            <InputAdornment position="start">
-                                                                <SearchIcon fontSize="small" />
-                                                            </InputAdornment>
-                                                        }
-                                                    />
-                                                )}
-                                            </>
+                                            <OutlinedInput
+                                                placeholder="Search..."
+                                                value={filters.search}
+                                                onChange={(e) => handleFilterChange("search", e.target.value)}
+                                                sx={{ 
+                                                    fontSize: 12,
+                                                    flex: 1,
+                                                    minWidth: 120,
+                                                    '& input::placeholder': { fontSize: 12 },
+                                                    height: '32px',
+                                                    '& .MuiOutlinedInput-input': {
+                                                        padding: '8px 12px'
+                                                    }
+                                                }}
+                                                size="small"
+                                                startAdornment={
+                                                    <InputAdornment position="start">
+                                                        <SearchIcon fontSize="small" />
+                                                    </InputAdornment>
+                                                }
+                                            />
                                         ) : (
                                             <OutlinedInput
                                                 placeholder="Search by name, email, phone, location..."
