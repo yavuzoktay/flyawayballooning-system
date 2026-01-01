@@ -5262,8 +5262,29 @@ setBookingDetail(finalVoucherDetail);
                                                             </>
                                                         ) : (
                                                             <>
-                                                                {v.book_flight === "Gift Voucher" ? (v.purchaser_phone || v.phone || '-') : (v.booking_phone || v.phone || v.mobile || '-')}
-                                                                <IconButton size="small" onClick={() => handleEditClick('mobile', v.book_flight === "Gift Voucher" ? (v.purchaser_phone || v.phone) : (v.booking_phone || v.phone || v.mobile))}><EditIcon fontSize="small" /></IconButton>
+                                                                {(() => {
+                                                                    // For Flight Voucher, prioritize booking_phone (from linked booking)
+                                                                    // For Gift Voucher, use purchaser_phone
+                                                                    const isGiftVoucher = v.book_flight === "Gift Voucher" || (v.book_flight || '').toLowerCase().includes('gift');
+                                                                    if (isGiftVoucher) {
+                                                                        return v.purchaser_phone || v.phone || '-';
+                                                                    } else {
+                                                                        // Flight Voucher: Use booking_phone if available and not empty
+                                                                        // booking_phone comes from the linked booking and has country code
+                                                                        const bookingPhone = v.booking_phone && String(v.booking_phone).trim() !== '' ? String(v.booking_phone).trim() : null;
+                                                                        if (bookingPhone) {
+                                                                            return bookingPhone;
+                                                                        }
+                                                                        // Fallback to phone or mobile if booking_phone is not available
+                                                                        return v.phone || v.mobile || '-';
+                                                                    }
+                                                                })()}
+                                                                <IconButton size="small" onClick={() => {
+                                                                    const phoneValue = v.book_flight === "Gift Voucher" 
+                                                                        ? (v.purchaser_phone || v.phone) 
+                                                                        : (v.booking_phone && v.booking_phone.trim() !== '' ? v.booking_phone : (v.phone || v.mobile));
+                                                                    handleEditClick('mobile', phoneValue);
+                                                                }}><EditIcon fontSize="small" /></IconButton>
                                                             </>
                                                         )}</Typography>
                                                         {/* Remove explicit Mobile row from Voucher Details popups */}
