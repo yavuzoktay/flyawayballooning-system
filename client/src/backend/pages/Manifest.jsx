@@ -29,6 +29,8 @@ import {
     DialogContent,
     DialogActions,
     InputAdornment,
+    useTheme,
+    useMediaQuery,
 } from "@mui/material";
 import { MoreVert as MoreVertIcon, Edit as EditIcon } from "@mui/icons-material";
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -130,6 +132,10 @@ const MemoizedEmailPreview = React.memo(
 );
 
 const Manifest = () => {
+    // Mobile detection
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+    
     // Hook'lar her zaman bir dizi döndürsün, yoksa boş dizi olsun
     const bookingHook = useBooking() || {};
     const pessangerHook = usePessanger() || {};
@@ -3911,17 +3917,137 @@ const Manifest = () => {
                                                         <Typography variant="h6">{activityName}{titleSuffix}{bookingIdSuffix} - Flight Time: {displayFlightTime}</Typography>
                                                     );
                                                 })()}
-                                                <Box display="flex" alignItems="center" gap={3} mt={1} className="manifest-flight-details">
-                                                    <Typography>Pax Booked: {paxBookedDisplay} / {paxTotalDisplay}</Typography>
-                                                    <Typography>Balloon Resource: {balloonResource}</Typography>
-                                                    <Typography>Status: <span
-   style={{ color: status === 'Closed' ? 'red' : 'green', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
-   onClick={() => handleToggleGroupStatus(groupFlights)}
- >{status}{statusLoadingGroup === first.id ? '...' : ''}</span></Typography>
-                                                    <Typography>Type: {first.flight_type}</Typography>
+                                                <Box display="flex" alignItems="center" gap={3} mt={1} className="manifest-flight-details" sx={{
+                                                    flexDirection: isMobile ? 'column' : 'row',
+                                                    alignItems: isMobile ? 'flex-start' : 'center',
+                                                    gap: isMobile ? 1 : 3
+                                                }}>
+                                                    <Box display="flex" alignItems="center" gap={1} sx={{ width: isMobile ? '100%' : 'auto' }}>
+                                                        <Typography>Pax Booked: {paxBookedDisplay} / {paxTotalDisplay}</Typography>
+                                                        {isMobile && (
+                                                            <IconButton size="small" onClick={(e) => {
+                                                                // Section menu for Pax Booked
+                                                                e.stopPropagation();
+                                                            }}>
+                                                                <MoreVertIcon fontSize="small" />
+                                                            </IconButton>
+                                                        )}
+                                                    </Box>
+                                                    <Box display="flex" alignItems="center" gap={1} sx={{ width: isMobile ? '100%' : 'auto' }}>
+                                                        <Typography>Balloon Resource: {balloonResource}</Typography>
+                                                        {isMobile && (
+                                                            <IconButton size="small" onClick={(e) => {
+                                                                // Section menu for Balloon Resource
+                                                                e.stopPropagation();
+                                                            }}>
+                                                                <MoreVertIcon fontSize="small" />
+                                                            </IconButton>
+                                                        )}
+                                                    </Box>
+                                                    <Box display="flex" alignItems="center" gap={1} sx={{ width: isMobile ? '100%' : 'auto' }}>
+                                                        <Typography>Status: <span
+                                                            style={{ color: status === 'Closed' ? 'red' : 'green', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+                                                            onClick={() => handleToggleGroupStatus(groupFlights)}
+                                                        >{status}{statusLoadingGroup === first.id ? '...' : ''}</span></Typography>
+                                                        {isMobile && (
+                                                            <IconButton size="small" onClick={(e) => {
+                                                                // Section menu for Status
+                                                                e.stopPropagation();
+                                                            }}>
+                                                                <MoreVertIcon fontSize="small" />
+                                                            </IconButton>
+                                                        )}
+                                                    </Box>
+                                                    <Box display="flex" alignItems="center" gap={1} sx={{ width: isMobile ? '100%' : 'auto' }}>
+                                                        <Typography>Type: {first.flight_type}</Typography>
+                                                        {isMobile && (
+                                                            <IconButton size="small" onClick={(e) => {
+                                                                // Section menu for Type
+                                                                e.stopPropagation();
+                                                            }}>
+                                                                <MoreVertIcon fontSize="small" />
+                                                            </IconButton>
+                                                        )}
+                                                    </Box>
                                                 </Box>
                                             </Box>
-                                            <Box display="flex" alignItems="center" gap={1} className="manifest-flight-actions">
+                                            {/* Mobile: Crew and Pilot selection above flight details */}
+                                            {isMobile && (
+                                                <Box sx={{ mb: 2, display: 'flex', gap: 1, alignItems: 'center' }}>
+                                                    {/* Crew Selection - Small */}
+                                                    {(() => {
+                                                        const activityIdForSlot = getFlightActivityId(first);
+                                                        const slotKeyValue = slotKey(activityIdForSlot, (first.flight_date||'').substring(0,10), (first.flight_date||'').substring(11,16));
+                                                        const currentCrewId = crewAssignmentsBySlot[slotKeyValue];
+                                                        const isActivityIdValid = activityIdForSlot !== null && activityIdForSlot !== undefined && !isNaN(activityIdForSlot);
+                                                        
+                                                        return (
+                                                            <Select
+                                                                native
+                                                                value={currentCrewId || ''}
+                                                                onChange={(e) => handleCrewChange(activityIdForSlot, first.flight_date, e.target.value)}
+                                                                disabled={!isActivityIdValid}
+                                                                sx={{ 
+                                                                    minWidth: 100,
+                                                                    maxWidth: 120,
+                                                                    fontSize: '11px',
+                                                                    height: '32px',
+                                                                    background: isActivityIdValid ? '#fff' : '#f3f4f6',
+                                                                    opacity: isActivityIdValid ? 1 : 0.6,
+                                                                    '& select': {
+                                                                        padding: '6px 8px',
+                                                                        fontSize: '11px'
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <option value="">Crew</option>
+                                                                {crewList.map(c => (
+                                                                    <option key={c.id} value={c.id}>{`${c.first_name} ${c.last_name}`}</option>
+                                                                ))}
+                                                            </Select>
+                                                        );
+                                                    })()}
+                                                    
+                                                    {/* Pilot Selection - Small */}
+                                                    {(() => {
+                                                        const activityIdForSlot = getFlightActivityId(first);
+                                                        const slotKeyValue = slotKey(activityIdForSlot, (first.flight_date||'').substring(0,10), (first.flight_date||'').substring(11,16));
+                                                        const currentPilotId = pilotAssignmentsBySlot[slotKeyValue];
+                                                        const isActivityIdValid = activityIdForSlot !== null && activityIdForSlot !== undefined && !isNaN(activityIdForSlot);
+                                                        
+                                                        return (
+                                                            <Select
+                                                                native
+                                                                value={currentPilotId || ''}
+                                                                onChange={(e) => handlePilotChange(activityIdForSlot, first.flight_date, e.target.value)}
+                                                                disabled={!isActivityIdValid}
+                                                                sx={{ 
+                                                                    minWidth: 100,
+                                                                    maxWidth: 120,
+                                                                    fontSize: '11px',
+                                                                    height: '32px',
+                                                                    background: isActivityIdValid ? '#fff' : '#f3f4f6',
+                                                                    opacity: isActivityIdValid ? 1 : 0.6,
+                                                                    '& select': {
+                                                                        padding: '6px 8px',
+                                                                        fontSize: '11px'
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <option value="">Pilot</option>
+                                                                {pilotList.map(p => (
+                                                                    <option key={p.id} value={p.id}>{`${p.first_name} ${p.last_name}`}</option>
+                                                                ))}
+                                                            </Select>
+                                                        );
+                                                    })()}
+                                                </Box>
+                                            )}
+                                            
+                                            <Box display="flex" alignItems="center" gap={1} className="manifest-flight-actions" sx={{
+                                                flexDirection: isMobile ? 'row' : 'row',
+                                                flexWrap: isMobile ? 'wrap' : 'nowrap'
+                                            }}>
                                                 {/* Sold Out Badge - Show when flight is fully booked */}
                                                 {paxBookedDisplay === paxTotalDisplay && (
                                                     <Box sx={{
@@ -3941,152 +4067,153 @@ const Manifest = () => {
                                                     </Box>
                                                 )}
                                                 
-                                                {/* Crew Selection Dropdown */}
-                        {(() => {
-                            const activityIdForSlot = getFlightActivityId(first);
-                            const slotKeyValue = slotKey(activityIdForSlot, (first.flight_date||'').substring(0,10), (first.flight_date||'').substring(11,16));
-                            const currentCrewId = crewAssignmentsBySlot[slotKeyValue];
-                            
-                            // Debug logging
-                            if (process.env.NODE_ENV === 'development') {
-                                console.log('Dropdown for flight:', first.id, 'slotKey:', slotKeyValue, 'currentCrewId:', currentCrewId, 'all assignments:', crewAssignmentsBySlot);
-                                console.log('Flight data:', { 
-                                    id: first.id, 
-                                    activity_id: activityIdForSlot, 
-                                    flight_date: first.flight_date,
-                                    date_part: (first.flight_date||'').substring(0,10),
-                                    time_part: (first.flight_date||'').substring(11,16),
-                                    fullFlight: first
-                                });
-                            }
-                            
-                            // Check if activityId is valid
-                            const isActivityIdValid = activityIdForSlot !== null && activityIdForSlot !== undefined && !isNaN(activityIdForSlot);
-                            
-                            if (!isActivityIdValid) {
-                                console.error('Invalid activityId for flight:', { 
-                                    flightId: first.id, 
-                                    activityId: activityIdForSlot,
-                                    flight: first 
-                                });
-                            }
-                            
-                            return (
-                                <>
-                                    <Select
-                                        native
-                                        value={currentCrewId || ''}
-                                        onChange={(e) => handleCrewChange(activityIdForSlot, first.flight_date, e.target.value)}
-                                        disabled={!isActivityIdValid}
-                                        sx={{ 
-                                            minWidth: 200, 
-                                            mr: 1, 
-                                            background: isActivityIdValid ? '#fff' : '#f3f4f6',
-                                            opacity: isActivityIdValid ? 1 : 0.6
-                                        }}
-                                    >
-                                        <option value="">{isActivityIdValid ? 'Crew Selection' : 'Activity ID Missing'}</option>
-                                        {crewList.map(c => (
-                                            <option key={c.id} value={c.id}>{`${c.first_name} ${c.last_name}`}</option>
-                                        ))}
-                                    </Select>
-                                    
-                                    {/* Crew Assignment Status Display */}
-                                    <Box sx={{ 
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        alignItems: 'flex-start',
-                                        ml: 1,
-                                        minWidth: 150
-                                    }}>
-                                        <Box sx={{ 
-                                            fontSize: '12px', 
-                                            fontWeight: '500',
-                                            color: currentCrewId ? '#10b981' : '#6b7280',
-                                            mb: 0.5
-                                        }}>
-                                            {currentCrewId ? '✓ Assigned' : '○ Not Assigned'}
-                                        </Box>
-                                        <Box sx={{ 
-                                            fontSize: '11px', 
-                                            color: '#6b7280',
-                                            fontStyle: currentCrewId ? 'normal' : 'italic'
-                                        }}>
-                                            {currentCrewId ? getCrewMemberName(currentCrewId) : 'No crew selected'}
-                                        </Box>
-                                    </Box>
-                                    
-                                </>
-                            );
-                        })()}
+                                                {/* Desktop: Crew Selection Dropdown */}
+                                                {!isMobile && (() => {
+                                                    const activityIdForSlot = getFlightActivityId(first);
+                                                    const slotKeyValue = slotKey(activityIdForSlot, (first.flight_date||'').substring(0,10), (first.flight_date||'').substring(11,16));
+                                                    const currentCrewId = crewAssignmentsBySlot[slotKeyValue];
+                                                    
+                                                    // Debug logging
+                                                    if (process.env.NODE_ENV === 'development') {
+                                                        console.log('Dropdown for flight:', first.id, 'slotKey:', slotKeyValue, 'currentCrewId:', currentCrewId, 'all assignments:', crewAssignmentsBySlot);
+                                                        console.log('Flight data:', { 
+                                                            id: first.id, 
+                                                            activity_id: activityIdForSlot, 
+                                                            flight_date: first.flight_date,
+                                                            date_part: (first.flight_date||'').substring(0,10),
+                                                            time_part: (first.flight_date||'').substring(11,16),
+                                                            fullFlight: first
+                                                        });
+                                                    }
+                                                    
+                                                    // Check if activityId is valid
+                                                    const isActivityIdValid = activityIdForSlot !== null && activityIdForSlot !== undefined && !isNaN(activityIdForSlot);
+                                                    
+                                                    if (!isActivityIdValid) {
+                                                        console.error('Invalid activityId for flight:', { 
+                                                            flightId: first.id, 
+                                                            activityId: activityIdForSlot,
+                                                            flight: first 
+                                                        });
+                                                    }
+                                                    
+                                                    return (
+                                                        <>
+                                                            <Select
+                                                                native
+                                                                value={currentCrewId || ''}
+                                                                onChange={(e) => handleCrewChange(activityIdForSlot, first.flight_date, e.target.value)}
+                                                                disabled={!isActivityIdValid}
+                                                                sx={{ 
+                                                                    minWidth: 200, 
+                                                                    mr: 1, 
+                                                                    background: isActivityIdValid ? '#fff' : '#f3f4f6',
+                                                                    opacity: isActivityIdValid ? 1 : 0.6
+                                                                }}
+                                                            >
+                                                                <option value="">{isActivityIdValid ? 'Crew Selection' : 'Activity ID Missing'}</option>
+                                                                {crewList.map(c => (
+                                                                    <option key={c.id} value={c.id}>{`${c.first_name} ${c.last_name}`}</option>
+                                                                ))}
+                                                            </Select>
+                                                            
+                                                            {/* Crew Assignment Status Display */}
+                                                            <Box sx={{ 
+                                                                display: 'flex',
+                                                                flexDirection: 'column',
+                                                                alignItems: 'flex-start',
+                                                                ml: 1,
+                                                                minWidth: 150
+                                                            }}>
+                                                                <Box sx={{ 
+                                                                    fontSize: '12px', 
+                                                                    fontWeight: '500',
+                                                                    color: currentCrewId ? '#10b981' : '#6b7280',
+                                                                    mb: 0.5
+                                                                }}>
+                                                                    {currentCrewId ? '✓ Assigned' : '○ Not Assigned'}
+                                                                </Box>
+                                                                <Box sx={{ 
+                                                                    fontSize: '11px', 
+                                                                    color: '#6b7280',
+                                                                    fontStyle: currentCrewId ? 'normal' : 'italic'
+                                                                }}>
+                                                                    {currentCrewId ? getCrewMemberName(currentCrewId) : 'No crew selected'}
+                                                                </Box>
+                                                            </Box>
+                                                        </>
+                                                    );
+                                                })()}
                                                 
-                                                {/* Pilot Selection Dropdown */}
-                        {(() => {
-                            const activityIdForSlot = getFlightActivityId(first);
-                            const slotKeyValue = slotKey(activityIdForSlot, (first.flight_date||'').substring(0,10), (first.flight_date||'').substring(11,16));
-                            const currentPilotId = pilotAssignmentsBySlot[slotKeyValue];
-                            
-                            // Check if activityId is valid
-                            const isActivityIdValid = activityIdForSlot !== null && activityIdForSlot !== undefined && !isNaN(activityIdForSlot);
-                            
-                            if (!isActivityIdValid) {
-                                console.error('Invalid activityId for pilot flight:', { 
-                                    flightId: first.id, 
-                                    activityId: activityIdForSlot,
-                                    flight: first 
-                                });
-                            }
-                            
-                            return (
-                                <>
-                                    <Select
-                                        native
-                                        value={currentPilotId || ''}
-                                        onChange={(e) => handlePilotChange(activityIdForSlot, first.flight_date, e.target.value)}
-                                        disabled={!isActivityIdValid}
-                                        sx={{ 
-                                            minWidth: 200, 
-                                            mr: 1, 
-                                            background: isActivityIdValid ? '#fff' : '#f3f4f6',
-                                            opacity: isActivityIdValid ? 1 : 0.6
-                                        }}
-                                    >
-                                        <option value="">{isActivityIdValid ? 'Pilot Selection' : 'Activity ID Missing'}</option>
-                                        {pilotList.map(p => (
-                                            <option key={p.id} value={p.id}>{`${p.first_name} ${p.last_name}`}</option>
-                                        ))}
-                                    </Select>
-                                    
-                                    {/* Pilot Assignment Status Display */}
-                                    <Box sx={{ 
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        alignItems: 'flex-start',
-                                        ml: 1,
-                                        minWidth: 150
-                                    }}>
-                                        <Box sx={{ 
-                                            fontSize: '12px', 
-                                            fontWeight: '500',
-                                            color: currentPilotId ? '#10b981' : '#6b7280',
-                                            mb: 0.5
-                                        }}>
-                                            {currentPilotId ? '✓ Assigned' : '○ Not Assigned'}
-                                        </Box>
-                                        <Box sx={{ 
-                                            fontSize: '11px', 
-                                            color: '#6b7280',
-                                            fontStyle: currentPilotId ? 'normal' : 'italic'
-                                        }}>
-                                            {currentPilotId ? getPilotName(currentPilotId) : 'No pilot selected'}
-                                        </Box>
-                                    </Box>
-                                    
-                                </>
-                            );
-                        })()}
+                                                {/* Desktop: Pilot Selection Dropdown */}
+                                                {!isMobile && (() => {
+                                                    const activityIdForSlot = getFlightActivityId(first);
+                                                    const slotKeyValue = slotKey(activityIdForSlot, (first.flight_date||'').substring(0,10), (first.flight_date||'').substring(11,16));
+                                                    const currentPilotId = pilotAssignmentsBySlot[slotKeyValue];
+                                                    
+                                                    // Check if activityId is valid
+                                                    const isActivityIdValid = activityIdForSlot !== null && activityIdForSlot !== undefined && !isNaN(activityIdForSlot);
+                                                    
+                                                    if (!isActivityIdValid) {
+                                                        console.error('Invalid activityId for pilot flight:', { 
+                                                            flightId: first.id, 
+                                                            activityId: activityIdForSlot,
+                                                            flight: first 
+                                                        });
+                                                    }
+                                                    
+                                                    return (
+                                                        <>
+                                                            <Select
+                                                                native
+                                                                value={currentPilotId || ''}
+                                                                onChange={(e) => handlePilotChange(activityIdForSlot, first.flight_date, e.target.value)}
+                                                                disabled={!isActivityIdValid}
+                                                                sx={{ 
+                                                                    minWidth: 200, 
+                                                                    mr: 1, 
+                                                                    background: isActivityIdValid ? '#fff' : '#f3f4f6',
+                                                                    opacity: isActivityIdValid ? 1 : 0.6
+                                                                }}
+                                                            >
+                                                                <option value="">{isActivityIdValid ? 'Pilot Selection' : 'Activity ID Missing'}</option>
+                                                                {pilotList.map(p => (
+                                                                    <option key={p.id} value={p.id}>{`${p.first_name} ${p.last_name}`}</option>
+                                                                ))}
+                                                            </Select>
+                                                            
+                                                            {/* Pilot Assignment Status Display */}
+                                                            <Box sx={{ 
+                                                                display: 'flex',
+                                                                flexDirection: 'column',
+                                                                alignItems: 'flex-start',
+                                                                ml: 1,
+                                                                minWidth: 150
+                                                            }}>
+                                                                <Box sx={{ 
+                                                                    fontSize: '12px', 
+                                                                    fontWeight: '500',
+                                                                    color: currentPilotId ? '#10b981' : '#6b7280',
+                                                                    mb: 0.5
+                                                                }}>
+                                                                    {currentPilotId ? '✓ Assigned' : '○ Not Assigned'}
+                                                                </Box>
+                                                                <Box sx={{ 
+                                                                    fontSize: '11px', 
+                                                                    color: '#6b7280',
+                                                                    fontStyle: currentPilotId ? 'normal' : 'italic'
+                                                                }}>
+                                                                    {currentPilotId ? getPilotName(currentPilotId) : 'No pilot selected'}
+                                                                </Box>
+                                                            </Box>
+                                                        </>
+                                                    );
+                                                })()}
                                                 
-                                                <Button variant="contained" color="primary" sx={{ minWidth: 90, fontWeight: 600, textTransform: 'none' }} onClick={() => handleOpenBookingModal(first)}>Book</Button>
+                                                {/* Book Button - Hidden on mobile */}
+                                                {!isMobile && (
+                                                    <Button variant="contained" color="primary" sx={{ minWidth: 90, fontWeight: 600, textTransform: 'none' }} onClick={() => handleOpenBookingModal(first)}>Book</Button>
+                                                )}
                                                 <IconButton size="large" onClick={e => handleGlobalMenuOpen(e, first, groupFlights)}>
                                                     <MoreVertIcon />
                                                 </IconButton>
