@@ -1,11 +1,14 @@
 import axios from "axios";
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import PaginatedTable from "../components/BookingPage/PaginatedTable";
-import { Container, FormControl, InputLabel, MenuItem, OutlinedInput, Select, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Grid, Typography, Box, Divider, IconButton, Table, TableHead, TableRow, TableCell, TableBody, TableContainer, FormControlLabel, Switch, FormGroup, Checkbox, Chip, InputAdornment } from "@mui/material";
+import { Container, FormControl, InputLabel, MenuItem, OutlinedInput, Select, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Grid, Typography, Box, Divider, IconButton, Table, TableHead, TableRow, TableCell, TableBody, TableContainer, FormControlLabel, Switch, FormGroup, Checkbox, Chip, InputAdornment, useTheme, useMediaQuery } from "@mui/material";
 import dayjs from 'dayjs';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import MailOutlineIcon from '@mui/icons-material/MailOutline';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import SearchIcon from '@mui/icons-material/Search';
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import RebookAvailabilityModal from '../components/BookingPage/RebookAvailabilityModal';
@@ -19,7 +22,12 @@ import {
 import { getAssignedResourceInfo } from '../utils/resourceAssignment';
 
 const BookingPage = () => {
+    // Mobile detection
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+    
     const [activeTab, setActiveTab] = useState("bookings");
+    const [showMobileSearch, setShowMobileSearch] = useState(false);
     const [booking, setBooking] = useState([]);
     const [dateRequested, setDateRequested] = useState([]);
     const [filteredData, setFilteredData] = useState([]);
@@ -4510,14 +4518,20 @@ setBookingDetail(finalVoucherDetail);
                 </div>
                 <div style={{ padding: "50px", background: "#f9f9f9", borderRadius: "20px" }} className="booking-page-content">
                     {/* Tabs */}
-                    <div style={{ marginBottom: "20px" }} className="booking-page-tabs">
+                    <div style={{ 
+                        marginBottom: "20px",
+                        display: "flex",
+                        flexDirection: isMobile ? "row" : "row",
+                        gap: isMobile ? "4px" : "10px",
+                        flexWrap: isMobile ? "nowrap" : "nowrap"
+                    }} className="booking-page-tabs">
                         <button
                             onClick={() => handleTabChange("bookings")}
                             style={{
-                                marginRight: "10px",
+                                marginRight: isMobile ? "0" : "10px",
                                 background: activeTab === "bookings" ? "#3274b4" : "#A6A6A6",
                                 color: "#FFF",
-                                padding: "8px 16px",
+                                padding: isMobile ? "6px 10px" : "8px 16px",
                                 border: "none",
                                 cursor: "pointer",
                                 position: "relative",
@@ -4525,9 +4539,10 @@ setBookingDetail(finalVoucherDetail);
                                 alignItems: "center",
                                 gap: "6px",
                                 borderRadius: "4px",
-                                fontSize: "14px",
+                                fontSize: isMobile ? "12px" : "14px",
                                 fontWeight: "500",
-                                transition: "all 0.3s ease"
+                                transition: "all 0.3s ease",
+                                flex: isMobile ? "1" : "none"
                             }}
                         >
                             All Bookings
@@ -4555,10 +4570,10 @@ setBookingDetail(finalVoucherDetail);
                         <button
                             onClick={() => handleTabChange("vouchers")}
                             style={{
-                                marginRight: "10px",
+                                marginRight: isMobile ? "0" : "10px",
                                 background: activeTab === "vouchers" ? "#3274b4" : "#A6A6A6",
                                 color: "#FFF",
-                                padding: "8px 16px",
+                                padding: isMobile ? "6px 10px" : "8px 16px",
                                 border: "none",
                                 cursor: "pointer",
                                 position: "relative",
@@ -4566,9 +4581,10 @@ setBookingDetail(finalVoucherDetail);
                                 alignItems: "center",
                                 gap: "6px",
                                 borderRadius: "4px",
-                                fontSize: "14px",
+                                fontSize: isMobile ? "12px" : "14px",
                                 fontWeight: "500",
-                                transition: "all 0.3s ease"
+                                transition: "all 0.3s ease",
+                                flex: isMobile ? "1" : "none"
                             }}
                         >
                             All Vouchers
@@ -4598,13 +4614,14 @@ setBookingDetail(finalVoucherDetail);
                             style={{
                                 background: activeTab === "dateRequests" ? "#3274b4" : "#A6A6A6",
                                 color: "#FFF",
-                                padding: "8px 16px",
+                                padding: isMobile ? "6px 10px" : "8px 16px",
                                 border: "none",
                                 cursor: "pointer",
                                 borderRadius: "4px",
-                                fontSize: "14px",
+                                fontSize: isMobile ? "12px" : "14px",
                                 fontWeight: "500",
-                                transition: "all 0.3s ease"
+                                transition: "all 0.3s ease",
+                                flex: isMobile ? "1" : "none"
                             }}
                         >
                             Date Requests
@@ -4635,18 +4652,49 @@ setBookingDetail(finalVoucherDetail);
                                     <div className="booking-filter-heading">
                                         <h3 style={{ fontFamily: "Gilroy Light" }}>All Bookings</h3>
                                     </div>
-                                    <div className="booking-search-booking" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <Button variant="outlined" color="primary" onClick={handleExportCSV} style={{ height: 40 }}>
-                                            Export
-                                        </Button>
-                                        <Button
-                                            variant="outlined"
-                                            color="secondary"
-                                            onClick={() => setFilterDialogOpen(true)}
-                                            style={{ height: 40 }}
-                                        >
-                                            Filter
-                                        </Button>
+                                    <div className="booking-search-booking" style={{ 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        gap: isMobile ? 4 : 8,
+                                        flexWrap: isMobile ? 'wrap' : 'nowrap'
+                                    }}>
+                                        {/* Export Button - Icon on mobile */}
+                                        {isMobile ? (
+                                            <IconButton
+                                                color="primary"
+                                                onClick={handleExportCSV}
+                                                size="small"
+                                                sx={{ border: '1px solid', borderColor: 'primary.main' }}
+                                            >
+                                                <FileDownloadIcon fontSize="small" />
+                                            </IconButton>
+                                        ) : (
+                                            <Button variant="outlined" color="primary" onClick={handleExportCSV} style={{ height: 40 }}>
+                                                Export
+                                            </Button>
+                                        )}
+                                        
+                                        {/* Filter Button - Icon on mobile */}
+                                        {isMobile ? (
+                                            <IconButton
+                                                color="secondary"
+                                                onClick={() => setFilterDialogOpen(true)}
+                                                size="small"
+                                                sx={{ border: '1px solid', borderColor: 'secondary.main' }}
+                                            >
+                                                <FilterListIcon fontSize="small" />
+                                            </IconButton>
+                                        ) : (
+                                            <Button
+                                                variant="outlined"
+                                                color="secondary"
+                                                onClick={() => setFilterDialogOpen(true)}
+                                                style={{ height: 40 }}
+                                            >
+                                                Filter
+                                            </Button>
+                                        )}
+                                        
                                         <Button
                                             variant="contained"
                                             color="primary"
@@ -4661,7 +4709,7 @@ setBookingDetail(finalVoucherDetail);
                                                     openEmailModalForBooking(filteredData[0], { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
                                                 }
                                             }}
-                                            style={{ height: 40 }}
+                                            style={{ height: 40, fontSize: isMobile ? '12px' : '14px', padding: isMobile ? '6px 12px' : '8px 16px' }}
                                         >
                                             Bulk Email
                                         </Button>
@@ -4679,16 +4727,60 @@ setBookingDetail(finalVoucherDetail);
                                                     openSmsModalForBooking(filteredData[0], { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
                                                 }
                                             }}
-                                            style={{ height: 40, background: '#17a2b8' }}
+                                            style={{ height: 40, background: '#17a2b8', fontSize: isMobile ? '12px' : '14px', padding: isMobile ? '6px 12px' : '8px 16px' }}
                                         >
                                             Bulk SMS
                                         </Button>
-                                        <OutlinedInput
-                                            placeholder="Search by name, email, phone, location..."
-                                            value={filters.search}
-                                            onChange={(e) => handleFilterChange("search", e.target.value)}
-                                            sx={{ fontSize: 14, '& input::placeholder': { fontSize: 14 } }}
-                                        />
+                                        
+                                        {/* Search Input - Icon button on mobile, full input on desktop */}
+                                        {isMobile ? (
+                                            <>
+                                                <IconButton
+                                                    color="default"
+                                                    size="small"
+                                                    onClick={() => setShowMobileSearch(!showMobileSearch)}
+                                                    sx={{ border: '1px solid', borderColor: 'divider' }}
+                                                >
+                                                    <SearchIcon fontSize="small" />
+                                                </IconButton>
+                                                {showMobileSearch && (
+                                                    <OutlinedInput
+                                                        placeholder="Search..."
+                                                        value={filters.search}
+                                                        onChange={(e) => handleFilterChange("search", e.target.value)}
+                                                        autoFocus
+                                                        sx={{ 
+                                                            fontSize: 12,
+                                                            flex: 1,
+                                                            minWidth: 120,
+                                                            '& input::placeholder': { fontSize: 12 },
+                                                            height: '32px',
+                                                            '& .MuiOutlinedInput-input': {
+                                                                padding: '8px 12px'
+                                                            }
+                                                        }}
+                                                        size="small"
+                                                        startAdornment={
+                                                            <InputAdornment position="start">
+                                                                <SearchIcon fontSize="small" />
+                                                            </InputAdornment>
+                                                        }
+                                                    />
+                                                )}
+                                            </>
+                                        ) : (
+                                            <OutlinedInput
+                                                placeholder="Search by name, email, phone, location..."
+                                                value={filters.search}
+                                                onChange={(e) => handleFilterChange("search", e.target.value)}
+                                                sx={{ 
+                                                    fontSize: 14, 
+                                                    '& input::placeholder': { fontSize: 14 },
+                                                    flex: 1,
+                                                    minWidth: 200
+                                                }}
+                                            />
+                                        )}
                                     </div>
                                     {/* Show active advanced filters as chips */}
                                     {(filters.statusMulti.length > 0 || filters.voucherTypeMulti.length > 0 || filters.locationMulti.length > 0) && (
