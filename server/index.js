@@ -12,6 +12,8 @@ const fs = require("fs");
 const dayjs = require("dayjs");
 const moment = require('moment');
 const { BALLOON_210_CAPACITY, BALLOON_105_CAPACITY, getAssignedResourceInfo } = require('./utils/resourceAssignment');
+const { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } = require('./utils/googleCalendar');
+const { sendConversion: sendGoogleAdsConversion } = require('./utils/googleAdsConversion');
 const multer = require('multer');
 const dotenv = require('dotenv');
 const axios = require('axios');
@@ -4873,6 +4875,61 @@ async function savePaymentHistory(session, bookingId, voucherId, voucherRef = nu
     }
 }
 
+/**
+ * Helper function to send Google Ads conversion after successful payment
+ * This is called from the webhook after payment is confirmed
+ * 
+ * @param {Object} session - Stripe checkout session object
+ * @param {string} transactionId - Unique transaction ID (payment intent ID or session ID)
+ * @param {number} value - Transaction value in currency units (not cents)
+ * @param {string} currency - Currency code (e.g., 'GBP')
+ */
+async function sendGoogleAdsConversionIfNeeded(session, transactionId, value, currency = 'GBP') {
+    try {
+        // Extract Google Ads IDs from session metadata
+        const gclid = session.metadata?.gclid || null;
+        const wbraid = session.metadata?.wbraid || null;
+        const gbraid = session.metadata?.gbraid || null;
+
+        // Only send conversion if we have at least one Google Ads ID or if configured to send all conversions
+        // For now, we'll send conversion if gclid exists (most common case)
+        // You can modify this logic if you want to track all conversions regardless of gclid
+        if (!gclid && !wbraid && !gbraid) {
+            console.log('⏭️ Skipping Google Ads conversion: No gclid/wbraid/gbraid found in session metadata');
+            return;
+        }
+
+        // Send conversion to Google Ads
+        const conversionResult = await sendGoogleAdsConversion({
+            transactionId: transactionId,
+            value: value,
+            currency: currency,
+            gclid: gclid,
+            wbraid: wbraid,
+            gbraid: gbraid,
+            conversionDateTime: new Date().toISOString()
+        });
+
+        if (conversionResult.success) {
+            console.log('✅ Google Ads conversion sent successfully:', {
+                transactionId,
+                value,
+                currency,
+                hasGclid: !!gclid
+            });
+        } else {
+            console.warn('⚠️ Google Ads conversion failed:', {
+                transactionId,
+                reason: conversionResult.reason,
+                error: conversionResult.error
+            });
+        }
+    } catch (error) {
+        // Log error but don't throw - we don't want to break the payment flow
+        console.error('❌ Error sending Google Ads conversion:', error.message);
+    }
+}
+
 // Stripe Webhook endpoint
 app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
     console.log('🔔 Stripe webhook endpoint hit!');
@@ -4974,6 +5031,18 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     // Save payment information
                     await savePaymentHistory(session, bookingId, null);
 
+                    // Send Google Ads conversion tracking (server-side)
+                    // Use payment intent ID if available, otherwise use session ID as transaction ID
+                    const transactionId = session.payment_intent || session.id;
+                    const conversionValue = session.amount_total ? Number(session.amount_total) / 100 : Number(storeData.totalPrice || 0);
+                    const conversionCurrency = session.currency?.toUpperCase() || 'GBP';
+                    
+                    // Send conversion asynchronously (don't block webhook response)
+                    sendGoogleAdsConversionIfNeeded(session, transactionId, conversionValue, conversionCurrency)
+                        .catch((err) => {
+                            console.error('Error in Google Ads conversion (non-blocking):', err.message);
+                        });
+
                     // Save user session data if provided
                     if (storeData.userSessionData && storeData.userSessionData.session_id && bookingId) {
                         const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.connection.remoteAddress || null;
@@ -5052,6 +5121,18 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
 
                     // Store voucher ID in session data to prevent duplicate creation
                     storeData.voucherData.voucher_id = voucherId;
+
+                    // Send Google Ads conversion tracking (server-side)
+                    // Use payment intent ID if available, otherwise use session ID as transaction ID
+                    const transactionId = session.payment_intent || session.id;
+                    const conversionValue = resolvedPaidAmount || Number(storeData.totalPrice || 0);
+                    const conversionCurrency = session.currency?.toUpperCase() || 'GBP';
+                    
+                    // Send conversion asynchronously (don't block webhook response)
+                    sendGoogleAdsConversionIfNeeded(session, transactionId, conversionValue, conversionCurrency)
+                        .catch((err) => {
+                            console.error('Error in Google Ads conversion (non-blocking):', err.message);
+                        });
 
                     // Persist Stripe amounts into voucher row to power receipt fields
                     // Try to update subtotal, total, original_amount if columns exist, otherwise just update paid
@@ -10325,8 +10406,9 @@ app.post('/api/createBooking', (req, res) => {
                 add_to_booking_items_total_price,
                 weather_refund_total_price,
                 flight_type_source,
-                resources
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                resources,
+                google_calendar_event_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         // Debug log for choose_add_on and bookingValues
@@ -10526,7 +10608,8 @@ app.post('/api/createBooking', (req, res) => {
             add_on_total_price, // add_to_booking_items_total_price
             weather_refund_total_price, // weather_refund_total_price
             flight_type_source, // flight_type_source ('Redeem Voucher' if activitySelect is 'Redeem Voucher', otherwise flight_type/experience)
-            getAssignedResource(chooseFlightType.type || experience, actualPaxCount) // resources (calculated based on flight type and passenger count)
+            getAssignedResource(chooseFlightType.type || experience, actualPaxCount), // resources (calculated based on flight type and passenger count)
+            null // google_calendar_event_id (will be set after event creation)
         ];
         console.log('bookingValues:', bookingValues);
 
@@ -10992,7 +11075,210 @@ app.post('/api/createBooking', (req, res) => {
                         console.log('⏭️ [createBooking] Skipping SMS - activitySelect is not "Book Flight". activitySelect:', activitySelect);
                     }
 
-                    res.status(201).json({ success: true, message: 'Booking created successfully!', bookingId: bookingId, created_at: createdAt });
+                    // Create Google Calendar event if flight is scheduled
+                    // Event should be created when: flight has a date/time AND status is 'Scheduled'
+                    if (bookingDateTime && bookingDateTime.trim() !== '' && bookingDateTime !== 'null' && bookingStatus === 'Scheduled') {
+                        console.log('📅 [createBooking] Creating Google Calendar event for scheduled flight');
+                        
+                        // Determine if this is a private or shared flight
+                        const isPrivateFlight = chooseFlightType.type === 'Private Charter' || chooseFlightType.type === 'Private';
+                        
+                        // For shared flights, check if this is the first booking for this flight slot
+                        // For private flights, always create event
+                        if (isPrivateFlight) {
+                            // Private flight: always create event
+                            createGoogleCalendarEvent(() => {
+                                res.status(201).json({ success: true, message: 'Booking created successfully!', bookingId: bookingId, created_at: createdAt });
+                            });
+                        } else {
+                            // Shared flight: check if this is the first booking for this slot
+                            const checkSharedFlightSql = `
+                                SELECT COUNT(*) as booking_count 
+                                FROM all_booking 
+                                WHERE flight_date = ? 
+                                AND location = ? 
+                                AND flight_type = ? 
+                                AND time_slot = ? 
+                                AND status != 'Cancelled'
+                                AND id != ?
+                            `;
+                            
+                            con.query(checkSharedFlightSql, [bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null, bookingId], (checkErr, checkResult) => {
+                                if (!checkErr && checkResult.length > 0) {
+                                    const existingBookings = checkResult[0].booking_count || 0;
+                                    // Create event if this is the first booking (existingBookings === 0)
+                                    // OR update existing event if there are already bookings
+                                    if (existingBookings === 0) {
+                                        createGoogleCalendarEvent(() => {
+                                            res.status(201).json({ success: true, message: 'Booking created successfully!', bookingId: bookingId, created_at: createdAt });
+                                        });
+                                    } else {
+                                        // Update existing event with new passenger count
+                                        updateGoogleCalendarEventForSharedFlight(() => {
+                                            res.status(201).json({ success: true, message: 'Booking created successfully!', bookingId: bookingId, created_at: createdAt });
+                                        });
+                                    }
+                                } else {
+                                    // If check fails, create event anyway
+                                    createGoogleCalendarEvent(() => {
+                                        res.status(201).json({ success: true, message: 'Booking created successfully!', bookingId: bookingId, created_at: createdAt });
+                                    });
+                                }
+                            });
+                        }
+                    } else {
+                        console.log('⏭️ [createBooking] Skipping Google Calendar event - flight not scheduled or no date/time');
+                        res.status(201).json({ success: true, message: 'Booking created successfully!', bookingId: bookingId, created_at: createdAt });
+                    }
+                    
+                    function createGoogleCalendarEvent(onComplete) {
+                        // Get total passenger count for this flight slot
+                        const getTotalPassengersSql = `
+                            SELECT SUM(pax) as total_passengers 
+                            FROM all_booking 
+                            WHERE flight_date = ? 
+                            AND location = ? 
+                            AND flight_type = ? 
+                            AND time_slot = ?
+                            AND status != 'Cancelled'
+                        `;
+                        
+                        con.query(getTotalPassengersSql, [bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null], async (paxErr, paxResult) => {
+                            const totalPassengers = (paxResult && paxResult.length > 0 && paxResult[0].total_passengers) 
+                                ? parseInt(paxResult[0].total_passengers) 
+                                : actualPaxCount;
+                            
+                            try {
+                                const eventId = await createCalendarEvent({
+                                    location: chooseLocation,
+                                    flightType: chooseFlightType.type,
+                                    passengerCount: totalPassengers,
+                                    flightDate: bookingDateTime,
+                                    crewMember: null, // Will be updated when crew is assigned
+                                    bookingId: bookingId.toString()
+                                });
+                                
+                                // For shared flights, update ALL bookings for this flight slot with the event ID
+                                // For private flights, only update this booking
+                                const isPrivateFlight = chooseFlightType.type === 'Private Charter' || chooseFlightType.type === 'Private';
+                                
+                                if (isPrivateFlight) {
+                                    // Private flight: only update this booking
+                                    con.query(
+                                        'UPDATE all_booking SET google_calendar_event_id = ? WHERE id = ?',
+                                        [eventId, bookingId],
+                                        (updateErr) => {
+                                            if (updateErr) {
+                                                console.error('❌ Error updating booking with Google Calendar event ID:', updateErr);
+                                            } else {
+                                                console.log('✅ Google Calendar event ID saved to booking:', eventId);
+                                            }
+                                            if (onComplete) onComplete();
+                                        }
+                                    );
+                                } else {
+                                    // Shared flight: update all bookings for this flight slot
+                                    const updateAllBookingsSql = `
+                                        UPDATE all_booking 
+                                        SET google_calendar_event_id = ? 
+                                        WHERE flight_date = ? 
+                                        AND location = ? 
+                                        AND flight_type = ? 
+                                        AND time_slot = ?
+                                        AND status != 'Cancelled'
+                                    `;
+                                    con.query(
+                                        updateAllBookingsSql,
+                                        [eventId, bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null],
+                                        (updateErr, updateResult) => {
+                                            if (updateErr) {
+                                                console.error('❌ Error updating bookings with Google Calendar event ID:', updateErr);
+                                            } else {
+                                                console.log(`✅ Google Calendar event ID saved to ${updateResult.affectedRows} bookings for shared flight:`, eventId);
+                                            }
+                                            if (onComplete) onComplete();
+                                        }
+                                    );
+                                }
+                            } catch (calendarError) {
+                                console.error('❌ Error creating Google Calendar event:', calendarError);
+                                // Don't fail the booking creation if calendar sync fails
+                                if (onComplete) onComplete();
+                            }
+                        });
+                    }
+                    
+                    function updateGoogleCalendarEventForSharedFlight(onComplete) {
+                        // Get existing event ID for this flight slot
+                        const getEventIdSql = `
+                            SELECT google_calendar_event_id 
+                            FROM all_booking 
+                            WHERE flight_date = ? 
+                            AND location = ? 
+                            AND flight_type = ? 
+                            AND time_slot = ?
+                            AND status != 'Cancelled'
+                            AND google_calendar_event_id IS NOT NULL
+                            LIMIT 1
+                        `;
+                        
+                        con.query(getEventIdSql, [bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null], async (eventErr, eventResult) => {
+                            if (eventErr || !eventResult || eventResult.length === 0) {
+                                // No existing event, create new one
+                                createGoogleCalendarEvent(onComplete);
+                                return;
+                            }
+                            
+                            const existingEventId = eventResult[0].google_calendar_event_id;
+                            
+                            // Get total passenger count
+                            const getTotalPassengersSql = `
+                                SELECT SUM(pax) as total_passengers 
+                                FROM all_booking 
+                                WHERE flight_date = ? 
+                                AND location = ? 
+                                AND flight_type = ? 
+                                AND time_slot = ?
+                                AND status != 'Cancelled'
+                            `;
+                            
+                            con.query(getTotalPassengersSql, [bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null], async (paxErr, paxResult) => {
+                                const totalPassengers = (paxResult && paxResult.length > 0 && paxResult[0].total_passengers) 
+                                    ? parseInt(paxResult[0].total_passengers) 
+                                    : actualPaxCount;
+                                
+                                try {
+                                    await updateCalendarEvent(existingEventId, {
+                                        location: chooseLocation,
+                                        flightType: chooseFlightType.type,
+                                        passengerCount: totalPassengers,
+                                        flightDate: bookingDateTime,
+                                        crewMember: null, // Will be updated when crew is assigned
+                                        bookingId: bookingId.toString()
+                                    });
+                                    
+                                    // Update this booking with the existing event ID (for shared flights)
+                                    con.query(
+                                        'UPDATE all_booking SET google_calendar_event_id = ? WHERE id = ?',
+                                        [existingEventId, bookingId],
+                                        (updateErr) => {
+                                            if (updateErr) {
+                                                console.error('❌ Error updating booking with Google Calendar event ID:', updateErr);
+                                            } else {
+                                                console.log('✅ Google Calendar event ID saved to new booking:', existingEventId);
+                                            }
+                                        }
+                                    );
+                                    
+                                    console.log('✅ Google Calendar event updated for shared flight');
+                                } catch (calendarError) {
+                                    console.error('❌ Error updating Google Calendar event:', calendarError);
+                                }
+                                
+                                if (onComplete) onComplete();
+                            });
+                        });
+                    }
                 });
             }
 
@@ -18923,6 +19209,100 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
             });
         });
 
+        // Update Google Calendar event based on status change
+        try {
+            // Get booking details for Google Calendar
+            const [bookingDetails] = await new Promise((resolve, reject) => {
+                con.query(
+                    'SELECT google_calendar_event_id, flight_type, time_slot FROM all_booking WHERE id = ?',
+                    [booking_id],
+                    (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    }
+                );
+            });
+
+            if (bookingDetails && bookingDetails.length > 0) {
+                const booking = bookingDetails[0];
+                const eventId = booking.google_calendar_event_id;
+
+                if (new_status === 'Cancelled') {
+                    // Delete Google Calendar event when flight is cancelled
+                    if (eventId) {
+                        try {
+                            await deleteCalendarEvent(eventId);
+                            // Clear event ID from database
+                            con.query(
+                                'UPDATE all_booking SET google_calendar_event_id = NULL WHERE id = ?',
+                                [booking_id],
+                                (updateErr) => {
+                                    if (updateErr) {
+                                        console.error('Error clearing Google Calendar event ID:', updateErr);
+                                    }
+                                }
+                            );
+                        } catch (calendarError) {
+                            console.error('Error deleting Google Calendar event:', calendarError);
+                        }
+                    }
+                } else if (eventId && (old_status !== new_status || total_pax)) {
+                    // Update Google Calendar event when status changes or passenger count changes
+                    // Get all bookings for this flight slot to calculate total passengers
+                    const getFlightBookingsSql = `
+                        SELECT SUM(pax) as total_passengers, flight_type, location, flight_date, time_slot
+                        FROM all_booking 
+                        WHERE flight_date = ? 
+                        AND location = ? 
+                        AND flight_type = ? 
+                        AND time_slot = ?
+                        AND status != 'Cancelled'
+                    `;
+                    
+                    con.query(getFlightBookingsSql, [flight_date, location, booking.flight_type, booking.time_slot || formattedTime], async (flightErr, flightResult) => {
+                        if (!flightErr && flightResult && flightResult.length > 0) {
+                            const flightData = flightResult[0];
+                            const totalPassengers = parseInt(flightData.total_passengers) || pax;
+                            
+                            // Get crew member if assigned
+                            const getCrewSql = `
+                                SELECT c.first_name, c.last_name 
+                                FROM flight_crew_assignments fca
+                                JOIN crew c ON fca.crew_id = c.id
+                                WHERE fca.activity_id = ? 
+                                AND fca.date = ? 
+                                AND fca.time = ?
+                                LIMIT 1
+                            `;
+                            
+                            con.query(getCrewSql, [activity_id, formattedDate, formattedTime || booking.time_slot], async (crewErr, crewResult) => {
+                                let crewMember = null;
+                                if (!crewErr && crewResult && crewResult.length > 0) {
+                                    crewMember = `${crewResult[0].first_name} ${crewResult[0].last_name}`;
+                                }
+                                
+                                try {
+                                    await updateCalendarEvent(eventId, {
+                                        location: location,
+                                        flightType: booking.flight_type || flightData.flight_type,
+                                        passengerCount: totalPassengers,
+                                        flightDate: flight_date,
+                                        crewMember: crewMember,
+                                        bookingId: booking_id.toString()
+                                    });
+                                } catch (calendarError) {
+                                    console.error('Error updating Google Calendar event:', calendarError);
+                                }
+                            });
+                        }
+                    });
+                }
+            }
+        } catch (calendarError) {
+            console.error('Error in Google Calendar sync:', calendarError);
+            // Don't fail the request if calendar sync fails
+        }
+
         res.json({
             success: true,
             message: "Status and availability updated successfully",
@@ -19345,8 +19725,8 @@ app.delete('/api/deleteBooking/:id', (req, res) => {
     if (!id) return res.status(400).json({ success: false, message: 'Missing booking id' });
 
     // First get the booking details to know which time slot to restore
-    const getBookingSql = 'SELECT activity_id, flight_date FROM all_booking WHERE id = ?';
-    con.query(getBookingSql, [id], (err, bookingResult) => {
+    const getBookingSql = 'SELECT activity_id, flight_date, flight_type, location, time_slot, google_calendar_event_id, pax FROM all_booking WHERE id = ?';
+    con.query(getBookingSql, [id], async (err, bookingResult) => {
         if (err) {
             console.error('Error getting booking details:', err);
             return res.status(500).json({ success: false, message: 'Database error' });
@@ -19357,6 +19737,7 @@ app.delete('/api/deleteBooking/:id', (req, res) => {
         }
 
         const booking = bookingResult[0];
+        const eventId = booking.google_calendar_event_id;
 
         // Parse the flight_date to extract date and time
         let bookingDate = null;
@@ -19371,6 +19752,87 @@ app.delete('/api/deleteBooking/:id', (req, res) => {
                 bookingDate = booking.flight_date;
                 bookingTime = null;
             }
+        }
+
+        // Handle Google Calendar event before deleting booking
+        try {
+            if (eventId && bookingDate && bookingTime) {
+                const isPrivateFlight = booking.flight_type === 'Private Charter' || booking.flight_type === 'Private';
+                
+                if (isPrivateFlight) {
+                    // Private flight: delete the event
+                    try {
+                        await deleteCalendarEvent(eventId);
+                        console.log('✅ Google Calendar event deleted for private flight booking:', id);
+                    } catch (calendarError) {
+                        console.error('❌ Error deleting Google Calendar event:', calendarError);
+                    }
+                } else {
+                    // Shared flight: check if there are other bookings for this slot
+                    const checkOtherBookingsSql = `
+                        SELECT COUNT(*) as remaining_count, SUM(pax) as total_passengers
+                        FROM all_booking 
+                        WHERE activity_id = ? 
+                        AND DATE(flight_date) = ? 
+                        AND (time_slot = ? OR TIME(flight_date) = ?)
+                        AND status != 'Cancelled'
+                        AND id != ?
+                    `;
+                    
+                    con.query(checkOtherBookingsSql, [booking.activity_id, bookingDate, bookingTime, bookingTime, id], async (checkErr, checkResult) => {
+                        if (!checkErr && checkResult && checkResult.length > 0) {
+                            const remainingCount = checkResult[0].remaining_count || 0;
+                            const totalPassengers = parseInt(checkResult[0].total_passengers) || 0;
+                            
+                            if (remainingCount === 0) {
+                                // No other bookings: delete the event
+                                try {
+                                    await deleteCalendarEvent(eventId);
+                                    console.log('✅ Google Calendar event deleted - no remaining bookings for shared flight');
+                                } catch (calendarError) {
+                                    console.error('❌ Error deleting Google Calendar event:', calendarError);
+                                }
+                            } else {
+                                // Other bookings exist: update the event with new passenger count
+                                // Get crew member if assigned
+                                const getCrewSql = `
+                                    SELECT c.first_name, c.last_name 
+                                    FROM flight_crew_assignments fca
+                                    JOIN crew c ON fca.crew_id = c.id
+                                    WHERE fca.activity_id = ? 
+                                    AND fca.date = ? 
+                                    AND fca.time = ?
+                                    LIMIT 1
+                                `;
+                                
+                                con.query(getCrewSql, [booking.activity_id, bookingDate, bookingTime], async (crewErr, crewResult) => {
+                                    let crewMember = null;
+                                    if (!crewErr && crewResult && crewResult.length > 0) {
+                                        crewMember = `${crewResult[0].first_name} ${crewResult[0].last_name}`;
+                                    }
+                                    
+                                    try {
+                                        await updateCalendarEvent(eventId, {
+                                            location: booking.location,
+                                            flightType: booking.flight_type,
+                                            passengerCount: totalPassengers,
+                                            flightDate: booking.flight_date || `${bookingDate} ${bookingTime}`,
+                                            crewMember: crewMember,
+                                            bookingId: id.toString()
+                                        });
+                                        console.log('✅ Google Calendar event updated for shared flight - passenger count reduced');
+                                    } catch (calendarError) {
+                                        console.error('❌ Error updating Google Calendar event:', calendarError);
+                                    }
+                                });
+                            }
+                        }
+                    });
+                }
+            }
+        } catch (calendarError) {
+            console.error('Error in Google Calendar sync during booking deletion:', calendarError);
+            // Don't fail the delete operation if calendar sync fails
         }
 
         // Delete the booking (passengers will be deleted automatically due to ON DELETE CASCADE)
@@ -20395,6 +20857,31 @@ app.post('/api/create-checkout-session', async (req, res) => {
             }
         }
 
+        // Extract Google Ads IDs from userSessionData for conversion tracking
+        const googleAdsIds = {
+            gclid: userSessionData?.gclid || null,
+            wbraid: userSessionData?.wbraid || null,
+            gbraid: userSessionData?.gbraid || null
+        };
+
+        // Prepare metadata for Stripe checkout session
+        // This metadata will be available in the webhook for Google Ads conversion tracking
+        const sessionMetadata = {
+            type: type || (voucherData ? 'voucher' : 'booking'),
+            session_id: 'PLACEHOLDER' // Will be updated below
+        };
+
+        // Add Google Ads IDs to metadata if present
+        if (googleAdsIds.gclid) {
+            sessionMetadata.gclid = googleAdsIds.gclid;
+        }
+        if (googleAdsIds.wbraid) {
+            sessionMetadata.wbraid = googleAdsIds.wbraid;
+        }
+        if (googleAdsIds.gbraid) {
+            sessionMetadata.gbraid = googleAdsIds.gbraid;
+        }
+
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             line_items: [
@@ -20414,10 +20901,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
             success_url: successUrl,
             cancel_url: `${baseUrl}/?payment=cancel`,
             allow_promotion_codes: true,
-            metadata: {
-                type: type || (voucherData ? 'voucher' : 'booking'),
-                session_id: 'PLACEHOLDER' // Will be updated below
-            }
+            metadata: sessionMetadata
         });
 
         console.log('Stripe session created:', session.id);
@@ -20456,9 +20940,12 @@ app.post('/api/create-checkout-session', async (req, res) => {
             console.warn('Failed to write session log:', e);
         }
 
-        // Stripe metadata'ya session_id ekle
+        // Stripe metadata'ya session_id ekle (preserve existing metadata including Google Ads IDs)
         await stripe.checkout.sessions.update(session_id, {
-            metadata: { session_id }
+            metadata: {
+                ...sessionMetadata,
+                session_id: session_id // Replace placeholder
+            }
         });
 
         console.log('Session stored and metadata updated');
@@ -23291,12 +23778,78 @@ app.post('/api/crew-assignment', (req, res) => {
             ON DUPLICATE KEY UPDATE crew_id = VALUES(crew_id), updated_at = CURRENT_TIMESTAMP
         `;
 
-        con.query(sql, [normalizedActivityId, date, time, normalizedCrewId], (err, result) => {
+        con.query(sql, [normalizedActivityId, date, time, normalizedCrewId], async (err, result) => {
             if (err) {
                 console.error('Error upserting crew assignment:', err);
                 return res.status(500).json({ success: false, message: 'Database error', error: err.message });
             }
             console.log('Crew assignment saved successfully:', result);
+
+            // Update Google Calendar events for all bookings on this flight slot
+            try {
+                // Get crew member name
+                const getCrewNameSql = 'SELECT first_name, last_name FROM crew WHERE id = ?';
+                con.query(getCrewNameSql, [normalizedCrewId], async (crewErr, crewResult) => {
+                    let crewMember = null;
+                    if (!crewErr && crewResult && crewResult.length > 0) {
+                        crewMember = `${crewResult[0].first_name} ${crewResult[0].last_name}`;
+                    }
+
+                    // Get all bookings for this flight slot
+                    const flightDateTime = `${date} ${time}`;
+                    const getBookingsSql = `
+                        SELECT id, google_calendar_event_id, flight_type, location, flight_date, pax, time_slot
+                        FROM all_booking 
+                        WHERE activity_id = ? 
+                        AND DATE(flight_date) = ? 
+                        AND (time_slot = ? OR TIME(flight_date) = ?)
+                        AND status != 'Cancelled'
+                        AND google_calendar_event_id IS NOT NULL
+                    `;
+                    
+                    con.query(getBookingsSql, [normalizedActivityId, date, time, time], async (bookingsErr, bookingsResult) => {
+                        if (!bookingsErr && bookingsResult && bookingsResult.length > 0) {
+                            // Get total passenger count for this flight slot
+                            const getTotalPassengersSql = `
+                                SELECT SUM(pax) as total_passengers 
+                                FROM all_booking 
+                                WHERE activity_id = ? 
+                                AND DATE(flight_date) = ? 
+                                AND (time_slot = ? OR TIME(flight_date) = ?)
+                                AND status != 'Cancelled'
+                            `;
+                            
+                            con.query(getTotalPassengersSql, [normalizedActivityId, date, time, time], async (paxErr, paxResult) => {
+                                const totalPassengers = (paxResult && paxResult.length > 0 && paxResult[0].total_passengers) 
+                                    ? parseInt(paxResult[0].total_passengers) 
+                                    : 0;
+                                
+                                // Update all Google Calendar events for this flight slot
+                                const updatePromises = bookingsResult.map(async (booking) => {
+                                    try {
+                                        await updateCalendarEvent(booking.google_calendar_event_id, {
+                                            location: booking.location,
+                                            flightType: booking.flight_type,
+                                            passengerCount: totalPassengers,
+                                            flightDate: booking.flight_date || flightDateTime,
+                                            crewMember: crewMember,
+                                            bookingId: booking.id.toString()
+                                        });
+                                        console.log(`✅ Updated Google Calendar event for booking ${booking.id}`);
+                                    } catch (calendarError) {
+                                        console.error(`❌ Error updating Google Calendar event for booking ${booking.id}:`, calendarError);
+                                    }
+                                });
+                                
+                                await Promise.all(updatePromises);
+                            });
+                        }
+                    });
+                });
+            } catch (calendarError) {
+                console.error('Error updating Google Calendar events for crew assignment:', calendarError);
+                // Don't fail the request if calendar sync fails
+            }
 
             // Return the saved assignment data
             res.json({
