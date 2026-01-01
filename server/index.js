@@ -2138,9 +2138,26 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     now, // created_at
                     expiresDateFinal || null, // expires - calculated from voucher created_at
                     passengerData[0].email || null,
-                    (passengerData[0].countryCode && passengerData[0].phone
-                        ? `${passengerData[0].countryCode}${passengerData[0].phone}`.trim()
-                        : (passengerData[0].phone || null)),
+                    (() => {
+                        // Combine countryCode and phone for mainPassenger phone
+                        const mainPassenger = passengerData[0] || {};
+                        let mainPassengerPhone = mainPassenger.phone || null;
+                        if (mainPassengerPhone) {
+                            mainPassengerPhone = String(mainPassengerPhone).trim();
+                            if (!mainPassengerPhone.startsWith('+')) {
+                                if (mainPassenger.countryCode) {
+                                    let countryCode = String(mainPassenger.countryCode).trim();
+                                    if (countryCode && !countryCode.startsWith('+')) {
+                                        countryCode = '+' + countryCode;
+                                    }
+                                    mainPassengerPhone = `${countryCode}${mainPassengerPhone}`.trim();
+                                } else {
+                                    mainPassengerPhone = `+44${mainPassengerPhone}`.trim();
+                                }
+                            }
+                        }
+                        return mainPassengerPhone;
+                    })(),
                     activity_id || null,
                     'Yes', // Redeem Voucher bookings always have redeemed_voucher = Yes
                     0, // flight_attempts (always 0 for redeem voucher bookings)
@@ -2268,13 +2285,36 @@ app.post('/api/createRedeemBooking', (req, res) => {
                         }
 
                         const passenger = validPassengers[index];
+                        // Combine countryCode and phone for each passenger
+                        let passengerPhone = passenger.phone || null;
+                        if (passengerPhone) {
+                            passengerPhone = String(passengerPhone).trim();
+                            if (!passengerPhone.startsWith('+')) {
+                                // Phone doesn't have country code, combine with countryCode if available
+                                if (passenger.countryCode) {
+                                    let countryCode = String(passenger.countryCode).trim();
+                                    // Ensure countryCode starts with + if it doesn't
+                                    if (countryCode && !countryCode.startsWith('+')) {
+                                        countryCode = '+' + countryCode;
+                                    }
+                                    passengerPhone = `${countryCode}${passengerPhone}`.trim();
+                                    console.log(`[createRedeemBooking] Passenger phone combined with countryCode: ${passengerPhone}`);
+                                } else {
+                                    // If no countryCode, use default UK code
+                                    passengerPhone = `+44${passengerPhone}`.trim();
+                                    console.log(`[createRedeemBooking] Passenger phone added default +44: ${passengerPhone}`);
+                                }
+                            } else {
+                                console.log(`[createRedeemBooking] Passenger phone already has country code: ${passengerPhone}`);
+                            }
+                        }
                         const passengerValues = [
                             bookingId,
                             passenger.firstName,
                             passenger.lastName || '',
                             passenger.weight || '',
                             passenger.email || '',
-                            passenger.phone || ''
+                            passengerPhone
                         ];
 
                         con.query(passengerSql, passengerValues, (passengerErr) => {
@@ -19486,7 +19526,24 @@ async function createBookingFromWebhook(bookingData, stripe_session_id = null) {
                 emptyToNull(additionalInfo?.prefer),
                 emptyToNull((passengerData && passengerData[0]) ? passengerData[0].weight : null),
                 emptyToNull((passengerData && passengerData[0]) ? passengerData[0].email : null),
-                emptyToNull((passengerData && passengerData[0]) ? passengerData[0].phone : null),
+                emptyToNull((() => {
+                    // Combine countryCode and phone for mainPassenger phone
+                    const mainPassenger = passengerData && passengerData[0] ? passengerData[0] : null;
+                    if (!mainPassenger || !mainPassenger.phone) return null;
+                    let mainPassengerPhone = String(mainPassenger.phone).trim();
+                    if (!mainPassengerPhone.startsWith('+')) {
+                        if (mainPassenger.countryCode) {
+                            let countryCode = String(mainPassenger.countryCode).trim();
+                            if (countryCode && !countryCode.startsWith('+')) {
+                                countryCode = '+' + countryCode;
+                            }
+                            mainPassengerPhone = `${countryCode}${mainPassengerPhone}`.trim();
+                        } else {
+                            mainPassengerPhone = `+44${mainPassengerPhone}`.trim();
+                        }
+                    }
+                    return mainPassengerPhone;
+                })()),
                 emptyToNull(choose_add_on_str),
                 emptyToNull(preferred_location),
                 emptyToNull(preferred_time),
@@ -19585,16 +19642,41 @@ async function createBookingFromWebhook(bookingData, stripe_session_id = null) {
                 // Now create passenger records
                 if (passengerData && passengerData.length > 0) {
                     const passengerSql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund) VALUES ?';
-                    const passengerValues = passengerData.map(p => [
-                        bookingId,
-                        p.firstName || '',
-                        p.lastName || '',
-                        (p.weight === '' ? null : p.weight || null),
-                        (p.email === '' ? null : p.email || null),
-                        (p.phone === '' ? null : p.phone || null),
-                        p.ticketType || chooseFlightType.type,
-                        p.weatherRefund ? 1 : 0
-                    ]);
+                    const passengerValues = passengerData.map(p => {
+                        // Combine countryCode and phone for each passenger
+                        let passengerPhone = p.phone || null;
+                        if (passengerPhone && passengerPhone !== '') {
+                            passengerPhone = String(passengerPhone).trim();
+                            if (!passengerPhone.startsWith('+')) {
+                                // Phone doesn't have country code, combine with countryCode if available
+                                if (p.countryCode) {
+                                    let countryCode = String(p.countryCode).trim();
+                                    // Ensure countryCode starts with + if it doesn't
+                                    if (countryCode && !countryCode.startsWith('+')) {
+                                        countryCode = '+' + countryCode;
+                                    }
+                                    passengerPhone = `${countryCode}${passengerPhone}`.trim();
+                                    console.log(`[createBookingFromWebhook] Passenger phone combined with countryCode: ${passengerPhone}`);
+                                } else {
+                                    // If no countryCode, use default UK code
+                                    passengerPhone = `+44${passengerPhone}`.trim();
+                                    console.log(`[createBookingFromWebhook] Passenger phone added default +44: ${passengerPhone}`);
+                                }
+                            } else {
+                                console.log(`[createBookingFromWebhook] Passenger phone already has country code: ${passengerPhone}`);
+                            }
+                        }
+                        return [
+                            bookingId,
+                            p.firstName || '',
+                            p.lastName || '',
+                            (p.weight === '' ? null : p.weight || null),
+                            (p.email === '' ? null : p.email || null),
+                            (passengerPhone === '' ? null : passengerPhone || null),
+                            p.ticketType || chooseFlightType.type,
+                            p.weatherRefund ? 1 : 0
+                        ];
+                    });
 
                     con.query(passengerSql, [passengerValues], (passengerErr, passengerResult) => {
                         if (passengerErr) {
@@ -22391,6 +22473,29 @@ const runDatabaseMigrations = () => {
             });
         } else {
             console.log('✅ user_session_id column already exists');
+        }
+    });
+
+    // Create error_logs table if it doesn't exist
+    const createErrorLogsTable = `
+        CREATE TABLE IF NOT EXISTS error_logs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            level VARCHAR(20) NOT NULL DEFAULT 'error' COMMENT 'Log level: error, warning, info',
+            message TEXT NOT NULL COMMENT 'Error message',
+            stack TEXT COMMENT 'Stack trace',
+            source VARCHAR(255) COMMENT 'Source of error (endpoint, function, etc.)',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_level (level),
+            INDEX idx_created_at (created_at),
+            INDEX idx_level_created (level, created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `;
+
+    con.query(createErrorLogsTable, (err) => {
+        if (err) {
+            console.error('Error creating error_logs table:', err);
+        } else {
+            console.log('✅ error_logs table ready');
         }
     });
 };
@@ -27734,6 +27839,125 @@ app.post('/api/fix-flight-dates', (req, res) => {
             });
         });
     });
+});
+
+// ===== ERROR LOGS ENDPOINTS =====
+
+// Helper function to save error log
+const saveErrorLog = (level, message, stack, source) => {
+    const sql = `INSERT INTO error_logs (level, message, stack, source) VALUES (?, ?, ?, ?)`;
+    con.query(sql, [level, message, stack || null, source || null], (err) => {
+        if (err) {
+            console.error('Error saving log to database:', err);
+        }
+    });
+};
+
+// Endpoint to get logs (last 24 hours of errors/warnings)
+app.get('/api/logs', (req, res) => {
+    try {
+        const sql = `
+            SELECT id, level, message, stack, source, created_at 
+            FROM error_logs 
+            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+            ORDER BY created_at DESC
+            LIMIT 1000
+        `;
+        
+        con.query(sql, (err, results) => {
+            if (err) {
+                console.error('Error fetching logs:', err);
+                return res.status(500).json({ success: false, message: 'Error fetching logs', error: err.message });
+            }
+            
+            res.json({ success: true, data: results });
+        });
+    } catch (error) {
+        console.error('Error in /api/logs:', error);
+        res.status(500).json({ success: false, message: 'Error fetching logs', error: error.message });
+    }
+});
+
+// Endpoint to save log from production site
+app.post('/api/logs', (req, res) => {
+    try {
+        const { level, message, stack, source } = req.body;
+        
+        if (!level || !message) {
+            return res.status(400).json({ success: false, message: 'Level and message are required' });
+        }
+        
+        saveErrorLog(level, message, stack, source);
+        
+        res.json({ success: true, message: 'Log saved successfully' });
+    } catch (error) {
+        console.error('Error saving log:', error);
+        res.status(500).json({ success: false, message: 'Error saving log', error: error.message });
+    }
+});
+
+// Function to fetch logs from production site
+const fetchProductionLogs = async () => {
+    try {
+        const productionUrl = 'https://flyawayballooning-system.com/api/logs';
+        const response = await axios.get(productionUrl, {
+            timeout: 10000,
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.data && response.data.success && Array.isArray(response.data.data)) {
+            const logs = response.data.data;
+            
+            // Save each log to local database if it doesn't exist
+            logs.forEach(log => {
+                const checkSql = `SELECT id FROM error_logs WHERE created_at = ? AND message = ? LIMIT 1`;
+                con.query(checkSql, [log.created_at, log.message], (err, results) => {
+                    if (err) {
+                        console.error('Error checking existing log:', err);
+                        return;
+                    }
+                    
+                    if (!results || results.length === 0) {
+                        // Log doesn't exist, insert it
+                        saveErrorLog(log.level || 'error', log.message, log.stack, log.source || 'production');
+                    }
+                });
+            });
+            
+            console.log(`✅ Fetched ${logs.length} logs from production site`);
+        }
+    } catch (error) {
+        console.error('Error fetching logs from production site:', error.message);
+        // Don't throw error, just log it
+    }
+};
+
+// Fetch logs from production site every 5 minutes
+if (process.env.NODE_ENV === 'production' || process.env.FETCH_PRODUCTION_LOGS === 'true') {
+    // Initial fetch after 30 seconds
+    setTimeout(() => {
+        fetchProductionLogs();
+    }, 30000);
+    
+    // Then fetch every 5 minutes
+    setInterval(() => {
+        fetchProductionLogs();
+    }, 5 * 60 * 1000);
+}
+
+// Global error handler to catch unhandled errors
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    saveErrorLog('error', error.message, error.stack, 'uncaughtException');
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    const message = reason && reason.message ? reason.message : String(reason);
+    const stack = reason && reason.stack ? reason.stack : null;
+    saveErrorLog('error', `Unhandled Rejection: ${message}`, stack, 'unhandledRejection');
 });
 
 // 404 handler - ensure CORS headers are set
