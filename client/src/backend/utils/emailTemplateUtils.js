@@ -305,12 +305,44 @@ const buildEmailLayout = ({
            </div>`
         : '';
 
+    const responsiveStyles = `
+    <style>
+        @media only screen and (max-width: 600px) {
+            /* Hero image - mobile optimized (preserve aspect ratio and quality) */
+            img[alt="Fly Away Ballooning"] {
+                min-height: auto !important;
+                max-height: none !important;
+                height: auto !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                object-fit: contain !important;
+                object-position: center !important;
+                border-radius: 16px 16px 0 0 !important;
+                -webkit-backface-visibility: hidden !important;
+                backface-visibility: hidden !important;
+                image-rendering: -webkit-optimize-contrast !important;
+                image-rendering: crisp-edges !important;
+            }
+            
+            /* Images in content - responsive (preserve quality) */
+            img {
+                max-width: 100% !important;
+                height: auto !important;
+                object-fit: contain !important;
+                image-rendering: -webkit-optimize-contrast !important;
+                image-rendering: crisp-edges !important;
+            }
+        }
+    </style>
+    `;
+
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${escapeHtml(subject)}</title>
+    ${responsiveStyles}
 </head>
 <body style="margin:0; padding:0; background-color:#f5f5f5; font-family:'Helvetica Neue', Arial, sans-serif;">
     <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
@@ -331,7 +363,7 @@ const buildEmailLayout = ({
                                         </v:textbox>
                                         </v:rect>
                                         <![endif]-->
-                                        <img src="${heroImage}" alt="Fly Away Ballooning" width="640" style="width:100%; max-width:640px; height:auto; min-height:220px; display:block; margin:0 auto; border:0; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; background-color:#ffffff; vertical-align:top; object-fit:cover; object-position:center; border-radius:24px 24px 0 0;" />
+                                        <img src="${heroImage}" alt="Fly Away Ballooning" width="640" style="width:100%; max-width:640px; height:auto; min-height:220px; display:block; margin:0 auto; border:0; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; background-color:#ffffff; vertical-align:top; object-fit:contain; object-position:center; border-radius:24px 24px 0 0;" />
                                     </td>
                                 </tr>
                             </table>
