@@ -1243,16 +1243,16 @@ const Manifest = () => {
         try {
             const activities = await fetchActivities();
             if (activities.length === 0) return;
-            
-            let allAvailabilities = [];
+
+                let allAvailabilities = [];
             // Only fetch availabilities for the selected date
-            for (const act of activities) {
-                try {
+                for (const act of activities) {
+                    try {
                     // Fetch availabilities with date filter if API supports it, otherwise filter client-side
                     const availRes = await axios.get(`/api/activity/${act.id}/availabilities`, {
                         params: { date: date } // Pass date as query parameter
                     });
-                    if (availRes.data.success && Array.isArray(availRes.data.data)) {
+                        if (availRes.data.success && Array.isArray(availRes.data.data)) {
                         // Filter by date on client side if API doesn't support date filter
                         const filteredAvailabilities = availRes.data.data.filter(avail => {
                             const availDate = avail.date ? dayjs(avail.date).format('YYYY-MM-DD') : null;
@@ -1260,22 +1260,22 @@ const Manifest = () => {
                         });
                         
                         const withMeta = filteredAvailabilities.map(avail => ({
-                            ...avail,
-                            activity_id: act.id,
-                            location: act.location,
-                            activity_name: act.activity_name,
-                            flight_type: act.flight_type,
-                            capacity: avail.capacity
-                        }));
-                        allAvailabilities = allAvailabilities.concat(withMeta);
+                                ...avail,
+                                activity_id: act.id,
+                                location: act.location,
+                                activity_name: act.activity_name,
+                                flight_type: act.flight_type,
+                                capacity: avail.capacity
+                            }));
+                            allAvailabilities = allAvailabilities.concat(withMeta);
+                        }
+                    } catch (error) {
+                        console.error(`Error fetching availabilities for activity ${act.id}:`, error);
                     }
-                } catch (error) {
-                    console.error(`Error fetching availabilities for activity ${act.id}:`, error);
                 }
-            }
             console.log(`Availabilities loaded for date ${date}:`, allAvailabilities.length, 'slots');
             availabilitiesCacheRef.current[date] = allAvailabilities; // Cache by date
-            setAvailabilities(allAvailabilities);
+                setAvailabilities(allAvailabilities);
         } catch (error) {
             console.error('Error fetching availabilities:', error);
         }
@@ -1326,7 +1326,7 @@ const Manifest = () => {
                 }
                 
                 return {
-                    ...f,
+                ...f,
                     activity_id: activityId
                 };
             });
@@ -1619,83 +1619,83 @@ const Manifest = () => {
         
         // Debounce: wait 500ms before actually updating
         autoUpdateStatusTimersRef.current[flightKey] = setTimeout(async () => {
-            try {
-                // Calculate total passengers for this flight group
-                const totalPassengers = flights.filter(f => 
-                    f.flight_date === flight.flight_date && 
-                    f.location === flight.location && 
-                    f.flight_type === flight.flight_type &&
-                    f.time_slot === flight.time_slot
-                ).reduce((sum, f) => sum + (f.passengers ? f.passengers.length : 0), 0);
-                
-                // Get capacity from activity
-                const maxCapacity = activity.find((a) => a.id == flight.activity_id)?.capacity || 0;
-                
-                console.log(`autoUpdateFlightStatus - Flight ${flight.id}: passengers ${totalPassengers}/${maxCapacity}, current status: ${getFlightStatus(flight)}`);
-                
-                // Eğer total passengers capacity'yi geçiyorsa, otomatik olarak flight'ı kapat
-                if (totalPassengers >= maxCapacity && maxCapacity > 0) {
-                    const currentStatus = getFlightStatus(flight);
-                    if (currentStatus === "Open") {
-                        console.log(`Auto-closing flight: ${flight.id} - passengers: ${totalPassengers}/${maxCapacity}`);
-                        
-                        // Update the flight status to Closed
-                        await axios.patch('/api/updateManifestStatus', {
-                            booking_id: flight.id,
-                            old_status: 'Open',
-                            new_status: 'Closed',
-                            flight_date: flight.flight_date,
-                            location: flight.location,
-                            total_pax: totalPassengers
-                        });
-                        
-                        // Update local state
-                        setFlights(prevFlights => prevFlights.map(f =>
-                            f.flight_date === flight.flight_date && 
-                            f.location === flight.location && 
-                            f.flight_type === flight.flight_type &&
-                            f.time_slot === flight.time_slot
-                                ? { ...f, manual_status_override: 0 } // 0 = Closed
-                                : f
-                        ));
-                        
-                        console.log(`Flight ${flight.id} status updated to Closed`);
-                    }
-                } else if (totalPassengers < maxCapacity && maxCapacity > 0) {
-                    // Eğer total passengers capacity'nin altındaysa ve status "Closed" ise, "Open" yapılabilir
-                    const currentStatus = getFlightStatus(flight);
-                    if (currentStatus === "Closed" && flight.manual_status_override === 0) {
-                        console.log(`Auto-opening flight: ${flight.id} - passengers: ${totalPassengers}/${maxCapacity}`);
-                        
-                        // Update the flight status to Open
-                        await axios.patch('/api/updateManifestStatus', {
-                            booking_id: flight.id,
-                            old_status: 'Closed',
-                            new_status: 'Open',
-                            flight_date: flight.flight_date,
-                            location: flight.location,
-                            total_pax: totalPassengers
-                        });
-                        
-                        // Update local state
-                        setFlights(prevFlights => prevFlights.map(f =>
-                            f.flight_date === flight.flight_date && 
-                            f.location === flight.location && 
-                            f.flight_type === flight.flight_type &&
-                            f.time_slot === flight.time_slot
-                                ? { ...f, manual_status_override: 1 } // 1 = Open
-                                : f
-                        ));
-                        
-                        console.log(`Flight ${flight.id} status updated to Open`);
-                    }
+        try {
+            // Calculate total passengers for this flight group
+            const totalPassengers = flights.filter(f => 
+                f.flight_date === flight.flight_date && 
+                f.location === flight.location && 
+                f.flight_type === flight.flight_type &&
+                f.time_slot === flight.time_slot
+            ).reduce((sum, f) => sum + (f.passengers ? f.passengers.length : 0), 0);
+            
+            // Get capacity from activity
+            const maxCapacity = activity.find((a) => a.id == flight.activity_id)?.capacity || 0;
+            
+            console.log(`autoUpdateFlightStatus - Flight ${flight.id}: passengers ${totalPassengers}/${maxCapacity}, current status: ${getFlightStatus(flight)}`);
+            
+            // Eğer total passengers capacity'yi geçiyorsa, otomatik olarak flight'ı kapat
+            if (totalPassengers >= maxCapacity && maxCapacity > 0) {
+                const currentStatus = getFlightStatus(flight);
+                if (currentStatus === "Open") {
+                    console.log(`Auto-closing flight: ${flight.id} - passengers: ${totalPassengers}/${maxCapacity}`);
+                    
+                    // Update the flight status to Closed
+                    await axios.patch('/api/updateManifestStatus', {
+                        booking_id: flight.id,
+                        old_status: 'Open',
+                        new_status: 'Closed',
+                        flight_date: flight.flight_date,
+                        location: flight.location,
+                        total_pax: totalPassengers
+                    });
+                    
+                    // Update local state
+                    setFlights(prevFlights => prevFlights.map(f =>
+                        f.flight_date === flight.flight_date && 
+                        f.location === flight.location && 
+                        f.flight_type === flight.flight_type &&
+                        f.time_slot === flight.time_slot
+                            ? { ...f, manual_status_override: 0 } // 0 = Closed
+                            : f
+                    ));
+                    
+                    console.log(`Flight ${flight.id} status updated to Closed`);
                 }
-            } catch (error) {
-                console.error('Error auto-updating flight status:', error);
+            } else if (totalPassengers < maxCapacity && maxCapacity > 0) {
+                // Eğer total passengers capacity'nin altındaysa ve status "Closed" ise, "Open" yapılabilir
+                const currentStatus = getFlightStatus(flight);
+                if (currentStatus === "Closed" && flight.manual_status_override === 0) {
+                    console.log(`Auto-opening flight: ${flight.id} - passengers: ${totalPassengers}/${maxCapacity}`);
+                    
+                    // Update the flight status to Open
+                    await axios.patch('/api/updateManifestStatus', {
+                        booking_id: flight.id,
+                        old_status: 'Closed',
+                        new_status: 'Open',
+                        flight_date: flight.flight_date,
+                        location: flight.location,
+                        total_pax: totalPassengers
+                    });
+                    
+                    // Update local state
+                    setFlights(prevFlights => prevFlights.map(f =>
+                        f.flight_date === flight.flight_date && 
+                        f.location === flight.location && 
+                        f.flight_type === flight.flight_type &&
+                        f.time_slot === flight.time_slot
+                            ? { ...f, manual_status_override: 1 } // 1 = Open
+                            : f
+                    ));
+                    
+                    console.log(`Flight ${flight.id} status updated to Open`);
+                }
+            }
+        } catch (error) {
+            console.error('Error auto-updating flight status:', error);
             } finally {
                 // Clean up timer
                 delete autoUpdateStatusTimersRef.current[flightKey];
-            }
+        }
         }, 500); // 500ms debounce
     };
 
@@ -2886,8 +2886,8 @@ const Manifest = () => {
                     const groupKey = `${firstFlight.flight_date}_${firstFlight.location}_${firstFlight.flight_type}_${firstFlight.time_slot}`;
                     if (!processedGroups.has(groupKey)) {
                         processedGroups.add(groupKey);
-                        autoUpdateFlightStatus(firstFlight);
-                    }
+                    autoUpdateFlightStatus(firstFlight);
+                }
                 }
             });
         }
@@ -3275,11 +3275,11 @@ const Manifest = () => {
             let emailSent = false;
             let emailErrorMsg = '';
             if (normalizedCrewId) {
-                try {
+            try {
                     console.log('📧 Starting email send process for crew ID:', normalizedCrewId);
-                    console.log('📧 Available email templates:', emailTemplates.map(t => t.name));
-                    
-                    // Fetch crew member details
+                console.log('📧 Available email templates:', emailTemplates.map(t => t.name));
+                
+                // Fetch crew member details
                     const crewResponse = await axios.get(`/api/crew/${normalizedCrewId}`);
                 const crewMember = crewResponse.data?.data;
                 console.log('📧 Crew member data:', { 
@@ -3362,15 +3362,15 @@ const Manifest = () => {
                     emailErrorMsg = crewMember ? 'Crew member email not found' : 'Crew member not found';
                     console.warn('⚠️', emailErrorMsg);
                 }
-                } catch (emailError) {
-                    emailErrorMsg = emailError.response?.data?.message || emailError.message || 'Unknown error';
-                    console.error('❌ Error sending crew management email:', emailError);
-                    console.error('Error details:', {
-                        message: emailError.message,
-                        response: emailError.response?.data,
-                        status: emailError.response?.status
-                    });
-                    // Don't fail the crew assignment if email fails
+            } catch (emailError) {
+                emailErrorMsg = emailError.response?.data?.message || emailError.message || 'Unknown error';
+                console.error('❌ Error sending crew management email:', emailError);
+                console.error('Error details:', {
+                    message: emailError.message,
+                    response: emailError.response?.data,
+                    status: emailError.response?.status
+                });
+                // Don't fail the crew assignment if email fails
                 }
             }
             
@@ -3923,7 +3923,7 @@ const Manifest = () => {
                                                     gap: isMobile ? 1 : 3
                                                 }}>
                                                     <Box display="flex" alignItems="center" gap={1} sx={{ width: isMobile ? '100%' : 'auto' }}>
-                                                        <Typography>Pax Booked: {paxBookedDisplay} / {paxTotalDisplay}</Typography>
+                                                    <Typography>Pax Booked: {paxBookedDisplay} / {paxTotalDisplay}</Typography>
                                                         {isMobile && (
                                                             <IconButton size="small" onClick={(e) => {
                                                                 // Section menu for Pax Booked
@@ -3934,7 +3934,7 @@ const Manifest = () => {
                                                         )}
                                                     </Box>
                                                     <Box display="flex" alignItems="center" gap={1} sx={{ width: isMobile ? '100%' : 'auto' }}>
-                                                        <Typography>Balloon Resource: {balloonResource}</Typography>
+                                                    <Typography>Balloon Resource: {balloonResource}</Typography>
                                                         {isMobile && (
                                                             <IconButton size="small" onClick={(e) => {
                                                                 // Section menu for Balloon Resource
@@ -3945,10 +3945,10 @@ const Manifest = () => {
                                                         )}
                                                     </Box>
                                                     <Box display="flex" alignItems="center" gap={1} sx={{ width: isMobile ? '100%' : 'auto' }}>
-                                                        <Typography>Status: <span
-                                                            style={{ color: status === 'Closed' ? 'red' : 'green', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
-                                                            onClick={() => handleToggleGroupStatus(groupFlights)}
-                                                        >{status}{statusLoadingGroup === first.id ? '...' : ''}</span></Typography>
+                                                    <Typography>Status: <span
+   style={{ color: status === 'Closed' ? 'red' : 'green', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+   onClick={() => handleToggleGroupStatus(groupFlights)}
+ >{status}{statusLoadingGroup === first.id ? '...' : ''}</span></Typography>
                                                         {isMobile && (
                                                             <IconButton size="small" onClick={(e) => {
                                                                 // Section menu for Status
@@ -3959,7 +3959,7 @@ const Manifest = () => {
                                                         )}
                                                     </Box>
                                                     <Box display="flex" alignItems="center" gap={1} sx={{ width: isMobile ? '100%' : 'auto' }}>
-                                                        <Typography>Type: {first.flight_type}</Typography>
+                                                    <Typography>Type: {first.flight_type}</Typography>
                                                         {isMobile && (
                                                             <IconButton size="small" onClick={(e) => {
                                                                 // Section menu for Type
@@ -3968,8 +3968,8 @@ const Manifest = () => {
                                                                 <MoreVertIcon fontSize="small" />
                                                             </IconButton>
                                                         )}
-                                                    </Box>
                                                 </Box>
+                                            </Box>
                                             </Box>
                                             {/* Mobile: Crew and Pilot selection above flight details */}
                                             {isMobile && (
@@ -4069,18 +4069,18 @@ const Manifest = () => {
                                                 
                                                 {/* Desktop: Crew Selection Dropdown */}
                                                 {!isMobile && (() => {
-                                                    const activityIdForSlot = getFlightActivityId(first);
-                                                    const slotKeyValue = slotKey(activityIdForSlot, (first.flight_date||'').substring(0,10), (first.flight_date||'').substring(11,16));
-                                                    const currentCrewId = crewAssignmentsBySlot[slotKeyValue];
-                                                    
-                                                    // Debug logging
-                                                    if (process.env.NODE_ENV === 'development') {
-                                                        console.log('Dropdown for flight:', first.id, 'slotKey:', slotKeyValue, 'currentCrewId:', currentCrewId, 'all assignments:', crewAssignmentsBySlot);
-                                                        console.log('Flight data:', { 
-                                                            id: first.id, 
-                                                            activity_id: activityIdForSlot, 
-                                                            flight_date: first.flight_date,
-                                                            date_part: (first.flight_date||'').substring(0,10),
+                            const activityIdForSlot = getFlightActivityId(first);
+                            const slotKeyValue = slotKey(activityIdForSlot, (first.flight_date||'').substring(0,10), (first.flight_date||'').substring(11,16));
+                            const currentCrewId = crewAssignmentsBySlot[slotKeyValue];
+                            
+                            // Debug logging
+                            if (process.env.NODE_ENV === 'development') {
+                                console.log('Dropdown for flight:', first.id, 'slotKey:', slotKeyValue, 'currentCrewId:', currentCrewId, 'all assignments:', crewAssignmentsBySlot);
+                                console.log('Flight data:', { 
+                                    id: first.id, 
+                                    activity_id: activityIdForSlot, 
+                                    flight_date: first.flight_date,
+                                    date_part: (first.flight_date||'').substring(0,10),
                                                             time_part: (first.flight_date||'').substring(11,16),
                                                             fullFlight: first
                                                         });
@@ -4094,15 +4094,15 @@ const Manifest = () => {
                                                             flightId: first.id, 
                                                             activityId: activityIdForSlot,
                                                             flight: first 
-                                                        });
-                                                    }
-                                                    
-                                                    return (
-                                                        <>
-                                                            <Select
-                                                                native
-                                                                value={currentCrewId || ''}
-                                                                onChange={(e) => handleCrewChange(activityIdForSlot, first.flight_date, e.target.value)}
+                                });
+                            }
+                            
+                            return (
+                                <>
+                                    <Select
+                                        native
+                                        value={currentCrewId || ''}
+                                        onChange={(e) => handleCrewChange(activityIdForSlot, first.flight_date, e.target.value)}
                                                                 disabled={!isActivityIdValid}
                                                                 sx={{ 
                                                                     minWidth: 200, 
@@ -4110,46 +4110,46 @@ const Manifest = () => {
                                                                     background: isActivityIdValid ? '#fff' : '#f3f4f6',
                                                                     opacity: isActivityIdValid ? 1 : 0.6
                                                                 }}
-                                                            >
+                                    >
                                                                 <option value="">{isActivityIdValid ? 'Crew Selection' : 'Activity ID Missing'}</option>
-                                                                {crewList.map(c => (
-                                                                    <option key={c.id} value={c.id}>{`${c.first_name} ${c.last_name}`}</option>
-                                                                ))}
-                                                            </Select>
-                                                            
-                                                            {/* Crew Assignment Status Display */}
-                                                            <Box sx={{ 
-                                                                display: 'flex',
-                                                                flexDirection: 'column',
-                                                                alignItems: 'flex-start',
-                                                                ml: 1,
-                                                                minWidth: 150
-                                                            }}>
-                                                                <Box sx={{ 
-                                                                    fontSize: '12px', 
-                                                                    fontWeight: '500',
-                                                                    color: currentCrewId ? '#10b981' : '#6b7280',
-                                                                    mb: 0.5
-                                                                }}>
-                                                                    {currentCrewId ? '✓ Assigned' : '○ Not Assigned'}
-                                                                </Box>
-                                                                <Box sx={{ 
-                                                                    fontSize: '11px', 
-                                                                    color: '#6b7280',
-                                                                    fontStyle: currentCrewId ? 'normal' : 'italic'
-                                                                }}>
-                                                                    {currentCrewId ? getCrewMemberName(currentCrewId) : 'No crew selected'}
-                                                                </Box>
-                                                            </Box>
-                                                        </>
-                                                    );
-                                                })()}
+                                        {crewList.map(c => (
+                                            <option key={c.id} value={c.id}>{`${c.first_name} ${c.last_name}`}</option>
+                                        ))}
+                                    </Select>
+                                    
+                                    {/* Crew Assignment Status Display */}
+                                    <Box sx={{ 
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'flex-start',
+                                        ml: 1,
+                                        minWidth: 150
+                                    }}>
+                                        <Box sx={{ 
+                                            fontSize: '12px', 
+                                            fontWeight: '500',
+                                            color: currentCrewId ? '#10b981' : '#6b7280',
+                                            mb: 0.5
+                                        }}>
+                                            {currentCrewId ? '✓ Assigned' : '○ Not Assigned'}
+                                        </Box>
+                                        <Box sx={{ 
+                                            fontSize: '11px', 
+                                            color: '#6b7280',
+                                            fontStyle: currentCrewId ? 'normal' : 'italic'
+                                        }}>
+                                            {currentCrewId ? getCrewMemberName(currentCrewId) : 'No crew selected'}
+                                        </Box>
+                                    </Box>
+                                </>
+                            );
+                        })()}
                                                 
                                                 {/* Desktop: Pilot Selection Dropdown */}
                                                 {!isMobile && (() => {
-                                                    const activityIdForSlot = getFlightActivityId(first);
-                                                    const slotKeyValue = slotKey(activityIdForSlot, (first.flight_date||'').substring(0,10), (first.flight_date||'').substring(11,16));
-                                                    const currentPilotId = pilotAssignmentsBySlot[slotKeyValue];
+                            const activityIdForSlot = getFlightActivityId(first);
+                            const slotKeyValue = slotKey(activityIdForSlot, (first.flight_date||'').substring(0,10), (first.flight_date||'').substring(11,16));
+                            const currentPilotId = pilotAssignmentsBySlot[slotKeyValue];
                                                     
                                                     // Check if activityId is valid
                                                     const isActivityIdValid = activityIdForSlot !== null && activityIdForSlot !== undefined && !isNaN(activityIdForSlot);
@@ -4161,13 +4161,13 @@ const Manifest = () => {
                                                             flight: first 
                                                         });
                                                     }
-                                                    
-                                                    return (
-                                                        <>
-                                                            <Select
-                                                                native
-                                                                value={currentPilotId || ''}
-                                                                onChange={(e) => handlePilotChange(activityIdForSlot, first.flight_date, e.target.value)}
+                            
+                            return (
+                                <>
+                                    <Select
+                                        native
+                                        value={currentPilotId || ''}
+                                        onChange={(e) => handlePilotChange(activityIdForSlot, first.flight_date, e.target.value)}
                                                                 disabled={!isActivityIdValid}
                                                                 sx={{ 
                                                                     minWidth: 200, 
@@ -4175,44 +4175,44 @@ const Manifest = () => {
                                                                     background: isActivityIdValid ? '#fff' : '#f3f4f6',
                                                                     opacity: isActivityIdValid ? 1 : 0.6
                                                                 }}
-                                                            >
+                                    >
                                                                 <option value="">{isActivityIdValid ? 'Pilot Selection' : 'Activity ID Missing'}</option>
-                                                                {pilotList.map(p => (
-                                                                    <option key={p.id} value={p.id}>{`${p.first_name} ${p.last_name}`}</option>
-                                                                ))}
-                                                            </Select>
-                                                            
-                                                            {/* Pilot Assignment Status Display */}
-                                                            <Box sx={{ 
-                                                                display: 'flex',
-                                                                flexDirection: 'column',
-                                                                alignItems: 'flex-start',
-                                                                ml: 1,
-                                                                minWidth: 150
-                                                            }}>
-                                                                <Box sx={{ 
-                                                                    fontSize: '12px', 
-                                                                    fontWeight: '500',
-                                                                    color: currentPilotId ? '#10b981' : '#6b7280',
-                                                                    mb: 0.5
-                                                                }}>
-                                                                    {currentPilotId ? '✓ Assigned' : '○ Not Assigned'}
-                                                                </Box>
-                                                                <Box sx={{ 
-                                                                    fontSize: '11px', 
-                                                                    color: '#6b7280',
-                                                                    fontStyle: currentPilotId ? 'normal' : 'italic'
-                                                                }}>
-                                                                    {currentPilotId ? getPilotName(currentPilotId) : 'No pilot selected'}
-                                                                </Box>
-                                                            </Box>
-                                                        </>
-                                                    );
-                                                })()}
+                                        {pilotList.map(p => (
+                                            <option key={p.id} value={p.id}>{`${p.first_name} ${p.last_name}`}</option>
+                                        ))}
+                                    </Select>
+                                    
+                                    {/* Pilot Assignment Status Display */}
+                                    <Box sx={{ 
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'flex-start',
+                                        ml: 1,
+                                        minWidth: 150
+                                    }}>
+                                        <Box sx={{ 
+                                            fontSize: '12px', 
+                                            fontWeight: '500',
+                                            color: currentPilotId ? '#10b981' : '#6b7280',
+                                            mb: 0.5
+                                        }}>
+                                            {currentPilotId ? '✓ Assigned' : '○ Not Assigned'}
+                                        </Box>
+                                        <Box sx={{ 
+                                            fontSize: '11px', 
+                                            color: '#6b7280',
+                                            fontStyle: currentPilotId ? 'normal' : 'italic'
+                                        }}>
+                                            {currentPilotId ? getPilotName(currentPilotId) : 'No pilot selected'}
+                                        </Box>
+                                    </Box>
+                                </>
+                            );
+                        })()}
                                                 
                                                 {/* Book Button - Hidden on mobile */}
                                                 {!isMobile && (
-                                                    <Button variant="contained" color="primary" sx={{ minWidth: 90, fontWeight: 600, textTransform: 'none' }} onClick={() => handleOpenBookingModal(first)}>Book</Button>
+                                                <Button variant="contained" color="primary" sx={{ minWidth: 90, fontWeight: 600, textTransform: 'none' }} onClick={() => handleOpenBookingModal(first)}>Book</Button>
                                                 )}
                                                 <IconButton size="large" onClick={e => handleGlobalMenuOpen(e, first, groupFlights)}>
                                                     <MoreVertIcon />
