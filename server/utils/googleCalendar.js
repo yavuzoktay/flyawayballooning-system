@@ -243,13 +243,17 @@ const updateCalendarEvent = async (eventId, flightData) => {
             },
         };
 
-        await calendar.events.update({
+        console.log('📅 [updateCalendarEvent] Sending update to Google Calendar API...');
+        console.log('📅 [updateCalendarEvent] Updated event description:', updatedEvent.description);
+        
+        const updateResponse = await calendar.events.update({
             calendarId: calendarId,
             eventId: eventId,
             resource: updatedEvent,
         });
 
-        console.log('✅ Google Calendar event updated:', eventId);
+        console.log('✅ [updateCalendarEvent] Google Calendar event updated successfully:', eventId);
+        console.log('✅ [updateCalendarEvent] Updated event description in response:', updateResponse.data.description);
     } catch (error) {
         console.error('❌ Error updating Google Calendar event:', error);
         
