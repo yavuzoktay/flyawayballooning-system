@@ -11119,8 +11119,23 @@ app.post('/api/createBooking', (req, res) => {
 
                     // Create Google Calendar event if flight is scheduled
                     // Event should be created when: flight has a date/time AND status is 'Scheduled'
+                    console.log('📅 [createBooking] Checking Google Calendar event creation conditions:', {
+                        bookingDateTime: bookingDateTime,
+                        bookingDateTimeTrimmed: bookingDateTime ? bookingDateTime.trim() : null,
+                        bookingStatus: bookingStatus,
+                        shouldCreate: bookingDateTime && bookingDateTime.trim() !== '' && bookingDateTime !== 'null' && bookingStatus === 'Scheduled'
+                    });
+                    
                     if (bookingDateTime && bookingDateTime.trim() !== '' && bookingDateTime !== 'null' && bookingStatus === 'Scheduled') {
-                        console.log('📅 [createBooking] Creating Google Calendar event for scheduled flight');
+                        console.log('📅 [createBooking] ✅ Conditions met! Creating Google Calendar event for scheduled flight');
+                        console.log('📅 [createBooking] Flight details:', {
+                            bookingId: bookingId,
+                            location: chooseLocation,
+                            flightType: chooseFlightType.type,
+                            flightDate: bookingDateTime,
+                            timeSlot: selectedTime,
+                            status: bookingStatus
+                        });
                         
                         // Determine if this is a private or shared flight
                         const isPrivateFlight = chooseFlightType.type === 'Private Charter' || chooseFlightType.type === 'Private';
@@ -11169,11 +11184,26 @@ app.post('/api/createBooking', (req, res) => {
                             });
                         }
                     } else {
-                        console.log('⏭️ [createBooking] Skipping Google Calendar event - flight not scheduled or no date/time');
+                        const skipReason = !bookingDateTime ? 'No booking date/time' 
+                            : (bookingDateTime.trim() === '' || bookingDateTime === 'null') ? 'Booking date/time is empty/null'
+                            : bookingStatus !== 'Scheduled' ? `Status is '${bookingStatus}' (not 'Scheduled')`
+                            : 'Unknown reason';
+                        console.log('⏭️ [createBooking] Skipping Google Calendar event creation. Reason:', skipReason);
+                        console.log('⏭️ [createBooking] Booking details:', {
+                            bookingId: bookingId,
+                            bookingDateTime: bookingDateTime,
+                            bookingStatus: bookingStatus
+                        });
+                        
+                        // Log this as info to database for tracking
+                        saveErrorLog('info', `Booking ${bookingId} created but Google Calendar event skipped. Reason: ${skipReason}. Flight Date: ${bookingDateTime || 'N/A'}, Status: ${bookingStatus || 'N/A'}`, null, 'createBooking.skipGoogleCalendar');
+                        
                         res.status(201).json({ success: true, message: 'Booking created successfully!', bookingId: bookingId, created_at: createdAt });
                     }
                     
                     function createGoogleCalendarEvent(onComplete) {
+                        console.log('📅 [createGoogleCalendarEvent] Function called for booking:', bookingId);
+                        
                         // Get total passenger count for this flight slot
                         const getTotalPassengersSql = `
                             SELECT SUM(pax) as total_passengers 
@@ -11185,12 +11215,27 @@ app.post('/api/createBooking', (req, res) => {
                             AND status != 'Cancelled'
                         `;
                         
+                        console.log('📅 [createGoogleCalendarEvent] Querying total passengers with params:', {
+                            flightDate: bookingDateTime,
+                            location: chooseLocation,
+                            flightType: chooseFlightType.type,
+                            timeSlot: selectedTime || null
+                        });
+                        
                         con.query(getTotalPassengersSql, [bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null], async (paxErr, paxResult) => {
+                            if (paxErr) {
+                                console.error('❌ [createGoogleCalendarEvent] Error querying total passengers:', paxErr);
+                                saveErrorLog('error', `Error querying total passengers for booking ${bookingId}: ${paxErr.message}`, paxErr.stack, 'createBooking.createGoogleCalendarEvent.queryPassengers');
+                            }
+                            
                             const totalPassengers = (paxResult && paxResult.length > 0 && paxResult[0].total_passengers) 
                                 ? parseInt(paxResult[0].total_passengers) 
                                 : actualPaxCount;
                             
+                            console.log('📅 [createGoogleCalendarEvent] Total passengers calculated:', totalPassengers);
+                            
                             try {
+                                console.log('📅 [createGoogleCalendarEvent] Calling createCalendarEvent...');
                                 const eventId = await createCalendarEvent({
                                     location: chooseLocation,
                                     flightType: chooseFlightType.type,
@@ -11199,6 +11244,8 @@ app.post('/api/createBooking', (req, res) => {
                                     crewMember: null, // Will be updated when crew is assigned
                                     bookingId: bookingId.toString()
                                 });
+                                
+                                console.log('📅 [createGoogleCalendarEvent] Event created successfully, ID:', eventId);
                                 
                                 // For shared flights, update ALL bookings for this flight slot with the event ID
                                 // For private flights, only update this booking
