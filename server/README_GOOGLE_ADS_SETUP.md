@@ -37,7 +37,13 @@ The system implements server-side Google Ads conversion tracking to ensure all s
 
 ### 3. Get Developer Token
 
-**⚠️ Important:** API Center is only available to **Manager Accounts**. If you see the message "The API Centre is only available to manager accounts", you need to create or convert to a Manager Account first.
+**⚠️ Important:** API Center is only available to **Manager Accounts**. This is a Google requirement, not related to your admin permissions.
+
+**Key Difference:**
+- **Admin Access:** Allows you to manage campaigns, settings, and users within a Google Ads account
+- **Manager Account:** A special account type that can manage multiple Google Ads accounts and has access to API Center
+
+**Even if you have Admin access, you still need a Manager Account to access API Center.** This is Google's policy - API Center is exclusively available in Manager Accounts, regardless of your permission level in regular accounts.
 
 #### Option A: Create a Manager Account (Recommended)
 
