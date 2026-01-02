@@ -195,12 +195,15 @@ async function sendConversion({
         console.log('📊 [Google Ads] Conversion Action Resource Name:', conversionActionResourceName);
 
         // Prepare conversion data
+        // Note: Google Ads API requires specific field names
         const conversionData = {
             conversionAction: conversionActionResourceName,
             conversionDateTime: conversionTime,
             conversionValue: Number(value),
             currencyCode: currency.toUpperCase(),
             orderId: transactionId, // Used for deduplication
+            // Add conversionEnvironment field (required in v16+)
+            conversionEnvironment: 'WEB' // WEB for website conversions, APP for app conversions
         };
 
         // Add click identifiers if available
