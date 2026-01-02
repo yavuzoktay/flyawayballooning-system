@@ -25155,12 +25155,16 @@ app.post('/api/pilot-assignment', (req, res) => {
 
             // Update Google Calendar events for all bookings on this flight slot
             try {
+                console.log('📅 [pilot-assignment] Starting Google Calendar update for pilot assignment');
                 // Get pilot member name
                 const getPilotNameSql = 'SELECT first_name, last_name FROM pilots WHERE id = ?';
                 con.query(getPilotNameSql, [normalizedPilotId], async (pilotErr, pilotResult) => {
                     let pilotMember = null;
                     if (!pilotErr && pilotResult && pilotResult.length > 0) {
                         pilotMember = `${pilotResult[0].first_name} ${pilotResult[0].last_name}`;
+                        console.log('📅 [pilot-assignment] Pilot member found:', pilotMember);
+                    } else {
+                        console.warn('⚠️ [pilot-assignment] Pilot member not found for ID:', normalizedPilotId);
                     }
 
                     // Get all bookings for this flight slot
