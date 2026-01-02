@@ -359,7 +359,9 @@ async function sendConversion({
             refresh_token: REFRESH_TOKEN,
         });
         console.log('📊 [Google Ads] Customer instance created successfully');
-        console.log('📊 [Google Ads] Customer instance customer_id:', customer.customer_id || 'NOT SET');
+        console.log('📊 [Google Ads] Customer ID passed to Customer():', customerIdForApi);
+        console.log('📊 [Google Ads] Customer ID length:', customerIdForApi.length);
+        console.log('📊 [Google Ads] Customer ID is 10 digits:', /^\d{10}$/.test(customerIdForApi));
 
         // Prepare conversion date/time
         const conversionTime = conversionDateTime 
