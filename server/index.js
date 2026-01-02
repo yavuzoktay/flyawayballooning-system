@@ -11242,6 +11242,7 @@ app.post('/api/createBooking', (req, res) => {
                                     passengerCount: totalPassengers,
                                     flightDate: bookingDateTime,
                                     crewMember: null, // Will be updated when crew is assigned
+                                    pilotMember: null, // Will be updated when pilot is assigned
                                     bookingId: bookingId.toString()
                                 });
                                 
@@ -11430,6 +11431,7 @@ app.post('/api/createBooking', (req, res) => {
                             passengerCount: totalPassengers,
                             flightDate: bookingDateTime,
                             crewMember: null, // Will be updated when crew is assigned
+                            pilotMember: null, // Will be updated when pilot is assigned
                             bookingId: bookingId.toString()
                         });
                         
