@@ -25214,8 +25214,10 @@ app.post('/api/pilot-assignment', (req, res) => {
                                     }
                                     
                                     // Update all Google Calendar events for this flight slot
+                                    console.log(`📅 [pilot-assignment] Updating ${bookingsResult.length} Google Calendar event(s) with pilot: ${pilotMember || 'None'}, crew: ${crewMember || 'None'}`);
                                     const updatePromises = bookingsResult.map(async (booking) => {
                                         try {
+                                            console.log(`📅 [pilot-assignment] Updating event ${booking.google_calendar_event_id} for booking ${booking.id}`);
                                             await updateCalendarEvent(booking.google_calendar_event_id, {
                                                 location: booking.location,
                                                 flightType: booking.flight_type,
@@ -25225,7 +25227,9 @@ app.post('/api/pilot-assignment', (req, res) => {
                                                 pilotMember: pilotMember,
                                                 bookingId: booking.id.toString()
                                             });
-                                            console.log(`✅ Updated Google Calendar event for booking ${booking.id} (Crew: ${crewMember || 'None'}, Pilot: ${pilotMember || 'None'})`);
+                                            console.log(`✅ [pilot-assignment] Successfully updated Google Calendar event for booking ${booking.id}`);
+                                            console.log(`   - Crew: ${crewMember || 'None'}`);
+                                            console.log(`   - Pilot: ${pilotMember || 'None'}`);
                                         } catch (calendarError) {
                                             console.error(`❌ Error updating Google Calendar event for booking ${booking.id}:`, calendarError);
                                             
