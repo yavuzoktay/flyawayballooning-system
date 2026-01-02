@@ -354,14 +354,24 @@ async function sendConversion({
         
         // Create customer instance with dash-less format (required by Google Ads API)
         // Ensure it's a string, not a number
-        const customer = client.Customer({
+        // google-ads-api package expects customer_id as string without dashes
+        const customerConfig = {
             customer_id: customerIdForApi, // Must be without dashes and as string
             refresh_token: REFRESH_TOKEN,
+        };
+        
+        console.log('📊 [Google Ads] Customer config:', {
+            customer_id: customerIdForApi,
+            customer_id_type: typeof customerIdForApi,
+            customer_id_length: customerIdForApi.length,
+            is_10_digits: /^\d{10}$/.test(customerIdForApi),
+            has_refresh_token: !!REFRESH_TOKEN
         });
+        
+        const customer = client.Customer(customerConfig);
         console.log('📊 [Google Ads] Customer instance created successfully');
-        console.log('📊 [Google Ads] Customer ID passed to Customer():', customerIdForApi);
-        console.log('📊 [Google Ads] Customer ID length:', customerIdForApi.length);
-        console.log('📊 [Google Ads] Customer ID is 10 digits:', /^\d{10}$/.test(customerIdForApi));
+        console.log('📊 [Google Ads] Customer instance type:', typeof customer);
+        console.log('📊 [Google Ads] Customer instance constructor:', customer.constructor.name);
 
         // Prepare conversion date/time
         const conversionTime = conversionDateTime 
@@ -369,14 +379,14 @@ async function sendConversion({
             : new Date();
 
         // Build conversion action resource name
-        // Note: CONVERSION_ID can be either Conversion Action ID (ctId) or Conversion ID from Google Tag
-        // Google Ads API uses Conversion Action ID (ctId) in the resource name
-        // If CONVERSION_ID is the Google Tag Conversion ID (like 17848519089), we need to find the actual Conversion Action ID
-        // For now, we'll try using it directly - if it fails, we'll need the actual ctId
-        const conversionActionResourceName = `customers/${formattedCustomerId}/conversionActions/${CONVERSION_ID}`;
+        // google-ads-api package automatically adds customer_id from Customer instance
+        // So we need to use the full resource name format: customers/{customer_id}/conversionActions/{conversion_action_id}
+        // Customer ID must be WITHOUT dashes (format: customers/XXXXXXXXXX/conversionActions/ID)
+        const conversionActionResourceName = `customers/${customerIdForApi}/conversionActions/${CONVERSION_ID}`;
         console.log('📊 [Google Ads] Conversion Action Resource Name:', conversionActionResourceName);
+        console.log('📊 [Google Ads] Customer ID in resource name (no dashes):', customerIdForApi);
         console.log('📊 [Google Ads] Using CONVERSION_ID:', CONVERSION_ID);
-        console.log('📊 [Google Ads] Note: If this fails, we may need the actual Conversion Action ID (ctId) from the conversion action detail page URL');
+        console.log('📊 [Google Ads] Note: CONVERSION_ID should be the Conversion Action ID (ctId) from the conversion action detail page URL');
 
         // Prepare conversion data using google-ads-api format
         const conversionData = {
