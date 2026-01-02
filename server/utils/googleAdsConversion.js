@@ -19,7 +19,15 @@
 
 const axios = require('axios');
 const { GoogleAdsApi } = require('google-ads-api');
+// Load environment variables - ensure dotenv is loaded
 require('dotenv').config();
+
+// Debug: Log environment variables on module load (for debugging)
+if (process.env.NODE_ENV !== 'production' || process.env.DEBUG_ENV === 'true') {
+    console.log('🔍 [Google Ads] Environment Variables on module load:');
+    console.log('  - GOOGLE_ADS_CUSTOMER_ID:', process.env.GOOGLE_ADS_CUSTOMER_ID ? `"${process.env.GOOGLE_ADS_CUSTOMER_ID}"` : 'NOT SET');
+    console.log('  - GOOGLE_ADS_CONVERSION_ID:', process.env.GOOGLE_ADS_CONVERSION_ID ? `"${process.env.GOOGLE_ADS_CONVERSION_ID}"` : 'NOT SET');
+}
 
 // Google Ads API configuration
 const GOOGLE_ADS_API_VERSION = 'v16';
