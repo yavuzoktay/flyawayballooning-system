@@ -12,7 +12,7 @@ const fs = require("fs");
 const dayjs = require("dayjs");
 const moment = require('moment');
 const { BALLOON_210_CAPACITY, BALLOON_105_CAPACITY, getAssignedResourceInfo } = require('./utils/resourceAssignment');
-const { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } = require('./utils/googleCalendar');
+const { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent, setSaveErrorLog } = require('./utils/googleCalendar');
 const { sendConversion: sendGoogleAdsConversion } = require('./utils/googleAdsConversion');
 const multer = require('multer');
 const dotenv = require('dotenv');
@@ -4923,10 +4923,25 @@ async function sendGoogleAdsConversionIfNeeded(session, transactionId, value, cu
                 reason: conversionResult.reason,
                 error: conversionResult.error
             });
+            
+            // Save warning to logs database
+            const warningMessage = `Google Ads Conversion: Failed to send conversion for transaction ${transactionId || 'unknown'}`;
+            const warningDetails = conversionResult.reason 
+                ? `Reason: ${conversionResult.reason}. ${conversionResult.error ? `Error: ${JSON.stringify(conversionResult.error)}` : ''}`
+                : 'Unknown reason';
+            saveErrorLog('warning', `${warningMessage}. ${warningDetails}`, null, 'googleAds.sendConversion');
         }
     } catch (error) {
         // Log error but don't throw - we don't want to break the payment flow
         console.error('❌ Error sending Google Ads conversion:', error.message);
+        
+        // Save error to logs database
+        const errorMessage = `Google Ads Conversion: Error sending conversion for transaction ${transactionId || 'unknown'}`;
+        const errorDetails = error.response?.data 
+            ? JSON.stringify(error.response.data) 
+            : error.message || 'Unknown error';
+        const stackTrace = error.stack || `${error.name}: ${error.message}`;
+        saveErrorLog('error', `${errorMessage}. Value: ${value}, Currency: ${currency}, Details: ${errorDetails}`, stackTrace, 'googleAds.sendConversionIfNeeded');
     }
 }
 
@@ -5506,6 +5521,15 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                 }
             } catch (error) {
                 console.error('Error processing webhook:', error);
+                
+                // Save error to logs database
+                const errorMessage = `Stripe Webhook: Error processing checkout.session.completed for session ${session_id || 'unknown'}`;
+                const errorDetails = error.response?.data 
+                    ? JSON.stringify(error.response.data) 
+                    : error.message || 'Unknown error';
+                const stackTrace = error.stack || `${error.name}: ${error.message}`;
+                saveErrorLog('error', `${errorMessage}. Type: ${storeData?.type || 'unknown'}, Details: ${errorDetails}`, stackTrace, 'stripe.webhook.checkout.session.completed');
+                
                 // Hata durumunda processed flag'ini geri al
                 storeData.processed = false;
                 return res.status(500).send('Internal server error');
@@ -5656,6 +5680,15 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                 }
             } catch (piError) {
                 console.error('Error processing payment_intent.succeeded:', piError);
+                
+                // Save error to logs database
+                const errorMessage = `Stripe Webhook: Error processing payment_intent.succeeded for payment intent ${paymentIntent?.id || 'unknown'}`;
+                const errorDetails = piError.response?.data 
+                    ? JSON.stringify(piError.response.data) 
+                    : piError.message || 'Unknown error';
+                const stackTrace = piError.stack || `${piError.name}: ${piError.message}`;
+                saveErrorLog('error', `${errorMessage}. Details: ${errorDetails}`, stackTrace, 'stripe.webhook.payment_intent.succeeded');
+                
                 // Don't fail the webhook - just log the error
             }
         } else {
@@ -5665,6 +5698,15 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
         res.json({ received: true });
     } catch (error) {
         console.error('Webhook processing error:', error);
+        
+        // Save error to logs database
+        const errorMessage = `Stripe Webhook: General processing error for event type ${event?.type || 'unknown'}`;
+        const errorDetails = error.response?.data 
+            ? JSON.stringify(error.response.data) 
+            : error.message || 'Unknown error';
+        const stackTrace = error.stack || `${error.name}: ${error.message}`;
+        saveErrorLog('error', `${errorMessage}. Details: ${errorDetails}`, stackTrace, 'stripe.webhook.general');
+        
         res.status(500).send('Webhook processing failed');
     }
 });
@@ -11202,6 +11244,15 @@ app.post('/api/createBooking', (req, res) => {
                                 }
                             } catch (calendarError) {
                                 console.error('❌ Error creating Google Calendar event:', calendarError);
+                                
+                                // Save error to logs database
+                                const errorMessage = `Google Calendar: Failed to create event for booking ${bookingId}`;
+                                const errorDetails = calendarError.response?.data 
+                                    ? JSON.stringify(calendarError.response.data) 
+                                    : calendarError.message || 'Unknown error';
+                                const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
+                                saveErrorLog('error', `${errorMessage}. Location: ${chooseLocation}, Flight Date: ${bookingDateTime}, Details: ${errorDetails}`, stackTrace, 'createBooking.googleCalendar');
+                                
                                 // Don't fail the booking creation if calendar sync fails
                                 if (onComplete) onComplete();
                             }
@@ -11273,6 +11324,14 @@ app.post('/api/createBooking', (req, res) => {
                                     console.log('✅ Google Calendar event updated for shared flight');
                                 } catch (calendarError) {
                                     console.error('❌ Error updating Google Calendar event:', calendarError);
+                                    
+                                    // Save error to logs database
+                                    const errorMessage = `Google Calendar: Failed to update event ${existingEventId || 'unknown'} for shared flight booking ${bookingId}`;
+                                    const errorDetails = calendarError.response?.data 
+                                        ? JSON.stringify(calendarError.response.data) 
+                                        : calendarError.message || 'Unknown error';
+                                    const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
+                                    saveErrorLog('error', `${errorMessage}. Location: ${chooseLocation}, Flight Date: ${bookingDateTime}, Details: ${errorDetails}`, stackTrace, 'createBooking.updateGoogleCalendarEventForSharedFlight');
                                 }
                                 
                                 if (onComplete) onComplete();
@@ -19244,6 +19303,14 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
                             );
                         } catch (calendarError) {
                             console.error('Error deleting Google Calendar event:', calendarError);
+                            
+                            // Save error to logs database
+                            const errorMessage = `Google Calendar: Failed to delete event ${eventId || 'unknown'} for booking ${booking_id || 'unknown'}`;
+                            const errorDetails = calendarError.response?.data 
+                                ? JSON.stringify(calendarError.response.data) 
+                                : calendarError.message || 'Unknown error';
+                            const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
+                            saveErrorLog('error', `${errorMessage}. Details: ${errorDetails}`, stackTrace, 'updateManifestStatus.deleteCalendarEvent');
                         }
                     }
                 } else if (eventId && (old_status !== new_status || total_pax)) {
@@ -19292,6 +19359,14 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
                                     });
                                 } catch (calendarError) {
                                     console.error('Error updating Google Calendar event:', calendarError);
+                                    
+                                    // Save error to logs database
+                                    const errorMessage = `Google Calendar: Failed to update event ${eventId || 'unknown'} for booking ${booking_id || 'unknown'}`;
+                                    const errorDetails = calendarError.response?.data 
+                                        ? JSON.stringify(calendarError.response.data) 
+                                        : calendarError.message || 'Unknown error';
+                                    const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
+                                    saveErrorLog('error', `${errorMessage}. Status: ${old_status} -> ${new_status}, Details: ${errorDetails}`, stackTrace, 'updateManifestStatus.updateCalendarEvent');
                                 }
                             });
                         }
@@ -19300,6 +19375,15 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
             }
         } catch (calendarError) {
             console.error('Error in Google Calendar sync:', calendarError);
+            
+            // Save error to logs database
+            const errorMessage = `Google Calendar: Error in sync for booking ${booking_id || 'unknown'}`;
+            const errorDetails = calendarError.response?.data 
+                ? JSON.stringify(calendarError.response.data) 
+                : calendarError.message || 'Unknown error';
+            const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
+            saveErrorLog('error', `${errorMessage}. Details: ${errorDetails}`, stackTrace, 'updateManifestStatus.googleCalendarSync');
+            
             // Don't fail the request if calendar sync fails
         }
 
@@ -19766,6 +19850,14 @@ app.delete('/api/deleteBooking/:id', (req, res) => {
                         console.log('✅ Google Calendar event deleted for private flight booking:', id);
                     } catch (calendarError) {
                         console.error('❌ Error deleting Google Calendar event:', calendarError);
+                        
+                        // Save error to logs database
+                        const errorMessage = `Google Calendar: Failed to delete event ${eventId || 'unknown'} for private flight booking ${id || 'unknown'}`;
+                        const errorDetails = calendarError.response?.data 
+                            ? JSON.stringify(calendarError.response.data) 
+                            : calendarError.message || 'Unknown error';
+                        const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
+                        saveErrorLog('error', `${errorMessage}. Details: ${errorDetails}`, stackTrace, 'deleteBooking.deleteCalendarEvent.private');
                     }
                 } else {
                     // Shared flight: check if there are other bookings for this slot
@@ -19791,6 +19883,14 @@ app.delete('/api/deleteBooking/:id', (req, res) => {
                                     console.log('✅ Google Calendar event deleted - no remaining bookings for shared flight');
                                 } catch (calendarError) {
                                     console.error('❌ Error deleting Google Calendar event:', calendarError);
+                                    
+                                    // Save error to logs database
+                                    const errorMessage = `Google Calendar: Failed to delete event ${eventId || 'unknown'} for shared flight booking ${id || 'unknown'}`;
+                                    const errorDetails = calendarError.response?.data 
+                                        ? JSON.stringify(calendarError.response.data) 
+                                        : calendarError.message || 'Unknown error';
+                                    const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
+                                    saveErrorLog('error', `${errorMessage}. Details: ${errorDetails}`, stackTrace, 'deleteBooking.deleteCalendarEvent.shared');
                                 }
                             } else {
                                 // Other bookings exist: update the event with new passenger count
@@ -19823,6 +19923,14 @@ app.delete('/api/deleteBooking/:id', (req, res) => {
                                         console.log('✅ Google Calendar event updated for shared flight - passenger count reduced');
                                     } catch (calendarError) {
                                         console.error('❌ Error updating Google Calendar event:', calendarError);
+                                        
+                                        // Save error to logs database
+                                        const errorMessage = `Google Calendar: Failed to update event ${eventId || 'unknown'} for shared flight booking ${id || 'unknown'}`;
+                                        const errorDetails = calendarError.response?.data 
+                                            ? JSON.stringify(calendarError.response.data) 
+                                            : calendarError.message || 'Unknown error';
+                                        const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
+                                        saveErrorLog('error', `${errorMessage}. Details: ${errorDetails}`, stackTrace, 'deleteBooking.updateCalendarEvent.shared');
                                     }
                                 });
                             }
@@ -19832,6 +19940,15 @@ app.delete('/api/deleteBooking/:id', (req, res) => {
             }
         } catch (calendarError) {
             console.error('Error in Google Calendar sync during booking deletion:', calendarError);
+            
+            // Save error to logs database
+            const errorMessage = `Google Calendar: Error in sync during booking deletion for booking ${id || 'unknown'}`;
+            const errorDetails = calendarError.response?.data 
+                ? JSON.stringify(calendarError.response.data) 
+                : calendarError.message || 'Unknown error';
+            const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
+            saveErrorLog('error', `${errorMessage}. Details: ${errorDetails}`, stackTrace, 'deleteBooking.googleCalendarSync');
+            
             // Don't fail the delete operation if calendar sync fails
         }
 
@@ -23838,6 +23955,14 @@ app.post('/api/crew-assignment', (req, res) => {
                                         console.log(`✅ Updated Google Calendar event for booking ${booking.id}`);
                                     } catch (calendarError) {
                                         console.error(`❌ Error updating Google Calendar event for booking ${booking.id}:`, calendarError);
+                                        
+                                        // Save error to logs database
+                                        const errorMessage = `Google Calendar: Failed to update event ${booking.google_calendar_event_id || 'unknown'} for booking ${booking.id || 'unknown'}`;
+                                        const errorDetails = calendarError.response?.data 
+                                            ? JSON.stringify(calendarError.response.data) 
+                                            : calendarError.message || 'Unknown error';
+                                        const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
+                                        saveErrorLog('error', `${errorMessage}. Crew Assignment - Activity: ${normalizedActivityId}, Date: ${date}, Time: ${time}, Details: ${errorDetails}`, stackTrace, 'crew-assignment.updateCalendarEvent');
                                     }
                                 });
                                 
@@ -23848,6 +23973,15 @@ app.post('/api/crew-assignment', (req, res) => {
                 });
             } catch (calendarError) {
                 console.error('Error updating Google Calendar events for crew assignment:', calendarError);
+                
+                // Save error to logs database
+                const errorMessage = `Google Calendar: Error updating events for crew assignment - Activity: ${normalizedActivityId}, Date: ${date}, Time: ${time}`;
+                const errorDetails = calendarError.response?.data 
+                    ? JSON.stringify(calendarError.response.data) 
+                    : calendarError.message || 'Unknown error';
+                const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
+                saveErrorLog('error', `${errorMessage}. Details: ${errorDetails}`, stackTrace, 'crew-assignment.googleCalendarSync');
+                
                 // Don't fail the request if calendar sync fails
             }
 
