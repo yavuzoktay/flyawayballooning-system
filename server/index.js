@@ -11118,15 +11118,17 @@ app.post('/api/createBooking', (req, res) => {
                     }
 
                     // Create Google Calendar event if flight is scheduled
-                    // Event should be created when: flight has a date/time AND status is 'Scheduled'
+                    // Event should be created when: flight has a date/time AND status is 'Scheduled' or 'Confirmed'
+                    const shouldCreateCalendarEvent = bookingDateTime && bookingDateTime.trim() !== '' && bookingDateTime !== 'null' && (bookingStatus === 'Scheduled' || bookingStatus === 'Confirmed');
+                    
                     console.log('📅 [createBooking] Checking Google Calendar event creation conditions:', {
                         bookingDateTime: bookingDateTime,
                         bookingDateTimeTrimmed: bookingDateTime ? bookingDateTime.trim() : null,
                         bookingStatus: bookingStatus,
-                        shouldCreate: bookingDateTime && bookingDateTime.trim() !== '' && bookingDateTime !== 'null' && bookingStatus === 'Scheduled'
+                        shouldCreate: shouldCreateCalendarEvent
                     });
                     
-                    if (bookingDateTime && bookingDateTime.trim() !== '' && bookingDateTime !== 'null' && bookingStatus === 'Scheduled') {
+                    if (shouldCreateCalendarEvent) {
                         console.log('📅 [createBooking] ✅ Conditions met! Creating Google Calendar event for scheduled flight');
                         console.log('📅 [createBooking] Flight details:', {
                             bookingId: bookingId,
@@ -11186,7 +11188,7 @@ app.post('/api/createBooking', (req, res) => {
                     } else {
                         const skipReason = !bookingDateTime ? 'No booking date/time' 
                             : (bookingDateTime.trim() === '' || bookingDateTime === 'null') ? 'Booking date/time is empty/null'
-                            : bookingStatus !== 'Scheduled' ? `Status is '${bookingStatus}' (not 'Scheduled')`
+                            : (bookingStatus !== 'Scheduled' && bookingStatus !== 'Confirmed') ? `Status is '${bookingStatus}' (not 'Scheduled' or 'Confirmed')`
                             : 'Unknown reason';
                         console.log('⏭️ [createBooking] Skipping Google Calendar event creation. Reason:', skipReason);
                         console.log('⏭️ [createBooking] Booking details:', {
