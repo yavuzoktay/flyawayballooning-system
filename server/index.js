@@ -30406,6 +30406,11 @@ app.post('/api/test-google-ads-conversion', async (req, res) => {
 
         // For test endpoint, use sendGoogleAdsConversion directly with allowTestPayments=true
         const { sendConversion: sendGoogleAdsConversionDirect } = require('./utils/googleAdsConversion');
+        
+        console.log('🧪 [TEST] Calling sendGoogleAdsConversionDirect with allowTestPayments=true');
+        console.log('🧪 [TEST] IS_PRODUCTION:', process.env.NODE_ENV === 'production');
+        console.log('🧪 [TEST] Transaction ID:', transactionId);
+        
         const result = await sendGoogleAdsConversionDirect({
             transactionId: transactionId,
             value: Number(value),
@@ -30416,6 +30421,8 @@ app.post('/api/test-google-ads-conversion', async (req, res) => {
             conversionDateTime: new Date().toISOString(),
             allowTestPayments: true // Allow test payments in test endpoint
         });
+        
+        console.log('🧪 [TEST] Conversion result:', result);
 
         res.json({
             success: true,

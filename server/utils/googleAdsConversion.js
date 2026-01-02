@@ -149,8 +149,9 @@ async function sendConversion({
     }
 
     // Skip test payments in production (unless explicitly allowed for testing)
+    // Note: allowTestPayments=true bypasses this check (for test endpoints)
     if (IS_PRODUCTION && transactionId.startsWith('test_') && !allowTestPayments) {
-        const infoMessage = `Skipping Google Ads conversion for test payment: ${transactionId}`;
+        const infoMessage = `Skipping Google Ads conversion for test payment: ${transactionId} (IS_PRODUCTION=${IS_PRODUCTION}, allowTestPayments=${allowTestPayments})`;
         console.log('⏭️', infoMessage);
         
         if (saveErrorLogFunction) {
@@ -158,6 +159,11 @@ async function sendConversion({
         }
         
         return { success: false, reason: 'test_payment' };
+    }
+    
+    // Log if we're allowing test payments
+    if (transactionId.startsWith('test_') && allowTestPayments) {
+        console.log('🧪 [TEST] Allowing test payment conversion:', transactionId);
     }
 
     try {
