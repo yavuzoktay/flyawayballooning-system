@@ -218,6 +218,14 @@ const updateCalendarEvent = async (eventId, flightData) => {
             description += `Pilot: ${flightData.pilotMember}`;
         }
 
+        console.log('📅 [updateCalendarEvent] Building description with data:', {
+            passengerCount: flightData.passengerCount,
+            bookingId: flightData.bookingId,
+            crewMember: flightData.crewMember,
+            pilotMember: flightData.pilotMember
+        });
+        console.log('📅 [updateCalendarEvent] Final description:', description);
+
         const updatedEvent = {
             ...existingEvent.data,
             summary: title,
