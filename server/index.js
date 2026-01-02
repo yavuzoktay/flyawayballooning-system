@@ -13866,6 +13866,17 @@ app.post('/api/addPassenger', (req, res) => {
                                 LIMIT 1
                             `;
                             
+                            // Get pilot member if assigned
+                            const getPilotSql = `
+                                SELECT p.first_name, p.last_name 
+                                FROM flight_pilot_assignments fpa
+                                JOIN pilots p ON fpa.pilot_id = p.id
+                                WHERE fpa.activity_id = ? 
+                                AND fpa.date = ? 
+                                AND fpa.time = ?
+                                LIMIT 1
+                            `;
+                            
                             const bookingDate = flightDate ? dayjs(flightDate).format('YYYY-MM-DD') : null;
                             const bookingTime = timeSlot || (flightDate ? dayjs(flightDate).format('HH:mm') : null);
                             
@@ -13875,27 +13886,35 @@ app.post('/api/addPassenger', (req, res) => {
                                     crewMember = `${crewResult[0].first_name} ${crewResult[0].last_name}`;
                                 }
                                 
-                                try {
-                                    await updateCalendarEvent(eventId, {
-                                        location: location,
-                                        flightType: flightType,
-                                        passengerCount: totalPassengers,
-                                        flightDate: flightDate,
-                                        crewMember: crewMember,
-                                        bookingId: bookingId.toString()
-                                    });
-                                    console.log('✅ [updateGoogleCalendarForPassengerChange] Google Calendar event updated successfully');
-                                } catch (calendarError) {
-                                    console.error('❌ [updateGoogleCalendarForPassengerChange] Error updating Google Calendar event:', calendarError);
-                                    const errorMessage = `Google Calendar: Failed to update event ${eventId || 'unknown'} after passenger change for booking ${bookingId}`;
-                                    const errorDetails = calendarError.response?.data 
-                                        ? JSON.stringify(calendarError.response.data) 
-                                        : calendarError.message || 'Unknown error';
-                                    const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
-                                    saveErrorLog('error', `${errorMessage}. New Pax: ${newPax}, Total Passengers: ${totalPassengers}, Details: ${errorDetails}`, stackTrace, 'addPassenger.updateGoogleCalendar');
-                                }
-                                
-                                if (onComplete) onComplete();
+                                con.query(getPilotSql, [activityId, bookingDate, bookingTime], async (pilotErr, pilotResult) => {
+                                    let pilotMember = null;
+                                    if (!pilotErr && pilotResult && pilotResult.length > 0) {
+                                        pilotMember = `${pilotResult[0].first_name} ${pilotResult[0].last_name}`;
+                                    }
+                                    
+                                    try {
+                                        await updateCalendarEvent(eventId, {
+                                            location: location,
+                                            flightType: flightType,
+                                            passengerCount: totalPassengers,
+                                            flightDate: flightDate,
+                                            crewMember: crewMember,
+                                            pilotMember: pilotMember,
+                                            bookingId: bookingId.toString()
+                                        });
+                                        console.log('✅ [updateGoogleCalendarForPassengerChange] Google Calendar event updated successfully');
+                                    } catch (calendarError) {
+                                        console.error('❌ [updateGoogleCalendarForPassengerChange] Error updating Google Calendar event:', calendarError);
+                                        const errorMessage = `Google Calendar: Failed to update event ${eventId || 'unknown'} after passenger change for booking ${bookingId}`;
+                                        const errorDetails = calendarError.response?.data 
+                                            ? JSON.stringify(calendarError.response.data) 
+                                            : calendarError.message || 'Unknown error';
+                                        const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
+                                        saveErrorLog('error', `${errorMessage}. New Pax: ${newPax}, Total Passengers: ${totalPassengers}, Details: ${errorDetails}`, stackTrace, 'addPassenger.updateGoogleCalendar');
+                                    }
+                                    
+                                    if (onComplete) onComplete();
+                                });
                             });
                         });
                     } else {
@@ -24707,12 +24726,93 @@ app.post('/api/crew-assignment', (req, res) => {
     // If crew_id is null, delete the assignment
     if (normalizedCrewId === null || normalizedCrewId === undefined) {
         const deleteSql = 'DELETE FROM flight_crew_assignments WHERE activity_id = ? AND date = ? AND time = ?';
-        con.query(deleteSql, [normalizedActivityId, date, time], (err, result) => {
+        con.query(deleteSql, [normalizedActivityId, date, time], async (err, result) => {
             if (err) {
                 console.error('Error deleting crew assignment:', err);
                 return res.status(500).json({ success: false, message: 'Database error', error: err.message });
             }
             console.log('Crew assignment deleted successfully:', result);
+            
+            // Update Google Calendar events - remove crew but keep pilot
+            try {
+                const flightDateTime = `${date} ${time}`;
+                const getBookingsSql = `
+                    SELECT id, google_calendar_event_id, flight_type, location, flight_date, pax, time_slot
+                    FROM all_booking 
+                    WHERE activity_id = ? 
+                    AND DATE(flight_date) = ? 
+                    AND (time_slot = ? OR TIME(flight_date) = ?)
+                    AND status != 'Cancelled'
+                    AND google_calendar_event_id IS NOT NULL
+                `;
+                
+                con.query(getBookingsSql, [normalizedActivityId, date, time, time], async (bookingsErr, bookingsResult) => {
+                    if (!bookingsErr && bookingsResult && bookingsResult.length > 0) {
+                        // Get total passenger count
+                        const getTotalPassengersSql = `
+                            SELECT SUM(pax) as total_passengers 
+                            FROM all_booking 
+                            WHERE activity_id = ? 
+                            AND DATE(flight_date) = ? 
+                            AND (time_slot = ? OR TIME(flight_date) = ?)
+                            AND status != 'Cancelled'
+                        `;
+                        
+                        con.query(getTotalPassengersSql, [normalizedActivityId, date, time, time], async (paxErr, paxResult) => {
+                            const totalPassengers = (paxResult && paxResult.length > 0 && paxResult[0].total_passengers) 
+                                ? parseInt(paxResult[0].total_passengers) 
+                                : 0;
+                            
+                            // Get pilot member if assigned (to preserve pilot info)
+                            const getPilotSql = `
+                                SELECT p.first_name, p.last_name 
+                                FROM flight_pilot_assignments fpa
+                                JOIN pilots p ON fpa.pilot_id = p.id
+                                WHERE fpa.activity_id = ? 
+                                AND fpa.date = ? 
+                                AND fpa.time = ?
+                                LIMIT 1
+                            `;
+                            
+                            con.query(getPilotSql, [normalizedActivityId, date, time], async (pilotErr, pilotResult) => {
+                                let pilotMember = null;
+                                if (!pilotErr && pilotResult && pilotResult.length > 0) {
+                                    pilotMember = `${pilotResult[0].first_name} ${pilotResult[0].last_name}`;
+                                }
+                                
+                                // Update all Google Calendar events - crew is null now
+                                const updatePromises = bookingsResult.map(async (booking) => {
+                                    try {
+                                        await updateCalendarEvent(booking.google_calendar_event_id, {
+                                            location: booking.location,
+                                            flightType: booking.flight_type,
+                                            passengerCount: totalPassengers,
+                                            flightDate: booking.flight_date || flightDateTime,
+                                            crewMember: null, // Crew removed
+                                            pilotMember: pilotMember,
+                                            bookingId: booking.id.toString()
+                                        });
+                                        console.log(`✅ Updated Google Calendar event for booking ${booking.id} (Crew removed, Pilot: ${pilotMember || 'None'})`);
+                                    } catch (calendarError) {
+                                        console.error(`❌ Error updating Google Calendar event for booking ${booking.id}:`, calendarError);
+                                        const errorMessage = `Google Calendar: Failed to update event ${booking.google_calendar_event_id || 'unknown'} after crew removal for booking ${booking.id || 'unknown'}`;
+                                        const errorDetails = calendarError.response?.data 
+                                            ? JSON.stringify(calendarError.response.data) 
+                                            : calendarError.message || 'Unknown error';
+                                        const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
+                                        saveErrorLog('error', `${errorMessage}. Details: ${errorDetails}`, stackTrace, 'crew-assignment.deleteCalendarEvent');
+                                    }
+                                });
+                                
+                                await Promise.all(updatePromises);
+                            });
+                        });
+                    }
+                });
+            } catch (calendarError) {
+                console.error('Error updating Google Calendar events after crew removal:', calendarError);
+            }
+            
             res.json({
                 success: true,
                 message: 'Crew assignment cleared',
@@ -24786,32 +24886,51 @@ app.post('/api/crew-assignment', (req, res) => {
                                     ? parseInt(paxResult[0].total_passengers) 
                                     : 0;
                                 
-                                // Update all Google Calendar events for this flight slot
-                                const updatePromises = bookingsResult.map(async (booking) => {
-                                    try {
-                                        await updateCalendarEvent(booking.google_calendar_event_id, {
-                                            location: booking.location,
-                                            flightType: booking.flight_type,
-                                            passengerCount: totalPassengers,
-                                            flightDate: booking.flight_date || flightDateTime,
-                                            crewMember: crewMember,
-                                            bookingId: booking.id.toString()
-                                        });
-                                        console.log(`✅ Updated Google Calendar event for booking ${booking.id}`);
-                                    } catch (calendarError) {
-                                        console.error(`❌ Error updating Google Calendar event for booking ${booking.id}:`, calendarError);
-                                        
-                                        // Save error to logs database
-                                        const errorMessage = `Google Calendar: Failed to update event ${booking.google_calendar_event_id || 'unknown'} for booking ${booking.id || 'unknown'}`;
-                                        const errorDetails = calendarError.response?.data 
-                                            ? JSON.stringify(calendarError.response.data) 
-                                            : calendarError.message || 'Unknown error';
-                                        const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
-                                        saveErrorLog('error', `${errorMessage}. Crew Assignment - Activity: ${normalizedActivityId}, Date: ${date}, Time: ${time}, Details: ${errorDetails}`, stackTrace, 'crew-assignment.updateCalendarEvent');
-                                    }
-                                });
+                                // Get pilot member if assigned (to preserve pilot info when updating crew)
+                                const getPilotSql = `
+                                    SELECT p.first_name, p.last_name 
+                                    FROM flight_pilot_assignments fpa
+                                    JOIN pilots p ON fpa.pilot_id = p.id
+                                    WHERE fpa.activity_id = ? 
+                                    AND fpa.date = ? 
+                                    AND fpa.time = ?
+                                    LIMIT 1
+                                `;
                                 
-                                await Promise.all(updatePromises);
+                                con.query(getPilotSql, [normalizedActivityId, date, time], async (pilotErr, pilotResult) => {
+                                    let pilotMember = null;
+                                    if (!pilotErr && pilotResult && pilotResult.length > 0) {
+                                        pilotMember = `${pilotResult[0].first_name} ${pilotResult[0].last_name}`;
+                                    }
+                                    
+                                    // Update all Google Calendar events for this flight slot
+                                    const updatePromises = bookingsResult.map(async (booking) => {
+                                        try {
+                                            await updateCalendarEvent(booking.google_calendar_event_id, {
+                                                location: booking.location,
+                                                flightType: booking.flight_type,
+                                                passengerCount: totalPassengers,
+                                                flightDate: booking.flight_date || flightDateTime,
+                                                crewMember: crewMember,
+                                                pilotMember: pilotMember,
+                                                bookingId: booking.id.toString()
+                                            });
+                                            console.log(`✅ Updated Google Calendar event for booking ${booking.id} (Crew: ${crewMember || 'None'}, Pilot: ${pilotMember || 'None'})`);
+                                        } catch (calendarError) {
+                                            console.error(`❌ Error updating Google Calendar event for booking ${booking.id}:`, calendarError);
+                                            
+                                            // Save error to logs database
+                                            const errorMessage = `Google Calendar: Failed to update event ${booking.google_calendar_event_id || 'unknown'} for booking ${booking.id || 'unknown'}`;
+                                            const errorDetails = calendarError.response?.data 
+                                                ? JSON.stringify(calendarError.response.data) 
+                                                : calendarError.message || 'Unknown error';
+                                            const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
+                                            saveErrorLog('error', `${errorMessage}. Crew Assignment - Activity: ${normalizedActivityId}, Date: ${date}, Time: ${time}, Details: ${errorDetails}`, stackTrace, 'crew-assignment.updateCalendarEvent');
+                                        }
+                                    });
+                                    
+                                    await Promise.all(updatePromises);
+                                });
                             });
                         }
                     });
@@ -24911,12 +25030,93 @@ app.post('/api/pilot-assignment', (req, res) => {
     // If pilot_id is null, delete the assignment
     if (normalizedPilotId === null || normalizedPilotId === undefined) {
         const deleteSql = 'DELETE FROM flight_pilot_assignments WHERE activity_id = ? AND date = ? AND time = ?';
-        con.query(deleteSql, [normalizedActivityId, date, time], (err, result) => {
+        con.query(deleteSql, [normalizedActivityId, date, time], async (err, result) => {
             if (err) {
                 console.error('Error deleting pilot assignment:', err);
                 return res.status(500).json({ success: false, message: 'Database error', error: err.message });
             }
             console.log('Pilot assignment deleted successfully:', result);
+            
+            // Update Google Calendar events - remove pilot but keep crew
+            try {
+                const flightDateTime = `${date} ${time}`;
+                const getBookingsSql = `
+                    SELECT id, google_calendar_event_id, flight_type, location, flight_date, pax, time_slot
+                    FROM all_booking 
+                    WHERE activity_id = ? 
+                    AND DATE(flight_date) = ? 
+                    AND (time_slot = ? OR TIME(flight_date) = ?)
+                    AND status != 'Cancelled'
+                    AND google_calendar_event_id IS NOT NULL
+                `;
+                
+                con.query(getBookingsSql, [normalizedActivityId, date, time, time], async (bookingsErr, bookingsResult) => {
+                    if (!bookingsErr && bookingsResult && bookingsResult.length > 0) {
+                        // Get total passenger count
+                        const getTotalPassengersSql = `
+                            SELECT SUM(pax) as total_passengers 
+                            FROM all_booking 
+                            WHERE activity_id = ? 
+                            AND DATE(flight_date) = ? 
+                            AND (time_slot = ? OR TIME(flight_date) = ?)
+                            AND status != 'Cancelled'
+                        `;
+                        
+                        con.query(getTotalPassengersSql, [normalizedActivityId, date, time, time], async (paxErr, paxResult) => {
+                            const totalPassengers = (paxResult && paxResult.length > 0 && paxResult[0].total_passengers) 
+                                ? parseInt(paxResult[0].total_passengers) 
+                                : 0;
+                            
+                            // Get crew member if assigned (to preserve crew info)
+                            const getCrewSql = `
+                                SELECT c.first_name, c.last_name 
+                                FROM flight_crew_assignments fca
+                                JOIN crew c ON fca.crew_id = c.id
+                                WHERE fca.activity_id = ? 
+                                AND fca.date = ? 
+                                AND fca.time = ?
+                                LIMIT 1
+                            `;
+                            
+                            con.query(getCrewSql, [normalizedActivityId, date, time], async (crewErr, crewResult) => {
+                                let crewMember = null;
+                                if (!crewErr && crewResult && crewResult.length > 0) {
+                                    crewMember = `${crewResult[0].first_name} ${crewResult[0].last_name}`;
+                                }
+                                
+                                // Update all Google Calendar events - pilot is null now
+                                const updatePromises = bookingsResult.map(async (booking) => {
+                                    try {
+                                        await updateCalendarEvent(booking.google_calendar_event_id, {
+                                            location: booking.location,
+                                            flightType: booking.flight_type,
+                                            passengerCount: totalPassengers,
+                                            flightDate: booking.flight_date || flightDateTime,
+                                            crewMember: crewMember,
+                                            pilotMember: null, // Pilot removed
+                                            bookingId: booking.id.toString()
+                                        });
+                                        console.log(`✅ Updated Google Calendar event for booking ${booking.id} (Pilot removed, Crew: ${crewMember || 'None'})`);
+                                    } catch (calendarError) {
+                                        console.error(`❌ Error updating Google Calendar event for booking ${booking.id}:`, calendarError);
+                                        const errorMessage = `Google Calendar: Failed to update event ${booking.google_calendar_event_id || 'unknown'} after pilot removal for booking ${booking.id || 'unknown'}`;
+                                        const errorDetails = calendarError.response?.data 
+                                            ? JSON.stringify(calendarError.response.data) 
+                                            : calendarError.message || 'Unknown error';
+                                        const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
+                                        saveErrorLog('error', `${errorMessage}. Details: ${errorDetails}`, stackTrace, 'pilot-assignment.deleteCalendarEvent');
+                                    }
+                                });
+                                
+                                await Promise.all(updatePromises);
+                            });
+                        });
+                    }
+                });
+            } catch (calendarError) {
+                console.error('Error updating Google Calendar events after pilot removal:', calendarError);
+            }
+            
             res.json({
                 success: true,
                 message: 'Pilot assignment cleared',
@@ -24944,12 +25144,114 @@ app.post('/api/pilot-assignment', (req, res) => {
             ON DUPLICATE KEY UPDATE pilot_id = VALUES(pilot_id), updated_at = CURRENT_TIMESTAMP
         `;
 
-        con.query(sql, [normalizedActivityId, date, time, normalizedPilotId], (err, result) => {
+        con.query(sql, [normalizedActivityId, date, time, normalizedPilotId], async (err, result) => {
             if (err) {
                 console.error('Error upserting pilot assignment:', err);
                 return res.status(500).json({ success: false, message: 'Database error', error: err.message });
             }
             console.log('Pilot assignment saved successfully:', result);
+
+            // Update Google Calendar events for all bookings on this flight slot
+            try {
+                // Get pilot member name
+                const getPilotNameSql = 'SELECT first_name, last_name FROM pilots WHERE id = ?';
+                con.query(getPilotNameSql, [normalizedPilotId], async (pilotErr, pilotResult) => {
+                    let pilotMember = null;
+                    if (!pilotErr && pilotResult && pilotResult.length > 0) {
+                        pilotMember = `${pilotResult[0].first_name} ${pilotResult[0].last_name}`;
+                    }
+
+                    // Get all bookings for this flight slot
+                    const flightDateTime = `${date} ${time}`;
+                    const getBookingsSql = `
+                        SELECT id, google_calendar_event_id, flight_type, location, flight_date, pax, time_slot
+                        FROM all_booking 
+                        WHERE activity_id = ? 
+                        AND DATE(flight_date) = ? 
+                        AND (time_slot = ? OR TIME(flight_date) = ?)
+                        AND status != 'Cancelled'
+                        AND google_calendar_event_id IS NOT NULL
+                    `;
+                    
+                    con.query(getBookingsSql, [normalizedActivityId, date, time, time], async (bookingsErr, bookingsResult) => {
+                        if (!bookingsErr && bookingsResult && bookingsResult.length > 0) {
+                            // Get total passenger count for this flight slot
+                            const getTotalPassengersSql = `
+                                SELECT SUM(pax) as total_passengers 
+                                FROM all_booking 
+                                WHERE activity_id = ? 
+                                AND DATE(flight_date) = ? 
+                                AND (time_slot = ? OR TIME(flight_date) = ?)
+                                AND status != 'Cancelled'
+                            `;
+                            
+                            con.query(getTotalPassengersSql, [normalizedActivityId, date, time, time], async (paxErr, paxResult) => {
+                                const totalPassengers = (paxResult && paxResult.length > 0 && paxResult[0].total_passengers) 
+                                    ? parseInt(paxResult[0].total_passengers) 
+                                    : 0;
+                                
+                                // Get crew member if assigned (to preserve crew info when updating pilot)
+                                const getCrewSql = `
+                                    SELECT c.first_name, c.last_name 
+                                    FROM flight_crew_assignments fca
+                                    JOIN crew c ON fca.crew_id = c.id
+                                    WHERE fca.activity_id = ? 
+                                    AND fca.date = ? 
+                                    AND fca.time = ?
+                                    LIMIT 1
+                                `;
+                                
+                                con.query(getCrewSql, [normalizedActivityId, date, time], async (crewErr, crewResult) => {
+                                    let crewMember = null;
+                                    if (!crewErr && crewResult && crewResult.length > 0) {
+                                        crewMember = `${crewResult[0].first_name} ${crewResult[0].last_name}`;
+                                    }
+                                    
+                                    // Update all Google Calendar events for this flight slot
+                                    const updatePromises = bookingsResult.map(async (booking) => {
+                                        try {
+                                            await updateCalendarEvent(booking.google_calendar_event_id, {
+                                                location: booking.location,
+                                                flightType: booking.flight_type,
+                                                passengerCount: totalPassengers,
+                                                flightDate: booking.flight_date || flightDateTime,
+                                                crewMember: crewMember,
+                                                pilotMember: pilotMember,
+                                                bookingId: booking.id.toString()
+                                            });
+                                            console.log(`✅ Updated Google Calendar event for booking ${booking.id} (Crew: ${crewMember || 'None'}, Pilot: ${pilotMember || 'None'})`);
+                                        } catch (calendarError) {
+                                            console.error(`❌ Error updating Google Calendar event for booking ${booking.id}:`, calendarError);
+                                            
+                                            // Save error to logs database
+                                            const errorMessage = `Google Calendar: Failed to update event ${booking.google_calendar_event_id || 'unknown'} for booking ${booking.id || 'unknown'}`;
+                                            const errorDetails = calendarError.response?.data 
+                                                ? JSON.stringify(calendarError.response.data) 
+                                                : calendarError.message || 'Unknown error';
+                                            const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
+                                            saveErrorLog('error', `${errorMessage}. Pilot Assignment - Activity: ${normalizedActivityId}, Date: ${date}, Time: ${time}, Details: ${errorDetails}`, stackTrace, 'pilot-assignment.updateCalendarEvent');
+                                        }
+                                    });
+                                    
+                                    await Promise.all(updatePromises);
+                                });
+                            });
+                        }
+                    });
+                });
+            } catch (calendarError) {
+                console.error('Error updating Google Calendar events for pilot assignment:', calendarError);
+                
+                // Save error to logs database
+                const errorMessage = `Google Calendar: Error updating events for pilot assignment - Activity: ${normalizedActivityId}, Date: ${date}, Time: ${time}`;
+                const errorDetails = calendarError.response?.data 
+                    ? JSON.stringify(calendarError.response.data) 
+                    : calendarError.message || 'Unknown error';
+                const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
+                saveErrorLog('error', `${errorMessage}. Details: ${errorDetails}`, stackTrace, 'pilot-assignment.googleCalendarSync');
+                
+                // Don't fail the request if calendar sync fails
+            }
 
             // Return the saved assignment data
             res.json({
