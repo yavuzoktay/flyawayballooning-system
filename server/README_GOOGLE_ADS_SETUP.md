@@ -272,15 +272,25 @@ If you want to use an existing conversion action:
    
    **Note:** Option A is simpler and works perfectly for server-side tracking. The website selection is just for organization - the actual conversion data is sent via API from your backend.
 
-5. After selecting a website (existing or new), you'll see a form to fill out:
-   - **Website URL:** Enter `https://flyawayballooning-book.com/` (your booking site)
+5. After selecting a website, you'll see **"Create a conversion"** options:
+
+   **Select: "Manually with code"**
+   - ✅ **"Manually with code"** - This is the correct choice for server-side conversion tracking
+   - ❌ Do NOT select "Automatically without code" (this is for Google Tag's automatic detection)
+   - **Why "Manually with code"?** 
+     - Server-side tracking uses the Google Ads API, not frontend code
+     - You'll get the Conversion Action ID which is what you need
+     - You won't actually add code to your website - the backend sends conversions via API
+     - This option gives you the Conversion Action ID and Label you need
+
+6. After selecting "Manually with code", you'll see a form to fill out:
    - **Conversion action name:** "Booking Purchase" or "Server-Side Booking"
    - **Category:** "Purchase/Sale"
    - **Value:** Select **"Use different values for each conversion"** (important for tracking actual booking values)
    - **Count:** **"Every"** (to count all conversions, not just one per user)
    - **Click-through conversion window:** 30 days
    - **Attribution model:** "Data-driven" (recommended) or your preferred model
-5. Click **"Create and continue"**
+7. Click **"Create and continue"** or **"Done"**
 6. After creation, you'll see the conversion action details page
 7. **Copy the Conversion Action ID:**
    - Look at the URL - find `ctId=` parameter (e.g., `ctId=1234567890`)
