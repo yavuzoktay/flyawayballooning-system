@@ -328,7 +328,7 @@ Add the following to your `.env` file in the `server` directory:
 ```dotenv
 # Google Ads API Configuration
 GOOGLE_ADS_CUSTOMER_ID="983-915-4698"  # Manager Account Customer ID (NOT the regular account ID)
-GOOGLE_ADS_CONVERSION_ID="17848519089"  # Conversion Action ID from Manager Account (Conversion ID from Google Tag)
+GOOGLE_ADS_CONVERSION_ID="7439667063"  # Conversion Action ID (ctId) from Manager Account conversion detail page URL
 GOOGLE_ADS_CONVERSION_LABEL="9hwyCPeewdsbELGT675C"  # Conversion Label from Manager Account
 GOOGLE_ADS_DEVELOPER_TOKEN="your-developer-token"  # From API Center
 GOOGLE_ADS_CLIENT_ID="your-client-id.apps.googleusercontent.com"  # From Google Cloud Console
