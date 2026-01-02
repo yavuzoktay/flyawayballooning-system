@@ -427,13 +427,23 @@ async function sendConversion({
         console.log('📊 [Google Ads] Customer instance customer_id type:', typeof customer.customer_id);
         
         try {
-            // Log the customer instance details
-            console.log('📊 [Google Ads] Customer instance details:', {
-                hasCustomerId: !!customer.customer_id,
-                customerIdValue: customer.customer_id,
-                customerIdType: typeof customer.customer_id
+            // Log the customer instance details before API call
+            console.log('📊 [Google Ads] About to call uploadClickConversions');
+            console.log('📊 [Google Ads] Customer instance:', {
+                type: typeof customer,
+                constructor: customer.constructor.name,
+                hasConversionUploads: !!customer.conversionUploads,
+                conversionUploadsType: typeof customer.conversionUploads
+            });
+            console.log('📊 [Google Ads] Conversion data:', {
+                conversion_action: conversionData.conversion_action,
+                order_id: conversionData.order_id,
+                conversion_value: conversionData.conversion_value,
+                currency_code: conversionData.currency_code
             });
             
+            // Call uploadClickConversions
+            // The customer instance should automatically use the customer_id we passed
             const response = await customer.conversionUploads.uploadClickConversions({
                 conversions: [conversionData],
                 partial_failure: false,
