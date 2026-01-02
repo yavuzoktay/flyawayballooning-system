@@ -235,10 +235,23 @@ async function sendConversion({
         });
 
         // Get customer instance
+        // google-ads-api expects customer_id as string without dashes
+        // Also ensure it's not empty
+        if (!formattedCustomerId || formattedCustomerId.trim() === '') {
+            const errorMsg = `Formatted Customer ID is empty. Original: ${CUSTOMER_ID}, Formatted: ${formattedCustomerId}`;
+            console.error('❌', errorMsg);
+            if (saveErrorLogFunction) {
+                saveErrorLogFunction('error', errorMsg, null, 'googleAds.sendConversion');
+            }
+            return { success: false, reason: 'empty_customer_id', error: errorMsg };
+        }
+        
+        console.log('📊 [Google Ads] Creating Customer instance with ID:', formattedCustomerId);
         const customer = client.Customer({
             customer_id: formattedCustomerId,
             refresh_token: REFRESH_TOKEN,
         });
+        console.log('📊 [Google Ads] Customer instance created successfully');
 
         // Prepare conversion date/time
         const conversionTime = conversionDateTime 
@@ -395,6 +408,7 @@ module.exports = {
     sendConversion,
     isDuplicateConversion,
     isConfigured,
-    setSaveErrorLog
+    setSaveErrorLog,
+    reloadEnvVariables
 };
 
