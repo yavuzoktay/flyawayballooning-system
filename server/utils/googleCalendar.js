@@ -195,6 +195,9 @@ const updateCalendarEvent = async (eventId, flightData) => {
             eventId: eventId,
         });
 
+        console.log('📅 [updateCalendarEvent] Existing event description:', existingEvent.data.description);
+        console.log('📅 [updateCalendarEvent] Received flightData:', JSON.stringify(flightData, null, 2));
+
         // Parse flight date
         const flightDateTime = new Date(flightData.flightDate);
         const endDateTime = new Date(flightDateTime);
