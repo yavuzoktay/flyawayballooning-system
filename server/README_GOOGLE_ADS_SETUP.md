@@ -347,6 +347,21 @@ GOOGLE_ADS_REFRESH_TOKEN="your-refresh-token"  # From OAuth 2.0 Playground
 
 **Note:** The conversion label is stored but not currently used in the API call (the conversion action ID is used instead). Keep it for reference.
 
+**⚠️ Important: "Inactive" Status is Normal**
+
+If you see the conversion action showing as **"Inactive"** in Google Ads:
+- ✅ **This is normal and expected** for server-side conversion tracking
+- ❌ **You do NOT need to add Google Tag Manager code** to your website
+- ❌ **You do NOT need to add JavaScript tracking code** to your website
+- The "Inactive" status will change to "Active" automatically once the first conversion is sent via API
+- Google Tag Manager setup is only needed for **frontend tracking**, not server-side tracking
+- Your backend will send conversions directly via Google Ads API, bypassing the need for frontend code
+
+**Why it shows "Inactive":**
+- Google Ads shows "Inactive" until it receives the first conversion
+- Since you're using server-side tracking, no frontend code is needed
+- Once your backend sends the first conversion via API, the status will update to "Active"
+
 ## How It Works
 
 ### Frontend (gclid Capture)
