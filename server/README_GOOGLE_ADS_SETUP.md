@@ -41,18 +41,36 @@ The system implements server-side Google Ads conversion tracking to ensure all s
 
 #### Option A: Create a Manager Account (Recommended)
 
-1. Go to [Google Ads Manager Accounts](https://ads.google.com/aw/manageraccounts)
-2. Click **"Create a manager account"**
+**Step 1: Create Manager Account**
+
+1. Go directly to: https://ads.google.com/aw/manageraccounts
+   - Or: In Google Ads, click on your account selector (top right, shows your account name/Customer ID)
+   - Look for **"Create manager account"** option in the dropdown
+2. Click **"Create a manager account"** button
 3. Fill out the form:
-   - Account name: e.g., "Fly Away Ballooning Manager Account"
-   - Country/Region: Select your country
-   - Currency: Select your currency
-   - Time zone: Select your time zone
-4. Click **"Submit"**
-5. Once created, link your existing Google Ads account to the Manager Account:
-   - In Manager Account, go to **"Accounts"** > **"Link existing account"**
-   - Enter your existing account's Customer ID (format: 123-456-7890)
-   - Request access
+   - **Account name:** e.g., "Fly Away Ballooning Manager Account"
+   - **Country/Region:** Select your country (e.g., United Kingdom)
+   - **Currency:** Select your currency (e.g., GBP)
+   - **Time zone:** Select your time zone (e.g., (GMT+00:00) United Kingdom Time)
+4. Click **"Submit"** or **"Create"**
+5. Wait for the Manager Account to be created (usually instant)
+
+**Step 2: Switch to Manager Account**
+
+1. After creation, you'll be automatically switched to the Manager Account
+2. You can also switch manually:
+   - Click on the account selector (top right)
+   - Select your Manager Account from the list
+
+**Step 3: Link Your Existing Account**
+
+1. In your Manager Account, you should see a different interface
+2. Go to **"Accounts"** in the left menu (or look for "My accounts" / "Linked accounts")
+3. Click **"Link existing account"** or **"+"** button
+4. Enter your existing account's Customer ID: **486-924-1209**
+5. Click **"Send request"** or **"Request access"**
+6. **Important:** Switch back to your original account (486-924-1209) and approve the link request
+7. Once linked, switch back to Manager Account to access API Center
 
 #### Option B: Use Existing Manager Account
 
@@ -62,17 +80,29 @@ If you already have a Manager Account:
 
 #### After Manager Account is Set Up:
 
-1. In your Manager Account, go to **"Tools & Settings"** > **"Setup"** > **"API Center"**
-   - Or go directly to: https://ads.google.com/aw/apicenter
-2. In the API Center page, find the **"Developer Token"** section
-3. Click **"Request Developer Token"** or **"Apply for Developer Token"** button
-4. Fill out the application form:
-   - Company name
-   - Website URL
-   - Use case description (e.g., "Server-side conversion tracking for e-commerce bookings")
-   - Contact information
+**Step 1: Access API Center**
+
+1. Make sure you're in your **Manager Account** (not the regular account)
+   - Check the account selector at top right - it should show your Manager Account name
+2. In Manager Account, click **"Tools & Settings"** icon (wrench/spanner icon) in top right
+3. In the left sidebar, you should now see **"Setup"** section (this only appears in Manager Accounts)
+4. Click on **"Setup"** to expand it
+5. Click on **"API Center"**
+   - Or go directly to: https://ads.google.com/aw/apicenter (only works if you're in Manager Account)
+
+**Step 2: Request Developer Token**
+
+1. In the API Center page, find the **"Developer Token"** section
+2. Click **"Request Developer Token"** or **"Apply for Developer Token"** button
+3. Fill out the application form:
+   - **Company name:** Fly Away Ballooning
+   - **Website URL:** Your website URL
+   - **Use case description:** "Server-side conversion tracking for e-commerce bookings via Stripe webhooks"
+   - **Contact information:** Your contact details
+4. Click **"Submit"** or **"Send request"**
 5. Wait for approval (can take 1-3 business days)
-6. Once approved, copy the **Developer Token** (it will be displayed in the API Center)
+6. Once approved, the Developer Token will appear in the API Center
+7. Copy the **Developer Token** (keep it secure)
 
 **Note:** 
 - While waiting for approval, you can still test the integration in test mode
