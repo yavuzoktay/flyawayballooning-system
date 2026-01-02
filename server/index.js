@@ -13800,7 +13800,7 @@ app.post('/api/addPassenger', (req, res) => {
         function updateGoogleCalendarForPassengerChange(bookingId, onComplete) {
             // Get booking details including Google Calendar event ID
             const getBookingDetailsSql = `
-                SELECT google_calendar_event_id, flight_date, location, flight_type, time_slot, pax, status
+                SELECT google_calendar_event_id, flight_date, location, flight_type, time_slot, pax, status, activity_id
                 FROM all_booking 
                 WHERE id = ?
             `;
