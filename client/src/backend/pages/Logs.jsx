@@ -21,12 +21,18 @@ import {
   Alert,
   IconButton,
   Tooltip,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import { Refresh as RefreshIcon, FilterList as FilterListIcon } from '@mui/icons-material';
 import axios from 'axios';
 import dayjs from 'dayjs';
 
 const Logs = () => {
+  // Mobile detection
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -130,14 +136,14 @@ const Logs = () => {
           <h2>LOGS</h2>
           <hr />
         </div>
-        <Box sx={{ padding: 2, background: "#f9f9f9", borderRadius: "20px" }}>
+        <Box sx={{ padding: isMobile ? 1 : 2, background: "#f9f9f9", borderRadius: isMobile ? "12px" : "20px" }}>
           {/* Header with filters */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
-            <Typography variant="h5" sx={{ fontWeight: 600 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: isMobile ? 2 : 3, flexWrap: 'wrap', gap: isMobile ? 1 : 2 }}>
+            <Typography variant="h5" sx={{ fontWeight: 600, fontSize: isMobile ? '16px' : undefined }}>
               Error Logs (Last 24 Hours)
             </Typography>
-            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-              <FormControl size="small" sx={{ minWidth: 120 }}>
+            <Box sx={{ display: 'flex', gap: isMobile ? 1 : 2, alignItems: 'center', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
+              <FormControl size="small" sx={{ minWidth: isMobile ? '100%' : 120, width: isMobile ? '100%' : 'auto' }}>
                 <InputLabel>Level</InputLabel>
                 <Select
                   value={filter.level}
@@ -155,10 +161,10 @@ const Logs = () => {
                 placeholder="Search logs..."
                 value={filter.search}
                 onChange={(e) => setFilter({ ...filter, search: e.target.value })}
-                sx={{ minWidth: 200 }}
+                sx={{ minWidth: isMobile ? '100%' : 200, width: isMobile ? '100%' : 'auto' }}
               />
               <Tooltip title="Refresh logs">
-                <IconButton onClick={fetchLogs} color="primary">
+                <IconButton onClick={fetchLogs} color="primary" sx={{ flexShrink: 0 }}>
                   <RefreshIcon />
                 </IconButton>
               </Tooltip>
@@ -185,42 +191,43 @@ const Logs = () => {
               </Typography>
             </Box>
           ) : (
-            <TableContainer component={Paper} sx={{ maxHeight: '70vh', overflow: 'auto' }}>
-              <Table stickyHeader>
+            <TableContainer component={Paper} sx={{ maxHeight: isMobile ? '60vh' : '70vh', overflow: 'auto' }} className="logs-table-container">
+              <Table stickyHeader sx={{ minWidth: isMobile ? 800 : 'auto' }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 700, minWidth: 150 }}>Date & Time</TableCell>
-                    <TableCell sx={{ fontWeight: 700, minWidth: 100 }}>Level</TableCell>
-                    <TableCell sx={{ fontWeight: 700, minWidth: 150 }}>Source</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Message</TableCell>
-                    <TableCell sx={{ fontWeight: 700, minWidth: 200 }}>Stack Trace</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: isMobile ? 120 : 150 }}>Date & Time</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: isMobile ? 70 : 100 }}>Level</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: isMobile ? 100 : 150 }}>Source</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: isMobile ? 200 : 'auto' }}>Message</TableCell>
+                    <TableCell sx={{ fontWeight: 700, minWidth: isMobile ? 150 : 200 }}>Stack Trace</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {filteredLogs.map((log, index) => (
                     <TableRow key={index} hover>
-                      <TableCell>{formatDate(log.created_at)}</TableCell>
+                      <TableCell sx={{ fontSize: isMobile ? '9px' : undefined }}>{formatDate(log.created_at)}</TableCell>
                       <TableCell>
                         <Chip 
                           label={log.level || 'unknown'} 
                           color={getLevelColor(log.level)} 
                           size="small"
+                          sx={{ fontSize: isMobile ? '9px' : undefined, height: isMobile ? '20px' : undefined }}
                         />
                       </TableCell>
-                      <TableCell>{log.source || '-'}</TableCell>
+                      <TableCell sx={{ fontSize: isMobile ? '9px' : undefined, wordBreak: 'break-all' }}>{log.source || '-'}</TableCell>
                       <TableCell>
-                        <Box sx={{ maxWidth: 400, wordBreak: 'break-word' }}>
+                        <Box sx={{ maxWidth: isMobile ? '100%' : 400, wordBreak: 'break-word', fontSize: isMobile ? '9px' : undefined }}>
                           {log.message || '-'}
                         </Box>
                       </TableCell>
                       <TableCell>
-                        <Box sx={{ maxWidth: 500, wordBreak: 'break-word', fontSize: '0.85rem', fontFamily: 'monospace' }}>
+                        <Box sx={{ maxWidth: isMobile ? '100%' : 500, wordBreak: 'break-word', fontSize: isMobile ? '8px' : '0.85rem', fontFamily: 'monospace' }}>
                           {log.stack ? (
                             <details>
-                              <summary style={{ cursor: 'pointer', color: '#3274b4' }}>
+                              <summary style={{ cursor: 'pointer', color: '#3274b4', fontSize: isMobile ? '9px' : undefined }}>
                                 Show stack trace
                               </summary>
-                              <pre style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>
+                              <pre style={{ marginTop: isMobile ? 4 : 8, whiteSpace: 'pre-wrap', fontSize: isMobile ? '7px' : undefined, padding: isMobile ? '4px' : undefined }}>
                                 {log.stack}
                               </pre>
                             </details>
