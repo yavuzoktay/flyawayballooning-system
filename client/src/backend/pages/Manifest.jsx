@@ -3476,9 +3476,9 @@ const Manifest = () => {
                     <h2>MANIFEST PAGE</h2>
                     <hr />
                 </div>
-                <Box sx={{ padding: 2 }}>
+                <Box sx={{ padding: isMobile ? 1 : 2 }}>
                     {/* Header Section */}
-                    <Box sx={{ marginBottom: 3 }}>
+                    <Box sx={{ marginBottom: isMobile ? 1 : 3 }}>
                         {/* Crew assignment notification */}
                         {crewNotification.show && (
                             <Box sx={{ 
@@ -3530,7 +3530,7 @@ const Manifest = () => {
                         <Box className="manifest-date-selector" sx={{
                             display: 'flex',
                             flexDirection: isMobile ? 'column' : 'row',
-                            alignItems: isMobile ? 'stretch' : 'center',
+                            alignItems: isMobile ? 'center' : 'center',
                             gap: isMobile ? 2 : 2
                         }}>
                             {/* Navigation buttons - side by side on mobile, above date picker */}
@@ -3914,64 +3914,101 @@ const Manifest = () => {
                                 displayFlightTime = dayjs(timePart, 'HH:mm').format('HH:mm');
                             }
                             return (
-                                <Card key={groupKey} sx={{ marginBottom: isMobile ? 1 : 2 }} className="manifest-flight-card">
-                                    <CardContent sx={{ padding: isMobile ? '12px !important' : undefined }}>
-                                        <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={isMobile ? 1 : 2} className="manifest-flight-header" sx={{ position: 'relative' }}>
+                                <Card key={groupKey} sx={{ marginBottom: isMobile ? 0.5 : 2 }} className="manifest-flight-card">
+                                    <CardContent sx={{ padding: isMobile ? '8px !important' : undefined }}>
+                                        <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={isMobile ? 0.5 : 2} className="manifest-flight-header" sx={{ position: 'relative' }}>
                                             <Box display="flex" flexDirection="column" alignItems="flex-start" sx={{ flex: 1, minWidth: 0 }}>
-                                                {/* Mobile: Three dots menu at top right of header */}
-                                                {isMobile && (
-                                                    <IconButton 
-                                                        size="small" 
-                                                        onClick={e => handleGlobalMenuOpen(e, first, groupFlights)}
-                                                        sx={{ 
-                                                            position: 'absolute',
-                                                            top: 0,
-                                                            right: 0,
-                                                            padding: '4px',
-                                                            zIndex: 1,
-                                                            '& .MuiSvgIcon-root': {
-                                                                fontSize: '18px',
-                                                                color: '#3274b4'
-                                                            }
-                                                        }}
-                                                    >
-                                                        <MoreVertIcon />
-                                                    </IconButton>
-                                                )}
-                                                {/* Section başlığında activityName ve flight time birlikte gösterilecek */}
-                                                {/* Check if any booking in this group has Proposal Flight voucher type */}
-                                                {/* For Private Flight, show booking ID in the title */}
-                                                {(() => {
-                                                    const hasProposal = groupFlights.some(f => {
-                                                        const voucherType = (f.voucher_type || '').toLowerCase();
-                                                        return voucherType.includes('proposal');
-                                                    });
-                                                    const isPrivateFlight = (first.flight_type || '').toLowerCase().includes('private') || 
-                                                                           (first.flight_type || '').toLowerCase().includes('charter');
-                                                    const titleSuffix = hasProposal ? ' | Proposal' : '';
-                                                    const bookingIdSuffix = isPrivateFlight && first.id ? ` | Booking ID: ${first.id}` : '';
-                                                    return (
-                                                        <Typography 
-                                                            variant="h6" 
+                                                {/* Mobile: Title and three dots menu in same row */}
+                                                {isMobile ? (
+                                                    <Box sx={{ 
+                                                        display: 'flex', 
+                                                        alignItems: 'center', 
+                                                        justifyContent: 'space-between',
+                                                        width: '100%',
+                                                        gap: 1
+                                                    }}>
+                                                        {/* Section başlığında activityName ve flight time birlikte gösterilecek */}
+                                                        {/* Check if any booking in this group has Proposal Flight voucher type */}
+                                                        {/* For Private Flight, show booking ID in the title */}
+                                                        {(() => {
+                                                            const hasProposal = groupFlights.some(f => {
+                                                                const voucherType = (f.voucher_type || '').toLowerCase();
+                                                                return voucherType.includes('proposal');
+                                                            });
+                                                            const isPrivateFlight = (first.flight_type || '').toLowerCase().includes('private') || 
+                                                                                   (first.flight_type || '').toLowerCase().includes('charter');
+                                                            const titleSuffix = hasProposal ? ' | Proposal' : '';
+                                                            const bookingIdSuffix = isPrivateFlight && first.id ? ` | Booking ID: ${first.id}` : '';
+                                                            return (
+                                                                <Typography 
+                                                                    variant="h6" 
+                                                                    sx={{ 
+                                                                        fontSize: '14px',
+                                                                        fontWeight: 600,
+                                                                        lineHeight: 1.3,
+                                                                        flex: 1,
+                                                                        minWidth: 0,
+                                                                        margin: 0
+                                                                    }}
+                                                                >
+                                                                    {activityName}{titleSuffix}{bookingIdSuffix} - Flight Time: {displayFlightTime}
+                                                                </Typography>
+                                                            );
+                                                        })()}
+                                                        <IconButton 
+                                                            size="small" 
+                                                            onClick={e => handleGlobalMenuOpen(e, first, groupFlights)}
                                                             sx={{ 
-                                                                fontSize: isMobile ? '14px' : undefined,
-                                                                fontWeight: isMobile ? 600 : undefined,
-                                                                lineHeight: isMobile ? 1.3 : undefined,
-                                                                pr: isMobile ? 4 : 0
+                                                                padding: '4px',
+                                                                flexShrink: 0,
+                                                                '& .MuiSvgIcon-root': {
+                                                                    fontSize: '18px',
+                                                                    color: '#3274b4'
+                                                                }
                                                             }}
                                                         >
-                                                            {activityName}{titleSuffix}{bookingIdSuffix} - Flight Time: {displayFlightTime}
-                                                        </Typography>
-                                                    );
-                                                })()}
+                                                            <MoreVertIcon />
+                                                        </IconButton>
+                                                    </Box>
+                                                ) : (
+                                                    <>
+                                                        {/* Desktop: Three dots menu at top right of header */}
+                                                        {/* Section başlığında activityName ve flight time birlikte gösterilecek */}
+                                                        {/* Check if any booking in this group has Proposal Flight voucher type */}
+                                                        {/* For Private Flight, show booking ID in the title */}
+                                                        {(() => {
+                                                            const hasProposal = groupFlights.some(f => {
+                                                                const voucherType = (f.voucher_type || '').toLowerCase();
+                                                                return voucherType.includes('proposal');
+                                                            });
+                                                            const isPrivateFlight = (first.flight_type || '').toLowerCase().includes('private') || 
+                                                                                   (first.flight_type || '').toLowerCase().includes('charter');
+                                                            const titleSuffix = hasProposal ? ' | Proposal' : '';
+                                                            const bookingIdSuffix = isPrivateFlight && first.id ? ` | Booking ID: ${first.id}` : '';
+                                                            return (
+                                                                <Typography 
+                                                                    variant="h6" 
+                                                                    sx={{ 
+                                                                        fontSize: isMobile ? '14px' : undefined,
+                                                                        fontWeight: isMobile ? 600 : undefined,
+                                                                        lineHeight: isMobile ? 1.3 : undefined,
+                                                                        pr: isMobile ? 4 : 0
+                                                                    }}
+                                                                >
+                                                                    {activityName}{titleSuffix}{bookingIdSuffix} - Flight Time: {displayFlightTime}
+                                                                </Typography>
+                                                            );
+                                                        })()}
+                                                    </>
+                                                )}
                                                 <Box className="manifest-flight-details" sx={{
                                                     display: 'flex',
                                                     flexDirection: isMobile ? 'row' : 'row',
                                                     alignItems: isMobile ? 'flex-start' : 'center',
-                                                    gap: isMobile ? 1 : 3,
+                                                    gap: isMobile ? 0.5 : 3,
                                                     flexWrap: 'wrap',
-                                                    mt: isMobile ? 0.5 : 1,
-                                                    mb: isMobile ? 0.5 : 0
+                                                    mt: isMobile ? 0.25 : 1,
+                                                    mb: isMobile ? 0.25 : 0
                                                 }}>
                                                     {isMobile ? (
                                                         // Mobile: Compact tag-style layout
@@ -4065,8 +4102,8 @@ const Manifest = () => {
                                             {/* Mobile: Crew and Pilot selection - Compact tag-style layout */}
                                             {isMobile && (
                                                 <Box sx={{ 
-                                                    mb: 0.5, 
-                                                    mt: 0.5,
+                                                    mb: 0.25, 
+                                                    mt: 0.25,
                                                     display: 'flex', 
                                                     gap: 0.5, 
                                                     alignItems: 'center',
@@ -4160,9 +4197,11 @@ const Manifest = () => {
                                                 </Box>
                                             )}
                                             
-                                            <Box display="flex" alignItems="center" gap={1} className="manifest-flight-actions" sx={{
+                                            <Box display="flex" alignItems="center" gap={isMobile ? 0.5 : 1} className="manifest-flight-actions" sx={{
                                                 flexDirection: isMobile ? 'row' : 'row',
-                                                flexWrap: isMobile ? 'wrap' : 'nowrap'
+                                                flexWrap: isMobile ? 'wrap' : 'nowrap',
+                                                mt: isMobile ? 0.25 : undefined,
+                                                mb: isMobile ? 0.25 : undefined
                                             }}>
                                                 {/* Sold Out Badge - Show when flight is fully booked */}
                                                 {paxBookedDisplay === paxTotalDisplay && (
@@ -4348,8 +4387,8 @@ const Manifest = () => {
                                                 <MenuItem onClick={() => handleGlobalMenuAction('sendMessageAllGuests')}>Send Message to All Guests</MenuItem>
                                             </Menu>
                                         </Box>
-                                        <Divider sx={{ marginY: isMobile ? 1 : 2 }} />
-                                        <TableContainer component={Paper} sx={{ marginTop: isMobile ? 1 : 2 }} className="manifest-table-container">
+                                        <Divider sx={{ marginY: isMobile ? 0.5 : 2 }} />
+                                        <TableContainer component={Paper} sx={{ marginTop: isMobile ? 0.5 : 2 }} className="manifest-table-container">
                                             <Table className="manifest-table">
                                                 <TableHead sx={{ marginTop: 2, background: "#d3d3d3", color: "#000" }}>
                                                     <TableRow>
