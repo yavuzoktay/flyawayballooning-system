@@ -33,14 +33,14 @@ if (process.env.NODE_ENV !== 'production' || process.env.DEBUG_ENV === 'true') {
 const GOOGLE_ADS_API_VERSION = 'v16';
 const GOOGLE_ADS_API_BASE_URL = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers`;
 
-// Environment variables
-const CUSTOMER_ID = process.env.GOOGLE_ADS_CUSTOMER_ID;
-const CONVERSION_ID = process.env.GOOGLE_ADS_CONVERSION_ID;
-const CONVERSION_LABEL = process.env.GOOGLE_ADS_CONVERSION_LABEL;
-const DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
-const CLIENT_ID = process.env.GOOGLE_ADS_CLIENT_ID;
-const CLIENT_SECRET = process.env.GOOGLE_ADS_CLIENT_SECRET;
-const REFRESH_TOKEN = process.env.GOOGLE_ADS_REFRESH_TOKEN;
+// Environment variables - Use let so they can be reloaded
+let CUSTOMER_ID = process.env.GOOGLE_ADS_CUSTOMER_ID;
+let CONVERSION_ID = process.env.GOOGLE_ADS_CONVERSION_ID;
+let CONVERSION_LABEL = process.env.GOOGLE_ADS_CONVERSION_LABEL;
+let DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
+let CLIENT_ID = process.env.GOOGLE_ADS_CLIENT_ID;
+let CLIENT_SECRET = process.env.GOOGLE_ADS_CLIENT_SECRET;
+let REFRESH_TOKEN = process.env.GOOGLE_ADS_REFRESH_TOKEN;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 // Function to save error logs to database (injected from index.js)
@@ -54,8 +54,34 @@ function setSaveErrorLog(saveErrorLog) {
     saveErrorLogFunction = saveErrorLog;
 }
 
+/**
+ * Reload environment variables from process.env
+ * This ensures we get the latest values even if .env was updated
+ */
+function reloadEnvVariables() {
+    // Force reload of dotenv
+    delete require.cache[require.resolve('dotenv')];
+    require('dotenv').config();
+    
+    // Reload variables directly from process.env
+    CUSTOMER_ID = process.env.GOOGLE_ADS_CUSTOMER_ID;
+    CONVERSION_ID = process.env.GOOGLE_ADS_CONVERSION_ID;
+    CONVERSION_LABEL = process.env.GOOGLE_ADS_CONVERSION_LABEL;
+    DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
+    CLIENT_ID = process.env.GOOGLE_ADS_CLIENT_ID;
+    CLIENT_SECRET = process.env.GOOGLE_ADS_CLIENT_SECRET;
+    REFRESH_TOKEN = process.env.GOOGLE_ADS_REFRESH_TOKEN;
+    
+    console.log('🔄 [Google Ads] Environment variables reloaded');
+    console.log('  - CUSTOMER_ID:', CUSTOMER_ID ? `"${CUSTOMER_ID}"` : 'NOT SET');
+    console.log('  - CONVERSION_ID:', CONVERSION_ID ? `"${CONVERSION_ID}"` : 'NOT SET');
+}
+
 // Check if Google Ads is configured
 const isConfigured = () => {
+    // Reload env vars before checking
+    reloadEnvVariables();
+    
     return !!(
         CUSTOMER_ID &&
         CONVERSION_ID &&
