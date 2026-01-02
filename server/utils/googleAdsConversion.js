@@ -341,15 +341,20 @@ async function sendConversion({
         
         // According to Google Ads API docs, customer_id should be WITHOUT dashes
         // Format: "1234567890" not "123-456-7890"
-        console.log('📊 [Google Ads] Creating Customer instance with ID (no dashes):', formattedCustomerId);
+        // But google-ads-api package might expect it as a string, not a number
+        const customerIdForApi = String(formattedCustomerId);
+        console.log('📊 [Google Ads] Creating Customer instance with ID (no dashes, as string):', customerIdForApi);
         console.log('📊 [Google Ads] Original format (with dashes):', customerIdValue);
+        console.log('📊 [Google Ads] Customer ID type:', typeof customerIdForApi);
         
         // Create customer instance with dash-less format (required by Google Ads API)
+        // Ensure it's a string, not a number
         const customer = client.Customer({
-            customer_id: formattedCustomerId, // Must be without dashes
+            customer_id: customerIdForApi, // Must be without dashes and as string
             refresh_token: REFRESH_TOKEN,
         });
         console.log('📊 [Google Ads] Customer instance created successfully');
+        console.log('📊 [Google Ads] Customer instance customer_id:', customer.customer_id || 'NOT SET');
 
         // Prepare conversion date/time
         const conversionTime = conversionDateTime 
