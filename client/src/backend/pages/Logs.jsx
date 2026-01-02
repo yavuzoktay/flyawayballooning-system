@@ -56,11 +56,14 @@ const Logs = () => {
       setError(null);
       const response = await axios.get('/api/logs');
       if (response.data.success) {
-        // Get last 24 hours of error logs
+        // Get last 24 hours of logs (errors, warnings, and Google Ads info logs)
         const last24Hours = dayjs().subtract(24, 'hours');
         const errorLogs = response.data.data.filter(log => {
           const logDate = dayjs(log.created_at);
-          return logDate.isAfter(last24Hours) && (log.level === 'error' || log.level === 'warning');
+          const isRecent = logDate.isAfter(last24Hours);
+          const isErrorOrWarning = log.level === 'error' || log.level === 'warning';
+          const isGoogleAdsInfo = log.level === 'info' && log.source && log.source.includes('googleAds');
+          return isRecent && (isErrorOrWarning || isGoogleAdsInfo);
         });
         setLogs(errorLogs);
       } else {
@@ -245,5 +248,7 @@ const Logs = () => {
 };
 
 export default Logs;
+
+
 
 

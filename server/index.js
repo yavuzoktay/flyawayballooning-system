@@ -13,7 +13,7 @@ const dayjs = require("dayjs");
 const moment = require('moment');
 const { BALLOON_210_CAPACITY, BALLOON_105_CAPACITY, getAssignedResourceInfo } = require('./utils/resourceAssignment');
 const { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent, setSaveErrorLog } = require('./utils/googleCalendar');
-const { sendConversion: sendGoogleAdsConversion } = require('./utils/googleAdsConversion');
+const { sendConversion: sendGoogleAdsConversion, setSaveErrorLog: setGoogleAdsSaveErrorLog } = require('./utils/googleAdsConversion');
 const multer = require('multer');
 const dotenv = require('dotenv');
 const axios = require('axios');
@@ -4886,18 +4886,39 @@ async function savePaymentHistory(session, bookingId, voucherId, voucherRef = nu
  */
 async function sendGoogleAdsConversionIfNeeded(session, transactionId, value, currency = 'GBP') {
     try {
+        console.log('📊 [Google Ads] sendGoogleAdsConversionIfNeeded called:', {
+            transactionId,
+            value,
+            currency,
+            sessionId: session?.id,
+            hasMetadata: !!session?.metadata
+        });
+        
         // Extract Google Ads IDs from session metadata
         const gclid = session.metadata?.gclid || null;
         const wbraid = session.metadata?.wbraid || null;
         const gbraid = session.metadata?.gbraid || null;
 
+        console.log('📊 [Google Ads] Extracted IDs from metadata:', {
+            gclid: gclid ? `${gclid.substring(0, 10)}...` : null,
+            wbraid: wbraid ? `${wbraid.substring(0, 10)}...` : null,
+            gbraid: gbraid ? `${gbraid.substring(0, 10)}...` : null,
+            fullMetadata: session.metadata
+        });
+
         // Only send conversion if we have at least one Google Ads ID or if configured to send all conversions
         // For now, we'll send conversion if gclid exists (most common case)
         // You can modify this logic if you want to track all conversions regardless of gclid
         if (!gclid && !wbraid && !gbraid) {
-            console.log('⏭️ Skipping Google Ads conversion: No gclid/wbraid/gbraid found in session metadata');
+            const skipMessage = `Skipping Google Ads conversion: No gclid/wbraid/gbraid found in session metadata. Transaction ID: ${transactionId}`;
+            console.log('⏭️', skipMessage);
+            
+            // Log to database for visibility
+            saveErrorLog('info', skipMessage, null, 'googleAds.sendConversionIfNeeded');
             return;
         }
+
+        console.log('📊 [Google Ads] Proceeding with conversion send...');
 
         // Send conversion to Google Ads
         const conversionResult = await sendGoogleAdsConversion({
@@ -4911,37 +4932,36 @@ async function sendGoogleAdsConversionIfNeeded(session, transactionId, value, cu
         });
 
         if (conversionResult.success) {
-            console.log('✅ Google Ads conversion sent successfully:', {
-                transactionId,
-                value,
-                currency,
-                hasGclid: !!gclid
-            });
+            const successMessage = `Google Ads conversion sent successfully. Transaction ID: ${transactionId}, Value: ${value} ${currency}, Has gclid: ${!!gclid}`;
+            console.log('✅', successMessage);
+            
+            // Log success to database
+            saveErrorLog('info', successMessage, JSON.stringify(conversionResult.response || {}, null, 2), 'googleAds.sendConversionIfNeeded');
         } else {
-            console.warn('⚠️ Google Ads conversion failed:', {
+            const warningMessage = `Google Ads conversion failed. Transaction ID: ${transactionId}, Reason: ${conversionResult.reason || 'unknown'}`;
+            console.warn('⚠️', warningMessage, {
                 transactionId,
                 reason: conversionResult.reason,
                 error: conversionResult.error
             });
             
             // Save warning to logs database
-            const warningMessage = `Google Ads Conversion: Failed to send conversion for transaction ${transactionId || 'unknown'}`;
             const warningDetails = conversionResult.reason 
                 ? `Reason: ${conversionResult.reason}. ${conversionResult.error ? `Error: ${JSON.stringify(conversionResult.error)}` : ''}`
                 : 'Unknown reason';
-            saveErrorLog('warning', `${warningMessage}. ${warningDetails}`, null, 'googleAds.sendConversion');
+            saveErrorLog('warning', `${warningMessage}. ${warningDetails}`, null, 'googleAds.sendConversionIfNeeded');
         }
     } catch (error) {
         // Log error but don't throw - we don't want to break the payment flow
-        console.error('❌ Error sending Google Ads conversion:', error.message);
+        const errorMessage = `Error sending Google Ads conversion. Transaction ID: ${transactionId || 'unknown'}, Error: ${error.message}`;
+        console.error('❌', errorMessage);
         
         // Save error to logs database
-        const errorMessage = `Google Ads Conversion: Error sending conversion for transaction ${transactionId || 'unknown'}`;
         const errorDetails = error.response?.data 
             ? JSON.stringify(error.response.data) 
             : error.message || 'Unknown error';
         const stackTrace = error.stack || `${error.name}: ${error.message}`;
-        saveErrorLog('error', `${errorMessage}. Value: ${value}, Currency: ${currency}, Details: ${errorDetails}`, stackTrace, 'googleAds.sendConversionIfNeeded');
+        saveErrorLog('error', `Google Ads Conversion: ${errorMessage}. Value: ${value}, Currency: ${currency}, Details: ${errorDetails}`, stackTrace, 'googleAds.sendConversionIfNeeded');
     }
 }
 

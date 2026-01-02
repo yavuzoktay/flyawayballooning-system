@@ -34,6 +34,17 @@ const CLIENT_SECRET = process.env.GOOGLE_ADS_CLIENT_SECRET;
 const REFRESH_TOKEN = process.env.GOOGLE_ADS_REFRESH_TOKEN;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
+// Function to save error logs to database (injected from index.js)
+let saveErrorLogFunction = null;
+
+/**
+ * Set the saveErrorLog function from index.js
+ * @param {Function} saveErrorLog - Function to save error logs to database
+ */
+function setSaveErrorLog(saveErrorLog) {
+    saveErrorLogFunction = saveErrorLog;
+}
+
 // Check if Google Ads is configured
 const isConfigured = () => {
     return !!(
@@ -91,33 +102,69 @@ async function sendConversion({
 }) {
     // Validate configuration
     if (!isConfigured()) {
-        console.warn('⚠️ Google Ads Conversion API not configured. Skipping conversion tracking.');
+        const warningMessage = 'Google Ads Conversion API not configured. Skipping conversion tracking.';
+        console.warn('⚠️', warningMessage);
+        
+        if (saveErrorLogFunction) {
+            saveErrorLogFunction('warning', warningMessage, null, 'googleAds.sendConversion');
+        }
+        
         return { success: false, reason: 'not_configured' };
     }
 
     // Validate required parameters
     if (!transactionId) {
-        console.error('❌ Transaction ID is required for Google Ads conversion');
+        const errorMessage = 'Transaction ID is required for Google Ads conversion';
+        console.error('❌', errorMessage);
+        
+        if (saveErrorLogFunction) {
+            saveErrorLogFunction('error', errorMessage, null, 'googleAds.sendConversion');
+        }
+        
         return { success: false, reason: 'missing_transaction_id' };
     }
 
     if (value === undefined || value === null || isNaN(Number(value))) {
-        console.error('❌ Valid value is required for Google Ads conversion');
+        const errorMessage = `Valid value is required for Google Ads conversion. Received: ${value}`;
+        console.error('❌', errorMessage);
+        
+        if (saveErrorLogFunction) {
+            saveErrorLogFunction('error', errorMessage, null, 'googleAds.sendConversion');
+        }
+        
         return { success: false, reason: 'invalid_value' };
     }
 
     // Skip test payments in production
     if (IS_PRODUCTION && transactionId.startsWith('test_')) {
-        console.log('⏭️ Skipping Google Ads conversion for test payment:', transactionId);
+        const infoMessage = `Skipping Google Ads conversion for test payment: ${transactionId}`;
+        console.log('⏭️', infoMessage);
+        
+        if (saveErrorLogFunction) {
+            saveErrorLogFunction('info', infoMessage, null, 'googleAds.sendConversion');
+        }
+        
         return { success: false, reason: 'test_payment' };
     }
 
     try {
+        console.log('📊 [Google Ads] Starting conversion send:', {
+            transactionId,
+            value,
+            currency,
+            hasGclid: !!gclid,
+            hasWbraid: !!wbraid,
+            hasGbraid: !!gbraid
+        });
+        
         // Get OAuth2 access token
+        console.log('📊 [Google Ads] Getting access token...');
         const accessToken = await getAccessToken();
+        console.log('📊 [Google Ads] Access token obtained');
 
         // Format customer ID (remove dashes if present)
         const formattedCustomerId = CUSTOMER_ID.replace(/-/g, '');
+        console.log('📊 [Google Ads] Formatted Customer ID:', formattedCustomerId);
 
         // Prepare conversion date/time
         const conversionTime = conversionDateTime 
@@ -126,6 +173,7 @@ async function sendConversion({
 
         // Build conversion action resource name
         const conversionActionResourceName = `customers/${formattedCustomerId}/conversionActions/${CONVERSION_ID}`;
+        console.log('📊 [Google Ads] Conversion Action Resource Name:', conversionActionResourceName);
 
         // Prepare conversion data
         const conversionData = {
@@ -147,6 +195,17 @@ async function sendConversion({
             conversionData.gbraid = gbraid;
         }
 
+        console.log('📊 [Google Ads] Conversion data prepared:', {
+            conversionAction: conversionActionResourceName,
+            conversionDateTime: conversionTime,
+            conversionValue: conversionData.conversionValue,
+            currencyCode: conversionData.currencyCode,
+            orderId: conversionData.orderId,
+            hasGclid: !!conversionData.gclid,
+            hasWbraid: !!conversionData.wbraid,
+            hasGbraid: !!conversionData.gbraid
+        });
+
         // Prepare the request payload
         // Note: customerId is in the URL path, not in the payload
         const requestPayload = {
@@ -157,6 +216,8 @@ async function sendConversion({
         // Make API request
         // Format: POST /customers/{customerId}:uploadConversions
         const url = `${GOOGLE_ADS_API_BASE_URL}/${formattedCustomerId}:uploadConversions`;
+        console.log('📊 [Google Ads] Sending request to:', url);
+        
         const response = await axios.post(url, requestPayload, {
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
@@ -165,13 +226,13 @@ async function sendConversion({
             },
         });
 
-        console.log('✅ Google Ads conversion sent successfully:', {
-            transactionId,
-            value,
-            currency,
-            hasGclid: !!gclid,
-            response: response.data
-        });
+        const successMessage = `Google Ads conversion sent successfully. Transaction ID: ${transactionId}, Value: ${value} ${currency}, Has gclid: ${!!gclid}`;
+        console.log('✅', successMessage);
+        console.log('✅ [Google Ads] Response:', JSON.stringify(response.data, null, 2));
+        
+        if (saveErrorLogFunction) {
+            saveErrorLogFunction('info', successMessage, JSON.stringify(response.data, null, 2), 'googleAds.sendConversion');
+        }
 
         return {
             success: true,
@@ -180,11 +241,25 @@ async function sendConversion({
         };
     } catch (error) {
         // Log error but don't throw (we don't want to break the payment flow)
-        console.error('❌ Error sending Google Ads conversion:', {
+        const errorDetails = {
             transactionId,
+            value,
+            currency,
             error: error.response?.data || error.message,
             status: error.response?.status,
-        });
+            statusText: error.response?.statusText
+        };
+        
+        console.error('❌ Error sending Google Ads conversion:', errorDetails);
+        
+        if (saveErrorLogFunction) {
+            const errorMessage = `Google Ads: Failed to send conversion for transaction ${transactionId || 'unknown'}. Value: ${value} ${currency}`;
+            const errorDetailsStr = error.response?.data 
+                ? JSON.stringify(error.response.data) 
+                : error.message || 'Unknown error';
+            const stackTrace = error.stack || `${error.name}: ${error.message}`;
+            saveErrorLogFunction('error', `${errorMessage}. Details: ${errorDetailsStr}`, stackTrace, 'googleAds.sendConversion');
+        }
 
         return {
             success: false,
@@ -211,6 +286,7 @@ function isDuplicateConversion(transactionId) {
 module.exports = {
     sendConversion,
     isDuplicateConversion,
-    isConfigured
+    isConfigured,
+    setSaveErrorLog
 };
 
