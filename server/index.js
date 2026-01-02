@@ -30353,6 +30353,9 @@ const saveErrorLog = (level, message, stack, source) => {
     });
 };
 
+// Set saveErrorLog function for Google Ads utility (after saveErrorLog is defined)
+setGoogleAdsSaveErrorLog(saveErrorLog);
+
 // Endpoint to get logs (last 24 hours of errors/warnings)
 app.get('/api/logs', (req, res) => {
     try {
