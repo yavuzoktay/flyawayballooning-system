@@ -32,8 +32,20 @@ The system implements server-side Google Ads conversion tracking to ensure all s
 1. In Google Cloud Console, go to "APIs & Services" > "Credentials"
 2. Click "CREATE CREDENTIALS" > "OAuth client ID"
 3. Choose "Web application" as the application type
-4. Add authorized redirect URIs (if needed for OAuth flow)
-5. Save the **Client ID** and **Client Secret**
+4. **Add Authorized redirect URIs:**
+   - Click **"+ Add URI"** under "Authorized redirect URIs"
+   - Add: `https://developers.google.com/oauthplayground`
+   - This is required for using OAuth 2.0 Playground to get refresh token
+5. Click **"Create"**
+6. Save the **Client ID** and **Client Secret** (you'll see them in a popup)
+
+**⚠️ Important:** If you already created the OAuth client ID without the redirect URI, you need to edit it:
+1. Go to "APIs & Services" > "Credentials"
+2. Find your OAuth 2.0 Client ID (the one you created)
+3. Click the **pencil icon (✏️)** to edit
+4. Under "Authorized redirect URIs", click **"+ Add URI"**
+5. Add: `https://developers.google.com/oauthplayground`
+6. Click **"Save"**
 
 ### 3. Get Developer Token
 
@@ -141,6 +153,8 @@ If you already have a Manager Account:
 ### 4. Get Refresh Token
 
 You need to obtain a refresh token using OAuth 2.0 Playground. This allows your backend to authenticate with Google Ads API.
+
+**⚠️ Before starting:** Make sure you've added `https://developers.google.com/oauthplayground` to your OAuth Client ID's "Authorized redirect URIs" in Google Cloud Console (see Step 2). If you get "Error 400: redirect_uri_mismatch", you need to add this redirect URI first.
 
 **Step-by-step using OAuth 2.0 Playground:**
 
