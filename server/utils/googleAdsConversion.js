@@ -237,50 +237,90 @@ async function sendConversion({
 
         // Upload click conversions using google-ads-api
         console.log('📊 [Google Ads] Uploading click conversions via google-ads-api...');
-        const response = await customer.conversionUploads.uploadClickConversions({
-            conversions: [conversionData],
-            partial_failure: false,
-        });
-
-        const successMessage = `Google Ads conversion sent successfully. Transaction ID: ${transactionId}, Value: ${value} ${currency}, Has gclid: ${!!gclid}`;
-        console.log('✅', successMessage);
-        console.log('✅ [Google Ads] Response:', JSON.stringify(response.data, null, 2));
+        console.log('📊 [Google Ads] Conversion data to send:', JSON.stringify(conversionData, null, 2));
         
-        if (saveErrorLogFunction) {
-            saveErrorLogFunction('info', successMessage, JSON.stringify(response.data, null, 2), 'googleAds.sendConversion');
-        }
+        try {
+            const response = await customer.conversionUploads.uploadClickConversions({
+                conversions: [conversionData],
+                partial_failure: false,
+            });
 
-        return {
-            success: true,
-            transactionId,
-            response: response.data
-        };
+            const successMessage = `Google Ads conversion sent successfully. Transaction ID: ${transactionId}, Value: ${value} ${currency}, Has gclid: ${!!gclid}`;
+            console.log('✅', successMessage);
+            console.log('✅ [Google Ads] Response:', JSON.stringify(response, null, 2));
+            
+            if (saveErrorLogFunction) {
+                saveErrorLogFunction('info', successMessage, JSON.stringify(response, null, 2), 'googleAds.sendConversion');
+            }
+
+            return {
+                success: true,
+                transactionId,
+                response: response
+            };
+        } catch (apiError) {
+            // google-ads-api paketi farklı hata formatı kullanıyor olabilir
+            console.error('❌ [Google Ads] API Error Details:');
+            console.error('  - Error Type:', apiError.constructor.name);
+            console.error('  - Error Message:', apiError.message);
+            console.error('  - Error Code:', apiError.code);
+            console.error('  - Error Status:', apiError.status);
+            console.error('  - Error Details:', apiError.details);
+            console.error('  - Full Error:', JSON.stringify(apiError, Object.getOwnPropertyNames(apiError), 2));
+            
+            throw apiError; // Re-throw to be caught by outer catch
+        }
     } catch (error) {
         // Log error but don't throw (we don't want to break the payment flow)
+        console.error('❌ [Google Ads] Error caught in outer catch:');
+        console.error('  - Error Type:', error?.constructor?.name || typeof error);
+        console.error('  - Error Message:', error?.message || 'No message');
+        console.error('  - Error Code:', error?.code);
+        console.error('  - Error Status:', error?.status);
+        console.error('  - Error Details:', error?.details);
+        console.error('  - Error Stack:', error?.stack);
+        console.error('  - Full Error Object:', error);
+        
+        // Try to extract error details from different possible formats
+        let errorMessage = 'Unknown error';
+        let errorDetailsStr = 'Unknown error';
+        
+        if (error?.message) {
+            errorMessage = error.message;
+            errorDetailsStr = error.message;
+        } else if (error?.details) {
+            errorMessage = JSON.stringify(error.details);
+            errorDetailsStr = JSON.stringify(error.details);
+        } else if (typeof error === 'string') {
+            errorMessage = error;
+            errorDetailsStr = error;
+        } else {
+            errorMessage = JSON.stringify(error);
+            errorDetailsStr = JSON.stringify(error);
+        }
+        
         const errorDetails = {
             transactionId,
             value,
             currency,
-            error: error.response?.data || error.message,
-            status: error.response?.status,
-            statusText: error.response?.statusText
+            error: errorMessage,
+            errorCode: error?.code,
+            errorStatus: error?.status,
+            errorType: error?.constructor?.name || typeof error
         };
         
         console.error('❌ Error sending Google Ads conversion:', errorDetails);
         
         if (saveErrorLogFunction) {
-            const errorMessage = `Google Ads: Failed to send conversion for transaction ${transactionId || 'unknown'}. Value: ${value} ${currency}`;
-            const errorDetailsStr = error.response?.data 
-                ? JSON.stringify(error.response.data) 
-                : error.message || 'Unknown error';
-            const stackTrace = error.stack || `${error.name}: ${error.message}`;
-            saveErrorLogFunction('error', `${errorMessage}. Details: ${errorDetailsStr}`, stackTrace, 'googleAds.sendConversion');
+            const logMessage = `Google Ads: Failed to send conversion for transaction ${transactionId || 'unknown'}. Value: ${value} ${currency}`;
+            const stackTrace = error?.stack || `${error?.name || 'Error'}: ${errorMessage}`;
+            saveErrorLogFunction('error', `${logMessage}. Details: ${errorDetailsStr}`, stackTrace, 'googleAds.sendConversion');
         }
 
         return {
             success: false,
             reason: 'api_error',
-            error: error.response?.data || error.message
+            error: errorMessage
         };
     }
 }
