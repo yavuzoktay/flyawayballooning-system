@@ -37,17 +37,48 @@ The system implements server-side Google Ads conversion tracking to ensure all s
 
 ### 3. Get Developer Token
 
-1. Go to [Google Ads](https://ads.google.com/)
-2. Click on the **"Tools & Settings"** icon (wrench/spanner icon) in the top right corner
-3. In the left sidebar, expand **"Setup"** section
-4. Click on **"API Center"** (or go directly to: https://ads.google.com/aw/apicenter)
-5. In the API Center page, find the **"Developer Token"** section
-6. Click **"Request Developer Token"** or **"Apply for Developer Token"** button
-7. Fill out the application form (may require business information)
-8. Wait for approval (can take a few days)
-9. Once approved, copy the **Developer Token** (it will be displayed in the API Center)
+**⚠️ Important:** API Center is only available to **Manager Accounts**. If you see the message "The API Centre is only available to manager accounts", you need to create or convert to a Manager Account first.
 
-**Note:** While waiting for approval, you can still test the integration in test mode. The developer token is required for production use.
+#### Option A: Create a Manager Account (Recommended)
+
+1. Go to [Google Ads Manager Accounts](https://ads.google.com/aw/manageraccounts)
+2. Click **"Create a manager account"**
+3. Fill out the form:
+   - Account name: e.g., "Fly Away Ballooning Manager Account"
+   - Country/Region: Select your country
+   - Currency: Select your currency
+   - Time zone: Select your time zone
+4. Click **"Submit"**
+5. Once created, link your existing Google Ads account to the Manager Account:
+   - In Manager Account, go to **"Accounts"** > **"Link existing account"**
+   - Enter your existing account's Customer ID (format: 123-456-7890)
+   - Request access
+
+#### Option B: Use Existing Manager Account
+
+If you already have a Manager Account:
+1. Switch to your Manager Account in Google Ads
+2. Go to **"Tools & Settings"** > **"Setup"** > **"API Center"**
+
+#### After Manager Account is Set Up:
+
+1. In your Manager Account, go to **"Tools & Settings"** > **"Setup"** > **"API Center"**
+   - Or go directly to: https://ads.google.com/aw/apicenter
+2. In the API Center page, find the **"Developer Token"** section
+3. Click **"Request Developer Token"** or **"Apply for Developer Token"** button
+4. Fill out the application form:
+   - Company name
+   - Website URL
+   - Use case description (e.g., "Server-side conversion tracking for e-commerce bookings")
+   - Contact information
+5. Wait for approval (can take 1-3 business days)
+6. Once approved, copy the **Developer Token** (it will be displayed in the API Center)
+
+**Note:** 
+- While waiting for approval, you can still test the integration in test mode
+- The developer token is required for production use
+- Manager Accounts are free to create and use
+- You can manage multiple Google Ads accounts from one Manager Account
 
 ### 4. Get Refresh Token
 
