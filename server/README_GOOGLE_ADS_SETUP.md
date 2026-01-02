@@ -327,13 +327,15 @@ Add the following to your `.env` file in the `server` directory:
 
 ```dotenv
 # Google Ads API Configuration
-GOOGLE_ADS_CUSTOMER_ID="486-924-1209"  # Your Google Ads Customer ID
+GOOGLE_ADS_CUSTOMER_ID="983-915-4698"  # Manager Account Customer ID (NOT the regular account ID)
 GOOGLE_ADS_CONVERSION_ID="7439291494"  # Conversion Action ID from URL ctId parameter
 GOOGLE_ADS_CONVERSION_LABEL="4G8SCOaoqtsbEOeUzd8B"  # Conversion Label from setup page
 GOOGLE_ADS_DEVELOPER_TOKEN="your-developer-token"  # From API Center
 GOOGLE_ADS_CLIENT_ID="your-client-id.apps.googleusercontent.com"  # From Google Cloud Console
 GOOGLE_ADS_CLIENT_SECRET="your-client-secret"  # From Google Cloud Console
 GOOGLE_ADS_REFRESH_TOKEN="your-refresh-token"  # From OAuth 2.0 Playground
+
+**⚠️ Important:** Use the Manager Account Customer ID (983-915-4698), not the regular account ID (486-924-1209)
 ```
 
 **Where each value comes from:**

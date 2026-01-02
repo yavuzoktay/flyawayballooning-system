@@ -178,7 +178,17 @@ async function sendConversion({
         });
         
         // Format customer ID (remove dashes if present)
+        if (!CUSTOMER_ID) {
+            const errorMsg = 'GOOGLE_ADS_CUSTOMER_ID environment variable is not set';
+            console.error('❌', errorMsg);
+            if (saveErrorLogFunction) {
+                saveErrorLogFunction('error', errorMsg, null, 'googleAds.sendConversion');
+            }
+            return { success: false, reason: 'missing_customer_id', error: errorMsg };
+        }
+        
         const formattedCustomerId = CUSTOMER_ID.replace(/-/g, '');
+        console.log('📊 [Google Ads] Customer ID from env:', CUSTOMER_ID);
         console.log('📊 [Google Ads] Formatted Customer ID:', formattedCustomerId);
 
         // Initialize Google Ads API client
