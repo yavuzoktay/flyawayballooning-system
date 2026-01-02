@@ -291,16 +291,25 @@ If you want to use an existing conversion action:
    - **Click-through conversion window:** 30 days
    - **Attribution model:** "Data-driven" (recommended) or your preferred model
 7. Click **"Create and continue"** or **"Done"**
-6. After creation, you'll see the conversion action details page
-7. **Copy the Conversion Action ID:**
-   - Look at the URL - find `ctId=` parameter (e.g., `ctId=1234567890`)
-   - This is your **Conversion Action ID**
-8. **Copy the Conversion Label:**
-   - In the conversion action details page, look for **"Conversion label"** or **"Label"** field
-   - It's usually shown in the settings section
-   - If you don't see it immediately, click **"Edit Settings"** button - the label should be visible there
-   - The label format is usually something like `abc123` or `xyz789`
-   - **Note:** If the label is auto-generated and not visible, you can leave it empty in `.env` - the Conversion Action ID is the primary identifier
+8. After creation, you'll see a setup page with conversion tracking code
+
+9. **Important: Get Conversion Action ID from URL**
+   - Look at the **URL in your browser** - it should contain `ctId=` parameter
+   - Example URL: `https://ads.google.com/aw/conversions/setup?ctId=1234567890&...`
+   - The number after `ctId=` is your **Conversion Action ID** (e.g., `1234567890`)
+   - **Note:** Conversion ID (shown on the page, e.g., `468929127`) is different from Conversion Action ID
+   - You need the **Conversion Action ID** from the URL, not the Conversion ID shown on the page
+
+10. **Copy the Conversion Label:**
+    - On the setup page, you'll see a table with conversion labels
+    - Look for **"Conversion label"** column in the table
+    - Copy the label value (e.g., `4G8SCOaoqtsbEOeUzd8B`)
+    - **Note:** The JavaScript code snippet shown is for frontend tracking - you don't need to add it since you're using server-side tracking
+
+**What you need for `.env` file:**
+- **Conversion Action ID:** From URL `ctId=` parameter (this is the most important)
+- **Conversion Label:** From the table on the setup page (e.g., `4G8SCOaoqtsbEOeUzd8B`)
+- **Conversion ID:** The number shown on the page (e.g., `468929127`) - this is your Google Ads account identifier, not the Conversion Action ID
 
 **Note:** For server-side conversion tracking, you typically want a conversion action that:
 - Counts "Every" conversion (not just "One")
