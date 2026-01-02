@@ -249,18 +249,30 @@ If you want to use an existing conversion action:
    - ❌ Do NOT select other options (they're for different tracking methods)
    - **Why Website?** Server-side conversion tracking sends conversion data from your website's backend (via Stripe webhooks), so it's considered a website conversion
 
-4. **If you see a list of existing websites:**
-   - You might see `www.flyawayballooning.com` in the list
-   - **Don't select the existing website** - you need to add a new one
-   - Look for an option like **"Add new website"**, **"Enter website URL"**, or **"Other"**
-   - Or you might need to manually enter the URL in the next step
+4. **If you see a list of existing websites (e.g., `www.flyawayballooning.com`):**
 
-5. **Enter your booking website URL:**
-   - In the website URL field, enter: `https://flyawayballooning-book.com/`
-   - Make sure to include `https://` and the trailing slash
-   - This is the domain where payments are processed (Stripe checkout)
+   **Option A: Use Existing Website (Recommended for Server-Side Tracking)**
+   
+   - ✅ **You can select the existing website** (`www.flyawayballooning.com`) even if payments are on `flyawayballooning-book.com`
+   - **Why this works:** For server-side conversion tracking, the website URL in Google Ads is just for organization. The actual tracking happens via API using the Conversion Action ID, which works regardless of which website is selected.
+   - The important part is getting the **Conversion Action ID**, not which website is linked
+   - Select the existing website and continue
 
-6. After entering the website URL, you'll see a form to fill out:
+   **Option B: Add New Website (If you want separate tracking)**
+   
+   If you really need to add `https://flyawayballooning-book.com/` as a separate website:
+   
+   - Look for a **"+" button**, **"Add website"**, or **"Add new"** option in the website list
+   - Or try clicking outside the modal and look for website management settings
+   - **Alternative:** You may need to add the website in Google Tag Manager or Google Analytics first:
+     1. Go to [Google Tag Manager](https://tagmanager.google.com/)
+     2. Create a new container for `flyawayballooning-book.com`
+     3. Or add it as a domain in your existing container
+     4. Then it should appear in Google Ads conversion setup
+   
+   **Note:** Option A is simpler and works perfectly for server-side tracking. The website selection is just for organization - the actual conversion data is sent via API from your backend.
+
+5. After selecting a website (existing or new), you'll see a form to fill out:
    - **Website URL:** Enter `https://flyawayballooning-book.com/` (your booking site)
    - **Conversion action name:** "Booking Purchase" or "Server-Side Booking"
    - **Category:** "Purchase/Sale"
