@@ -53,7 +53,8 @@ const createCalendarEvent = async (flightData) => {
         console.log('📅 [createCalendarEvent] Environment check:', {
             hasClientEmail,
             hasPrivateKey,
-            calendarId: calendarId || 'primary (default)'
+            calendarId: calendarId || 'primary (default)',
+            clientEmail: process.env.GOOGLE_CLIENT_EMAIL || 'NOT SET'
         });
         
         if (!hasClientEmail || !hasPrivateKey) {
@@ -62,8 +63,31 @@ const createCalendarEvent = async (flightData) => {
             throw new Error(errorMsg);
         }
         
+        // Validate calendar ID format
+        if (!calendarId || calendarId.trim() === '') {
+            const errorMsg = 'GOOGLE_CALENDAR_ID is not set. Please set it to the calendar email address (e.g., info@flyawayballooning.com)';
+            console.error('❌ [createCalendarEvent]', errorMsg);
+            throw new Error(errorMsg);
+        }
+        
         const calendar = getCalendarClient();
         console.log('📅 [createCalendarEvent] Calendar client initialized');
+        
+        // Test calendar access before creating event
+        try {
+            console.log('📅 [createCalendarEvent] Testing calendar access for:', calendarId);
+            await calendar.calendars.get({ calendarId: calendarId });
+            console.log('✅ [createCalendarEvent] Calendar access verified');
+        } catch (accessError) {
+            const accessErrorMsg = accessError.response?.data?.error?.message || accessError.message;
+            if (accessError.code === 403 || accessErrorMsg?.includes('writer access') || accessErrorMsg?.includes('requiredAccessLevel')) {
+                const detailedError = `Google Calendar permission error: Service account '${process.env.GOOGLE_CLIENT_EMAIL}' does not have writer access to calendar '${calendarId}'. Please: 1) Share the calendar with the service account email, 2) Grant 'Make changes to events' permission (not just 'See only free/busy').`;
+                console.error('❌ [createCalendarEvent]', detailedError);
+                throw new Error(detailedError);
+            }
+            // If it's a different error (like 404), log it but continue
+            console.warn('⚠️ [createCalendarEvent] Calendar access check failed (non-critical):', accessErrorMsg);
+        }
 
         // Parse flight date
         const flightDateTime = new Date(flightData.flightDate);
@@ -109,6 +133,7 @@ const createCalendarEvent = async (flightData) => {
 
         console.log('📅 [createCalendarEvent] Sending event to Google Calendar API...');
         console.log('📅 [createCalendarEvent] Event data:', JSON.stringify(event, null, 2));
+        console.log('📅 [createCalendarEvent] Target calendar ID:', calendarId);
         
         const response = await calendar.events.insert({
             calendarId: calendarId,
@@ -122,14 +147,28 @@ const createCalendarEvent = async (flightData) => {
     } catch (error) {
         console.error('❌ Error creating Google Calendar event:', error);
         
-        // Save error to logs database
-        if (saveErrorLogFunction) {
-            const errorMessage = `Google Calendar: Failed to create event for booking ${flightData.bookingId || 'unknown'}`;
+        // Check for specific permission errors
+        const errorMessage = error.response?.data?.error?.message || error.message || 'Unknown error';
+        const errorCode = error.response?.data?.error?.code || error.code;
+        
+        let detailedErrorMessage = `Google Calendar: Failed to create event for booking ${flightData.bookingId || 'unknown'}`;
+        
+        if (errorCode === 403 || errorMessage.includes('writer access') || errorMessage.includes('requiredAccessLevel')) {
+            detailedErrorMessage += `. PERMISSION ERROR: Service account '${process.env.GOOGLE_CLIENT_EMAIL || 'NOT SET'}' needs 'Make changes to events' permission on calendar '${process.env.GOOGLE_CALENDAR_ID || 'NOT SET'}'. `;
+            detailedErrorMessage += `Please: 1) Go to Google Calendar settings, 2) Share the calendar with service account email, 3) Grant 'Make changes to events' permission (NOT 'See only free/busy').`;
+        } else if (errorCode === 404) {
+            detailedErrorMessage += `. CALENDAR NOT FOUND: Calendar '${process.env.GOOGLE_CALENDAR_ID || 'NOT SET'}' not found. Please check GOOGLE_CALENDAR_ID environment variable.`;
+        } else {
             const errorDetails = error.response?.data 
                 ? JSON.stringify(error.response.data) 
-                : error.message || 'Unknown error';
+                : errorMessage;
+            detailedErrorMessage += `. Details: ${errorDetails}`;
+        }
+        
+        // Save error to logs database
+        if (saveErrorLogFunction) {
             const stackTrace = error.stack || `${error.name}: ${error.message}`;
-            saveErrorLogFunction('error', `${errorMessage}. Details: ${errorDetails}`, stackTrace, 'googleCalendar.createCalendarEvent');
+            saveErrorLogFunction('error', detailedErrorMessage, stackTrace, 'googleCalendar.createCalendarEvent');
         }
         
         throw error;
