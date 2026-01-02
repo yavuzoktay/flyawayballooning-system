@@ -59,9 +59,44 @@ function setSaveErrorLog(saveErrorLog) {
  * This ensures we get the latest values even if .env was updated
  */
 function reloadEnvVariables() {
-    // Force reload of dotenv
-    delete require.cache[require.resolve('dotenv')];
-    require('dotenv').config();
+    // Force reload of dotenv - clear cache and reload
+    const dotenvPath = require.resolve('dotenv');
+    delete require.cache[dotenvPath];
+    
+    // Also clear fs cache if possible
+    const fs = require('fs');
+    const path = require('path');
+    const envPath = path.join(__dirname, '..', '.env');
+    try {
+        // Force reload by reading file directly
+        const envContent = fs.readFileSync(envPath, 'utf8');
+        const envVars = {};
+        envContent.split('\n').forEach(line => {
+            const trimmedLine = line.trim();
+            if (trimmedLine && !trimmedLine.startsWith('#')) {
+                const equalIndex = trimmedLine.indexOf('=');
+                if (equalIndex > 0) {
+                    const key = trimmedLine.substring(0, equalIndex).trim();
+                    let value = trimmedLine.substring(equalIndex + 1).trim();
+                    // Remove quotes if present
+                    if ((value.startsWith('"') && value.endsWith('"')) || 
+                        (value.startsWith("'") && value.endsWith("'"))) {
+                        value = value.slice(1, -1);
+                    }
+                    envVars[key] = value;
+                }
+            }
+        });
+        
+        // Update process.env
+        Object.keys(envVars).forEach(key => {
+            process.env[key] = envVars[key];
+        });
+    } catch (error) {
+        console.warn('⚠️ [Google Ads] Could not manually reload .env file:', error.message);
+        // Fallback to dotenv
+        require('dotenv').config({ override: true });
+    }
     
     // Reload variables directly from process.env
     CUSTOMER_ID = process.env.GOOGLE_ADS_CUSTOMER_ID;
@@ -74,6 +109,7 @@ function reloadEnvVariables() {
     
     console.log('🔄 [Google Ads] Environment variables reloaded');
     console.log('  - CUSTOMER_ID:', CUSTOMER_ID ? `"${CUSTOMER_ID}"` : 'NOT SET');
+    console.log('  - CUSTOMER_ID (raw from process.env):', process.env.GOOGLE_ADS_CUSTOMER_ID ? `"${process.env.GOOGLE_ADS_CUSTOMER_ID}"` : 'NOT SET');
     console.log('  - CONVERSION_ID:', CONVERSION_ID ? `"${CONVERSION_ID}"` : 'NOT SET');
 }
 
@@ -236,15 +272,25 @@ async function sendConversion({
         }
         
         // Remove quotes if present (sometimes .env files have quotes)
-        let customerIdValue = CUSTOMER_ID.trim();
-        if ((customerIdValue.startsWith('"') && customerIdValue.endsWith('"')) || 
-            (customerIdValue.startsWith("'") && customerIdValue.endsWith("'"))) {
-            customerIdValue = customerIdValue.slice(1, -1);
+        let customerIdValue = customerIdToUse.trim();
+        
+        // Remove double quotes
+        if (customerIdValue.startsWith('"') && customerIdValue.endsWith('"')) {
+            customerIdValue = customerIdValue.slice(1, -1).trim();
         }
+        
+        // Remove single quotes
+        if (customerIdValue.startsWith("'") && customerIdValue.endsWith("'")) {
+            customerIdValue = customerIdValue.slice(1, -1).trim();
+        }
+        
+        // Final trim after quote removal
+        customerIdValue = customerIdValue.trim();
         
         if (!customerIdValue) {
             const errorMsg = 'GOOGLE_ADS_CUSTOMER_ID is empty after trimming quotes';
             console.error('❌', errorMsg);
+            console.error('❌ [Google Ads] Original CUSTOMER_ID:', JSON.stringify(CUSTOMER_ID));
             if (saveErrorLogFunction) {
                 saveErrorLogFunction('error', errorMsg, null, 'googleAds.sendConversion');
             }
@@ -252,8 +298,8 @@ async function sendConversion({
         }
         
         const formattedCustomerId = customerIdValue.replace(/-/g, '');
-        console.log('📊 [Google Ads] Customer ID from env (raw):', CUSTOMER_ID);
-        console.log('📊 [Google Ads] Customer ID (trimmed):', customerIdValue);
+        console.log('📊 [Google Ads] Customer ID from env (raw):', JSON.stringify(CUSTOMER_ID));
+        console.log('📊 [Google Ads] Customer ID (after quote removal):', JSON.stringify(customerIdValue));
         console.log('📊 [Google Ads] Formatted Customer ID (no dashes):', formattedCustomerId);
 
         // Initialize Google Ads API client
