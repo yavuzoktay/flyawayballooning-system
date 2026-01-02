@@ -117,14 +117,27 @@ function reloadEnvVariables() {
 const isConfigured = () => {
     // Don't reload here - reloadEnvVariables is called in sendConversion
     // This prevents infinite loops and excessive reloading
+    // Check that all required variables are set and not empty strings
+    const isCustomerIdSet = CUSTOMER_ID && typeof CUSTOMER_ID === 'string' && CUSTOMER_ID.trim() !== '';
+    const isConversionIdSet = CONVERSION_ID && typeof CONVERSION_ID === 'string' && CONVERSION_ID.trim() !== '';
+    const isConversionLabelSet = CONVERSION_LABEL && typeof CONVERSION_LABEL === 'string' && CONVERSION_LABEL.trim() !== '';
+    const isDeveloperTokenSet = DEVELOPER_TOKEN && typeof DEVELOPER_TOKEN === 'string' && DEVELOPER_TOKEN.trim() !== '';
+    const isClientIdSet = CLIENT_ID && typeof CLIENT_ID === 'string' && CLIENT_ID.trim() !== '';
+    const isClientSecretSet = CLIENT_SECRET && typeof CLIENT_SECRET === 'string' && CLIENT_SECRET.trim() !== '';
+    const isRefreshTokenSet = REFRESH_TOKEN && typeof REFRESH_TOKEN === 'string' && REFRESH_TOKEN.trim() !== '';
+    
+    if (!isCustomerIdSet) {
+        console.warn('⚠️ [Google Ads] CUSTOMER_ID is not properly configured:', CUSTOMER_ID);
+    }
+    
     return !!(
-        CUSTOMER_ID &&
-        CONVERSION_ID &&
-        CONVERSION_LABEL &&
-        DEVELOPER_TOKEN &&
-        CLIENT_ID &&
-        CLIENT_SECRET &&
-        REFRESH_TOKEN
+        isCustomerIdSet &&
+        isConversionIdSet &&
+        isConversionLabelSet &&
+        isDeveloperTokenSet &&
+        isClientIdSet &&
+        isClientSecretSet &&
+        isRefreshTokenSet
     );
 };
 
@@ -353,7 +366,36 @@ async function sendConversion({
         // According to Google Ads API docs, customer_id should be WITHOUT dashes
         // Format: "1234567890" not "123-456-7890"
         // But google-ads-api package might expect it as a string, not a number
-        const customerIdForApi = String(formattedCustomerId);
+        const customerIdForApi = String(formattedCustomerId).trim();
+        
+        // Final validation - ensure customer ID is not empty and is valid
+        if (!customerIdForApi || customerIdForApi === '' || customerIdForApi === 'undefined' || customerIdForApi === 'null') {
+            const errorMsg = `Invalid customer ID: "${customerIdForApi}". Original: "${CUSTOMER_ID}", Formatted: "${formattedCustomerId}"`;
+            console.error('❌', errorMsg);
+            console.error('❌ [Google Ads] Debug info:', {
+                CUSTOMER_ID,
+                customerIdToUse,
+                customerIdValue,
+                formattedCustomerId,
+                customerIdForApi,
+                processEnvValue: process.env.GOOGLE_ADS_CUSTOMER_ID
+            });
+            if (saveErrorLogFunction) {
+                saveErrorLogFunction('error', errorMsg, null, 'googleAds.sendConversion');
+            }
+            return { success: false, reason: 'invalid_customer_id', error: errorMsg };
+        }
+        
+        // Validate customer ID format (should be 10 digits without dashes)
+        if (!/^\d{10}$/.test(customerIdForApi)) {
+            const errorMsg = `Customer ID format is invalid. Expected 10 digits, got: "${customerIdForApi}" (length: ${customerIdForApi.length})`;
+            console.error('❌', errorMsg);
+            if (saveErrorLogFunction) {
+                saveErrorLogFunction('error', errorMsg, null, 'googleAds.sendConversion');
+            }
+            return { success: false, reason: 'invalid_customer_id_format', error: errorMsg };
+        }
+        
         console.log('📊 [Google Ads] Creating Customer instance with ID (no dashes, as string):', customerIdForApi);
         console.log('📊 [Google Ads] Original format (with dashes):', customerIdValue);
         console.log('📊 [Google Ads] Customer ID type:', typeof customerIdForApi);
@@ -383,10 +425,31 @@ async function sendConversion({
             has_login_customer_id: !!customerConfig.login_customer_id
         });
         
+        // Validate customer config before creating instance
+        if (!customerConfig.customer_id || customerConfig.customer_id.trim() === '') {
+            const errorMsg = 'Customer ID is empty in customerConfig before creating Customer instance';
+            console.error('❌', errorMsg);
+            console.error('❌ [Google Ads] customerConfig:', JSON.stringify(customerConfig, null, 2));
+            if (saveErrorLogFunction) {
+                saveErrorLogFunction('error', errorMsg, null, 'googleAds.sendConversion');
+            }
+            return { success: false, reason: 'empty_customer_id_in_config', error: errorMsg };
+        }
+        
         const customer = client.Customer(customerConfig);
         console.log('📊 [Google Ads] Customer instance created successfully');
         console.log('📊 [Google Ads] Customer instance type:', typeof customer);
         console.log('📊 [Google Ads] Customer instance constructor:', customer.constructor.name);
+        
+        // Verify customer instance was created with customer_id
+        if (customer && typeof customer.customer_id !== 'undefined') {
+            console.log('📊 [Google Ads] Customer instance customer_id:', customer.customer_id);
+            if (customer.customer_id && customer.customer_id.trim() === '') {
+                console.warn('⚠️ [Google Ads] Customer instance customer_id is empty string!');
+            }
+        } else {
+            console.warn('⚠️ [Google Ads] Customer instance does not have customer_id property');
+        }
 
         // Prepare conversion date/time
         const conversionTime = conversionDateTime 
@@ -459,10 +522,38 @@ async function sendConversion({
             
             // Call uploadClickConversions
             // The customer instance should automatically use the customer_id we passed
-            const response = await customer.conversionUploads.uploadClickConversions({
+            // Log customer_id one more time before API call to ensure it's set
+            console.log('📊 [Google Ads] Final verification before API call:');
+            console.log('  - customerIdForApi:', customerIdForApi);
+            console.log('  - customer.customer_id:', customer.customer_id || 'NOT SET');
+            console.log('  - conversion_action resource:', conversionData.conversion_action);
+            
+            // Ensure customer_id is in the conversion_action resource name
+            if (!conversionData.conversion_action.includes(customerIdForApi)) {
+                const errorMsg = `Customer ID ${customerIdForApi} not found in conversion_action resource name: ${conversionData.conversion_action}`;
+                console.error('❌', errorMsg);
+                if (saveErrorLogFunction) {
+                    saveErrorLogFunction('error', errorMsg, null, 'googleAds.sendConversion');
+                }
+                return { success: false, reason: 'customer_id_mismatch', error: errorMsg };
+            }
+            
+            // IMPORTANT: customer_id must be explicitly included in the request
+            // The google-ads-api package requires customer_id to be passed in the request object
+            const uploadRequest = {
+                customer_id: customerIdForApi, // Explicitly pass customer_id (without dashes, as string)
                 conversions: [conversionData],
                 partial_failure: false,
+            };
+            
+            console.log('📊 [Google Ads] Upload request prepared:', {
+                customer_id: uploadRequest.customer_id,
+                customer_id_length: uploadRequest.customer_id.length,
+                conversions_count: uploadRequest.conversions.length,
+                partial_failure: uploadRequest.partial_failure
             });
+            
+            const response = await customer.conversionUploads.uploadClickConversions(uploadRequest);
 
             const successMessage = `Google Ads conversion sent successfully. Transaction ID: ${transactionId}, Value: ${value} ${currency}, Has gclid: ${!!gclid}`;
             console.log('✅', successMessage);

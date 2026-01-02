@@ -636,9 +636,34 @@ const PaginatedTable = ({
                                                     );
                                                 })()
                                             ) : id === 'status' ? (
-                                                item[id] === 'Confirmed' ? 'Scheduled' : 
-                                                item[id] === 'Scheduled' ? 'Scheduled' : 
-                                                item[id]
+                                                // Status with color coding: Scheduled (green), Cancelled (orange), Flown (blue)
+                                                (() => {
+                                                    const statusValue = item[id];
+                                                    let displayStatus = statusValue;
+                                                    let statusColor = 'inherit';
+                                                    let fontWeight = 'normal';
+                                                    
+                                                    // Normalize status values
+                                                    if (statusValue === 'Confirmed' || statusValue === 'Scheduled') {
+                                                        displayStatus = 'Scheduled';
+                                                        statusColor = '#28a745'; // Green
+                                                        fontWeight = '600';
+                                                    } else if (statusValue === 'Cancelled' || statusValue === 'Canceled') {
+                                                        displayStatus = 'Cancelled';
+                                                        statusColor = '#fd7e14'; // Orange
+                                                        fontWeight = '600';
+                                                    } else if (statusValue === 'Flown' || statusValue === 'Completed') {
+                                                        displayStatus = 'Flown';
+                                                        statusColor = '#007bff'; // Blue
+                                                        fontWeight = '600';
+                                                    }
+                                                    
+                                                    return (
+                                                        <span style={{ color: statusColor, fontWeight }}>
+                                                            {displayStatus}
+                                                        </span>
+                                                    );
+                                                })()
                                             ) : id === 'voucher_code' ? (
                                                 // Make voucher code clickable if it exists
                                                 item[id] ? (
@@ -648,11 +673,7 @@ const PaginatedTable = ({
                                                             textDecoration: 'underline', 
                                                             cursor: 'pointer',
                                                             fontWeight: '600',
-                                                            fontSize: '16px',
-                                                            padding: '4px 8px',
-                                                            backgroundColor: '#e3f2fd',
-                                                            borderRadius: '4px',
-                                                            border: '1px solid #2196f3'
+                                                            fontSize: '16px'
                                                         }}
                                                         onClick={() => {
                                                             setSelectedVoucherData({
@@ -676,13 +697,32 @@ const PaginatedTable = ({
                                                     </span>
                                                 ) : ''
                                                             ) : id === 'paid' ? (
-                                                                // Show paid amount in red if refund exists
-                                                                <span style={{ 
-                                                                    color: (item.has_refund === 1 || item.has_refund === true) ? '#dc3545' : 'inherit',
-                                                                    fontWeight: (item.has_refund === 1 || item.has_refund === true) ? '600' : 'normal'
-                                                                }}>
-                                                                    {item[id]}
-                                                                </span>
+                                                                // Show paid amount: red for full refund, green for normal payment
+                                                                (() => {
+                                                                    const paidValue = parseFloat(item[id] || 0);
+                                                                    const hasRefund = item.has_refund === 1 || item.has_refund === true;
+                                                                    const isFullyRefunded = hasRefund && paidValue <= 0.01;
+                                                                    const hasNormalPayment = !hasRefund && paidValue > 0.01;
+                                                                    
+                                                                    let color = 'inherit';
+                                                                    let fontWeight = 'normal';
+                                                                    
+                                                                    if (isFullyRefunded) {
+                                                                        // Full refund: red
+                                                                        color = '#dc3545';
+                                                                        fontWeight = '600';
+                                                                    } else if (hasNormalPayment) {
+                                                                        // Normal payment: green
+                                                                        color = '#28a745';
+                                                                        fontWeight = '600';
+                                                                    }
+                                                                    
+                                                                    return (
+                                                                        <span style={{ color, fontWeight }}>
+                                                                            {item[id]}
+                                                                        </span>
+                                                                    );
+                                                                })()
                                                             ) : item[id]}
                                         </td>
                                     );

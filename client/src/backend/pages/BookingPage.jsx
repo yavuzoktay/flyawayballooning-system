@@ -4648,8 +4648,74 @@ setBookingDetail(finalVoucherDetail);
                         {activeTab === "bookings" && (
                             <>
                                 <div className="booking-top-wrap">
-                                    <div className="booking-filter-heading">
-                                        <h3 style={{ fontFamily: "Gilroy Light" }}>All Bookings</h3>
+                                    <div className="booking-filter-heading" style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: isMobile ? '8px' : '0',
+                                        flexWrap: isMobile ? 'nowrap' : 'wrap'
+                                    }}>
+                                        <h3 style={{ fontFamily: "Gilroy Light", margin: 0, marginRight: isMobile ? 'auto' : 0 }}>All Bookings</h3>
+                                        {/* Export and Filter Buttons - Only show next to heading on mobile */}
+                                        {isMobile && (
+                                            <>
+                                                <OutlinedInput
+                                                    readOnly
+                                                    onClick={handleExportCSV}
+                                                    value="Export"
+                                                    sx={{
+                                                        cursor: 'pointer',
+                                                        height: '32px',
+                                                        fontSize: 12,
+                                                        minWidth: '80px',
+                                                        '& input': {
+                                                            cursor: 'pointer',
+                                                            textAlign: 'center',
+                                                            padding: '8px 12px'
+                                                        },
+                                                        '& fieldset': {
+                                                            borderColor: 'primary.main'
+                                                        },
+                                                        '&:hover fieldset': {
+                                                            borderColor: 'primary.dark'
+                                                        }
+                                                    }}
+                                                    size="small"
+                                                    startAdornment={
+                                                        <InputAdornment position="start">
+                                                            <FileDownloadIcon fontSize="small" color="primary" />
+                                                        </InputAdornment>
+                                                    }
+                                                />
+                                                <OutlinedInput
+                                                    readOnly
+                                                    onClick={() => setFilterDialogOpen(true)}
+                                                    value="Filter"
+                                                    sx={{
+                                                        cursor: 'pointer',
+                                                        height: '32px',
+                                                        fontSize: 12,
+                                                        minWidth: '80px',
+                                                        '& input': {
+                                                            cursor: 'pointer',
+                                                            textAlign: 'center',
+                                                            padding: '8px 12px'
+                                                        },
+                                                        '& fieldset': {
+                                                            borderColor: 'secondary.main'
+                                                        },
+                                                        '&:hover fieldset': {
+                                                            borderColor: 'secondary.dark'
+                                                        }
+                                                    }}
+                                                    size="small"
+                                                    startAdornment={
+                                                        <InputAdornment position="start">
+                                                            <FilterListIcon fontSize="small" color="secondary" />
+                                                        </InputAdornment>
+                                                    }
+                                                />
+                                            </>
+                                        )}
                                     </div>
                                     <div className="booking-search-booking" style={{ 
                                         display: 'flex', 
@@ -4657,79 +4723,23 @@ setBookingDetail(finalVoucherDetail);
                                         gap: isMobile ? 4 : 8,
                                         flexWrap: isMobile ? 'wrap' : 'nowrap'
                                     }}>
-                                        {/* Export Button - Input-like on mobile */}
-                                        {isMobile ? (
-                                            <OutlinedInput
-                                                readOnly
-                                                onClick={handleExportCSV}
-                                                value="Export"
-                                                sx={{
-                                                    cursor: 'pointer',
-                                                    height: '32px',
-                                                    fontSize: 12,
-                                                    '& input': {
-                                                        cursor: 'pointer',
-                                                        textAlign: 'center',
-                                                        padding: '8px 12px'
-                                                    },
-                                                    '& fieldset': {
-                                                        borderColor: 'primary.main'
-                                                    },
-                                                    '&:hover fieldset': {
-                                                        borderColor: 'primary.dark'
-                                                    }
-                                                }}
-                                                size="small"
-                                                startAdornment={
-                                                    <InputAdornment position="start">
-                                                        <FileDownloadIcon fontSize="small" color="primary" />
-                                                    </InputAdornment>
-                                                }
-                                            />
-                                        ) : (
-                                        <Button variant="outlined" color="primary" onClick={handleExportCSV} style={{ height: 40 }}>
-                                            Export
-                                        </Button>
+                                        {/* Export Button - Only show on desktop */}
+                                        {!isMobile && (
+                                            <Button variant="outlined" color="primary" onClick={handleExportCSV} style={{ height: 40 }}>
+                                                Export
+                                            </Button>
                                         )}
                                         
-                                        {/* Filter Button - Input-like on mobile */}
-                                        {isMobile ? (
-                                            <OutlinedInput
-                                                readOnly
+                                        {/* Filter Button - Only show on desktop */}
+                                        {!isMobile && (
+                                            <Button
+                                                variant="outlined"
+                                                color="secondary"
                                                 onClick={() => setFilterDialogOpen(true)}
-                                                value="Filter"
-                                                sx={{
-                                                    cursor: 'pointer',
-                                                    height: '32px',
-                                                    fontSize: 12,
-                                                    '& input': {
-                                                        cursor: 'pointer',
-                                                        textAlign: 'center',
-                                                        padding: '8px 12px'
-                                                    },
-                                                    '& fieldset': {
-                                                        borderColor: 'secondary.main'
-                                                    },
-                                                    '&:hover fieldset': {
-                                                        borderColor: 'secondary.dark'
-                                                    }
-                                                }}
-                                                size="small"
-                                                startAdornment={
-                                                    <InputAdornment position="start">
-                                                        <FilterListIcon fontSize="small" color="secondary" />
-                                                    </InputAdornment>
-                                                }
-                                            />
-                                        ) : (
-                                        <Button
-                                            variant="outlined"
-                                            color="secondary"
-                                            onClick={() => setFilterDialogOpen(true)}
-                                            style={{ height: 40 }}
-                                        >
-                                            Filter
-                                        </Button>
+                                                style={{ height: 40 }}
+                                            >
+                                                Filter
+                                            </Button>
                                         )}
                                         
                                         <Button
