@@ -210,8 +210,14 @@ async function sendConversion({
             : new Date();
 
         // Build conversion action resource name
+        // Note: CONVERSION_ID can be either Conversion Action ID (ctId) or Conversion ID from Google Tag
+        // Google Ads API uses Conversion Action ID (ctId) in the resource name
+        // If CONVERSION_ID is the Google Tag Conversion ID (like 17848519089), we need to find the actual Conversion Action ID
+        // For now, we'll try using it directly - if it fails, we'll need the actual ctId
         const conversionActionResourceName = `customers/${formattedCustomerId}/conversionActions/${CONVERSION_ID}`;
         console.log('📊 [Google Ads] Conversion Action Resource Name:', conversionActionResourceName);
+        console.log('📊 [Google Ads] Using CONVERSION_ID:', CONVERSION_ID);
+        console.log('📊 [Google Ads] Note: If this fails, we may need the actual Conversion Action ID (ctId) from the conversion action detail page URL');
 
         // Prepare conversion data using google-ads-api format
         const conversionData = {
