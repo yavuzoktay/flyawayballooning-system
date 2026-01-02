@@ -38,9 +38,16 @@ The system implements server-side Google Ads conversion tracking to ensure all s
 ### 3. Get Developer Token
 
 1. Go to [Google Ads](https://ads.google.com/)
-2. Navigate to "Tools & Settings" > "Setup" > "API Center"
-3. Request a **Developer Token** (may require approval)
-4. Copy the developer token
+2. Click on the **"Tools & Settings"** icon (wrench/spanner icon) in the top right corner
+3. In the left sidebar, expand **"Setup"** section
+4. Click on **"API Center"** (or go directly to: https://ads.google.com/aw/apicenter)
+5. In the API Center page, find the **"Developer Token"** section
+6. Click **"Request Developer Token"** or **"Apply for Developer Token"** button
+7. Fill out the application form (may require business information)
+8. Wait for approval (can take a few days)
+9. Once approved, copy the **Developer Token** (it will be displayed in the API Center)
+
+**Note:** While waiting for approval, you can still test the integration in test mode. The developer token is required for production use.
 
 ### 4. Get Refresh Token
 
