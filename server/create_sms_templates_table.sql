@@ -22,3 +22,4 @@ INSERT INTO sms_templates (name, message, category, edited) VALUES
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
 
+
