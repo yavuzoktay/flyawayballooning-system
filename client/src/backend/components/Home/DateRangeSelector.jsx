@@ -5,6 +5,28 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
     const [summary, setSummary] = useState({});
+    const [isMobile, setIsMobile] = useState(false);
+
+    // Detect mobile device
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth <= 768);
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
+    // Set default dates for mobile on mount
+    useEffect(() => {
+        if (isMobile && !startDate && !endDate) {
+            const today = new Date();
+            const todayStr = today.toISOString().split('T')[0];
+            setStartDate(todayStr);
+            setEndDate(todayStr);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isMobile]);
 
     useEffect(() => {
         // Calculate summary for all data on page load
@@ -142,7 +164,13 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                         type="date"
                         value={startDate}
                         onChange={(e) => setStartDate(e.target.value)}
-                        style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                        style={{ 
+                            width: '100%', 
+                            padding: '8px', 
+                            borderRadius: '4px', 
+                            border: '1px solid #ccc',
+                            fontSize: isMobile ? '16px' : 'inherit'
+                        }}
                     />
                 </label>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: '1 1 auto', minWidth: '120px' }}>
@@ -151,7 +179,13 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                         type="date"
                         value={endDate}
                         onChange={(e) => setEndDate(e.target.value)}
-                        style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                        style={{ 
+                            width: '100%', 
+                            padding: '8px', 
+                            borderRadius: '4px', 
+                            border: '1px solid #ccc',
+                            fontSize: isMobile ? '16px' : 'inherit'
+                        }}
                     />
                 </label>
                 <button 

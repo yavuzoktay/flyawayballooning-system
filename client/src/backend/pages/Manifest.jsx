@@ -3527,7 +3527,23 @@ const Manifest = () => {
                         
                         {/* Debug info for crew assignments - removed for production */}
                         {/* Intentionally hidden */}
-                        <Box display="flex" alignItems="center" gap={2} className="manifest-date-selector">
+                        <Box className="manifest-date-selector" sx={{
+                            display: 'flex',
+                            flexDirection: isMobile ? 'column' : 'row',
+                            alignItems: isMobile ? 'stretch' : 'center',
+                            gap: isMobile ? 2 : 2
+                        }}>
+                            {/* Navigation buttons - side by side on mobile, above date picker */}
+                            <Box sx={{
+                                display: 'flex',
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: isMobile ? 'center' : 'flex-start',
+                                gap: isMobile ? 1 : 0,
+                                order: isMobile ? -1 : 0,
+                                width: isMobile ? '100%' : 'auto',
+                                marginBottom: isMobile ? 1 : 0
+                            }} className="manifest-nav-buttons">
                             <IconButton onClick={() => {
                                 const newDate = dayjs(selectedDate).subtract(1, 'day').format('YYYY-MM-DD');
                                 console.log('Date navigation: going back to', newDate);
@@ -3552,6 +3568,31 @@ const Manifest = () => {
                             }}>
                                 <ArrowBackIosNewIcon />
                             </IconButton>
+                                <IconButton onClick={() => {
+                                    const newDate = dayjs(selectedDate).add(1, 'day').format('YYYY-MM-DD');
+                                    console.log('Date navigation: going forward to', newDate);
+                                    setSelectedDate(newDate);
+                                    setCrewAssignmentsBySlot({});
+                                    
+                                    // Fetch crew assignments for the new date
+                                    axios.get('/api/crew-assignments', { params: { date: newDate } })
+                                        .then(res => {
+                                            if (res.data?.success && Array.isArray(res.data.data)) {
+                                                const map = {};
+                                                for (const row of res.data.data) {
+                                                    const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
+                                                    map[key] = row.crew_id;
+                                                }
+                                                setCrewAssignmentsBySlot(map);
+                                            }
+                                        })
+                                        .catch((err) => {
+                                            console.error('Error fetching crew assignments for next date:', err);
+                                        });
+                                }}>
+                                    <ArrowForwardIosIcon />
+                                </IconButton>
+                            </Box>
                             <LocalizationProvider dateAdapter={AdapterDayjs}>
                                 <DatePicker
                                     label="Select Date"
@@ -3589,30 +3630,6 @@ const Manifest = () => {
                                     }}
                                 />
                             </LocalizationProvider>
-                            <IconButton onClick={() => {
-                                const newDate = dayjs(selectedDate).add(1, 'day').format('YYYY-MM-DD');
-                                console.log('Date navigation: going forward to', newDate);
-                                setSelectedDate(newDate);
-                                setCrewAssignmentsBySlot({});
-                                
-                                // Fetch crew assignments for the new date
-                                axios.get('/api/crew-assignments', { params: { date: newDate } })
-                                    .then(res => {
-                                        if (res.data?.success && Array.isArray(res.data.data)) {
-                                            const map = {};
-                                            for (const row of res.data.data) {
-                                                const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
-                                                map[key] = row.crew_id;
-                                            }
-                                            setCrewAssignmentsBySlot(map);
-                                        }
-                                    })
-                                    .catch((err) => {
-                                        console.error('Error fetching crew assignments for next date:', err);
-                                    });
-                            }}>
-                                <ArrowForwardIosIcon />
-                            </IconButton>
                         </Box>
                     </Box>
 
@@ -3897,10 +3914,30 @@ const Manifest = () => {
                                 displayFlightTime = dayjs(timePart, 'HH:mm').format('HH:mm');
                             }
                             return (
-                                <Card key={groupKey} sx={{ marginBottom: 2 }} className="manifest-flight-card">
-                                    <CardContent>
-                                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} className="manifest-flight-header">
-                                            <Box display="flex" flexDirection="column" alignItems="flex-start">
+                                <Card key={groupKey} sx={{ marginBottom: isMobile ? 1 : 2 }} className="manifest-flight-card">
+                                    <CardContent sx={{ padding: isMobile ? '12px !important' : undefined }}>
+                                        <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={isMobile ? 1 : 2} className="manifest-flight-header" sx={{ position: 'relative' }}>
+                                            <Box display="flex" flexDirection="column" alignItems="flex-start" sx={{ flex: 1, minWidth: 0 }}>
+                                                {/* Mobile: Three dots menu at top right of header */}
+                                                {isMobile && (
+                                                    <IconButton 
+                                                        size="small" 
+                                                        onClick={e => handleGlobalMenuOpen(e, first, groupFlights)}
+                                                        sx={{ 
+                                                            position: 'absolute',
+                                                            top: 0,
+                                                            right: 0,
+                                                            padding: '4px',
+                                                            zIndex: 1,
+                                                            '& .MuiSvgIcon-root': {
+                                                                fontSize: '18px',
+                                                                color: '#3274b4'
+                                                            }
+                                                        }}
+                                                    >
+                                                        <MoreVertIcon />
+                                                    </IconButton>
+                                                )}
                                                 {/* Section başlığında activityName ve flight time birlikte gösterilecek */}
                                                 {/* Check if any booking in this group has Proposal Flight voucher type */}
                                                 {/* For Private Flight, show booking ID in the title */}
@@ -3914,72 +3951,135 @@ const Manifest = () => {
                                                     const titleSuffix = hasProposal ? ' | Proposal' : '';
                                                     const bookingIdSuffix = isPrivateFlight && first.id ? ` | Booking ID: ${first.id}` : '';
                                                     return (
-                                                        <Typography variant="h6">{activityName}{titleSuffix}{bookingIdSuffix} - Flight Time: {displayFlightTime}</Typography>
+                                                        <Typography 
+                                                            variant="h6" 
+                                                            sx={{ 
+                                                                fontSize: isMobile ? '14px' : undefined,
+                                                                fontWeight: isMobile ? 600 : undefined,
+                                                                lineHeight: isMobile ? 1.3 : undefined,
+                                                                pr: isMobile ? 4 : 0
+                                                            }}
+                                                        >
+                                                            {activityName}{titleSuffix}{bookingIdSuffix} - Flight Time: {displayFlightTime}
+                                                        </Typography>
                                                     );
                                                 })()}
-                                                <Box display="flex" alignItems="center" gap={3} mt={1} className="manifest-flight-details" sx={{
-                                                    flexDirection: isMobile ? 'column' : 'row',
+                                                <Box className="manifest-flight-details" sx={{
+                                                    display: 'flex',
+                                                    flexDirection: isMobile ? 'row' : 'row',
                                                     alignItems: isMobile ? 'flex-start' : 'center',
-                                                    gap: isMobile ? 1 : 3
+                                                    gap: isMobile ? 1 : 3,
+                                                    flexWrap: 'wrap',
+                                                    mt: isMobile ? 0.5 : 1,
+                                                    mb: isMobile ? 0.5 : 0
                                                 }}>
-                                                    <Box display="flex" alignItems="center" gap={1} sx={{ width: isMobile ? '100%' : 'auto' }}>
-                                                    <Typography>Pax Booked: {paxBookedDisplay} / {paxTotalDisplay}</Typography>
-                                                        {isMobile && (
-                                                            <IconButton size="small" onClick={(e) => {
-                                                                // Section menu for Pax Booked
-                                                                e.stopPropagation();
+                                                    {isMobile ? (
+                                                        // Mobile: Compact tag-style layout
+                                                        <>
+                                                            <Box sx={{
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                padding: '4px 8px',
+                                                                borderRadius: '4px',
+                                                                backgroundColor: '#f5f5f5',
+                                                                fontSize: '11px',
+                                                                fontWeight: 500,
+                                                                whiteSpace: 'nowrap'
                                                             }}>
-                                                                <MoreVertIcon fontSize="small" />
-                                                            </IconButton>
-                                                        )}
+                                                                <Typography sx={{ fontSize: '11px', fontWeight: 500, margin: 0 }}>
+                                                                    {paxBookedDisplay}/{paxTotalDisplay} Pax
+                                                                </Typography>
                                                     </Box>
-                                                    <Box display="flex" alignItems="center" gap={1} sx={{ width: isMobile ? '100%' : 'auto' }}>
-                                                    <Typography>Balloon Resource: {balloonResource}</Typography>
-                                                        {isMobile && (
-                                                            <IconButton size="small" onClick={(e) => {
-                                                                // Section menu for Balloon Resource
-                                                                e.stopPropagation();
+                                                            <Box sx={{
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                padding: '4px 8px',
+                                                                borderRadius: '4px',
+                                                                backgroundColor: '#f5f5f5',
+                                                                fontSize: '11px',
+                                                                fontWeight: 500,
+                                                                whiteSpace: 'nowrap'
                                                             }}>
-                                                                <MoreVertIcon fontSize="small" />
-                                                            </IconButton>
-                                                        )}
+                                                                <Typography sx={{ fontSize: '11px', fontWeight: 500, margin: 0 }}>
+                                                                    {balloonResource}
+                                                                </Typography>
                                                     </Box>
-                                                    <Box display="flex" alignItems="center" gap={1} sx={{ width: isMobile ? '100%' : 'auto' }}>
+                                                            <Box sx={{
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                padding: '4px 8px',
+                                                                borderRadius: '4px',
+                                                                backgroundColor: status === 'Closed' ? '#fee' : '#efe',
+                                                                fontSize: '11px',
+                                                                fontWeight: 600,
+                                                                whiteSpace: 'nowrap',
+                                                                cursor: 'pointer',
+                                                                border: `1px solid ${status === 'Closed' ? '#fcc' : '#cfc'}`
+                                                            }} onClick={() => handleToggleGroupStatus(groupFlights)}>
+                                                                <Typography sx={{ 
+                                                                    fontSize: '11px', 
+                                                                    fontWeight: 600, 
+                                                                    margin: 0,
+                                                                    color: status === 'Closed' ? '#c33' : '#3c3'
+                                                                }}>
+                                                                    {status}{statusLoadingGroup === first.id ? '...' : ''}
+                                                                </Typography>
+                                                            </Box>
+                                                            <Box sx={{
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                padding: '4px 8px',
+                                                                borderRadius: '4px',
+                                                                backgroundColor: '#e3f2fd',
+                                                                fontSize: '11px',
+                                                                fontWeight: 500,
+                                                                whiteSpace: 'nowrap'
+                                                            }}>
+                                                                <Typography sx={{ fontSize: '11px', fontWeight: 500, margin: 0 }}>
+                                                                    {first.flight_type}
+                                                                </Typography>
+                                                            </Box>
+                                                        </>
+                                                    ) : (
+                                                        // Desktop: Original layout
+                                                        <>
+                                                            <Box display="flex" alignItems="center" gap={1}>
+                                                                <Typography>Pax Booked: {paxBookedDisplay} / {paxTotalDisplay}</Typography>
+                                                            </Box>
+                                                            <Box display="flex" alignItems="center" gap={1}>
+                                                                <Typography>Balloon Resource: {balloonResource}</Typography>
+                                                            </Box>
+                                                            <Box display="flex" alignItems="center" gap={1}>
                                                     <Typography>Status: <span
    style={{ color: status === 'Closed' ? 'red' : 'green', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
    onClick={() => handleToggleGroupStatus(groupFlights)}
  >{status}{statusLoadingGroup === first.id ? '...' : ''}</span></Typography>
-                                                        {isMobile && (
-                                                            <IconButton size="small" onClick={(e) => {
-                                                                // Section menu for Status
-                                                                e.stopPropagation();
-                                                            }}>
-                                                                <MoreVertIcon fontSize="small" />
-                                                            </IconButton>
-                                                        )}
                                                     </Box>
-                                                    <Box display="flex" alignItems="center" gap={1} sx={{ width: isMobile ? '100%' : 'auto' }}>
+                                                            <Box display="flex" alignItems="center" gap={1}>
                                                     <Typography>Type: {first.flight_type}</Typography>
-                                                        {isMobile && (
-                                                            <IconButton size="small" onClick={(e) => {
-                                                                // Section menu for Type
-                                                                e.stopPropagation();
-                                                            }}>
-                                                                <MoreVertIcon fontSize="small" />
-                                                            </IconButton>
+                                                            </Box>
+                                                        </>
                                                         )}
                                                 </Box>
                                             </Box>
-                                            </Box>
-                                            {/* Mobile: Crew and Pilot selection above flight details */}
+                                            {/* Mobile: Crew and Pilot selection - Compact tag-style layout */}
                                             {isMobile && (
-                                                <Box sx={{ mb: 2, display: 'flex', gap: 1, alignItems: 'center' }}>
-                                                    {/* Crew Selection - Small */}
+                                                <Box sx={{ 
+                                                    mb: 0.5, 
+                                                    mt: 0.5,
+                                                    display: 'flex', 
+                                                    gap: 0.5, 
+                                                    alignItems: 'center',
+                                                    flexWrap: 'wrap'
+                                                }} className="manifest-crew-pilot-mobile">
+                                                    {/* Crew Selection - Compact */}
                                                     {(() => {
                                                         const activityIdForSlot = getFlightActivityId(first);
                                                         const slotKeyValue = slotKey(activityIdForSlot, (first.flight_date||'').substring(0,10), (first.flight_date||'').substring(11,16));
                                                         const currentCrewId = crewAssignmentsBySlot[slotKeyValue];
                                                         const isActivityIdValid = activityIdForSlot !== null && activityIdForSlot !== undefined && !isNaN(activityIdForSlot);
+                                                        const selectedCrew = crewList.find(c => c.id == currentCrewId);
+                                                        const crewDisplayName = selectedCrew ? `${selectedCrew.first_name} ${selectedCrew.last_name}` : 'Crew';
                                                         
                                                         return (
                                                             <Select
@@ -3988,15 +4088,22 @@ const Manifest = () => {
                                                                 onChange={(e) => handleCrewChange(activityIdForSlot, first.flight_date, e.target.value)}
                                                                 disabled={!isActivityIdValid}
                                                                 sx={{ 
-                                                                    minWidth: 100,
-                                                                    maxWidth: 120,
+                                                                    flex: '1 1 auto',
+                                                                    minWidth: 'calc(50% - 4px)',
+                                                                    maxWidth: 'calc(50% - 4px)',
                                                                     fontSize: '11px',
-                                                                    height: '32px',
+                                                                    height: '28px',
                                                                     background: isActivityIdValid ? '#fff' : '#f3f4f6',
                                                                     opacity: isActivityIdValid ? 1 : 0.6,
+                                                                    border: '1px solid #ddd',
+                                                                    borderRadius: '4px',
                                                                     '& select': {
-                                                                        padding: '6px 8px',
-                                                                        fontSize: '11px'
+                                                                        padding: '4px 6px',
+                                                                        fontSize: '11px',
+                                                                        height: '28px'
+                                                                    },
+                                                                    '& .MuiSelect-icon': {
+                                                                        fontSize: '16px'
                                                                     }
                                                                 }}
                                                             >
@@ -4008,12 +4115,14 @@ const Manifest = () => {
                                                         );
                                                     })()}
                                                     
-                                                    {/* Pilot Selection - Small */}
+                                                    {/* Pilot Selection - Compact */}
                                                     {(() => {
                                                         const activityIdForSlot = getFlightActivityId(first);
                                                         const slotKeyValue = slotKey(activityIdForSlot, (first.flight_date||'').substring(0,10), (first.flight_date||'').substring(11,16));
                                                         const currentPilotId = pilotAssignmentsBySlot[slotKeyValue];
                                                         const isActivityIdValid = activityIdForSlot !== null && activityIdForSlot !== undefined && !isNaN(activityIdForSlot);
+                                                        const selectedPilot = pilotList.find(p => p.id == currentPilotId);
+                                                        const pilotDisplayName = selectedPilot ? `${selectedPilot.first_name} ${selectedPilot.last_name}` : 'Pilot';
                                                         
                                                         return (
                                                             <Select
@@ -4022,15 +4131,22 @@ const Manifest = () => {
                                                                 onChange={(e) => handlePilotChange(activityIdForSlot, first.flight_date, e.target.value)}
                                                                 disabled={!isActivityIdValid}
                                                                 sx={{ 
-                                                                    minWidth: 100,
-                                                                    maxWidth: 120,
+                                                                    flex: '1 1 auto',
+                                                                    minWidth: 'calc(50% - 4px)',
+                                                                    maxWidth: 'calc(50% - 4px)',
                                                                     fontSize: '11px',
-                                                                    height: '32px',
+                                                                    height: '28px',
                                                                     background: isActivityIdValid ? '#fff' : '#f3f4f6',
                                                                     opacity: isActivityIdValid ? 1 : 0.6,
+                                                                    border: '1px solid #ddd',
+                                                                    borderRadius: '4px',
                                                                     '& select': {
-                                                                        padding: '6px 8px',
-                                                                        fontSize: '11px'
+                                                                        padding: '4px 6px',
+                                                                        fontSize: '11px',
+                                                                        height: '28px'
+                                                                    },
+                                                                    '& .MuiSelect-icon': {
+                                                                        fontSize: '16px'
                                                                     }
                                                                 }}
                                                             >
@@ -4214,9 +4330,12 @@ const Manifest = () => {
                                                 {!isMobile && (
                                                 <Button variant="contained" color="primary" sx={{ minWidth: 90, fontWeight: 600, textTransform: 'none' }} onClick={() => handleOpenBookingModal(first)}>Book</Button>
                                                 )}
+                                                {/* Three dots menu - Desktop only (mobile is in header) */}
+                                                {!isMobile && (
                                                 <IconButton size="large" onClick={e => handleGlobalMenuOpen(e, first, groupFlights)}>
                                                     <MoreVertIcon />
                                                 </IconButton>
+                                                )}
                                             </Box>
                                             <Menu
                                                 anchorEl={globalMenuAnchorEl}
@@ -4229,8 +4348,8 @@ const Manifest = () => {
                                                 <MenuItem onClick={() => handleGlobalMenuAction('sendMessageAllGuests')}>Send Message to All Guests</MenuItem>
                                             </Menu>
                                         </Box>
-                                        <Divider sx={{ marginY: 2 }} />
-                                        <TableContainer component={Paper} sx={{ marginTop: 2 }} className="manifest-table-container">
+                                        <Divider sx={{ marginY: isMobile ? 1 : 2 }} />
+                                        <TableContainer component={Paper} sx={{ marginTop: isMobile ? 1 : 2 }} className="manifest-table-container">
                                             <Table className="manifest-table">
                                                 <TableHead sx={{ marginTop: 2, background: "#d3d3d3", color: "#000" }}>
                                                     <TableRow>

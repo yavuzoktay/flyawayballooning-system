@@ -140,15 +140,61 @@ If you already have a Manager Account:
    - **Contact information:** Your contact details (email, phone)
 
 4. Click **"Submit"** or **"Send request"**
-5. Wait for approval (can take 1-3 business days)
+5. Wait for initial approval (can take 1-3 business days)
 6. Once approved, the Developer Token will appear in the API Center
 7. Copy the **Developer Token** (keep it secure - you won't be able to view it again)
+
+**⚠️ IMPORTANT: Developer Token Approval Levels**
+
+After your initial developer token is approved, it may be in **"Test Account"** mode, which only allows access to test accounts. To use it with your real Google Ads accounts, you need to request **Basic** or **Standard** access.
+
+**If you see the error: "DEVELOPER_TOKEN_NOT_APPROVED - The developer token is only approved for use with test accounts":**
+
+1. **Go to API Center** (in your Manager Account):
+   - Navigate to **"Tools & Settings"** > **"Setup"** > **"API Center"**
+   - Or go directly to: https://ads.google.com/aw/apicenter
+
+2. **Find your Developer Token section:**
+   - You should see your developer token listed
+   - Check the **"Status"** or **"Access Level"** column
+   - If it says "Test Account" or "Limited", you need to upgrade
+
+3. **Request Basic or Standard Access:**
+   - Look for a button like **"Request Access"**, **"Upgrade Access"**, or **"Apply for Basic Access"**
+   - Click on it to start the application process
+   - **Basic Access** is usually sufficient for most advertisers (recommended)
+   - **Standard Access** is for agencies or developers managing multiple client accounts
+
+4. **Fill out the Access Request Form:**
+   - **Access Level:** Select **"Basic"** (recommended for your use case)
+   - **Reason for Request:** Explain why you need access to real accounts, for example:
+     ```
+     We need to track conversions for our live Google Ads campaigns. 
+     Our booking system uses server-side conversion tracking via the 
+     Google Ads API to send conversion data from Stripe webhooks. 
+     This is essential for accurate conversion measurement and 
+     campaign optimization.
+     ```
+   - **Use Case:** Select **"Advertiser"** or **"Track conversions"**
+   - Fill in any other required fields (company info, contact details, etc.)
+
+5. **Submit and Wait:**
+   - Click **"Submit"** or **"Send request"**
+   - Approval can take **1-5 business days** (usually 1-2 days)
+   - You'll receive an email notification when approved
+
+6. **After Approval:**
+   - Your developer token status will change to **"Basic"** or **"Standard"**
+   - You can now use the API with your real Google Ads accounts
+   - No need to regenerate the token - the same token will work
 
 **Note:** 
 - While waiting for approval, you can still test the integration in test mode
 - The developer token is required for production use
 - Manager Accounts are free to create and use
 - You can manage multiple Google Ads accounts from one Manager Account
+- **Basic Access** is free and sufficient for most advertisers
+- **Standard Access** may require additional verification for agencies
 
 ### 4. Get Refresh Token
 
