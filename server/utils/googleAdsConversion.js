@@ -79,9 +79,8 @@ function reloadEnvVariables() {
 
 // Check if Google Ads is configured
 const isConfigured = () => {
-    // Reload env vars before checking
-    reloadEnvVariables();
-    
+    // Don't reload here - reloadEnvVariables is called in sendConversion
+    // This prevents infinite loops and excessive reloading
     return !!(
         CUSTOMER_ID &&
         CONVERSION_ID &&
