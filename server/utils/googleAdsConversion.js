@@ -261,14 +261,32 @@ async function sendConversion({
         console.log('  - REFRESH_TOKEN:', REFRESH_TOKEN ? 'SET' : 'NOT SET');
         
         // Format customer ID (remove dashes if present)
-        if (!CUSTOMER_ID) {
+        // Try to get from process.env directly if CUSTOMER_ID is still empty
+        let customerIdToUse = CUSTOMER_ID || process.env.GOOGLE_ADS_CUSTOMER_ID;
+        
+        if (!customerIdToUse) {
             const errorMsg = 'GOOGLE_ADS_CUSTOMER_ID environment variable is not set or empty';
             console.error('❌', errorMsg);
-            console.error('❌ [Google Ads] Full CUSTOMER_ID value:', JSON.stringify(CUSTOMER_ID));
+            console.error('❌ [Google Ads] CUSTOMER_ID variable:', JSON.stringify(CUSTOMER_ID));
+            console.error('❌ [Google Ads] process.env.GOOGLE_ADS_CUSTOMER_ID:', JSON.stringify(process.env.GOOGLE_ADS_CUSTOMER_ID));
+            console.error('❌ [Google Ads] All GOOGLE_ADS env vars:', {
+                CUSTOMER_ID: process.env.GOOGLE_ADS_CUSTOMER_ID,
+                CONVERSION_ID: process.env.GOOGLE_ADS_CONVERSION_ID,
+                CONVERSION_LABEL: process.env.GOOGLE_ADS_CONVERSION_LABEL,
+                DEVELOPER_TOKEN: process.env.GOOGLE_ADS_DEVELOPER_TOKEN ? 'SET' : 'NOT SET',
+                CLIENT_ID: process.env.GOOGLE_ADS_CLIENT_ID ? 'SET' : 'NOT SET',
+                CLIENT_SECRET: process.env.GOOGLE_ADS_CLIENT_SECRET ? 'SET' : 'NOT SET',
+                REFRESH_TOKEN: process.env.GOOGLE_ADS_REFRESH_TOKEN ? 'SET' : 'NOT SET'
+            });
             if (saveErrorLogFunction) {
                 saveErrorLogFunction('error', errorMsg, null, 'googleAds.sendConversion');
             }
             return { success: false, reason: 'missing_customer_id', error: errorMsg };
+        }
+        
+        // Update CUSTOMER_ID if we got it from process.env
+        if (!CUSTOMER_ID && customerIdToUse) {
+            CUSTOMER_ID = customerIdToUse;
         }
         
         // Remove quotes if present (sometimes .env files have quotes)
@@ -310,8 +328,8 @@ async function sendConversion({
         });
 
         // Get customer instance
-        // google-ads-api expects customer_id as string without dashes
-        // Also ensure it's not empty
+        // google-ads-api expects customer_id as string - try both formats
+        // Some versions expect with dashes, some without
         if (!formattedCustomerId || formattedCustomerId.trim() === '') {
             const errorMsg = `Formatted Customer ID is empty. Original: ${CUSTOMER_ID}, Formatted: ${formattedCustomerId}`;
             console.error('❌', errorMsg);
@@ -321,9 +339,14 @@ async function sendConversion({
             return { success: false, reason: 'empty_customer_id', error: errorMsg };
         }
         
-        console.log('📊 [Google Ads] Creating Customer instance with ID:', formattedCustomerId);
+        // According to Google Ads API docs, customer_id should be WITHOUT dashes
+        // Format: "1234567890" not "123-456-7890"
+        console.log('📊 [Google Ads] Creating Customer instance with ID (no dashes):', formattedCustomerId);
+        console.log('📊 [Google Ads] Original format (with dashes):', customerIdValue);
+        
+        // Create customer instance with dash-less format (required by Google Ads API)
         const customer = client.Customer({
-            customer_id: formattedCustomerId,
+            customer_id: formattedCustomerId, // Must be without dashes
             refresh_token: REFRESH_TOKEN,
         });
         console.log('📊 [Google Ads] Customer instance created successfully');
