@@ -1,6 +1,17 @@
 const { google } = require('googleapis');
 require('dotenv').config();
 
+// Function to save error logs (will be passed from index.js)
+let saveErrorLogFunction = null;
+
+/**
+ * Set the saveErrorLog function from the main server file
+ * @param {Function} saveErrorLog - Function to save error logs
+ */
+const setSaveErrorLog = (saveErrorLog) => {
+    saveErrorLogFunction = saveErrorLog;
+};
+
 // Initialize Google Calendar API
 const getCalendarClient = () => {
     const auth = new google.auth.JWT(
@@ -75,6 +86,17 @@ const createCalendarEvent = async (flightData) => {
         return response.data.id;
     } catch (error) {
         console.error('❌ Error creating Google Calendar event:', error);
+        
+        // Save error to logs database
+        if (saveErrorLogFunction) {
+            const errorMessage = `Google Calendar: Failed to create event for booking ${flightData.bookingId || 'unknown'}`;
+            const errorDetails = error.response?.data 
+                ? JSON.stringify(error.response.data) 
+                : error.message || 'Unknown error';
+            const stackTrace = error.stack || `${error.name}: ${error.message}`;
+            saveErrorLogFunction('error', `${errorMessage}. Details: ${errorDetails}`, stackTrace, 'googleCalendar.createCalendarEvent');
+        }
+        
         throw error;
     }
 };
@@ -139,6 +161,17 @@ const updateCalendarEvent = async (eventId, flightData) => {
         console.log('✅ Google Calendar event updated:', eventId);
     } catch (error) {
         console.error('❌ Error updating Google Calendar event:', error);
+        
+        // Save error to logs database
+        if (saveErrorLogFunction) {
+            const errorMessage = `Google Calendar: Failed to update event ${eventId || 'unknown'} for booking ${flightData.bookingId || 'unknown'}`;
+            const errorDetails = error.response?.data 
+                ? JSON.stringify(error.response.data) 
+                : error.message || 'Unknown error';
+            const stackTrace = error.stack || `${error.name}: ${error.message}`;
+            saveErrorLogFunction('error', `${errorMessage}. Details: ${errorDetails}`, stackTrace, 'googleCalendar.updateCalendarEvent');
+        }
+        
         throw error;
     }
 };
@@ -166,6 +199,17 @@ const deleteCalendarEvent = async (eventId) => {
             return;
         }
         console.error('❌ Error deleting Google Calendar event:', error);
+        
+        // Save error to logs database
+        if (saveErrorLogFunction) {
+            const errorMessage = `Google Calendar: Failed to delete event ${eventId || 'unknown'}`;
+            const errorDetails = error.response?.data 
+                ? JSON.stringify(error.response.data) 
+                : error.message || 'Unknown error';
+            const stackTrace = error.stack || `${error.name}: ${error.message}`;
+            saveErrorLogFunction('error', `${errorMessage}. Details: ${errorDetails}`, stackTrace, 'googleCalendar.deleteCalendarEvent');
+        }
+        
         throw error;
     }
 };
@@ -174,5 +218,6 @@ module.exports = {
     createCalendarEvent,
     updateCalendarEvent,
     deleteCalendarEvent,
+    setSaveErrorLog,
 };
 
