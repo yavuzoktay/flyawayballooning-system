@@ -4928,7 +4928,8 @@ async function sendGoogleAdsConversionIfNeeded(session, transactionId, value, cu
             gclid: gclid,
             wbraid: wbraid,
             gbraid: gbraid,
-            conversionDateTime: new Date().toISOString()
+            conversionDateTime: new Date().toISOString(),
+            allowTestPayments: false // Don't allow test payments in production webhooks
         });
 
         if (conversionResult.success) {
@@ -30403,12 +30404,18 @@ app.post('/api/test-google-ads-conversion', async (req, res) => {
             }
         };
 
-        const result = await sendGoogleAdsConversionIfNeeded(
-            mockSession,
-            transactionId,
-            Number(value),
-            currency
-        );
+        // For test endpoint, use sendGoogleAdsConversion directly with allowTestPayments=true
+        const { sendConversion: sendGoogleAdsConversionDirect } = require('./utils/googleAdsConversion');
+        const result = await sendGoogleAdsConversionDirect({
+            transactionId: transactionId,
+            value: Number(value),
+            currency: currency,
+            gclid: gclid || null,
+            wbraid: wbraid || null,
+            gbraid: gbraid || null,
+            conversionDateTime: new Date().toISOString(),
+            allowTestPayments: true // Allow test payments in test endpoint
+        });
 
         res.json({
             success: true,

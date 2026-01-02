@@ -110,7 +110,8 @@ async function sendConversion({
     gclid = null,
     wbraid = null,
     gbraid = null,
-    conversionDateTime = null
+    conversionDateTime = null,
+    allowTestPayments = false // Allow test payments (for testing endpoints)
 }) {
     // Validate configuration
     if (!isConfigured()) {
@@ -147,8 +148,8 @@ async function sendConversion({
         return { success: false, reason: 'invalid_value' };
     }
 
-    // Skip test payments in production
-    if (IS_PRODUCTION && transactionId.startsWith('test_')) {
+    // Skip test payments in production (unless explicitly allowed for testing)
+    if (IS_PRODUCTION && transactionId.startsWith('test_') && !allowTestPayments) {
         const infoMessage = `Skipping Google Ads conversion for test payment: ${transactionId}`;
         console.log('⏭️', infoMessage);
         
