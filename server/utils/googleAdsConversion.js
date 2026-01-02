@@ -18,6 +18,7 @@
  */
 
 const axios = require('axios');
+const { GoogleAdsApi } = require('google-ads-api');
 require('dotenv').config();
 
 // Google Ads API configuration
@@ -176,34 +177,40 @@ async function sendConversion({
             hasGbraid: !!gbraid
         });
         
-        // Get OAuth2 access token
-        console.log('📊 [Google Ads] Getting access token...');
-        const accessToken = await getAccessToken();
-        console.log('📊 [Google Ads] Access token obtained');
-
         // Format customer ID (remove dashes if present)
         const formattedCustomerId = CUSTOMER_ID.replace(/-/g, '');
         console.log('📊 [Google Ads] Formatted Customer ID:', formattedCustomerId);
 
+        // Initialize Google Ads API client
+        const client = new GoogleAdsApi({
+            client_id: CLIENT_ID,
+            client_secret: CLIENT_SECRET,
+            developer_token: DEVELOPER_TOKEN,
+        });
+
+        // Get customer instance
+        const customer = client.Customer({
+            customer_id: formattedCustomerId,
+            refresh_token: REFRESH_TOKEN,
+        });
+
         // Prepare conversion date/time
         const conversionTime = conversionDateTime 
-            ? new Date(conversionDateTime).toISOString().replace(/\.\d{3}Z$/, '+00:00')
-            : new Date().toISOString().replace(/\.\d{3}Z$/, '+00:00');
+            ? new Date(conversionDateTime)
+            : new Date();
 
         // Build conversion action resource name
         const conversionActionResourceName = `customers/${formattedCustomerId}/conversionActions/${CONVERSION_ID}`;
         console.log('📊 [Google Ads] Conversion Action Resource Name:', conversionActionResourceName);
 
-        // Prepare conversion data
-        // Note: Google Ads API requires specific field names
+        // Prepare conversion data using google-ads-api format
         const conversionData = {
-            conversionAction: conversionActionResourceName,
-            conversionDateTime: conversionTime,
-            conversionValue: Number(value),
-            currencyCode: currency.toUpperCase(),
-            orderId: transactionId, // Used for deduplication
-            // Add conversionEnvironment field (required in v16+)
-            conversionEnvironment: 'WEB' // WEB for website conversions, APP for app conversions
+            conversion_action: conversionActionResourceName,
+            conversion_date_time: conversionTime.toISOString().replace(/\.\d{3}Z$/, '+00:00'),
+            conversion_value: Number(value),
+            currency_code: currency.toUpperCase(),
+            order_id: transactionId, // Used for deduplication
+            conversion_environment: 'WEB' // WEB for website conversions, APP for app conversions
         };
 
         // Add click identifiers if available
@@ -219,46 +226,20 @@ async function sendConversion({
 
         console.log('📊 [Google Ads] Conversion data prepared:', {
             conversionAction: conversionActionResourceName,
-            conversionDateTime: conversionTime,
-            conversionValue: conversionData.conversionValue,
-            currencyCode: conversionData.currencyCode,
-            orderId: conversionData.orderId,
+            conversionDateTime: conversionData.conversion_date_time,
+            conversionValue: conversionData.conversion_value,
+            currencyCode: conversionData.currency_code,
+            orderId: conversionData.order_id,
             hasGclid: !!conversionData.gclid,
             hasWbraid: !!conversionData.wbraid,
             hasGbraid: !!conversionData.gbraid
         });
 
-        // Prepare the request payload
-        // Note: customerId is in the URL path, not in the payload
-        const requestPayload = {
+        // Upload click conversions using google-ads-api
+        console.log('📊 [Google Ads] Uploading click conversions via google-ads-api...');
+        const response = await customer.conversionUploads.uploadClickConversions({
             conversions: [conversionData],
-            partialFailure: false, // Fail all if one fails
-        };
-
-        // Make API request
-        // Google Ads API REST endpoint format for v16:
-        // POST /customers/{customerId}:uploadClickConversions
-        // Note: The colon (:) is used for custom methods in REST API
-        const url = `${GOOGLE_ADS_API_BASE_URL}/${formattedCustomerId}:uploadClickConversions`;
-        console.log('📊 [Google Ads] API Request Details:');
-        console.log('  - URL:', url);
-        console.log('  - Method: POST');
-        console.log('  - Customer ID:', formattedCustomerId);
-        console.log('  - Conversion Action ID:', CONVERSION_ID);
-        console.log('  - Conversion Action Resource:', conversionActionResourceName);
-        console.log('  - Request Payload:', JSON.stringify(requestPayload, null, 2));
-        console.log('  - Headers:', {
-            'Authorization': 'Bearer [REDACTED]',
-            'Developer-Token': DEVELOPER_TOKEN ? `${DEVELOPER_TOKEN.substring(0, 5)}...` : 'MISSING',
-            'Content-Type': 'application/json'
-        });
-        
-        const response = await axios.post(url, requestPayload, {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Developer-Token': DEVELOPER_TOKEN,
-                'Content-Type': 'application/json',
-            },
+            partial_failure: false,
         });
 
         const successMessage = `Google Ads conversion sent successfully. Transaction ID: ${transactionId}, Value: ${value} ${currency}, Has gclid: ${!!gclid}`;
