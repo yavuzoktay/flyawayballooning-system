@@ -215,11 +215,47 @@ You need to obtain a refresh token using OAuth 2.0 Playground. This allows your 
 
 ### 5. Get Conversion Action ID
 
-1. In Google Ads, go to "Tools & Settings" > "Conversions"
-2. Find or create your conversion action
-3. Click on the conversion action to view details
-4. The **Conversion Action ID** is shown in the URL or details (e.g., `123456789`)
-5. The **Conversion Label** is also shown (e.g., `abc123`)
+**Option A: Use Existing Conversion Action**
+
+1. In Google Ads, go to **"Goals"** > **"Conversions"** > **"Summary"**
+2. In the conversion table, find a conversion action you want to use (e.g., "flyawayballooning.com - GA4 (web) checkout")
+3. **Click on the conversion action name** (it's a clickable link)
+4. You'll be taken to the conversion action details page
+5. **Find the Conversion Action ID:**
+   - Look at the **URL** in your browser - it will contain something like:
+     ```
+     https://ads.google.com/aw/conversions/details?ocid=...&__c=486-924-1209&__u=...&__o=csu&id=123456789
+     ```
+     The number after `id=` is your **Conversion Action ID** (e.g., `123456789`)
+   - Or scroll down in the details page - the ID might be shown in the settings
+6. **Find the Conversion Label:**
+   - In the conversion action details page, look for **"Conversion label"** or **"Label"** field
+   - It's usually shown near the top of the page or in the settings section
+   - The label format is usually something like `abc123` or `xyz789`
+
+**Option B: Create New Conversion Action (Recommended for Server-Side Tracking)**
+
+If you want to create a dedicated conversion action for server-side tracking:
+
+1. In Google Ads, go to **"Goals"** > **"Conversions"** > **"Summary"**
+2. Click the **blue "+" button** (or "New conversion action" button)
+3. Select **"Website"** as the source
+4. Fill out the form:
+   - **Conversion action name:** "Booking Purchase" or "Server-Side Booking"
+   - **Category:** "Purchase/Sale"
+   - **Value:** Select "Use different values for each conversion"
+   - **Count:** "Every" (to count all conversions)
+   - **Click-through conversion window:** 30 days
+   - **Attribution model:** Choose your preferred model
+5. Click **"Create and continue"**
+6. After creation, you'll see the conversion action details page
+7. **Copy the Conversion Action ID** from the URL (as described in Option A)
+8. **Copy the Conversion Label** from the details page
+
+**Note:** For server-side conversion tracking, you typically want a conversion action that:
+- Counts "Every" conversion (not just "One")
+- Uses "Purchase/Sale" category
+- Has a 30-day conversion window
 
 ### 6. Get Customer ID
 
