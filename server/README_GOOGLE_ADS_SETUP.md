@@ -327,14 +327,23 @@ Add the following to your `.env` file in the `server` directory:
 
 ```dotenv
 # Google Ads API Configuration
-GOOGLE_ADS_CUSTOMER_ID="123-456-7890"
-GOOGLE_ADS_CONVERSION_ID="123456789"
-GOOGLE_ADS_CONVERSION_LABEL="abc123"
-GOOGLE_ADS_DEVELOPER_TOKEN="your-developer-token"
-GOOGLE_ADS_CLIENT_ID="your-client-id.apps.googleusercontent.com"
-GOOGLE_ADS_CLIENT_SECRET="your-client-secret"
-GOOGLE_ADS_REFRESH_TOKEN="your-refresh-token"
+GOOGLE_ADS_CUSTOMER_ID="486-924-1209"  # Your Google Ads Customer ID
+GOOGLE_ADS_CONVERSION_ID="7439291494"  # Conversion Action ID from URL ctId parameter
+GOOGLE_ADS_CONVERSION_LABEL="4G8SCOaoqtsbEOeUzd8B"  # Conversion Label from setup page
+GOOGLE_ADS_DEVELOPER_TOKEN="your-developer-token"  # From API Center
+GOOGLE_ADS_CLIENT_ID="your-client-id.apps.googleusercontent.com"  # From Google Cloud Console
+GOOGLE_ADS_CLIENT_SECRET="your-client-secret"  # From Google Cloud Console
+GOOGLE_ADS_REFRESH_TOKEN="your-refresh-token"  # From OAuth 2.0 Playground
 ```
+
+**Where each value comes from:**
+- `GOOGLE_ADS_CUSTOMER_ID`: Your Google Ads account Customer ID (from Account Settings)
+- `GOOGLE_ADS_CONVERSION_ID`: Conversion Action ID from URL `ctId=` parameter (e.g., `7439291494`)
+- `GOOGLE_ADS_CONVERSION_LABEL`: Conversion Label from the setup page table (e.g., `4G8SCOaoqtsbEOeUzd8B`)
+- `GOOGLE_ADS_DEVELOPER_TOKEN`: From API Center in Manager Account (e.g., `i1hgVo3HBTzc3T-eyUvTUg`)
+- `GOOGLE_ADS_CLIENT_ID`: From Google Cloud Console OAuth credentials
+- `GOOGLE_ADS_CLIENT_SECRET`: From Google Cloud Console OAuth credentials
+- `GOOGLE_ADS_REFRESH_TOKEN`: From OAuth 2.0 Playground Step 2
 
 **Note:** The conversion label is stored but not currently used in the API call (the conversion action ID is used instead). Keep it for reference.
 
