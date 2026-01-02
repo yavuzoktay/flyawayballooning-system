@@ -37,13 +37,43 @@ const getCalendarClient = () => {
  */
 const createCalendarEvent = async (flightData) => {
     try {
-        const calendar = getCalendarClient();
+        console.log('📅 [createCalendarEvent] Starting event creation with data:', {
+            location: flightData.location,
+            flightType: flightData.flightType,
+            passengerCount: flightData.passengerCount,
+            flightDate: flightData.flightDate,
+            bookingId: flightData.bookingId
+        });
+        
+        // Check environment variables
+        const hasClientEmail = !!process.env.GOOGLE_CLIENT_EMAIL;
+        const hasPrivateKey = !!process.env.GOOGLE_PRIVATE_KEY;
         const calendarId = process.env.GOOGLE_CALENDAR_ID || 'primary';
+        
+        console.log('📅 [createCalendarEvent] Environment check:', {
+            hasClientEmail,
+            hasPrivateKey,
+            calendarId: calendarId || 'primary (default)'
+        });
+        
+        if (!hasClientEmail || !hasPrivateKey) {
+            const errorMsg = 'Google Calendar environment variables not configured. GOOGLE_CLIENT_EMAIL or GOOGLE_PRIVATE_KEY missing.';
+            console.error('❌ [createCalendarEvent]', errorMsg);
+            throw new Error(errorMsg);
+        }
+        
+        const calendar = getCalendarClient();
+        console.log('📅 [createCalendarEvent] Calendar client initialized');
 
         // Parse flight date
         const flightDateTime = new Date(flightData.flightDate);
         const endDateTime = new Date(flightDateTime);
         endDateTime.setHours(endDateTime.getHours() + 2); // 2 hour flight duration
+        
+        console.log('📅 [createCalendarEvent] Flight times:', {
+            start: flightDateTime.toISOString(),
+            end: endDateTime.toISOString()
+        });
 
         // Format title: [Location] – [Private/Shared] – [Guest Count]
         const flightTypeLabel = flightData.flightType === 'Private Charter' || flightData.flightType === 'Private' 
@@ -77,12 +107,17 @@ const createCalendarEvent = async (flightData) => {
             },
         };
 
+        console.log('📅 [createCalendarEvent] Sending event to Google Calendar API...');
+        console.log('📅 [createCalendarEvent] Event data:', JSON.stringify(event, null, 2));
+        
         const response = await calendar.events.insert({
             calendarId: calendarId,
             resource: event,
         });
 
-        console.log('✅ Google Calendar event created:', response.data.id);
+        console.log('✅ [createCalendarEvent] Google Calendar event created successfully!');
+        console.log('✅ [createCalendarEvent] Event ID:', response.data.id);
+        console.log('✅ [createCalendarEvent] Event link:', response.data.htmlLink);
         return response.data.id;
     } catch (error) {
         console.error('❌ Error creating Google Calendar event:', error);
