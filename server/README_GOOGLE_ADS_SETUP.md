@@ -248,7 +248,19 @@ If you want to use an existing conversion action:
    - ❌ Do NOT select "Phone" (for call tracking)
    - ❌ Do NOT select other options (they're for different tracking methods)
    - **Why Website?** Server-side conversion tracking sends conversion data from your website's backend (via Stripe webhooks), so it's considered a website conversion
-4. After selecting "Website", you'll see a form to fill out:
+
+4. **If you see a list of existing websites:**
+   - You might see `www.flyawayballooning.com` in the list
+   - **Don't select the existing website** - you need to add a new one
+   - Look for an option like **"Add new website"**, **"Enter website URL"**, or **"Other"**
+   - Or you might need to manually enter the URL in the next step
+
+5. **Enter your booking website URL:**
+   - In the website URL field, enter: `https://flyawayballooning-book.com/`
+   - Make sure to include `https://` and the trailing slash
+   - This is the domain where payments are processed (Stripe checkout)
+
+6. After entering the website URL, you'll see a form to fill out:
    - **Website URL:** Enter `https://flyawayballooning-book.com/` (your booking site)
    - **Conversion action name:** "Booking Purchase" or "Server-Side Booking"
    - **Category:** "Purchase/Sale"
