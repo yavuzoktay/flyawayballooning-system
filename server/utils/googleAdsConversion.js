@@ -147,6 +147,10 @@ async function sendConversion({
     conversionDateTime = null,
     allowTestPayments = false // Allow test payments (for testing endpoints)
 }) {
+    // Reload environment variables to ensure we have the latest values
+    // This is important if .env was updated without server restart
+    reloadEnvVariables();
+    
     // Validate configuration
     if (!isConfigured()) {
         const warningMessage = 'Google Ads Conversion API not configured. Skipping conversion tracking.';
