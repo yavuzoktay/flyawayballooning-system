@@ -236,14 +236,22 @@ async function sendConversion({
         };
 
         // Make API request
-        // Format: POST /customers/{customerId}:uploadClickConversions
-        // Note: Google Ads API REST uses colon notation for custom methods
-        // Try the standard format first: /customers/{customerId}:uploadClickConversions
+        // Google Ads API REST endpoint format for v16:
+        // POST /customers/{customerId}:uploadClickConversions
+        // Note: The colon (:) is used for custom methods in REST API
         const url = `${GOOGLE_ADS_API_BASE_URL}/${formattedCustomerId}:uploadClickConversions`;
-        console.log('📊 [Google Ads] Sending request to:', url);
-        console.log('📊 [Google Ads] Request payload:', JSON.stringify(requestPayload, null, 2));
-        console.log('📊 [Google Ads] Customer ID:', formattedCustomerId);
-        console.log('📊 [Google Ads] Conversion ID:', CONVERSION_ID);
+        console.log('📊 [Google Ads] API Request Details:');
+        console.log('  - URL:', url);
+        console.log('  - Method: POST');
+        console.log('  - Customer ID:', formattedCustomerId);
+        console.log('  - Conversion Action ID:', CONVERSION_ID);
+        console.log('  - Conversion Action Resource:', conversionActionResourceName);
+        console.log('  - Request Payload:', JSON.stringify(requestPayload, null, 2));
+        console.log('  - Headers:', {
+            'Authorization': 'Bearer [REDACTED]',
+            'Developer-Token': DEVELOPER_TOKEN ? `${DEVELOPER_TOKEN.substring(0, 5)}...` : 'MISSING',
+            'Content-Type': 'application/json'
+        });
         
         const response = await axios.post(url, requestPayload, {
             headers: {
