@@ -101,14 +101,36 @@ If you already have a Manager Account:
 1. In the API Center page, find the **"Developer Token"** section
 2. Click **"Request Developer Token"** or **"Apply for Developer Token"** button
 3. Fill out the application form:
+
+   **Company type:**
+   - Select **"Advertiser"** (You are using the API for your own business to track conversions)
+   - ❌ Do NOT select "Independent Google Ads Developer" (this is for third-party software developers)
+   - ❌ Do NOT select "Agency/SEM" (unless you manage campaigns for other clients)
+   - ❌ Do NOT select "Affiliate" (unless you're an affiliate marketer)
+
+   **Intended use:**
+   - Enter a clear description, for example:
+     ```
+     Server-side conversion tracking for our e-commerce booking system. 
+     We use the Google Ads API to send conversion data from our backend 
+     (via Stripe webhooks) to ensure accurate conversion tracking even 
+     when frontend tracking is blocked by ad blockers or browser restrictions.
+     ```
+   - Or shorter version:
+     ```
+     Server-side conversion tracking for booking system to track 
+     completed payments via Stripe webhooks for accurate conversion measurement.
+     ```
+
+   **Other fields:**
    - **Company name:** Fly Away Ballooning
-   - **Website URL:** Your website URL
-   - **Use case description:** "Server-side conversion tracking for e-commerce bookings via Stripe webhooks"
-   - **Contact information:** Your contact details
+   - **Website URL:** Your website URL (e.g., https://flyawayballooning.com)
+   - **Contact information:** Your contact details (email, phone)
+
 4. Click **"Submit"** or **"Send request"**
 5. Wait for approval (can take 1-3 business days)
 6. Once approved, the Developer Token will appear in the API Center
-7. Copy the **Developer Token** (keep it secure)
+7. Copy the **Developer Token** (keep it secure - you won't be able to view it again)
 
 **Note:** 
 - While waiting for approval, you can still test the integration in test mode
