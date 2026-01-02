@@ -406,8 +406,17 @@ async function sendConversion({
         // Upload click conversions using google-ads-api
         console.log('📊 [Google Ads] Uploading click conversions via google-ads-api...');
         console.log('📊 [Google Ads] Conversion data to send:', JSON.stringify(conversionData, null, 2));
+        console.log('📊 [Google Ads] Customer instance customer_id before upload:', customer.customer_id || 'NOT SET');
+        console.log('📊 [Google Ads] Customer instance customer_id type:', typeof customer.customer_id);
         
         try {
+            // Log the customer instance details
+            console.log('📊 [Google Ads] Customer instance details:', {
+                hasCustomerId: !!customer.customer_id,
+                customerIdValue: customer.customer_id,
+                customerIdType: typeof customer.customer_id
+            });
+            
             const response = await customer.conversionUploads.uploadClickConversions({
                 conversions: [conversionData],
                 partial_failure: false,
