@@ -4906,16 +4906,16 @@ async function sendGoogleAdsConversionIfNeeded(session, transactionId, value, cu
             fullMetadata: session.metadata
         });
 
-        // Only send conversion if we have at least one Google Ads ID or if configured to send all conversions
-        // For now, we'll send conversion if gclid exists (most common case)
-        // You can modify this logic if you want to track all conversions regardless of gclid
+        // Send conversion even without gclid/wbraid/gbraid
+        // Google Ads API accepts conversions without click identifiers
+        // This allows tracking all conversions, not just those from Google Ads clicks
         if (!gclid && !wbraid && !gbraid) {
-            const skipMessage = `Skipping Google Ads conversion: No gclid/wbraid/gbraid found in session metadata. Transaction ID: ${transactionId}`;
-            console.log('⏭️', skipMessage);
+            const infoMessage = `Sending Google Ads conversion without gclid/wbraid/gbraid. Transaction ID: ${transactionId}`;
+            console.log('ℹ️', infoMessage);
             
             // Log to database for visibility
-            saveErrorLog('info', skipMessage, null, 'googleAds.sendConversionIfNeeded');
-            return;
+            saveErrorLog('info', infoMessage, null, 'googleAds.sendConversionIfNeeded');
+            // Continue to send conversion (don't return)
         }
 
         console.log('📊 [Google Ads] Proceeding with conversion send...');
@@ -5075,7 +5075,15 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     // Send conversion asynchronously (don't block webhook response)
                     sendGoogleAdsConversionIfNeeded(session, transactionId, conversionValue, conversionCurrency)
                         .catch((err) => {
-                            console.error('Error in Google Ads conversion (non-blocking):', err.message);
+                            const errorMessage = `Error in Google Ads conversion (non-blocking) for booking ${bookingId || 'unknown'}. Transaction ID: ${transactionId}`;
+                            console.error('❌', errorMessage, err.message);
+                            
+                            // Log error to database
+                            const errorDetails = err.response?.data 
+                                ? JSON.stringify(err.response.data) 
+                                : err.message || 'Unknown error';
+                            const stackTrace = err.stack || `${err.name}: ${err.message}`;
+                            saveErrorLog('error', `${errorMessage}. Details: ${errorDetails}`, stackTrace, 'googleAds.webhook.booking');
                         });
 
                     // Save user session data if provided
@@ -5166,7 +5174,15 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     // Send conversion asynchronously (don't block webhook response)
                     sendGoogleAdsConversionIfNeeded(session, transactionId, conversionValue, conversionCurrency)
                         .catch((err) => {
-                            console.error('Error in Google Ads conversion (non-blocking):', err.message);
+                            const errorMessage = `Error in Google Ads conversion (non-blocking) for voucher ${voucherId || 'unknown'}. Transaction ID: ${transactionId}`;
+                            console.error('❌', errorMessage, err.message);
+                            
+                            // Log error to database
+                            const errorDetails = err.response?.data 
+                                ? JSON.stringify(err.response.data) 
+                                : err.message || 'Unknown error';
+                            const stackTrace = err.stack || `${err.name}: ${err.message}`;
+                            saveErrorLog('error', `${errorMessage}. Details: ${errorDetails}`, stackTrace, 'googleAds.webhook.voucher');
                         });
 
                     // Persist Stripe amounts into voucher row to power receipt fields
@@ -30355,6 +30371,59 @@ const saveErrorLog = (level, message, stack, source) => {
 
 // Set saveErrorLog function for Google Ads utility (after saveErrorLog is defined)
 setGoogleAdsSaveErrorLog(saveErrorLog);
+
+// Test endpoint for Google Ads conversion (for debugging)
+app.post('/api/test-google-ads-conversion', async (req, res) => {
+    try {
+        const { transactionId, value, currency = 'GBP', gclid, wbraid, gbraid } = req.body;
+        
+        if (!transactionId || !value) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'transactionId and value are required' 
+            });
+        }
+
+        console.log('🧪 [TEST] Testing Google Ads conversion:', {
+            transactionId,
+            value,
+            currency,
+            hasGclid: !!gclid,
+            hasWbraid: !!wbraid,
+            hasGbraid: !!gbraid
+        });
+
+        // Create a mock session object
+        const mockSession = {
+            id: `test_session_${Date.now()}`,
+            metadata: {
+                gclid: gclid || null,
+                wbraid: wbraid || null,
+                gbraid: gbraid || null
+            }
+        };
+
+        const result = await sendGoogleAdsConversionIfNeeded(
+            mockSession,
+            transactionId,
+            Number(value),
+            currency
+        );
+
+        res.json({
+            success: true,
+            message: 'Test conversion sent',
+            result: result
+        });
+    } catch (error) {
+        console.error('❌ [TEST] Error testing Google Ads conversion:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error testing conversion',
+            error: error.message
+        });
+    }
+});
 
 // Endpoint to get logs (last 24 hours of errors/warnings)
 app.get('/api/logs', (req, res) => {

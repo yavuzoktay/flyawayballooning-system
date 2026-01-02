@@ -64,6 +64,7 @@ const isConfigured = () => {
  */
 async function getAccessToken() {
     try {
+        console.log('📊 [Google Ads] Requesting OAuth2 access token...');
         const response = await axios.post('https://oauth2.googleapis.com/token', {
             client_id: CLIENT_ID,
             client_secret: CLIENT_SECRET,
@@ -71,9 +72,20 @@ async function getAccessToken() {
             grant_type: 'refresh_token'
         });
 
+        console.log('📊 [Google Ads] Access token obtained successfully');
         return response.data.access_token;
     } catch (error) {
-        console.error('❌ Error getting Google Ads access token:', error.response?.data || error.message);
+        const errorMessage = `Error getting Google Ads access token: ${error.response?.data ? JSON.stringify(error.response.data) : error.message}`;
+        console.error('❌', errorMessage);
+        
+        if (saveErrorLogFunction) {
+            const errorDetails = error.response?.data 
+                ? JSON.stringify(error.response.data) 
+                : error.message || 'Unknown error';
+            const stackTrace = error.stack || `${error.name}: ${error.message}`;
+            saveErrorLogFunction('error', `Google Ads: ${errorMessage}`, stackTrace, 'googleAds.getAccessToken');
+        }
+        
         throw error;
     }
 }
