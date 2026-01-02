@@ -217,40 +217,52 @@ You need to obtain a refresh token using OAuth 2.0 Playground. This allows your 
 
 **Option A: Use Existing Conversion Action**
 
+**Note:** GA4-sourced conversion actions (like "flyawayballooning.com - GA4 (web) checkout") may not show a Conversion Label because they're managed by Google Analytics. For server-side tracking, it's **recommended to create a new conversion action** (see Option B below).
+
+If you want to use an existing conversion action:
+
 1. In Google Ads, go to **"Goals"** > **"Conversions"** > **"Summary"**
-2. In the conversion table, find a conversion action you want to use (e.g., "flyawayballooning.com - GA4 (web) checkout")
+2. In the conversion table, find a conversion action you want to use
 3. **Click on the conversion action name** (it's a clickable link)
 4. You'll be taken to the conversion action details page
 5. **Find the Conversion Action ID:**
-   - Look at the **URL** in your browser - it will contain something like:
+   - Look at the **URL** in your browser - it will contain `ctId=` parameter:
      ```
-     https://ads.google.com/aw/conversions/details?ocid=...&__c=486-924-1209&__u=...&__o=csu&id=123456789
+     https://ads.google.com/aw/conversions/detail?ctId=6603616530&...
      ```
-     The number after `id=` is your **Conversion Action ID** (e.g., `123456789`)
-   - Or scroll down in the details page - the ID might be shown in the settings
+     The number after `ctId=` is your **Conversion Action ID** (e.g., `6603616530`)
 6. **Find the Conversion Label:**
-   - In the conversion action details page, look for **"Conversion label"** or **"Label"** field
-   - It's usually shown near the top of the page or in the settings section
+   - **For GA4 conversions:** Conversion Label may not be visible because GA4 manages these automatically
+   - **For website conversions:** Look for **"Conversion label"** or **"Label"** field in the details page
+   - **If label is not visible:** You can still use the Conversion Action ID - the label is optional for server-side tracking
    - The label format is usually something like `abc123` or `xyz789`
 
 **Option B: Create New Conversion Action (Recommended for Server-Side Tracking)**
 
-If you want to create a dedicated conversion action for server-side tracking:
+**This is the recommended approach** for server-side conversion tracking, especially if you're using a new domain (`https://flyawayballooning-book.com/`).
 
 1. In Google Ads, go to **"Goals"** > **"Conversions"** > **"Summary"**
 2. Click the **blue "+" button** (or "New conversion action" button)
 3. Select **"Website"** as the source
 4. Fill out the form:
+   - **Website URL:** Enter `https://flyawayballooning-book.com/` (your booking site)
    - **Conversion action name:** "Booking Purchase" or "Server-Side Booking"
    - **Category:** "Purchase/Sale"
-   - **Value:** Select "Use different values for each conversion"
-   - **Count:** "Every" (to count all conversions)
+   - **Value:** Select **"Use different values for each conversion"** (important for tracking actual booking values)
+   - **Count:** **"Every"** (to count all conversions, not just one per user)
    - **Click-through conversion window:** 30 days
-   - **Attribution model:** Choose your preferred model
+   - **Attribution model:** "Data-driven" (recommended) or your preferred model
 5. Click **"Create and continue"**
 6. After creation, you'll see the conversion action details page
-7. **Copy the Conversion Action ID** from the URL (as described in Option A)
-8. **Copy the Conversion Label** from the details page
+7. **Copy the Conversion Action ID:**
+   - Look at the URL - find `ctId=` parameter (e.g., `ctId=1234567890`)
+   - This is your **Conversion Action ID**
+8. **Copy the Conversion Label:**
+   - In the conversion action details page, look for **"Conversion label"** or **"Label"** field
+   - It's usually shown in the settings section
+   - If you don't see it immediately, click **"Edit Settings"** button - the label should be visible there
+   - The label format is usually something like `abc123` or `xyz789`
+   - **Note:** If the label is auto-generated and not visible, you can leave it empty in `.env` - the Conversion Action ID is the primary identifier
 
 **Note:** For server-side conversion tracking, you typically want a conversion action that:
 - Counts "Every" conversion (not just "One")
