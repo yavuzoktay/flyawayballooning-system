@@ -140,20 +140,59 @@ If you already have a Manager Account:
 
 ### 4. Get Refresh Token
 
-You need to obtain a refresh token using OAuth 2.0. This typically involves:
+You need to obtain a refresh token using OAuth 2.0 Playground. This allows your backend to authenticate with Google Ads API.
 
-1. Using the OAuth 2.0 Playground or a script to authenticate
-2. Granting access to your Google Ads account
-3. Exchanging the authorization code for access and refresh tokens
+**Step-by-step using OAuth 2.0 Playground:**
 
-**Quick method using OAuth 2.0 Playground:**
-1. Go to [OAuth 2.0 Playground](https://developers.google.com/oauthplayground/)
-2. Click the gear icon (⚙️) and check "Use your own OAuth credentials"
-3. Enter your Client ID and Client Secret
-4. In "Step 1", select "Google Ads API" scope: `https://www.googleapis.com/auth/adwords`
-5. Click "Authorize APIs" and complete the OAuth flow
-6. In "Step 2", click "Exchange authorization code for tokens"
-7. Copy the **Refresh Token**
+1. **Go to OAuth 2.0 Playground:**
+   - Visit: https://developers.google.com/oauthplayground/
+
+2. **Configure OAuth Credentials:**
+   - Click the **gear icon (⚙️)** in the top right corner
+   - Check the box **"Use your own OAuth credentials"**
+   - Enter your **Client ID:** (from Step 2, format: `xxxxx.apps.googleusercontent.com`)
+   - Enter your **Client Secret:** (from Step 2, format: `GOCSPX-xxxxx`)
+   - Click **"Close"**
+
+3. **Select Google Ads API Scope:**
+   - In the left panel, scroll down to find **"AdWords API"** in the list
+   - Or, in the **"Input your own scopes"** field at the bottom, enter:
+     ```
+     https://www.googleapis.com/auth/adwords
+     ```
+   - Click **"Authorize APIs"** button
+
+4. **Authorize Access:**
+   - You'll be redirected to Google's authorization page
+   - Select the Google account that has access to your Google Ads account
+   - Review the permissions and click **"Allow"** or **"Continue"**
+   - You'll be redirected back to OAuth Playground
+
+5. **Exchange Authorization Code for Tokens:**
+   - In **"Step 2: Exchange authorization code for tokens"**, click the **"Exchange authorization code for tokens"** button
+   - You'll see a response with tokens
+
+6. **Copy the Refresh Token:**
+   - In the response, find the **"refresh_token"** field
+   - Copy the entire refresh token value (it's a long string)
+   - **Important:** Save this token securely - you'll need it for your `.env` file
+
+**Example response format:**
+```json
+{
+  "access_token": "ya29.a0AfH6...",
+  "expires_in": 3599,
+  "refresh_token": "1//0g...",  ← Copy this value
+  "scope": "https://www.googleapis.com/auth/adwords",
+  "token_type": "Bearer"
+}
+```
+
+**⚠️ Important Notes:**
+- The refresh token is long-lived and doesn't expire (unless revoked)
+- Keep it secure - never commit it to version control
+- If you lose it, you'll need to repeat this process
+- The refresh token allows your backend to get new access tokens automatically
 
 ### 5. Get Conversion Action ID
 
