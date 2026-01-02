@@ -183,13 +183,18 @@ You need to obtain a refresh token using OAuth 2.0 Playground. This allows your 
    - You'll be redirected back to OAuth Playground
 
 5. **Exchange Authorization Code for Tokens:**
-   - In **"Step 2: Exchange authorization code for tokens"**, click the **"Exchange authorization code for tokens"** button
-   - You'll see a response with tokens
+   - After Step 1 completes, you'll see **"Step 2: Exchange authorization code for tokens"** section
+   - The authorization code should already be filled in the input field (it looks like: `4/0ATX87...`)
+   - Click the blue **"Exchange authorization code for tokens"** button
+   - Wait a moment - you'll see a response appear in the right panel
 
 6. **Copy the Refresh Token:**
-   - In the response, find the **"refresh_token"** field
-   - Copy the entire refresh token value (it's a long string)
+   - After clicking the button, look at the **"Request / Response"** panel on the right
+   - You'll see a JSON response with tokens
+   - Find the **"refresh_token"** field in the response
+   - Copy the entire refresh token value (it's a long string starting with `1//0g...` or similar)
    - **Important:** Save this token securely - you'll need it for your `.env` file
+   - The refresh token will also appear in the **"Refresh token:"** input field on the left - you can copy it from there too
 
 **Example response format:**
 ```json
