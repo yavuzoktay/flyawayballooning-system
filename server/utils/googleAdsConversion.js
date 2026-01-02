@@ -177,9 +177,36 @@ async function sendConversion({
             hasGbraid: !!gbraid
         });
         
+        // Debug: Log all environment variables (without sensitive data)
+        console.log('📊 [Google Ads] Environment Variables Check:');
+        console.log('  - CUSTOMER_ID:', CUSTOMER_ID ? `${CUSTOMER_ID.substring(0, 5)}...` : 'NOT SET');
+        console.log('  - CONVERSION_ID:', CONVERSION_ID ? `${CONVERSION_ID.substring(0, 5)}...` : 'NOT SET');
+        console.log('  - CONVERSION_LABEL:', CONVERSION_LABEL ? `${CONVERSION_LABEL.substring(0, 5)}...` : 'NOT SET');
+        console.log('  - DEVELOPER_TOKEN:', DEVELOPER_TOKEN ? 'SET' : 'NOT SET');
+        console.log('  - CLIENT_ID:', CLIENT_ID ? 'SET' : 'NOT SET');
+        console.log('  - CLIENT_SECRET:', CLIENT_SECRET ? 'SET' : 'NOT SET');
+        console.log('  - REFRESH_TOKEN:', REFRESH_TOKEN ? 'SET' : 'NOT SET');
+        
         // Format customer ID (remove dashes if present)
         if (!CUSTOMER_ID) {
-            const errorMsg = 'GOOGLE_ADS_CUSTOMER_ID environment variable is not set';
+            const errorMsg = 'GOOGLE_ADS_CUSTOMER_ID environment variable is not set or empty';
+            console.error('❌', errorMsg);
+            console.error('❌ [Google Ads] Full CUSTOMER_ID value:', JSON.stringify(CUSTOMER_ID));
+            if (saveErrorLogFunction) {
+                saveErrorLogFunction('error', errorMsg, null, 'googleAds.sendConversion');
+            }
+            return { success: false, reason: 'missing_customer_id', error: errorMsg };
+        }
+        
+        // Remove quotes if present (sometimes .env files have quotes)
+        let customerIdValue = CUSTOMER_ID.trim();
+        if ((customerIdValue.startsWith('"') && customerIdValue.endsWith('"')) || 
+            (customerIdValue.startsWith("'") && customerIdValue.endsWith("'"))) {
+            customerIdValue = customerIdValue.slice(1, -1);
+        }
+        
+        if (!customerIdValue) {
+            const errorMsg = 'GOOGLE_ADS_CUSTOMER_ID is empty after trimming quotes';
             console.error('❌', errorMsg);
             if (saveErrorLogFunction) {
                 saveErrorLogFunction('error', errorMsg, null, 'googleAds.sendConversion');
@@ -187,9 +214,10 @@ async function sendConversion({
             return { success: false, reason: 'missing_customer_id', error: errorMsg };
         }
         
-        const formattedCustomerId = CUSTOMER_ID.replace(/-/g, '');
-        console.log('📊 [Google Ads] Customer ID from env:', CUSTOMER_ID);
-        console.log('📊 [Google Ads] Formatted Customer ID:', formattedCustomerId);
+        const formattedCustomerId = customerIdValue.replace(/-/g, '');
+        console.log('📊 [Google Ads] Customer ID from env (raw):', CUSTOMER_ID);
+        console.log('📊 [Google Ads] Customer ID (trimmed):', customerIdValue);
+        console.log('📊 [Google Ads] Formatted Customer ID (no dashes):', formattedCustomerId);
 
         // Initialize Google Ads API client
         const client = new GoogleAdsApi({
