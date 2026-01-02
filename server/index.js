@@ -25218,6 +25218,15 @@ app.post('/api/pilot-assignment', (req, res) => {
                                     const updatePromises = bookingsResult.map(async (booking) => {
                                         try {
                                             console.log(`📅 [pilot-assignment] Updating event ${booking.google_calendar_event_id} for booking ${booking.id}`);
+                                            console.log(`📅 [pilot-assignment] Data being sent to updateCalendarEvent:`, {
+                                                location: booking.location,
+                                                flightType: booking.flight_type,
+                                                passengerCount: totalPassengers,
+                                                flightDate: booking.flight_date || flightDateTime,
+                                                crewMember: crewMember,
+                                                pilotMember: pilotMember,
+                                                bookingId: booking.id.toString()
+                                            });
                                             await updateCalendarEvent(booking.google_calendar_event_id, {
                                                 location: booking.location,
                                                 flightType: booking.flight_type,
