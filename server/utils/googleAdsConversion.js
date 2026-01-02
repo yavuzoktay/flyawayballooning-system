@@ -321,16 +321,22 @@ async function sendConversion({
         console.log('📊 [Google Ads] Formatted Customer ID (no dashes):', formattedCustomerId);
 
         // Initialize Google Ads API client
-        // For Manager Accounts, we might need to set login-customer-id
-        // But google-ads-api package handles this internally via Customer instance
-        const client = new GoogleAdsApi({
+        // For Manager Accounts accessing sub-accounts, we might need login_customer_id
+        // But first, let's try without it since we're using the Manager Account ID directly
+        const clientConfig = {
             client_id: CLIENT_ID,
             client_secret: CLIENT_SECRET,
             developer_token: DEVELOPER_TOKEN,
-        });
+        };
+        
+        // If using Manager Account to access a sub-account, uncomment this:
+        // clientConfig.login_customer_id = formattedCustomerId; // Manager Account ID
         
         console.log('📊 [Google Ads] GoogleAdsApi client initialized');
         console.log('📊 [Google Ads] Developer Token:', DEVELOPER_TOKEN ? `${DEVELOPER_TOKEN.substring(0, 5)}...` : 'NOT SET');
+        console.log('📊 [Google Ads] Client ID:', CLIENT_ID ? `${CLIENT_ID.substring(0, 20)}...` : 'NOT SET');
+        
+        const client = new GoogleAdsApi(clientConfig);
 
         // Get customer instance
         // google-ads-api expects customer_id as string - try both formats
