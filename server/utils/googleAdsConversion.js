@@ -361,17 +361,26 @@ async function sendConversion({
         // Create customer instance with dash-less format (required by Google Ads API)
         // Ensure it's a string, not a number
         // google-ads-api package expects customer_id as string without dashes
+        // For Manager Accounts, we might need to set login_customer_id to the Manager Account ID
+        // But since we're using the Manager Account ID as customer_id, we might not need it
         const customerConfig = {
             customer_id: customerIdForApi, // Must be without dashes and as string
             refresh_token: REFRESH_TOKEN,
         };
+        
+        // If the customer_id is a Manager Account and we're accessing a sub-account,
+        // we would set login_customer_id to the Manager Account ID
+        // But since we're using Manager Account ID directly, we don't need it
+        // Uncomment if accessing a sub-account:
+        // customerConfig.login_customer_id = customerIdForApi; // Manager Account ID
         
         console.log('📊 [Google Ads] Customer config:', {
             customer_id: customerIdForApi,
             customer_id_type: typeof customerIdForApi,
             customer_id_length: customerIdForApi.length,
             is_10_digits: /^\d{10}$/.test(customerIdForApi),
-            has_refresh_token: !!REFRESH_TOKEN
+            has_refresh_token: !!REFRESH_TOKEN,
+            has_login_customer_id: !!customerConfig.login_customer_id
         });
         
         const customer = client.Customer(customerConfig);
