@@ -4687,9 +4687,9 @@ setBookingDetail(finalVoucherDetail);
                                                 }
                                             />
                                         ) : (
-                                            <Button variant="outlined" color="primary" onClick={handleExportCSV} style={{ height: 40 }}>
-                                                Export
-                                            </Button>
+                                        <Button variant="outlined" color="primary" onClick={handleExportCSV} style={{ height: 40 }}>
+                                            Export
+                                        </Button>
                                         )}
                                         
                                         {/* Filter Button - Input-like on mobile */}
@@ -4722,14 +4722,14 @@ setBookingDetail(finalVoucherDetail);
                                                 }
                                             />
                                         ) : (
-                                            <Button
-                                                variant="outlined"
-                                                color="secondary"
-                                                onClick={() => setFilterDialogOpen(true)}
-                                                style={{ height: 40 }}
-                                            >
-                                                Filter
-                                            </Button>
+                                        <Button
+                                            variant="outlined"
+                                            color="secondary"
+                                            onClick={() => setFilterDialogOpen(true)}
+                                            style={{ height: 40 }}
+                                        >
+                                            Filter
+                                        </Button>
                                         )}
                                         
                                         <Button
@@ -4793,17 +4793,17 @@ setBookingDetail(finalVoucherDetail);
                                                 }
                                             />
                                         ) : (
-                                            <OutlinedInput
-                                                placeholder="Search by name, email, phone, location..."
-                                                value={filters.search}
-                                                onChange={(e) => handleFilterChange("search", e.target.value)}
+                                        <OutlinedInput
+                                            placeholder="Search by name, email, phone, location..."
+                                            value={filters.search}
+                                            onChange={(e) => handleFilterChange("search", e.target.value)}
                                                 sx={{ 
                                                     fontSize: 14, 
                                                     '& input::placeholder': { fontSize: 14 },
                                                     flex: 1,
                                                     minWidth: 200
                                                 }}
-                                            />
+                                        />
                                         )}
                                     </div>
                                     {/* Show active advanced filters as chips */}

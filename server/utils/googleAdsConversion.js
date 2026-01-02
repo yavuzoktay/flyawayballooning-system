@@ -233,9 +233,11 @@ async function sendConversion({
         };
 
         // Make API request
-        // Format: POST /customers/{customerId}:uploadConversions
-        const url = `${GOOGLE_ADS_API_BASE_URL}/${formattedCustomerId}:uploadConversions`;
+        // Format: POST /customers/{customerId}/conversionUploads:uploadClickConversions
+        // Note: Google Ads API v16 uses conversionUploads:uploadClickConversions endpoint
+        const url = `${GOOGLE_ADS_API_BASE_URL}/${formattedCustomerId}/conversionUploads:uploadClickConversions`;
         console.log('📊 [Google Ads] Sending request to:', url);
+        console.log('📊 [Google Ads] Request payload:', JSON.stringify(requestPayload, null, 2));
         
         const response = await axios.post(url, requestPayload, {
             headers: {
