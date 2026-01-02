@@ -243,8 +243,12 @@ If you want to use an existing conversion action:
 
 1. In Google Ads, go to **"Goals"** > **"Conversions"** > **"Summary"**
 2. Click the **blue "+" button** (or "New conversion action" button)
-3. Select **"Website"** as the source
-4. Fill out the form:
+3. **Select data source:** Choose **"Website"**
+   - ✅ **Website** - This is the correct choice for server-side conversion tracking
+   - ❌ Do NOT select "Phone" (for call tracking)
+   - ❌ Do NOT select other options (they're for different tracking methods)
+   - **Why Website?** Server-side conversion tracking sends conversion data from your website's backend (via Stripe webhooks), so it's considered a website conversion
+4. After selecting "Website", you'll see a form to fill out:
    - **Website URL:** Enter `https://flyawayballooning-book.com/` (your booking site)
    - **Conversion action name:** "Booking Purchase" or "Server-Side Booking"
    - **Category:** "Purchase/Sale"
