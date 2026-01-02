@@ -13820,6 +13820,7 @@ app.post('/api/addPassenger', (req, res) => {
                 const timeSlot = booking.time_slot;
                 const newPax = booking.pax;
                 const status = booking.status;
+                const activityId = booking.activity_id;
                 
                 // Only update if event exists and booking is scheduled/confirmed
                 if (!eventId || !flightDate || (status !== 'Scheduled' && status !== 'Confirmed')) {
@@ -13868,7 +13869,7 @@ app.post('/api/addPassenger', (req, res) => {
                             const bookingDate = flightDate ? dayjs(flightDate).format('YYYY-MM-DD') : null;
                             const bookingTime = timeSlot || (flightDate ? dayjs(flightDate).format('HH:mm') : null);
                             
-                            con.query(getCrewSql, [booking.activity_id, bookingDate, bookingTime], async (crewErr, crewResult) => {
+                            con.query(getCrewSql, [activityId, bookingDate, bookingTime], async (crewErr, crewResult) => {
                                 let crewMember = null;
                                 if (!crewErr && crewResult && crewResult.length > 0) {
                                     crewMember = `${crewResult[0].first_name} ${crewResult[0].last_name}`;
@@ -20464,7 +20465,7 @@ app.delete('/api/deleteBooking/:id', (req, res) => {
                                     LIMIT 1
                                 `;
                                 
-                                con.query(getCrewSql, [booking.activity_id, bookingDate, bookingTime], async (crewErr, crewResult) => {
+                                con.query(getCrewSql, [activityId, bookingDate, bookingTime], async (crewErr, crewResult) => {
                                     let crewMember = null;
                                     if (!crewErr && crewResult && crewResult.length > 0) {
                                         crewMember = `${crewResult[0].first_name} ${crewResult[0].last_name}`;
