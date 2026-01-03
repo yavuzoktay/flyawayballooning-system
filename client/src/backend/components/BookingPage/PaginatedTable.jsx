@@ -449,7 +449,9 @@ const PaginatedTable = ({
                                 whiteSpace: "nowrap",
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
-                                fontSize: "16px"
+                                fontSize: "16px",
+                                fontWeight: "normal",
+                                fontFamily: "'Gilroy', sans-serif"
                             }}>{col}</th>
                         ))}
                     </tr>
@@ -481,12 +483,14 @@ const PaginatedTable = ({
                                                             overflow: "hidden",
                                                             textOverflow: "ellipsis",
                                                             maxWidth: id === 'flight_date' ? "200px" : "200px",
-                                                            fontSize: "16px"
+                                                            fontSize: "16px",
+                                                            fontWeight: "normal",
+                                                            fontFamily: "'Gilroy', sans-serif"
                                                         }}>
                                                             {id === 'name' ? (
                                                                 onNameClick ? (
                                                                     <span
-                                                                        style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontSize: '16px' }}
+                                                                        style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontSize: '16px', fontWeight: 'normal', fontFamily: "'Gilroy', sans-serif" }}
                                                                         onClick={() => onNameClick && onNameClick(item)}
                                                                     >
                                                                         {item[id]}
@@ -571,7 +575,7 @@ const PaginatedTable = ({
                                                         return (
                                                             <a
                                                                 href={`https://flyawayballooning-system.com/manifest?date=${urlDate}`}
-                                                                style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600, fontSize: '16px' }}
+                                                                style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontWeight: 'normal', fontSize: '16px', fontFamily: "'Gilroy', sans-serif" }}
                                                                 target="_self"
                                                                 rel="noopener noreferrer"
                                                             >
@@ -625,8 +629,9 @@ const PaginatedTable = ({
                                                                 color: '#3274b4',
                                                                 textDecoration: 'underline',
                                                                 cursor: 'pointer',
-                                                                fontWeight: '600',
-                                                                fontSize: '16px'
+                                                                fontWeight: 'normal',
+                                                                fontSize: '16px',
+                                                                fontFamily: "'Gilroy', sans-serif"
                                                             }}
                                                             onClick={() => onVoucherRefClick(item)}
                                                             title="View related booking"
@@ -647,19 +652,19 @@ const PaginatedTable = ({
                                                     if (statusValue === 'Confirmed' || statusValue === 'Scheduled') {
                                                         displayStatus = 'Scheduled';
                                                         statusColor = '#28a745'; // Green
-                                                        fontWeight = '600';
+                                                        fontWeight = 'normal';
                                                     } else if (statusValue === 'Cancelled' || statusValue === 'Canceled') {
                                                         displayStatus = 'Cancelled';
                                                         statusColor = '#fd7e14'; // Orange
-                                                        fontWeight = '600';
+                                                        fontWeight = 'normal';
                                                     } else if (statusValue === 'Flown' || statusValue === 'Completed') {
                                                         displayStatus = 'Flown';
                                                         statusColor = '#007bff'; // Blue
-                                                        fontWeight = '600';
+                                                        fontWeight = 'normal';
                                                     }
                                                     
                                                     return (
-                                                        <span style={{ color: statusColor, fontWeight }}>
+                                                        <span style={{ color: statusColor, fontWeight, fontSize: '16px', fontFamily: "'Gilroy', sans-serif" }}>
                                                             {displayStatus}
                                                         </span>
                                                     );
@@ -672,8 +677,9 @@ const PaginatedTable = ({
                                                             color: '#3274b4', 
                                                             textDecoration: 'underline', 
                                                             cursor: 'pointer',
-                                                            fontWeight: '600',
-                                                            fontSize: '16px'
+                                                            fontWeight: 'normal',
+                                                            fontSize: '16px',
+                                                            fontFamily: "'Gilroy', sans-serif"
                                                         }}
                                                         onClick={() => {
                                                             setSelectedVoucherData({
@@ -710,15 +716,15 @@ const PaginatedTable = ({
                                                                     if (isFullyRefunded) {
                                                                         // Full refund: red
                                                                         color = '#dc3545';
-                                                                        fontWeight = '600';
+                                                                        fontWeight = 'normal';
                                                                     } else if (hasNormalPayment) {
                                                                         // Normal payment: green
                                                                         color = '#28a745';
-                                                                        fontWeight = '600';
+                                                                        fontWeight = 'normal';
                                                                     }
                                                                     
                                                                     return (
-                                                                        <span style={{ color, fontWeight }}>
+                                                                        <span style={{ color, fontWeight, fontSize: '16px', fontFamily: "'Gilroy', sans-serif" }}>
                                                                             {item[id]}
                                                                         </span>
                                                                     );
