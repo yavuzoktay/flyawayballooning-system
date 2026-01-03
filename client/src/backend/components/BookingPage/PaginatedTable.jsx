@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import dayjs from "dayjs";
 
 const PaginatedTable = ({
     data,
@@ -642,14 +643,71 @@ const PaginatedTable = ({
                                                     );
                                                 })()
                                             ) : id === 'status' ? (
-                                                // Status with color coding: Scheduled (green), Cancelled (orange), Flown (blue)
+                                                // Status with color coding: Scheduled (green), Cancelled (orange), Flown (blue), Expired (red)
                                                 (() => {
                                                     const statusValue = item[id];
                                                     let displayStatus = statusValue;
                                                     let statusColor = 'inherit';
                                                     let fontWeight = 'normal';
                                                     
-                                                    // Normalize status values
+                                                    // Check if booking is expired (only for bookings context)
+                                                    if (context === 'bookings' && item.expires) {
+                                                        try {
+                                                            // Parse expires date - handle different formats
+                                                            let expiresDate = item.expires;
+                                                            let parsedDate = null;
+                                                            
+                                                            if (typeof expiresDate === 'string' && expiresDate.trim() !== '') {
+                                                                // Try to parse as ISO string first (YYYY-MM-DD or YYYY-MM-DD HH:mm:ss)
+                                                                parsedDate = dayjs(expiresDate);
+                                                                
+                                                                // If not valid, try DD/MM/YYYY format
+                                                                if (!parsedDate.isValid()) {
+                                                                    const parts = expiresDate.split('/');
+                                                                    if (parts.length === 3) {
+                                                                        // Handle 2-digit year (YY) or 4-digit year (YYYY)
+                                                                        let year = parts[2];
+                                                                        if (year.length === 2) {
+                                                                            // Convert 2-digit year to 4-digit (assuming 20XX for years 00-99)
+                                                                            year = '20' + year;
+                                                                        }
+                                                                        parsedDate = dayjs(`${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
+                                                                    }
+                                                                }
+                                                                
+                                                                // If still not valid, try other common formats
+                                                                if (!parsedDate.isValid()) {
+                                                                    // Try parsing as Date object
+                                                                    const dateObj = new Date(expiresDate);
+                                                                    if (!isNaN(dateObj.getTime())) {
+                                                                        parsedDate = dayjs(dateObj);
+                                                                    }
+                                                                }
+                                                                
+                                                                // Check if expires date is before today (start of day)
+                                                                if (parsedDate && parsedDate.isValid()) {
+                                                                    const today = dayjs().startOf('day');
+                                                                    const expiresStartOfDay = parsedDate.startOf('day');
+                                                                    
+                                                                    // If expires date is before today, mark as expired
+                                                                    if (expiresStartOfDay.isBefore(today)) {
+                                                                        displayStatus = 'Expired';
+                                                                        statusColor = '#dc3545'; // Red
+                                                                        fontWeight = 'normal';
+                                                                        return (
+                                                                            <span style={{ color: statusColor, fontWeight, fontSize: '16px', fontFamily: "'Gilroy', sans-serif" }}>
+                                                                                {displayStatus}
+                                                                            </span>
+                                                                        );
+                                                                    }
+                                                                }
+                                                            }
+                                                        } catch (expiresError) {
+                                                            console.error('Error checking expires date:', expiresError, 'expires value:', item.expires);
+                                                        }
+                                                    }
+                                                    
+                                                    // Normalize status values (only if not expired)
                                                     if (statusValue === 'Confirmed' || statusValue === 'Scheduled') {
                                                         displayStatus = 'Scheduled';
                                                         statusColor = '#28a745'; // Green
@@ -726,8 +784,8 @@ const PaginatedTable = ({
                                                                     
                                                                     return (
                                                                         <span style={{ color, fontWeight, fontSize: '16px', fontFamily: "'Gilroy', sans-serif" }}>
-                                                                            {item[id]}
-                                                                        </span>
+                                                                    {item[id]}
+                                                                </span>
                                                                     );
                                                                 })()
                                                             ) : item[id]}
