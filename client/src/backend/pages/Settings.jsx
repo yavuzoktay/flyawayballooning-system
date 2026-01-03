@@ -5239,16 +5239,29 @@ const Settings = () => {
                         maxHeight: 'calc(100vh - 16px)',
                         margin: '0',
                         borderRadius: '8px'
-                    } : {}}>
+                    } : {
+                        maxWidth: '800px',
+                        width: '90%',
+                        maxHeight: '90vh',
+                        overflow: 'auto'
+                    }}>
                         <div className="modal-header" style={isMobile ? {
                             padding: '10px 12px',
                             borderBottom: '1px solid #e5e7eb'
-                        } : {}}>
+                        } : {
+                            padding: '20px 24px',
+                            borderBottom: '1px solid #e5e7eb'
+                        }}>
                             <h3 style={isMobile ? {
                                 fontSize: '14px',
                                 fontWeight: 600,
                                 margin: 0
-                            } : {}}>Create New Resources</h3>
+                            } : {
+                                fontSize: '20px',
+                                fontWeight: 600,
+                                margin: 0,
+                                color: '#1f2937'
+                            }}>Create New Resources</h3>
                             <button 
                                 className="close-btn"
                                 onClick={() => setShowResourceForm(false)}
@@ -5256,7 +5269,11 @@ const Settings = () => {
                                     fontSize: '18px',
                                     width: '24px',
                                     height: '24px'
-                                } : {}}
+                                } : {
+                                    fontSize: '24px',
+                                    width: '32px',
+                                    height: '32px'
+                                }}
                             >
                                 ×
                             </button>
@@ -5307,22 +5324,37 @@ const Settings = () => {
                             className="voucher-form"
                             style={isMobile ? {
                                 padding: '12px'
-                            } : {}}
+                            } : {
+                                padding: '24px'
+                            }}
                         >
                             <div className="form-row" style={isMobile ? {
                                 display: 'flex',
                                 flexDirection: 'column',
                                 gap: '8px',
                                 marginBottom: '12px'
-                            } : {}}>
+                            } : {
+                                display: 'flex',
+                                gap: '20px',
+                                marginBottom: '20px'
+                            }}>
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    flex: 1,
+                                    marginBottom: 0
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Resource Name</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Resource Name</label>
                                     <input
                                         type="text"
                                         placeholder="Resource #244"
@@ -5333,18 +5365,35 @@ const Settings = () => {
                                             fontSize: '13px',
                                             borderRadius: '4px',
                                             height: '32px',
+                                            boxSizing: 'border-box',
+                                            width: '100%'
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
                                             boxSizing: 'border-box'
-                                        } : {}}
+                                        }}
                                     />
                                 </div>
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    flex: 1,
+                                    marginBottom: 0
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Resource Group</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Resource Group</label>
                                     <select
                                         value={resourceFormData.resource_group_id}
                                         onChange={(e) => setResourceFormData({ ...resourceFormData, resource_group_id: e.target.value })}
@@ -5356,7 +5405,16 @@ const Settings = () => {
                                             width: '100%',
                                             height: '32px',
                                             boxSizing: 'border-box'
-                                        } : {}}
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
+                                            boxSizing: 'border-box',
+                                            backgroundColor: '#fff',
+                                            cursor: 'pointer'
+                                        }}
                                     >
                                         <option value="" disabled>Select group</option>
                                         {resourceGroups.map(g => (
@@ -5368,7 +5426,12 @@ const Settings = () => {
                                         color: '#6b7280',
                                         marginTop: '4px',
                                         display: 'block'
-                                    } : {}}>Assign this resource to a Resource Group</small>
+                                    } : {
+                                        fontSize: '12px',
+                                        color: '#6b7280',
+                                        marginTop: '4px',
+                                        display: 'block'
+                                    }}>Assign this resource to a Resource Group</small>
                                 </div>
                             </div>
 
@@ -5377,15 +5440,28 @@ const Settings = () => {
                                 flexDirection: 'column',
                                 gap: '8px',
                                 marginBottom: '12px'
-                            } : {}}>
+                            } : {
+                                display: 'flex',
+                                gap: '20px',
+                                marginBottom: '20px'
+                            }}>
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    flex: 1,
+                                    marginBottom: 0
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Max Uses</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Max Uses</label>
                                     <input
                                         type="number"
                                         min="1"
@@ -5396,24 +5472,46 @@ const Settings = () => {
                                             fontSize: '13px',
                                             borderRadius: '4px',
                                             height: '32px',
+                                            boxSizing: 'border-box',
+                                            width: '100%'
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
                                             boxSizing: 'border-box'
-                                        } : {}}
+                                        }}
                                     />
                                     <small style={isMobile ? {
                                         fontSize: '10px',
                                         color: '#6b7280',
                                         marginTop: '4px',
                                         display: 'block'
-                                    } : {}}>Max number of times this resource can be used at one time.</small>
+                                    } : {
+                                        fontSize: '12px',
+                                        color: '#6b7280',
+                                        marginTop: '4px',
+                                        display: 'block'
+                                    }}>Max number of times this resource can be used at one time.</small>
                                 </div>
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    flex: 1,
+                                    marginBottom: 0
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Sort Order</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Sort Order</label>
                                     <input
                                         type="number"
                                         min="0"
@@ -5424,15 +5522,28 @@ const Settings = () => {
                                             fontSize: '13px',
                                             borderRadius: '4px',
                                             height: '32px',
+                                            boxSizing: 'border-box',
+                                            width: '100%'
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
                                             boxSizing: 'border-box'
-                                        } : {}}
+                                        }}
                                     />
                                     <small style={isMobile ? {
                                         fontSize: '10px',
                                         color: '#6b7280',
                                         marginTop: '4px',
                                         display: 'block'
-                                    } : {}}>Sort order to display resources on Manifest Timeline</small>
+                                    } : {
+                                        fontSize: '12px',
+                                        color: '#6b7280',
+                                        marginTop: '4px',
+                                        display: 'block'
+                                    }}>Sort order to display resources on Manifest Timeline</small>
                                 </div>
                             </div>
 
@@ -5441,15 +5552,28 @@ const Settings = () => {
                                 flexDirection: 'column',
                                 gap: '8px',
                                 marginBottom: '12px'
-                            } : {}}>
+                            } : {
+                                display: 'flex',
+                                gap: '20px',
+                                marginBottom: '20px'
+                            }}>
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    flex: 1,
+                                    marginBottom: 0
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Experience</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Experience</label>
                                     <div style={isMobile ? {
                                         display: 'grid',
                                         gridTemplateColumns: '1fr',
@@ -5459,9 +5583,10 @@ const Settings = () => {
                                         borderRadius: '6px',
                                         background: '#f9fafb'
                                     } : {
-                                        display: 'grid',
-                                        gridTemplateColumns: '1fr',
-                                        gap: '8px'
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '8px',
+                                        padding: '16px',
+                                        background: '#f9fafb'
                                     }}>
                                         {experienceTypes.map(opt => (
                                             <label key={opt} style={isMobile ? {
@@ -5471,7 +5596,9 @@ const Settings = () => {
                                             } : {
                                                 display: 'flex',
                                                 alignItems: 'center',
-                                                gap: '8px'
+                                                gap: '8px',
+                                                marginBottom: '8px',
+                                                cursor: 'pointer'
                                             }}>
                                                 <input
                                                     type="checkbox"
@@ -5487,12 +5614,19 @@ const Settings = () => {
                                                     style={isMobile ? {
                                                         width: '14px',
                                                         height: '14px'
-                                                    } : {}}
+                                                    } : {
+                                                        width: '18px',
+                                                        height: '18px',
+                                                        cursor: 'pointer'
+                                                    }}
                                                 />
                                                 <span style={isMobile ? {
                                                     fontSize: '11px',
                                                     color: '#374151'
-                                                } : {}}>{opt}</span>
+                                                } : {
+                                                    fontSize: '14px',
+                                                    color: '#374151'
+                                                }}>{opt}</span>
                                             </label>
                                         ))}
                                     </div>
@@ -5501,16 +5635,30 @@ const Settings = () => {
                                         color: '#6b7280',
                                         marginTop: '4px',
                                         display: 'block'
-                                    } : {}}>Choose which experience this resource is used for</small>
+                                    } : {
+                                        fontSize: '12px',
+                                        color: '#6b7280',
+                                        marginTop: '4px',
+                                        display: 'block'
+                                    }}>Choose which experience this resource is used for</small>
                                 </div>
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    flex: 1,
+                                    marginBottom: 0
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Display Color</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Display Color</label>
                                     <input
                                         type="color"
                                         value={resourceFormData.color}
@@ -5521,23 +5669,44 @@ const Settings = () => {
                                             borderRadius: '4px',
                                             border: '1px solid #d1d5db',
                                             boxSizing: 'border-box'
-                                        } : {}}
+                                        } : {
+                                            width: '100%',
+                                            height: '40px',
+                                            borderRadius: '6px',
+                                            border: '1px solid #d1d5db',
+                                            boxSizing: 'border-box',
+                                            cursor: 'pointer'
+                                        }}
                                     />
                                     <small style={isMobile ? {
                                         fontSize: '10px',
                                         color: '#6b7280',
                                         marginTop: '4px',
                                         display: 'block'
-                                    } : {}}>The color to use when showing this resource on the manifest</small>
+                                    } : {
+                                        fontSize: '12px',
+                                        color: '#6b7280',
+                                        marginTop: '4px',
+                                        display: 'block'
+                                    }}>The color to use when showing this resource on the manifest</small>
                                 </div>
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    flex: 1,
+                                    marginBottom: 0
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Icon</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Icon</label>
                                     <select
                                         value={resourceFormData.icon}
                                         onChange={(e) => setResourceFormData({ ...resourceFormData, icon: e.target.value })}
@@ -5548,7 +5717,16 @@ const Settings = () => {
                                             width: '100%',
                                             height: '32px',
                                             boxSizing: 'border-box'
-                                        } : {}}
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
+                                            boxSizing: 'border-box',
+                                            backgroundColor: '#fff',
+                                            cursor: 'pointer'
+                                        }}
                                     >
                                         <option value="Generic">Generic</option>
                                         <option value="Balloon">Balloon</option>
@@ -5560,18 +5738,31 @@ const Settings = () => {
                                         color: '#6b7280',
                                         marginTop: '4px',
                                         display: 'block'
-                                    } : {}}>Icon used on manifest and booking views</small>
+                                    } : {
+                                        fontSize: '12px',
+                                        color: '#6b7280',
+                                        marginTop: '4px',
+                                        display: 'block'
+                                    }}>Icon used on manifest and booking views</small>
                                 </div>
                             </div>
 
                             <div className="form-group" style={isMobile ? {
                                 marginBottom: '12px'
-                            } : {}}>
+                            } : {
+                                marginBottom: '20px'
+                            }}>
                                 <label style={isMobile ? {
                                     fontSize: '11px',
                                     marginBottom: '4px',
                                     fontWeight: 600
-                                } : {}}>Number of Resources</label>
+                                } : {
+                                    display: 'block',
+                                    marginBottom: '8px',
+                                    fontWeight: 500,
+                                    color: '#374151',
+                                    fontSize: '14px'
+                                }}>Number of Resources</label>
                                 <input
                                     type="number"
                                     min="1"
@@ -5582,15 +5773,28 @@ const Settings = () => {
                                         fontSize: '13px',
                                         borderRadius: '4px',
                                         height: '32px',
+                                        boxSizing: 'border-box',
+                                        width: '100%'
+                                    } : {
+                                        width: '100%',
+                                        padding: '10px 12px',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '6px',
+                                        fontSize: '14px',
                                         boxSizing: 'border-box'
-                                    } : {}}
+                                    }}
                                 />
                                 <small style={isMobile ? {
                                     fontSize: '10px',
                                     color: '#6b7280',
                                     marginTop: '4px',
                                     display: 'block'
-                                } : {}}>The number of resources you'd like to create.</small>
+                                } : {
+                                    fontSize: '12px',
+                                    color: '#6b7280',
+                                    marginTop: '4px',
+                                    display: 'block'
+                                }}>The number of resources you'd like to create.</small>
                             </div>
 
                             <div className="form-actions" style={isMobile ? {
@@ -5600,14 +5804,25 @@ const Settings = () => {
                                 paddingTop: '12px',
                                 marginTop: '12px',
                                 borderTop: '1px solid #e5e7eb'
-                            } : {}}>
+                            } : {
+                                borderTop: '1px solid #e5e7eb',
+                                padding: '16px 24px',
+                                display: 'flex',
+                                justifyContent: 'flex-end',
+                                gap: '12px',
+                                marginTop: '20px'
+                            }}>
                                 <button type="button" className="btn btn-secondary" onClick={() => setShowResourceForm(false)} style={isMobile ? {
                                     padding: '8px 12px',
                                     fontSize: '12px',
                                     width: '100%',
                                     borderRadius: '4px',
                                     height: '36px'
-                                } : {}}>Cancel</button>
+                                } : {
+                                    padding: '8px 20px',
+                                    fontSize: '14px',
+                                    borderRadius: '6px'
+                                }}>Cancel</button>
                                 <button type="submit" className="btn btn-primary" style={isMobile ? {
                                     padding: '8px 12px',
                                     fontSize: '12px',
@@ -5618,7 +5833,15 @@ const Settings = () => {
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     gap: '6px'
-                                } : {}}><Plus size={isMobile ? 14 : 16} /> Create</button>
+                                } : {
+                                    padding: '8px 20px',
+                                    fontSize: '14px',
+                                    borderRadius: '6px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px'
+                                }}><Plus size={isMobile ? 14 : 16} /> Create</button>
                             </div>
                         </form>
                     </div>
@@ -10098,8 +10321,8 @@ const Settings = () => {
                                         padding: '10px',
                                         background: '#f9fafb'
                                     } : {
-                                        border: '1px solid #d1d5db',
-                                        borderRadius: '8px',
+                                        border: '1px solid #d1d5db', 
+                                        borderRadius: '8px', 
                                         padding: '16px',
                                         background: '#f9fafb'
                                     }}>
@@ -10193,8 +10416,8 @@ const Settings = () => {
                                         padding: '10px',
                                         background: '#f9fafb'
                                     } : {
-                                        border: '1px solid #d1d5db',
-                                        borderRadius: '8px',
+                                        border: '1px solid #d1d5db', 
+                                        borderRadius: '8px', 
                                         padding: '16px',
                                         background: '#f9fafb'
                                     }}>
@@ -11744,9 +11967,9 @@ const Settings = () => {
                                                         cursor: 'pointer',
                                                         whiteSpace: 'nowrap'
                                                     } : {
-                                                        padding: '4px 8px',
-                                                        fontSize: '11px',
-                                                        backgroundColor: placeholder.includes('Company Name') || placeholder.includes('Customer Portal Link') || placeholder.includes('Experience Data') ? '#dbeafe' : '#f3f4f6',
+                                                        padding: '4px 8px', 
+                                                        fontSize: '11px', 
+                                                        backgroundColor: placeholder.includes('Company Name') || placeholder.includes('Customer Portal Link') || placeholder.includes('Experience Data') ? '#dbeafe' : '#f3f4f6', 
                                                         color: placeholder.includes('Company Name') || placeholder.includes('Customer Portal Link') || placeholder.includes('Experience Data') ? '#1d4ed8' : '#6366f1',
                                                         border: '1px solid #e5e7eb',
                                                         borderRadius: '4px',
@@ -11777,10 +12000,10 @@ const Settings = () => {
                                                 minHeight: '70px',
                                                 boxSizing: 'border-box'
                                             } : {
-                                                width: '100%',
-                                                padding: '12px',
-                                                border: '1px solid #d1d5db',
-                                                borderRadius: '6px',
+                                                width: '100%', 
+                                                padding: '12px', 
+                                                border: '1px solid #d1d5db', 
+                                                borderRadius: '6px', 
                                                 fontSize: '14px',
                                                 fontFamily: 'inherit',
                                                 resize: 'vertical',
@@ -12489,11 +12712,11 @@ const Settings = () => {
                                     <div style={isMobile ? {
                                         fontSize: '13px'
                                     } : {}}>
-                                        <RichTextEditor
-                                            value={customerPortalFormData.body}
-                                            onChange={(html) => setCustomerPortalFormData({ ...customerPortalFormData, body: html })}
-                                            placeholder="Enter body content..."
-                                        />
+                                    <RichTextEditor
+                                        value={customerPortalFormData.body}
+                                        onChange={(html) => setCustomerPortalFormData({ ...customerPortalFormData, body: html })}
+                                        placeholder="Enter body content..."
+                                    />
                                     </div>
                                 </div>
 
@@ -12793,11 +13016,11 @@ const Settings = () => {
                                     <div style={isMobile ? {
                                         fontSize: '13px'
                                     } : {}}>
-                                        <RichTextEditor
-                                            value={customerPortalFormData.body}
-                                            onChange={(html) => setCustomerPortalFormData({ ...customerPortalFormData, body: html })}
-                                            placeholder="Enter body content..."
-                                        />
+                                    <RichTextEditor
+                                        value={customerPortalFormData.body}
+                                        onChange={(html) => setCustomerPortalFormData({ ...customerPortalFormData, body: html })}
+                                        placeholder="Enter body content..."
+                                    />
                                     </div>
                                 </div>
 
