@@ -3927,19 +3927,19 @@ const Manifest = () => {
                                                         width: '100%',
                                                         gap: 1
                                                     }}>
-                                                        {/* Section başlığında activityName ve flight time birlikte gösterilecek */}
-                                                        {/* Check if any booking in this group has Proposal Flight voucher type */}
-                                                        {/* For Private Flight, show booking ID in the title */}
-                                                        {(() => {
-                                                            const hasProposal = groupFlights.some(f => {
-                                                                const voucherType = (f.voucher_type || '').toLowerCase();
-                                                                return voucherType.includes('proposal');
-                                                            });
-                                                            const isPrivateFlight = (first.flight_type || '').toLowerCase().includes('private') || 
-                                                                                   (first.flight_type || '').toLowerCase().includes('charter');
-                                                            const titleSuffix = hasProposal ? ' | Proposal' : '';
-                                                            const bookingIdSuffix = isPrivateFlight && first.id ? ` | Booking ID: ${first.id}` : '';
-                                                            return (
+                                                {/* Section başlığında activityName ve flight time birlikte gösterilecek */}
+                                                {/* Check if any booking in this group has Proposal Flight voucher type */}
+                                                {/* For Private Flight, show booking ID in the title */}
+                                                {(() => {
+                                                    const hasProposal = groupFlights.some(f => {
+                                                        const voucherType = (f.voucher_type || '').toLowerCase();
+                                                        return voucherType.includes('proposal');
+                                                    });
+                                                    const isPrivateFlight = (first.flight_type || '').toLowerCase().includes('private') || 
+                                                                           (first.flight_type || '').toLowerCase().includes('charter');
+                                                    const titleSuffix = hasProposal ? ' | Proposal' : '';
+                                                    const bookingIdSuffix = isPrivateFlight && first.id ? ` | Booking ID: ${first.id}` : '';
+                                                    return (
                                                                 <Typography 
                                                                     variant="h6" 
                                                                     sx={{ 
@@ -3953,8 +3953,8 @@ const Manifest = () => {
                                                                 >
                                                                     {activityName}{titleSuffix}{bookingIdSuffix} - Flight Time: {displayFlightTime}
                                                                 </Typography>
-                                                            );
-                                                        })()}
+                                                    );
+                                                })()}
                                                         <IconButton 
                                                             size="small" 
                                                             onClick={e => handleGlobalMenuOpen(e, first, groupFlights)}
@@ -4562,11 +4562,55 @@ const Manifest = () => {
                                                     })}
                                                     {/* Move the summary row here, inside TableBody */}
                                                     <TableRow>
-                                                        <TableCell colSpan={11} style={{ textAlign: 'right', fontWeight: 600, background: '#f5f5f5' }}>
+                                                        {isMobile ? (
+                                                            <>
+                                                                <TableCell 
+                                                                    sx={{ 
+                                                                        textAlign: 'left', 
+                                                                        fontWeight: 600, 
+                                                                        background: '#f5f5f5',
+                                                                        fontSize: '5px',
+                                                                        padding: '8px 4px',
+                                                                        whiteSpace: 'nowrap',
+                                                                        verticalAlign: 'middle',
+                                                                        overflow: 'hidden',
+                                                                        textOverflow: 'ellipsis',
+                                                                        lineHeight: '1',
+                                                                        wordBreak: 'keep-all',
+                                                                        minWidth: '250px',
+                                                                        maxWidth: '100%'
+                                                                    }}
+                                                                >
+                                                                    Total Price: £{groupFlights.reduce((sum, f) => sum + (parseFloat(f.paid) || 0), 0).toFixed(2)} | Total Weight: {totalWeightDisplay}kg | Total Pax: {passengerCountDisplay}
+                                                                </TableCell>
+                                                                {/* Empty cells for remaining columns on mobile */}
+                                                                <TableCell sx={{ background: '#f5f5f5', padding: '10px 6px' }}></TableCell>
+                                                                <TableCell sx={{ background: '#f5f5f5', padding: '10px 6px' }}></TableCell>
+                                                                <TableCell sx={{ background: '#f5f5f5', padding: '10px 6px' }}></TableCell>
+                                                                <TableCell sx={{ background: '#f5f5f5', padding: '10px 6px' }}></TableCell>
+                                                                <TableCell sx={{ background: '#f5f5f5', padding: '10px 6px' }}></TableCell>
+                                                                <TableCell sx={{ background: '#f5f5f5', padding: '10px 6px' }}></TableCell>
+                                                                <TableCell sx={{ background: '#f5f5f5', padding: '10px 6px' }}></TableCell>
+                                                                <TableCell sx={{ background: '#f5f5f5', padding: '10px 6px' }}></TableCell>
+                                                                <TableCell sx={{ background: '#f5f5f5', padding: '10px 6px' }}></TableCell>
+                                                            </>
+                                                        ) : (
+                                                            <TableCell 
+                                                                colSpan={11} 
+                                                                sx={{ 
+                                                                    textAlign: 'right', 
+                                                                    fontWeight: 600, 
+                                                                    background: '#f5f5f5',
+                                                                    fontSize: 'inherit',
+                                                                    padding: '10px',
+                                                                    whiteSpace: 'normal'
+                                                                }}
+                                                            >
                                                                                                             Total Price: £{groupFlights.reduce((sum, f) => sum + (parseFloat(f.paid) || 0), 0)} &nbsp;&nbsp;|
                                                 Total Weight: {totalWeightDisplay} kg &nbsp;&nbsp;|
                                                 Total Pax: {passengerCountDisplay}
                                                         </TableCell>
+                                                        )}
                                                     </TableRow>
                                                 </TableBody>
                                             </Table>
