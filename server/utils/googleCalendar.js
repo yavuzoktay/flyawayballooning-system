@@ -99,11 +99,11 @@ const createCalendarEvent = async (flightData) => {
             end: endDateTime.toISOString()
         });
 
-        // Format title: [Location] – [Private/Shared] – [Guest Count]
+        // Format title: [Location] – [Private/Shared] – x [Count]
         const flightTypeLabel = flightData.flightType === 'Private Charter' || flightData.flightType === 'Private' 
             ? 'Private' 
             : 'Shared';
-        const title = `${flightData.location} – ${flightTypeLabel} – ${flightData.passengerCount} Guest${flightData.passengerCount !== 1 ? 's' : ''}`;
+        const title = `${flightData.location} – ${flightTypeLabel} – x ${flightData.passengerCount}`;
 
         // Build description - Format: Total Passengers, Booking ID, Crew, Pilot
         let description = `Total Passengers: ${flightData.passengerCount}\n`;
@@ -203,11 +203,11 @@ const updateCalendarEvent = async (eventId, flightData) => {
         const endDateTime = new Date(flightDateTime);
         endDateTime.setHours(endDateTime.getHours() + 2); // 2 hour flight duration
 
-        // Format title: [Location] – [Private/Shared] – [Guest Count]
+        // Format title: [Location] – [Private/Shared] – x [Count]
         const flightTypeLabel = flightData.flightType === 'Private Charter' || flightData.flightType === 'Private' 
             ? 'Private' 
             : 'Shared';
-        const title = `${flightData.location} – ${flightTypeLabel} – ${flightData.passengerCount} Guest${flightData.passengerCount !== 1 ? 's' : ''}`;
+        const title = `${flightData.location} – ${flightTypeLabel} – x ${flightData.passengerCount}`;
 
         // Build description - Format: Total Passengers, Booking ID, Crew, Pilot
         let description = `Total Passengers: ${flightData.passengerCount}\n`;

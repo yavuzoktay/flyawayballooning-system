@@ -101,9 +101,9 @@ npm install googleapis
   - Shared flights: Event created when the first booking is made for a flight slot
 
 ### Event Title Format
-`[Location] – [Private/Shared] – [Guest Count]`
+`[Location] – [Private/Shared] – x [Count]`
 
-Example: `Bath – Shared – 4 Guests`
+Example: `Bath – Shared – x 4`
 
 ### Event Description
 - Total number of passengers
