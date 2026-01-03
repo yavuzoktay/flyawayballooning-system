@@ -105,11 +105,8 @@ const createCalendarEvent = async (flightData) => {
             : 'Shared';
         const title = `${flightData.location} – ${flightTypeLabel} – x ${flightData.passengerCount}`;
 
-        // Build description - Format: Total Passengers, Booking ID, Crew, Pilot
+        // Build description - Format: Total Passengers, Crew, Pilot
         let description = `Total Passengers: ${flightData.passengerCount}\n`;
-        if (flightData.bookingId) {
-            description += `Booking ID: ${flightData.bookingId}\n`;
-        }
         if (flightData.crewMember) {
             description += `Crew: ${flightData.crewMember}\n`;
         }
@@ -209,11 +206,8 @@ const updateCalendarEvent = async (eventId, flightData) => {
             : 'Shared';
         const title = `${flightData.location} – ${flightTypeLabel} – x ${flightData.passengerCount}`;
 
-        // Build description - Format: Total Passengers, Booking ID, Crew, Pilot
+        // Build description - Format: Total Passengers, Crew, Pilot
         let description = `Total Passengers: ${flightData.passengerCount}\n`;
-        if (flightData.bookingId) {
-            description += `Booking ID: ${flightData.bookingId}\n`;
-        }
         if (flightData.crewMember) {
             description += `Crew: ${flightData.crewMember}\n`;
         }
