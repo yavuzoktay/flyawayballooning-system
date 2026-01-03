@@ -6947,10 +6947,27 @@ const Settings = () => {
 
             {/* Create/Edit Additional Information Question Form Modal */}
             {(showAdditionalInfoForm || showEditAdditionalInfoForm) && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <div className="modal-header">
-                            <h3>{showEditAdditionalInfoForm ? 'Edit Question' : 'Create New Question'}</h3>
+                <div className="modal-overlay" style={isMobile ? {
+                    padding: '8px',
+                    alignItems: 'flex-start',
+                    overflowY: 'auto'
+                } : {}}>
+                    <div className="modal-content" style={isMobile ? {
+                        maxWidth: 'calc(100vw - 16px)',
+                        width: '100%',
+                        maxHeight: 'calc(100vh - 16px)',
+                        margin: '0',
+                        borderRadius: '8px'
+                    } : {}}>
+                        <div className="modal-header" style={isMobile ? {
+                            padding: '10px 12px',
+                            borderBottom: '1px solid #e5e7eb'
+                        } : {}}>
+                            <h3 style={isMobile ? {
+                                fontSize: '14px',
+                                fontWeight: 600,
+                                margin: 0
+                            } : {}}>{showEditAdditionalInfoForm ? 'Edit Question' : 'Create New Question'}</h3>
                             <button 
                                 className="close-btn"
                                 onClick={() => {
@@ -6958,30 +6975,69 @@ const Settings = () => {
                                     setShowEditAdditionalInfoForm(false);
                                     resetAdditionalInfoForm();
                                 }}
+                                style={isMobile ? {
+                                    fontSize: '18px',
+                                    width: '24px',
+                                    height: '24px'
+                                } : {}}
                             >
                                 ×
                             </button>
                         </div>
                         
-                        <form onSubmit={handleAdditionalInfoSubmit} className="additional-info-form">
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Question Text *</label>
+                        <form onSubmit={handleAdditionalInfoSubmit} className="additional-info-form" style={isMobile ? {
+                            padding: '12px'
+                        } : {}}>
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                marginBottom: '12px'
+                            } : {}}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Question Text *</label>
                                     <input
                                         type="text"
                                         value={additionalInfoFormData.question_text}
                                         onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, question_text: e.target.value})}
                                         placeholder="e.g., How did you hear about us?"
                                         required
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     />
                                 </div>
                                 
-                                <div className="form-group">
-                                    <label>Question Type *</label>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Question Type *</label>
                                     <select
                                         value={additionalInfoFormData.question_type}
                                         onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, question_type: e.target.value})}
                                         required
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            width: '100%',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     >
                                         <option value="dropdown">Dropdown</option>
                                         <option value="text">Text Input</option>
@@ -6991,12 +7047,31 @@ const Settings = () => {
                                 </div>
                             </div>
                             
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Category</label>
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                marginBottom: '12px'
+                            } : {}}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Category</label>
                                     <select
                                         value={additionalInfoFormData.category}
                                         onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, category: e.target.value})}
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            width: '100%',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     >
                                         <option value="General">General</option>
                                         <option value="Communication">Communication</option>
@@ -7006,34 +7081,80 @@ const Settings = () => {
                                     </select>
                                 </div>
                                 
-                                <div className="form-group">
-                                    <label>Sort Order</label>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Sort Order</label>
                                     <input
                                         type="number"
                                         value={additionalInfoFormData.sort_order}
                                         onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, sort_order: e.target.value})}
                                         placeholder="0"
                                         min="0"
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     />
                                 </div>
                             </div>
                             
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Required Field</label>
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                marginBottom: '12px'
+                            } : {}}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Required Field</label>
                                     <select
                                         value={additionalInfoFormData.is_required}
                                         onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, is_required: e.target.value === 'true'})}
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            width: '100%',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     >
                                         <option value={true}>Required</option>
                                     </select>
                                 </div>
                                 
-                                <div className="form-group">
-                                    <label>Status</label>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Status</label>
                                     <select
                                         value={additionalInfoFormData.is_active}
                                         onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, is_active: e.target.value === 'true'})}
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            width: '100%',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     >
                                         <option value={true}>Active</option>
                                         <option value={false}>Inactive</option>
@@ -7041,19 +7162,43 @@ const Settings = () => {
                                 </div>
                             </div>
                             
-                            <div className="form-group">
-                                <label>Journey Types *</label>
-                                <div style={{ 
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '12px'
+                            } : {}}>
+                                <label style={isMobile ? {
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
+                                    fontWeight: 600
+                                } : {}}>Journey Types *</label>
+                                <div style={isMobile ? {
+                                    border: '1px solid #d1d5db', 
+                                    borderRadius: '6px', 
+                                    padding: '10px',
+                                    background: '#f9fafb'
+                                } : {
                                     border: '1px solid #d1d5db', 
                                     borderRadius: '8px', 
                                     padding: '16px',
                                     background: '#f9fafb'
                                 }}>
-                                    <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
+                                    <div style={isMobile ? {
+                                        marginBottom: '8px',
+                                        fontSize: '11px',
+                                        color: '#374151'
+                                    } : {
+                                        marginBottom: '12px',
+                                        fontSize: '14px',
+                                        color: '#374151'
+                                    }}>
                                         Select which journey types this question applies to:
                                     </div>
                                     {journeyTypes.map((journeyType) => (
-                                        <label key={journeyType} style={{ 
+                                        <label key={journeyType} style={isMobile ? {
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            marginBottom: '6px',
+                                            cursor: 'pointer'
+                                        } : {
                                             display: 'flex', 
                                             alignItems: 'center', 
                                             marginBottom: '8px',
@@ -7075,32 +7220,76 @@ const Settings = () => {
                                                         });
                                                     }
                                                 }}
-                                                style={{ marginRight: '8px' }}
+                                                style={isMobile ? {
+                                                    marginRight: '6px',
+                                                    width: '14px',
+                                                    height: '14px'
+                                                } : {
+                                                    marginRight: '8px'
+                                                }}
                                             />
-                                            <span style={{ fontSize: '14px', color: '#374151' }}>{journeyType}</span>
+                                            <span style={isMobile ? {
+                                                fontSize: '11px',
+                                                color: '#374151'
+                                            } : {
+                                                fontSize: '14px',
+                                                color: '#374151'
+                                            }}>{journeyType}</span>
                                         </label>
                                     ))}
                                     {additionalInfoFormData.journey_types.length === 0 && (
-                                        <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '8px' }}>
+                                        <div style={isMobile ? {
+                                            fontSize: '10px',
+                                            color: '#ef4444',
+                                            marginTop: '6px'
+                                        } : {
+                                            fontSize: '12px',
+                                            color: '#ef4444',
+                                            marginTop: '8px'
+                                        }}>
                                             Please select at least one journey type.
                                         </div>
                                     )}
                                 </div>
                             </div>
                             
-                            <div className="form-group">
-                                <label>Locations *</label>
-                                <div style={{ 
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '12px'
+                            } : {}}>
+                                <label style={isMobile ? {
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
+                                    fontWeight: 600
+                                } : {}}>Locations *</label>
+                                <div style={isMobile ? {
+                                    border: '1px solid #d1d5db', 
+                                    borderRadius: '6px', 
+                                    padding: '10px',
+                                    background: '#f9fafb'
+                                } : {
                                     border: '1px solid #d1d5db', 
                                     borderRadius: '8px', 
                                     padding: '16px',
                                     background: '#f9fafb'
                                 }}>
-                                    <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
+                                    <div style={isMobile ? {
+                                        marginBottom: '8px',
+                                        fontSize: '11px',
+                                        color: '#374151'
+                                    } : {
+                                        marginBottom: '12px',
+                                        fontSize: '14px',
+                                        color: '#374151'
+                                    }}>
                                         Select which locations this question applies to:
                                     </div>
                                     {activityLocations.map((location) => (
-                                        <label key={location} style={{ 
+                                        <label key={location} style={isMobile ? {
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            marginBottom: '6px',
+                                            cursor: 'pointer'
+                                        } : {
                                             display: 'flex', 
                                             alignItems: 'center', 
                                             marginBottom: '8px',
@@ -7122,32 +7311,76 @@ const Settings = () => {
                                                         });
                                                     }
                                                 }}
-                                                style={{ marginRight: '8px' }}
+                                                style={isMobile ? {
+                                                    marginRight: '6px',
+                                                    width: '14px',
+                                                    height: '14px'
+                                                } : {
+                                                    marginRight: '8px'
+                                                }}
                                             />
-                                            <span style={{ fontSize: '14px', color: '#374151' }}>{location}</span>
+                                            <span style={isMobile ? {
+                                                fontSize: '11px',
+                                                color: '#374151'
+                                            } : {
+                                                fontSize: '14px',
+                                                color: '#374151'
+                                            }}>{location}</span>
                                         </label>
                                     ))}
                                     {additionalInfoFormData.locations.length === 0 && (
-                                        <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '8px' }}>
+                                        <div style={isMobile ? {
+                                            fontSize: '10px',
+                                            color: '#ef4444',
+                                            marginTop: '6px'
+                                        } : {
+                                            fontSize: '12px',
+                                            color: '#ef4444',
+                                            marginTop: '8px'
+                                        }}>
                                             Please select at least one location.
                                         </div>
                                             )}
                                 </div>
                             </div>
                             
-                            <div className="form-group">
-                                <label>Experience Types *</label>
-                                <div style={{ 
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '12px'
+                            } : {}}>
+                                <label style={isMobile ? {
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
+                                    fontWeight: 600
+                                } : {}}>Experience Types *</label>
+                                <div style={isMobile ? {
+                                    border: '1px solid #d1d5db', 
+                                    borderRadius: '6px', 
+                                    padding: '10px',
+                                    background: '#f9fafb'
+                                } : {
                                     border: '1px solid #d1d5db', 
                                     borderRadius: '8px', 
                                     padding: '16px',
                                     background: '#f9fafb'
                                 }}>
-                                    <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
+                                    <div style={isMobile ? {
+                                        marginBottom: '8px',
+                                        fontSize: '11px',
+                                        color: '#374151'
+                                    } : {
+                                        marginBottom: '12px',
+                                        fontSize: '14px',
+                                        color: '#374151'
+                                    }}>
                                         Select which experience types this question applies to:
                                     </div>
                                     {experienceTypes.map((experienceType) => (
-                                        <label key={experienceType} style={{ 
+                                        <label key={experienceType} style={isMobile ? {
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            marginBottom: '6px',
+                                            cursor: 'pointer'
+                                        } : {
                                             display: 'flex', 
                                             alignItems: 'center', 
                                             marginBottom: '8px',
@@ -7169,13 +7402,33 @@ const Settings = () => {
                                                         });
                                                     }
                                                 }}
-                                                style={{ marginRight: '8px' }}
+                                                style={isMobile ? {
+                                                    marginRight: '6px',
+                                                    width: '14px',
+                                                    height: '14px'
+                                                } : {
+                                                    marginRight: '8px'
+                                                }}
                                             />
-                                            <span style={{ fontSize: '14px', color: '#374151' }}>{experienceType}</span>
+                                            <span style={isMobile ? {
+                                                fontSize: '11px',
+                                                color: '#374151'
+                                            } : {
+                                                fontSize: '14px',
+                                                color: '#374151'
+                                            }}>{experienceType}</span>
                                         </label>
                                     ))}
                                     {additionalInfoFormData.experience_types.length === 0 && (
-                                        <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '8px' }}>
+                                        <div style={isMobile ? {
+                                            fontSize: '10px',
+                                            color: '#ef4444',
+                                            marginTop: '6px'
+                                        } : {
+                                            fontSize: '12px',
+                                            color: '#ef4444',
+                                            marginTop: '8px'
+                                        }}>
                                             Please select at least one experience type.
                                         </div>
                                     )}
@@ -7183,52 +7436,122 @@ const Settings = () => {
                             </div>
                             
                             {(additionalInfoFormData.question_type === 'dropdown' || additionalInfoFormData.question_type === 'radio' || additionalInfoFormData.question_type === 'checkbox') && (
-                                <div className="form-group">
-                                    <label>Options (JSON array)</label>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Options (JSON array)</label>
                                     <textarea
                                         value={additionalInfoFormData.options}
                                         onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, options: e.target.value})}
                                         placeholder='["Option 1", "Option 2", "Option 3"]'
-                                        rows="3"
-                                        style={{ fontFamily: 'monospace' }}
+                                        rows={isMobile ? 2 : 3}
+                                        style={isMobile ? {
+                                            fontFamily: 'monospace',
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            minHeight: '60px',
+                                            resize: 'vertical',
+                                            boxSizing: 'border-box'
+                                        } : {
+                                            fontFamily: 'monospace'
+                                        }}
                                     />
-                                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                                    <div style={isMobile ? {
+                                        fontSize: '10px',
+                                        color: '#6b7280',
+                                        marginTop: '4px'
+                                    } : {
+                                        fontSize: '12px',
+                                        color: '#6b7280',
+                                        marginTop: '4px'
+                                    }}>
                                         Enter options as a JSON array. Example: ["Yes", "No", "Maybe"]
                                     </div>
                                 </div>
                             )}
                             
                             {additionalInfoFormData.question_type === 'text' && (
-                                <div className="form-group">
-                                    <label>Placeholder Text</label>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Placeholder Text</label>
                                     <input
                                         type="text"
                                         value={additionalInfoFormData.placeholder_text}
                                         onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, placeholder_text: e.target.value})}
                                         placeholder="e.g., Please enter your special requirements..."
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     />
                                 </div>
                             )}
                             
-                            <div className="form-group">
-                                <label>Help Text</label>
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '12px'
+                            } : {}}>
+                                <label style={isMobile ? {
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
+                                    fontWeight: 600
+                                } : {}}>Help Text</label>
                                 <textarea
                                     value={additionalInfoFormData.help_text}
                                     onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, help_text: e.target.value})}
                                     placeholder="Additional help text to display below the question..."
-                                    rows="2"
+                                    rows={isMobile ? 2 : 2}
+                                    style={isMobile ? {
+                                        padding: '6px 8px',
+                                        fontSize: '13px',
+                                        borderRadius: '4px',
+                                        minHeight: '60px',
+                                        resize: 'vertical',
+                                        boxSizing: 'border-box'
+                                    } : {}}
                                 />
                             </div>
                             
-                            <div className="form-actions">
+                            <div className="form-actions" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                paddingTop: '12px',
+                                marginTop: '12px',
+                                borderTop: '1px solid #e5e7eb'
+                            } : {}}>
                                 <button type="button" className="btn btn-secondary" onClick={() => {
                                     setShowAdditionalInfoForm(false);
                                     setShowEditAdditionalInfoForm(false);
                                     resetAdditionalInfoForm();
-                                }}>
+                                }} style={isMobile ? {
+                                    padding: '8px 12px',
+                                    fontSize: '12px',
+                                    width: '100%',
+                                    borderRadius: '4px',
+                                    height: '36px'
+                                } : {}}>
                                     Cancel
                                 </button>
-                                <button type="submit" className="btn btn-primary">
+                                <button type="submit" className="btn btn-primary" style={isMobile ? {
+                                    padding: '8px 12px',
+                                    fontSize: '12px',
+                                    width: '100%',
+                                    borderRadius: '4px',
+                                    height: '36px'
+                                } : {}}>
                                     {showEditAdditionalInfoForm ? 'Update Question' : 'Create Question'}
                                 </button>
                             </div>
