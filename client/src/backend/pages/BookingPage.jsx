@@ -6819,14 +6819,31 @@ setBookingDetail(finalVoucherDetail);
                                                                                     </>
                                                                                 );
                                                                             })()}
-                                                                            <IconButton size="small" onClick={() => handleEditPassengerClick(p)}><EditIcon fontSize="small" /></IconButton>
+                                                                            <IconButton 
+                                                                                size="small" 
+                                                                                onClick={() => handleEditPassengerClick(p)}
+                                                                                sx={{ 
+                                                                                    padding: !isMobile ? '4px' : '8px',
+                                                                                    '& .MuiSvgIcon-root': {
+                                                                                        fontSize: !isMobile ? '14px' : 'small'
+                                                                                    }
+                                                                                }}
+                                                                            >
+                                                                                <EditIcon fontSize={!isMobile ? '14px' : 'small'} />
+                                                                            </IconButton>
                                                                             {i > 0 && ( // Only show delete button for additional passengers (not the first one)
                                                                                 <IconButton 
                                                                                     size="small" 
                                                                                     onClick={() => handleDeletePassenger(p.id)}
-                                                                                    sx={{ color: 'red' }}
+                                                                                    sx={{ 
+                                                                                        color: 'red',
+                                                                                        padding: !isMobile ? '4px' : '8px',
+                                                                                        '& .MuiSvgIcon-root': {
+                                                                                            fontSize: !isMobile ? '14px' : 'small'
+                                                                                        }
+                                                                                    }}
                                                                                 >
-                                                                                    <DeleteIcon fontSize="small" />
+                                                                                    <DeleteIcon fontSize={!isMobile ? '14px' : 'small'} />
                                                                                 </IconButton>
                                                                             )}
                                                                         </>
@@ -9008,23 +9025,23 @@ setBookingDetail(finalVoucherDetail);
                                 ) : (smsLogs && smsLogs.length > 0 ? (
                                     <TableContainer sx={{ maxHeight: isMobile ? '200px' : 'none', overflowX: 'auto' }}>
                                         <Table size={isMobile ? "small" : "small"}>
-                                            <TableHead>
-                                                <TableRow>
+                                        <TableHead>
+                                            <TableRow>
                                                     <TableCell sx={{ fontSize: isMobile ? 10 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>Date</TableCell>
                                                     <TableCell sx={{ fontSize: isMobile ? 10 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>To</TableCell>
                                                     <TableCell sx={{ fontSize: isMobile ? 10 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>Status</TableCell>
-                                                </TableRow>
-                                            </TableHead>
-                                            <TableBody>
-                                                {smsLogs.map((log) => (
-                                                    <TableRow key={log.id}>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {smsLogs.map((log) => (
+                                                <TableRow key={log.id}>
                                                         <TableCell sx={{ fontSize: isMobile ? 9 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>{(() => { try { return dayjs(log.sent_at).format('DD/MM/YYYY HH:mm'); } catch { return String(log.sent_at || ''); } })()}</TableCell>
                                                         <TableCell sx={{ fontSize: isMobile ? 9 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit', wordBreak: 'break-word' }}>{log.to_number}</TableCell>
                                                         <TableCell sx={{ fontSize: isMobile ? 9 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>{log.status}</TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
                                     </TableContainer>
                                 ) : (<Typography variant="body2" sx={{ fontSize: isMobile ? 12 : 'inherit' }}>No SMS sent yet.</Typography>))}
                             </Grid>
