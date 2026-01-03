@@ -5769,11 +5769,11 @@ const Settings = () => {
                         borderRadius: '8px'
                     } : {}}>
                         <div className="modal-header" style={isMobile ? {
-                            padding: '12px 16px',
+                            padding: '10px 12px',
                             borderBottom: '1px solid #e5e7eb'
                         } : {}}>
                             <h3 style={isMobile ? {
-                                fontSize: '16px',
+                                fontSize: '14px',
                                 fontWeight: 600,
                                 margin: 0
                             } : {}}>{showEditExperienceForm ? 'Edit Experience' : 'Create New Experience'}</h3>
@@ -5785,9 +5785,9 @@ const Settings = () => {
                                     resetExperienceForm();
                                 }}
                                 style={isMobile ? {
-                                    fontSize: '20px',
-                                    width: '28px',
-                                    height: '28px'
+                                    fontSize: '18px',
+                                    width: '24px',
+                                    height: '24px'
                                 } : {}}
                             >
                                 ×
@@ -5795,20 +5795,20 @@ const Settings = () => {
                         </div>
                         
                         <form onSubmit={handleExperienceSubmit} className="experience-form" style={isMobile ? {
-                            padding: '16px'
+                            padding: '12px'
                         } : {}}>
                             <div className="form-row" style={isMobile ? {
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '12px',
-                                marginBottom: '16px'
+                                gap: '8px',
+                                marginBottom: '12px'
                             } : {}}>
                                 <div className="form-group" style={isMobile ? {
-                                    marginBottom: '16px'
+                                    marginBottom: '12px'
                                 } : {}}>
                                     <label style={isMobile ? {
-                                        fontSize: '12px',
-                                        marginBottom: '6px',
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
                                         fontWeight: 600
                                     } : {}}>Title *</label>
                                     <input
@@ -5818,19 +5818,21 @@ const Settings = () => {
                                         placeholder="e.g., Shared Flight"
                                         required
                                         style={isMobile ? {
-                                            padding: '10px 12px',
-                                            fontSize: '14px',
-                                            borderRadius: '6px'
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
                                         } : {}}
                                     />
                                 </div>
                                 
                                 <div className="form-group" style={isMobile ? {
-                                    marginBottom: '16px'
+                                    marginBottom: '12px'
                                 } : {}}>
                                     <label style={isMobile ? {
-                                        fontSize: '12px',
-                                        marginBottom: '6px',
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
                                         fontWeight: 600
                                     } : {}}>Max Passengers</label>
                                     <input
@@ -5840,20 +5842,22 @@ const Settings = () => {
                                         placeholder="8"
                                         min="1"
                                         style={isMobile ? {
-                                            padding: '10px 12px',
-                                            fontSize: '14px',
-                                            borderRadius: '6px'
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
                                         } : {}}
                                     />
                                 </div>
                             </div>
                             
                             <div className="form-group" style={isMobile ? {
-                                marginBottom: '16px'
+                                marginBottom: '12px'
                             } : {}}>
                                 <label style={isMobile ? {
-                                    fontSize: '12px',
-                                    marginBottom: '6px',
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
                                     fontWeight: 600
                                 } : {}}>Description *</label>
                                 <textarea
@@ -5863,27 +5867,28 @@ const Settings = () => {
                                     rows={isMobile ? 3 : 4}
                                     required
                                     style={isMobile ? {
-                                        padding: '10px 12px',
-                                        fontSize: '14px',
-                                        borderRadius: '6px',
-                                        minHeight: '80px',
-                                        resize: 'vertical'
+                                        padding: '6px 8px',
+                                        fontSize: '13px',
+                                        borderRadius: '4px',
+                                        minHeight: '70px',
+                                        resize: 'vertical',
+                                        boxSizing: 'border-box'
                                     } : {}}
                                 />
                             </div>
                             
                             <div className="form-group" style={isMobile ? {
-                                marginBottom: '16px'
+                                marginBottom: '12px'
                             } : {}}>
                                 <label style={isMobile ? {
-                                    fontSize: '12px',
-                                    marginBottom: '6px',
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
                                     fontWeight: 600
                                 } : {}}>Experience Image</label>
                                 <div style={isMobile ? {
                                     display: 'flex',
                                     flexDirection: 'column',
-                                    gap: '8px',
+                                    gap: '6px',
                                     alignItems: 'stretch'
                                 } : {
                                     display: 'flex',
@@ -5903,8 +5908,10 @@ const Settings = () => {
                                         style={isMobile ? {
                                             flex: 1,
                                             minWidth: '0',
-                                            padding: '8px 10px',
-                                            fontSize: '12px'
+                                            padding: '6px 8px',
+                                            fontSize: '11px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
                                         } : {
                                             flex: 1,
                                             minWidth: '200px'
@@ -5913,10 +5920,10 @@ const Settings = () => {
                                     {experienceFormData.image_url && (
                                         <>
                                             <div style={isMobile ? {
-                                                fontSize: '11px',
+                                                fontSize: '10px',
                                                 color: '#6b7280',
                                                 wordBreak: 'break-word',
-                                                padding: '8px',
+                                                padding: '6px',
                                                 background: '#f9fafb',
                                                 borderRadius: '4px'
                                             } : {
@@ -5943,15 +5950,17 @@ const Settings = () => {
                                                     }
                                                 }}
                                                 style={isMobile ? {
-                                                    padding: '8px 12px',
+                                                    padding: '6px 10px',
                                                     backgroundColor: '#dc2626',
                                                     color: 'white',
                                                     border: 'none',
-                                                    borderRadius: '6px',
+                                                    borderRadius: '4px',
                                                     cursor: 'pointer',
-                                                    fontSize: '12px',
+                                                    fontSize: '11px',
                                                     fontWeight: '500',
-                                                    width: '100%'
+                                                    width: '100%',
+                                                    height: '32px',
+                                                    boxSizing: 'border-box'
                                                 } : {
                                                     padding: '8px 16px',
                                                     backgroundColor: '#dc2626',
@@ -5976,15 +5985,15 @@ const Settings = () => {
                             <div className="form-row" style={isMobile ? {
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '12px',
-                                marginBottom: '16px'
+                                gap: '8px',
+                                marginBottom: '12px'
                             } : {}}>
                                 <div className="form-group" style={isMobile ? {
-                                    marginBottom: '16px'
+                                    marginBottom: '12px'
                                 } : {}}>
                                     <label style={isMobile ? {
-                                        fontSize: '12px',
-                                        marginBottom: '6px',
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
                                         fontWeight: 600
                                     } : {}}>Sort Order</label>
                                     <input
@@ -5994,29 +6003,33 @@ const Settings = () => {
                                         placeholder="0"
                                         min="0"
                                         style={isMobile ? {
-                                            padding: '10px 12px',
-                                            fontSize: '14px',
-                                            borderRadius: '6px'
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
                                         } : {}}
                                     />
                                 </div>
                                 
                                 <div className="form-group" style={isMobile ? {
-                                    marginBottom: '16px'
+                                    marginBottom: '12px'
                                 } : {}}>
                                     <label style={isMobile ? {
-                                        fontSize: '12px',
-                                        marginBottom: '6px',
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
                                         fontWeight: 600
                                     } : {}}>Status</label>
                                     <select
                                         value={experienceFormData.is_active}
                                         onChange={(e) => setExperienceFormData({...experienceFormData, is_active: e.target.value === 'true'})}
                                         style={isMobile ? {
-                                            padding: '10px 12px',
-                                            fontSize: '14px',
-                                            borderRadius: '6px',
-                                            width: '100%'
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            width: '100%',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
                                         } : {}}
                                     >
                                         <option value={true}>Active</option>
@@ -6028,9 +6041,9 @@ const Settings = () => {
                             <div className="form-actions" style={isMobile ? {
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '10px',
-                                paddingTop: '16px',
-                                marginTop: '16px',
+                                gap: '8px',
+                                paddingTop: '12px',
+                                marginTop: '12px',
                                 borderTop: '1px solid #e5e7eb'
                             } : {}}>
                                 <button type="button" className="btn btn-secondary" onClick={() => {
@@ -6038,18 +6051,20 @@ const Settings = () => {
                                     setShowEditExperienceForm(false);
                                     resetExperienceForm();
                                 }} style={isMobile ? {
-                                    padding: '10px 16px',
-                                    fontSize: '13px',
+                                    padding: '8px 12px',
+                                    fontSize: '12px',
                                     width: '100%',
-                                    borderRadius: '6px'
+                                    borderRadius: '4px',
+                                    height: '36px'
                                 } : {}}>
                                     Cancel
                                 </button>
                                 <button type="submit" className="btn btn-primary" style={isMobile ? {
-                                    padding: '10px 16px',
-                                    fontSize: '13px',
+                                    padding: '8px 12px',
+                                    fontSize: '12px',
                                     width: '100%',
-                                    borderRadius: '6px'
+                                    borderRadius: '4px',
+                                    height: '36px'
                                 } : {}}>
                                     {showEditExperienceForm ? 'Update Experience' : 'Create Experience'}
                                 </button>
