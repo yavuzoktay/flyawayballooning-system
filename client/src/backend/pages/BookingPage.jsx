@@ -8212,61 +8212,88 @@ setBookingDetail(finalVoucherDetail);
                         setPaymentHistoryModalOpen(false);
                         setExpandedPaymentIds({});
                     }}
-                    maxWidth="lg"
+                    maxWidth={isMobile ? "lg" : "xl"}
                     fullWidth
+                    PaperProps={{
+                        sx: !isMobile ? {
+                            maxWidth: '1200px',
+                            width: '95%',
+                            maxHeight: '90vh',
+                            overflow: 'auto'
+                        } : {}
+                    }}
                 >
                     <DialogTitle sx={{ 
                         fontWeight: 700, 
-                        fontSize: isMobile ? 18 : 24,
+                        fontSize: isMobile ? 18 : '20px',
                         display: 'flex',
                         flexDirection: isMobile ? 'column' : 'row',
                         justifyContent: 'space-between',
                         alignItems: isMobile ? 'flex-start' : 'center',
                         pb: isMobile ? 1 : 2,
-                        padding: isMobile ? '12px 16px' : 'inherit',
-                        gap: isMobile ? 1 : 0
+                        padding: isMobile ? '12px 16px' : '20px 24px',
+                        gap: isMobile ? 1 : 0,
+                        color: isMobile ? 'inherit' : '#1f2937',
+                        borderBottom: isMobile ? 'none' : '1px solid #e5e7eb',
+                        margin: isMobile ? 'inherit' : 0
                     }}>
-                        <Box component="span" sx={{ fontWeight: 700, fontSize: isMobile ? '1.125rem' : '1.5rem' }}>
+                        <Box component="span" sx={{ 
+                            fontWeight: 700, 
+                            fontSize: isMobile ? '1.125rem' : '20px',
+                            color: isMobile ? 'inherit' : '#1f2937'
+                        }}>
                             Payments / Promos
                         </Box>
                         <Box sx={{ display: 'flex', gap: isMobile ? 0.5 : 1, flexWrap: isMobile ? 'wrap' : 'nowrap', width: isMobile ? '100%' : 'auto' }}>
                             <Button 
                                 variant="outlined" 
-                                size={isMobile ? "small" : "small"}
+                                size={isMobile ? "small" : "medium"}
                                 sx={{ 
                                     textTransform: 'none', 
-                                    borderRadius: 1,
-                                    fontSize: isMobile ? 12 : 'inherit',
-                                    padding: isMobile ? '4px 8px' : 'inherit',
-                                    minWidth: isMobile ? 'auto' : 'inherit'
+                                    borderRadius: isMobile ? 1 : '6px',
+                                    fontSize: isMobile ? 12 : '14px',
+                                    padding: isMobile ? '4px 8px' : '8px 16px',
+                                    minWidth: isMobile ? 'auto' : 'inherit',
+                                    borderColor: isMobile ? 'inherit' : '#d1d5db',
+                                    '&:hover': {
+                                        borderColor: isMobile ? 'inherit' : '#9ca3af'
+                                    }
                                 }}
                             >
                                 + Payment
                             </Button>
                             <Button 
                                 variant="outlined" 
-                                size={isMobile ? "small" : "small"}
+                                size={isMobile ? "small" : "medium"}
                                 sx={{ 
                                     textTransform: 'none', 
-                                    borderRadius: 1,
-                                    fontSize: isMobile ? 12 : 'inherit',
-                                    padding: isMobile ? '4px 8px' : 'inherit',
-                                    minWidth: isMobile ? 'auto' : 'inherit'
+                                    borderRadius: isMobile ? 1 : '6px',
+                                    fontSize: isMobile ? 12 : '14px',
+                                    padding: isMobile ? '4px 8px' : '8px 16px',
+                                    minWidth: isMobile ? 'auto' : 'inherit',
+                                    borderColor: isMobile ? 'inherit' : '#d1d5db',
+                                    '&:hover': {
+                                        borderColor: isMobile ? 'inherit' : '#9ca3af'
+                                    }
                                 }}
                             >
                                 + Promo
                             </Button>
                             <Button 
                                 variant="outlined" 
-                                size={isMobile ? "small" : "small"}
+                                size={isMobile ? "small" : "medium"}
                                 startIcon={<span style={{ fontSize: isMobile ? 14 : 'inherit' }}>🕐</span>}
                                 sx={{ 
                                     textTransform: 'none', 
-                                    borderRadius: 1,
-                                    fontSize: isMobile ? 11 : 'inherit',
-                                    padding: isMobile ? '4px 6px' : 'inherit',
+                                    borderRadius: isMobile ? 1 : '6px',
+                                    fontSize: isMobile ? 11 : '14px',
+                                    padding: isMobile ? '4px 6px' : '8px 16px',
                                     minWidth: isMobile ? 'auto' : 'inherit',
-                                    whiteSpace: isMobile ? 'normal' : 'nowrap'
+                                    whiteSpace: isMobile ? 'normal' : 'nowrap',
+                                    borderColor: isMobile ? 'inherit' : '#d1d5db',
+                                    '&:hover': {
+                                        borderColor: isMobile ? 'inherit' : '#9ca3af'
+                                    }
                                 }}
                             >
                                 Save Card & Charge Later
@@ -8276,11 +8303,11 @@ setBookingDetail(finalVoucherDetail);
                     <DialogContent dividers sx={{ background: '#ffffff', p: 0, padding: isMobile ? '0' : '0' }}>
                         {paymentHistoryLoading ? (
                             <Box sx={{ p: isMobile ? 2 : 3, textAlign: 'center' }}>
-                                <Typography variant="body2" sx={{ fontSize: isMobile ? 14 : 'inherit' }}>Loading payment history...</Typography>
+                                <Typography variant="body2" sx={{ fontSize: isMobile ? 14 : '14px' }}>Loading payment history...</Typography>
                             </Box>
                         ) : paymentHistory.length === 0 ? (
                             <Box sx={{ p: isMobile ? 2 : 3, textAlign: 'center' }}>
-                                <Typography variant="body2" color="text.secondary" sx={{ fontSize: isMobile ? 14 : 'inherit' }}>
+                                <Typography variant="body2" color="text.secondary" sx={{ fontSize: isMobile ? 14 : '14px' }}>
                                     No payment history available for this booking.
                                 </Typography>
                             </Box>
@@ -8291,16 +8318,33 @@ setBookingDetail(finalVoucherDetail);
                                     display: isMobile ? 'none' : 'flex', 
                                     px: isMobile ? 1.5 : 3, 
                                     py: isMobile ? 1 : 1.5, 
-                                    borderBottom: '1px solid #e2e8f0',
+                                    borderBottom: isMobile ? '1px solid #e2e8f0' : '1px solid #e5e7eb',
                                     background: '#f8f9fa'
                                 }}>
-                                    <Box sx={{ flex: '0 0 200px', color: '#6c757d', fontSize: isMobile ? '0.7rem' : '0.875rem', fontWeight: 500 }}>
+                                    <Box sx={{ 
+                                        flex: '0 0 200px', 
+                                        color: '#6c757d', 
+                                        fontSize: isMobile ? '0.7rem' : '14px', 
+                                        fontWeight: 500 
+                                    }}>
                                         DATE
                                     </Box>
-                                    <Box sx={{ flex: 1, textAlign: 'center', color: '#6c757d', fontSize: isMobile ? '0.7rem' : '0.875rem', fontWeight: 500 }}>
+                                    <Box sx={{ 
+                                        flex: 1, 
+                                        textAlign: 'center', 
+                                        color: '#6c757d', 
+                                        fontSize: isMobile ? '0.7rem' : '14px', 
+                                        fontWeight: 500 
+                                    }}>
                                         DETAILS
                                     </Box>
-                                    <Box sx={{ flex: '0 0 150px', textAlign: 'right', color: '#6c757d', fontSize: isMobile ? '0.7rem' : '0.875rem', fontWeight: 500 }}>
+                                    <Box sx={{ 
+                                        flex: '0 0 150px', 
+                                        textAlign: 'right', 
+                                        color: '#6c757d', 
+                                        fontSize: isMobile ? '0.7rem' : '14px', 
+                                        fontWeight: 500 
+                                    }}>
                                         AMOUNT
                                     </Box>
                                     <Box sx={{ flex: '0 0 100px' }}></Box>
@@ -8350,14 +8394,25 @@ setBookingDetail(finalVoucherDetail);
                                                 }}>
                                                     {paymentDate && (
                                                         <>
-                                                            <Typography variant="body2" sx={{ fontWeight: 500, fontSize: isMobile ? 13 : 'inherit' }}>
+                                                            <Typography variant="body2" sx={{ 
+                                                                fontWeight: 500, 
+                                                                fontSize: isMobile ? 13 : '14px',
+                                                                color: isMobile ? 'inherit' : '#374151'
+                                                            }}>
                                                                 {paymentDate.format('MMM D, YYYY')}
                                                             </Typography>
-                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 11 : 'inherit', display: 'block' }}>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ 
+                                                                fontSize: isMobile ? 11 : '12px', 
+                                                                display: 'block',
+                                                                lineHeight: isMobile ? 'inherit' : '1.4'
+                                                            }}>
                                                                 {paymentDate.format('h:mm A')}
                                                             </Typography>
                                                             {daysAgo !== null && (
-                                                                <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
+                                                                <Typography variant="caption" color="text.secondary" display="block" sx={{ 
+                                                                    fontSize: isMobile ? 10 : '12px',
+                                                                    lineHeight: isMobile ? 'inherit' : '1.4'
+                                                                }}>
                                                                     {daysAgo} {daysAgo === 1 ? 'day' : 'days'} ago
                                                                 </Typography>
                                                             )}
@@ -8377,10 +8432,10 @@ setBookingDetail(finalVoucherDetail);
                                                         <Typography variant="body2" sx={{ 
                                                             fontWeight: 600,
                                                             textTransform: 'uppercase',
-                                                            fontSize: isMobile ? '0.65rem' : '0.75rem',
+                                                            fontSize: isMobile ? '0.65rem' : '12px',
                                                             px: isMobile ? 0.5 : 1,
                                                             py: isMobile ? 0.25 : 0.5,
-                                                            borderRadius: 1,
+                                                            borderRadius: isMobile ? 1 : '6px',
                                                             background: '#fee',
                                                             color: '#c33'
                                                         }}>
@@ -8391,15 +8446,18 @@ setBookingDetail(finalVoucherDetail);
                                                     <Typography variant="body2" sx={{ 
                                                         fontWeight: 600,
                                                         textTransform: 'uppercase',
-                                                        fontSize: isMobile ? '0.65rem' : '0.75rem',
+                                                        fontSize: isMobile ? '0.65rem' : '12px',
                                                         px: isMobile ? 0.5 : 1,
                                                         py: isMobile ? 0.25 : 0.5,
-                                                        borderRadius: 1,
+                                                        borderRadius: isMobile ? 1 : '6px',
                                                         background: '#f0f0f0'
                                                     }}>
                                                         {getCardBrandLogo(payment.card_brand)}
                                                     </Typography>
-                                                    <Typography variant="body2" sx={{ fontSize: isMobile ? 13 : 'inherit' }}>
+                                                    <Typography variant="body2" sx={{ 
+                                                        fontSize: isMobile ? 13 : '14px',
+                                                        color: isMobile ? 'inherit' : '#374151'
+                                                    }}>
                                                         **** {payment.card_last4 || 'N/A'}
                                                     </Typography>
                                                         </>
@@ -8417,7 +8475,7 @@ setBookingDetail(finalVoucherDetail);
                                                     <Typography variant="body1" sx={{ 
                                                         fontWeight: 600,
                                                         color: (payment.payment_status === 'refunded' || payment.origin === 'refund') ? '#c33' : 'inherit',
-                                                        fontSize: isMobile ? 15 : 'inherit'
+                                                        fontSize: isMobile ? 15 : '16px'
                                                     }}>
                                                         £{Math.abs(parseFloat(payment.amount || 0)).toFixed(2)}
                                                     </Typography>
@@ -8446,9 +8504,14 @@ setBookingDetail(finalVoucherDetail);
                                                                 sx={{ 
                                                                     ml: isMobile ? 0 : 1, 
                                                                     textTransform: 'none',
-                                                                    fontSize: isMobile ? 11 : 'inherit',
-                                                                    padding: isMobile ? '4px 8px' : 'inherit',
-                                                                    minWidth: isMobile ? 'auto' : 'inherit'
+                                                                    fontSize: isMobile ? 11 : '14px',
+                                                                    padding: isMobile ? '4px 8px' : '8px 16px',
+                                                                    minWidth: isMobile ? 'auto' : 'inherit',
+                                                                    borderRadius: isMobile ? 'inherit' : '6px',
+                                                                    borderColor: isMobile ? 'inherit' : '#d1d5db',
+                                                                    '&:hover': {
+                                                                        borderColor: isMobile ? 'inherit' : '#9ca3af'
+                                                                    }
                                                                 }}
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
@@ -8468,100 +8531,190 @@ setBookingDetail(finalVoucherDetail);
                                                     px: isMobile ? 1.5 : 3, 
                                                     py: isMobile ? 1.5 : 2, 
                                                     background: '#ffffff',
-                                                    borderTop: '1px solid #e2e8f0'
+                                                    borderTop: isMobile ? '1px solid #e2e8f0' : '1px solid #e5e7eb'
                                                 }}>
                                                     <Grid container spacing={isMobile ? 1.5 : 2}>
                                                         <Grid item xs={isMobile ? 12 : 6}>
-                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ 
+                                                                fontSize: isMobile ? 10 : '12px',
+                                                                fontWeight: isMobile ? 'inherit' : 500,
+                                                                color: isMobile ? 'inherit' : '#6b7280',
+                                                                display: 'block',
+                                                                marginBottom: isMobile ? 'inherit' : '4px'
+                                                            }}>
                                                                 Created
                                                             </Typography>
-                                                            <Typography variant="body2" sx={{ fontSize: isMobile ? 12 : 'inherit', wordBreak: 'break-word' }}>
+                                                            <Typography variant="body2" sx={{ 
+                                                                fontSize: isMobile ? 12 : '14px', 
+                                                                wordBreak: 'break-word',
+                                                                color: isMobile ? 'inherit' : '#374151'
+                                                            }}>
                                                                 {paymentDate ? `${paymentDate.format('MMM D, YYYY h:mm A')} (${daysAgo} ${daysAgo === 1 ? 'day' : 'days'} ago)` : 'N/A'}
                                                             </Typography>
                                                         </Grid>
                                                         <Grid item xs={isMobile ? 12 : 6}>
-                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ 
+                                                                fontSize: isMobile ? 10 : '12px',
+                                                                fontWeight: isMobile ? 'inherit' : 500,
+                                                                color: isMobile ? 'inherit' : '#6b7280',
+                                                                display: 'block',
+                                                                marginBottom: isMobile ? 'inherit' : '4px'
+                                                            }}>
                                                                 {payment.payment_status === 'refunded' || payment.origin === 'refund' ? 'Refund Amount' : 'Guest Charge'}
                                                             </Typography>
                                                             <Typography variant="body2" sx={{ 
                                                                 fontWeight: 600,
                                                                 color: (payment.payment_status === 'refunded' || payment.origin === 'refund') ? '#c33' : 'inherit',
-                                                                fontSize: isMobile ? 12 : 'inherit'
+                                                                fontSize: isMobile ? 12 : '14px'
                                                             }}>
                                                                 £{Math.abs(parseFloat(payment.amount || 0)).toFixed(2)}
                                                             </Typography>
                                                         </Grid>
                                                         <Grid item xs={isMobile ? 12 : 6}>
-                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ 
+                                                                fontSize: isMobile ? 10 : '12px',
+                                                                fontWeight: isMobile ? 'inherit' : 500,
+                                                                color: isMobile ? 'inherit' : '#6b7280',
+                                                                display: 'block',
+                                                                marginBottom: isMobile ? 'inherit' : '4px'
+                                                            }}>
                                                                 Card Type
                                                             </Typography>
-                                                            <Typography variant="body2" sx={{ fontSize: isMobile ? 12 : 'inherit' }}>
+                                                            <Typography variant="body2" sx={{ 
+                                                                fontSize: isMobile ? 12 : '14px',
+                                                                color: isMobile ? 'inherit' : '#374151'
+                                                            }}>
                                                                 Credit Card **** {payment.card_last4 || 'N/A'}
                                                             </Typography>
                                                         </Grid>
                                                         <Grid item xs={isMobile ? 12 : 6}>
-                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ 
+                                                                fontSize: isMobile ? 10 : '12px',
+                                                                fontWeight: isMobile ? 'inherit' : 500,
+                                                                color: isMobile ? 'inherit' : '#6b7280',
+                                                                display: 'block',
+                                                                marginBottom: isMobile ? 'inherit' : '4px'
+                                                            }}>
                                                                 Wallet Type
                                                             </Typography>
-                                                            <Typography variant="body2" sx={{ fontSize: isMobile ? 12 : 'inherit' }}>
+                                                            <Typography variant="body2" sx={{ 
+                                                                fontSize: isMobile ? 12 : '14px',
+                                                                color: isMobile ? 'inherit' : '#374151'
+                                                            }}>
                                                                 {payment.wallet_type || 'N/A'}
                                                                 {payment.wallet_type === 'apple_pay' && ' 🍎'}
                                                             </Typography>
                                                         </Grid>
                                                         <Grid item xs={isMobile ? 12 : 6}>
-                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ 
+                                                                fontSize: isMobile ? 10 : '12px',
+                                                                fontWeight: isMobile ? 'inherit' : 500,
+                                                                color: isMobile ? 'inherit' : '#6b7280',
+                                                                display: 'block',
+                                                                marginBottom: isMobile ? 'inherit' : '4px'
+                                                            }}>
                                                                 Fingerprint
                                                             </Typography>
-                                                            <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: isMobile ? '0.65rem' : '0.75rem', wordBreak: 'break-word' }}>
+                                                            <Typography variant="body2" sx={{ 
+                                                                fontFamily: 'monospace', 
+                                                                fontSize: isMobile ? '0.65rem' : '12px', 
+                                                                wordBreak: 'break-word',
+                                                                color: isMobile ? 'inherit' : '#374151'
+                                                            }}>
                                                                 {payment.fingerprint || 'N/A'}
                                                             </Typography>
                                                         </Grid>
                                                         <Grid item xs={isMobile ? 12 : 6}>
-                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ 
+                                                                fontSize: isMobile ? 10 : '12px',
+                                                                fontWeight: isMobile ? 'inherit' : 500,
+                                                                color: isMobile ? 'inherit' : '#6b7280',
+                                                                display: 'block',
+                                                                marginBottom: isMobile ? 'inherit' : '4px'
+                                                            }}>
                                                                 Origin
                                                             </Typography>
-                                                            <Typography variant="body2" sx={{ fontSize: isMobile ? 12 : 'inherit' }}>
+                                                            <Typography variant="body2" sx={{ 
+                                                                fontSize: isMobile ? 12 : '14px',
+                                                                color: isMobile ? 'inherit' : '#374151'
+                                                            }}>
                                                                 {payment.origin || 'N/A'}
                                                             </Typography>
                                                         </Grid>
                                                         <Grid item xs={isMobile ? 12 : 6}>
-                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ 
+                                                                fontSize: isMobile ? 10 : '12px',
+                                                                fontWeight: isMobile ? 'inherit' : 500,
+                                                                color: isMobile ? 'inherit' : '#6b7280',
+                                                                display: 'block',
+                                                                marginBottom: isMobile ? 'inherit' : '4px'
+                                                            }}>
                                                                 Transaction ID
                                                             </Typography>
-                                                            <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: isMobile ? '0.65rem' : '0.75rem', wordBreak: 'break-word' }}>
+                                                            <Typography variant="body2" sx={{ 
+                                                                fontFamily: 'monospace', 
+                                                                fontSize: isMobile ? '0.65rem' : '12px', 
+                                                                wordBreak: 'break-word',
+                                                                color: isMobile ? 'inherit' : '#374151'
+                                                            }}>
                                                                 {payment.transaction_id || payment.stripe_charge_id || 'N/A'}
                                                             </Typography>
                                                         </Grid>
                                                         <Grid item xs={isMobile ? 12 : 6}>
-                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ 
+                                                                fontSize: isMobile ? 10 : '12px',
+                                                                fontWeight: isMobile ? 'inherit' : 500,
+                                                                color: isMobile ? 'inherit' : '#6b7280',
+                                                                display: 'block',
+                                                                marginBottom: isMobile ? 'inherit' : '4px'
+                                                            }}>
                                                                 Card Present
                                                             </Typography>
-                                                            <Typography variant="body2" sx={{ fontSize: isMobile ? 12 : 'inherit' }}>
+                                                            <Typography variant="body2" sx={{ 
+                                                                fontSize: isMobile ? 12 : '14px',
+                                                                color: isMobile ? 'inherit' : '#374151'
+                                                            }}>
                                                                 {payment.card_present ? 'Yes' : 'No'}
                                                             </Typography>
                                                         </Grid>
                                                         {(payment.payment_status === 'refunded' || payment.origin === 'refund') && payment.refund_comment && (
                                                             <Grid item xs={12}>
-                                                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
+                                                                <Typography variant="caption" color="text.secondary" sx={{ 
+                                                                    fontSize: isMobile ? 10 : '12px',
+                                                                    fontWeight: isMobile ? 'inherit' : 500,
+                                                                    color: isMobile ? 'inherit' : '#6b7280',
+                                                                    display: 'block',
+                                                                    marginBottom: isMobile ? 'inherit' : '4px'
+                                                                }}>
                                                                     Refund Comment
                                                                 </Typography>
-                                                                <Typography variant="body2" sx={{ fontSize: isMobile ? 12 : 'inherit', wordBreak: 'break-word' }}>
+                                                                <Typography variant="body2" sx={{ 
+                                                                    fontSize: isMobile ? 12 : '14px', 
+                                                                    wordBreak: 'break-word',
+                                                                    color: isMobile ? 'inherit' : '#374151'
+                                                                }}>
                                                                     {payment.refund_comment}
                                                                 </Typography>
                                                             </Grid>
                                                         )}
                                                         <Grid item xs={isMobile ? 12 : 6}>
-                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ 
+                                                                fontSize: isMobile ? 10 : '12px',
+                                                                fontWeight: isMobile ? 'inherit' : 500,
+                                                                color: isMobile ? 'inherit' : '#6b7280',
+                                                                display: 'block',
+                                                                marginBottom: isMobile ? 'inherit' : '4px'
+                                                            }}>
                                                                 Status
                                                             </Typography>
                                                             <Box sx={{ 
                                                                 display: 'inline-block',
                                                                 px: isMobile ? 0.75 : 1,
                                                                 py: isMobile ? 0.25 : 0.5,
-                                                                borderRadius: 1,
+                                                                borderRadius: isMobile ? 1 : '6px',
                                                                 background: payment.payment_status === 'succeeded' ? '#28a745' : '#6c757d',
                                                                 color: '#fff',
-                                                                fontSize: isMobile ? '0.65rem' : '0.75rem',
+                                                                fontSize: isMobile ? '0.65rem' : '12px',
                                                                 fontWeight: 600
                                                             }}>
                                                                 {payment.payment_status === 'succeeded' ? 'Successful' : payment.payment_status || 'Pending'}
@@ -8569,20 +8722,40 @@ setBookingDetail(finalVoucherDetail);
                                                         </Grid>
                                                         {payment.payout_id && (
                                                             <Grid item xs={isMobile ? 12 : 6}>
-                                                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
+                                                                <Typography variant="caption" color="text.secondary" sx={{ 
+                                                                    fontSize: isMobile ? 10 : '12px',
+                                                                    fontWeight: isMobile ? 'inherit' : 500,
+                                                                    color: isMobile ? 'inherit' : '#6b7280',
+                                                                    display: 'block',
+                                                                    marginBottom: isMobile ? 'inherit' : '4px'
+                                                                }}>
                                                                     Payout
                                                                 </Typography>
-                                                                <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: isMobile ? '0.65rem' : '0.75rem', wordBreak: 'break-word' }}>
+                                                                <Typography variant="body2" sx={{ 
+                                                                    fontFamily: 'monospace', 
+                                                                    fontSize: isMobile ? '0.65rem' : '12px', 
+                                                                    wordBreak: 'break-word',
+                                                                    color: isMobile ? 'inherit' : '#374151'
+                                                                }}>
                                                                     {payment.payout_id}
                                                                 </Typography>
                                                             </Grid>
                                                         )}
                                                         {payment.arriving_on && (
                                                             <Grid item xs={isMobile ? 12 : 6}>
-                                                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
+                                                                <Typography variant="caption" color="text.secondary" sx={{ 
+                                                                    fontSize: isMobile ? 10 : '12px',
+                                                                    fontWeight: isMobile ? 'inherit' : 500,
+                                                                    color: isMobile ? 'inherit' : '#6b7280',
+                                                                    display: 'block',
+                                                                    marginBottom: isMobile ? 'inherit' : '4px'
+                                                                }}>
                                                                     Arriving on
                                                                 </Typography>
-                                                                <Typography variant="body2" sx={{ fontSize: isMobile ? 12 : 'inherit' }}>
+                                                                <Typography variant="body2" sx={{ 
+                                                                    fontSize: isMobile ? 12 : '14px',
+                                                                    color: isMobile ? 'inherit' : '#374151'
+                                                                }}>
                                                                     {dayjs(payment.arriving_on).format('MMM D, YYYY')}
                                                                 </Typography>
                                                             </Grid>
@@ -8596,11 +8769,26 @@ setBookingDetail(finalVoucherDetail);
                             </Box>
                         )}
                     </DialogContent>
-                    <DialogActions sx={{ padding: isMobile ? '8px 16px' : 'inherit' }}>
-                        <Button onClick={() => {
-                            setPaymentHistoryModalOpen(false);
-                            setExpandedPaymentIds({});
-                        }} sx={{ fontSize: isMobile ? 14 : 'inherit', padding: isMobile ? '6px 12px' : 'inherit' }}>Close</Button>
+                    <DialogActions sx={{ 
+                        padding: isMobile ? '8px 16px' : '16px 24px',
+                        borderTop: isMobile ? 'none' : '1px solid #e5e7eb',
+                        marginTop: isMobile ? 'inherit' : '20px',
+                        justifyContent: isMobile ? 'inherit' : 'flex-end',
+                        gap: isMobile ? 'inherit' : '12px'
+                    }}>
+                        <Button 
+                            onClick={() => {
+                                setPaymentHistoryModalOpen(false);
+                                setExpandedPaymentIds({});
+                            }} 
+                            sx={{ 
+                                fontSize: isMobile ? 14 : '14px', 
+                                padding: isMobile ? '6px 12px' : '8px 20px',
+                                borderRadius: isMobile ? 'inherit' : '6px'
+                            }}
+                        >
+                            Close
+                        </Button>
                     </DialogActions>
                 </Dialog>
 
