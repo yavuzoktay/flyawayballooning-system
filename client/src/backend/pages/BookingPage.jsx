@@ -7982,22 +7982,41 @@ setBookingDetail(finalVoucherDetail);
                 <Dialog
                     open={messagesModalOpen}
                     onClose={() => setMessagesModalOpen(false)}
-                    maxWidth="md"
+                    maxWidth={isMobile ? "md" : "lg"}
                     fullWidth
+                    PaperProps={{
+                        sx: !isMobile ? {
+                            maxWidth: '1200px',
+                            width: '95%',
+                            maxHeight: '90vh',
+                            overflow: 'auto'
+                        } : {}
+                    }}
                 >
-                    <DialogTitle sx={{ fontWeight: 700, fontSize: isMobile ? 18 : 24, padding: isMobile ? '12px 16px' : 'inherit' }}>
+                    <DialogTitle sx={{ 
+                        fontWeight: 700, 
+                        fontSize: isMobile ? 18 : '20px', 
+                        padding: isMobile ? '12px 16px' : '20px 24px',
+                        color: isMobile ? 'inherit' : '#1f2937',
+                        borderBottom: isMobile ? 'none' : '1px solid #e5e7eb',
+                        margin: isMobile ? 'inherit' : 0
+                    }}>
                         Messages
                         {selectedBookingForEmail && (
-                            <Typography variant="subtitle2" color="textSecondary" sx={{ mt: isMobile ? 0.25 : 0.5, fontSize: isMobile ? 12 : 'inherit' }}>
+                            <Typography variant="subtitle2" color="textSecondary" sx={{ 
+                                mt: isMobile ? 0.25 : 0.5, 
+                                fontSize: isMobile ? 12 : '12px',
+                                fontWeight: isMobile ? 'inherit' : 400
+                            }}>
                                 Booking: {selectedBookingForEmail.name} ({selectedBookingForEmail.id})
                             </Typography>
                         )}
                     </DialogTitle>
                     <DialogContent dividers sx={{ background: '#f5f7fb', padding: isMobile ? '12px 16px' : '24px' }}>
                         {messagesLoading ? (
-                            <Typography variant="body2" sx={{ fontSize: isMobile ? 14 : 'inherit' }}>Loading messages...</Typography>
+                            <Typography variant="body2" sx={{ fontSize: isMobile ? 14 : '14px' }}>Loading messages...</Typography>
                         ) : messageLogs.length === 0 ? (
-                            <Typography variant="body2" color="text.secondary" sx={{ fontSize: isMobile ? 14 : 'inherit' }}>
+                            <Typography variant="body2" color="text.secondary" sx={{ fontSize: isMobile ? 14 : '14px' }}>
                                 No messages have been sent for this booking yet.
                             </Typography>
                         ) : (
@@ -8018,11 +8037,11 @@ setBookingDetail(finalVoucherDetail);
                                             key={log.id || index}
                                             sx={{
                                                 mb: isMobile ? 1.5 : 3,
-                                                borderRadius: isMobile ? 2 : 3,
+                                                borderRadius: isMobile ? 2 : '8px',
                                                 background: '#ffffff',
                                                 boxShadow: '0 10px 30px rgba(15, 23, 42, 0.08)',
                                                 overflow: 'hidden',
-                                                border: '1px solid #e2e8f0'
+                                                border: isMobile ? '1px solid #e2e8f0' : '1px solid #e5e7eb'
                                             }}
                                         >
                                             <Box
@@ -8053,15 +8072,29 @@ setBookingDetail(finalVoucherDetail);
                                                         <MailOutlineIcon sx={{ fontSize: isMobile ? 18 : 24 }} />
                                                     </Box>
                                                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                                                        <Typography sx={{ fontWeight: 700, fontSize: isMobile ? 14 : 18, mb: isMobile ? 0.25 : 0.5, wordBreak: 'break-word' }}>
+                                                        <Typography sx={{ 
+                                                            fontWeight: 700, 
+                                                            fontSize: isMobile ? 14 : '16px', 
+                                                            mb: isMobile ? 0.25 : 0.5, 
+                                                            wordBreak: 'break-word',
+                                                            color: isMobile ? 'inherit' : '#1f2937'
+                                                        }}>
                                                             {log.subject || 'Email'}
                                                         </Typography>
-                                                        <Typography variant="body2" color="text.secondary" sx={{ fontSize: isMobile ? 11 : 'inherit', mb: isMobile ? 0.25 : 0 }}>
+                                                        <Typography variant="body2" color="text.secondary" sx={{ 
+                                                            fontSize: isMobile ? 11 : '14px', 
+                                                            mb: isMobile ? 0.25 : 0,
+                                                            lineHeight: isMobile ? 'inherit' : '1.4'
+                                                        }}>
                                                             {log.sent_at
                                                                 ? dayjs(log.sent_at).format('dddd, MMMM D, YYYY h:mm A')
                                                                 : 'Unknown send date'}
                                                         </Typography>
-                                                        <Typography variant="body2" color="text.secondary" sx={{ fontSize: isMobile ? 11 : 'inherit', wordBreak: 'break-word' }}>
+                                                        <Typography variant="body2" color="text.secondary" sx={{ 
+                                                            fontSize: isMobile ? 11 : '14px', 
+                                                            wordBreak: 'break-word',
+                                                            lineHeight: isMobile ? 'inherit' : '1.4'
+                                                        }}>
                                                             To: {log.recipient_email || '—'}
                                                         </Typography>
                                                     </Box>
@@ -8074,7 +8107,7 @@ setBookingDetail(finalVoucherDetail);
                                                             px: isMobile ? 1 : 1.5,
                                                             py: isMobile ? 0.25 : 0.5,
                                                             borderRadius: 999,
-                                                            fontSize: isMobile ? 10 : 12,
+                                                            fontSize: isMobile ? 10 : '12px',
                                                             fontWeight: 600,
                                                             color: '#fff',
                                                             backgroundColor: statusInfo.color,
@@ -8083,10 +8116,19 @@ setBookingDetail(finalVoucherDetail);
                                                     >
                                                         {statusInfo.label}
                                                     </Box>
-                                                    <Typography variant="caption" display="block" sx={{ mt: isMobile ? 0.5 : 1, color: '#64748b', fontSize: isMobile ? 9 : 'inherit' }}>
+                                                    <Typography variant="caption" display="block" sx={{ 
+                                                        mt: isMobile ? 0.5 : 1, 
+                                                        color: '#64748b', 
+                                                        fontSize: isMobile ? 9 : '12px',
+                                                        lineHeight: isMobile ? 'inherit' : '1.4'
+                                                    }}>
                                                         Category: {log.template_type || 'Custom'}
                                                     </Typography>
-                                                    <Typography variant="caption" display="block" sx={{ color: '#64748b', fontSize: isMobile ? 9 : 'inherit' }}>
+                                                    <Typography variant="caption" display="block" sx={{ 
+                                                        color: '#64748b', 
+                                                        fontSize: isMobile ? 9 : '12px',
+                                                        lineHeight: isMobile ? 'inherit' : '1.4'
+                                                    }}>
                                                         Opens: {log.opens || 0} · Clicks: {log.clicks || 0}
                                                     </Typography>
                                                 </Box>
@@ -8096,13 +8138,13 @@ setBookingDetail(finalVoucherDetail);
                                                     <Box
                                                         sx={{
                                                             background: '#f8fafc',
-                                                            borderRadius: 2,
+                                                            borderRadius: isMobile ? 2 : '8px',
                                                             p: isMobile ? 1 : 2,
                                                             maxHeight: isMobile ? 250 : 400,
                                                             overflowY: 'auto',
-                                                            fontSize: isMobile ? '12px' : 'inherit',
+                                                            fontSize: isMobile ? '12px' : '14px',
                                                             '& *': {
-                                                                fontSize: isMobile ? '12px !important' : 'inherit',
+                                                                fontSize: isMobile ? '12px !important' : '14px !important',
                                                                 maxWidth: '100%'
                                                             }
                                                         }}
@@ -8113,9 +8155,9 @@ setBookingDetail(finalVoucherDetail);
                                                         sx={{ 
                                                             color: '#475569', 
                                                             lineHeight: 1.6,
-                                                            fontSize: isMobile ? '12px' : 'inherit',
+                                                            fontSize: isMobile ? '12px' : '14px',
                                                             '& *': {
-                                                                fontSize: isMobile ? '12px !important' : 'inherit',
+                                                                fontSize: isMobile ? '12px !important' : '14px !important',
                                                                 maxWidth: '100%',
                                                                 wordBreak: 'break-word'
                                                             }
@@ -8129,8 +8171,9 @@ setBookingDetail(finalVoucherDetail);
                                                         onClick={() => toggleMessageExpand(log.id || index)}
                                                         sx={{ 
                                                             textTransform: 'none',
-                                                            fontSize: isMobile ? 12 : 'inherit',
-                                                            padding: isMobile ? '4px 8px' : 'inherit'
+                                                            fontSize: isMobile ? 12 : '14px',
+                                                            padding: isMobile ? '4px 8px' : '8px 16px',
+                                                            borderRadius: isMobile ? 'inherit' : '6px'
                                                         }}
                                                     >
                                                         {expanded ? 'Collapse' : 'Expand'}
@@ -8142,8 +8185,23 @@ setBookingDetail(finalVoucherDetail);
                                 })
                         )}
                     </DialogContent>
-                    <DialogActions sx={{ padding: isMobile ? '8px 16px' : 'inherit' }}>
-                        <Button onClick={() => setMessagesModalOpen(false)} sx={{ fontSize: isMobile ? 14 : 'inherit', padding: isMobile ? '6px 12px' : 'inherit' }}>Close</Button>
+                    <DialogActions sx={{ 
+                        padding: isMobile ? '8px 16px' : '16px 24px',
+                        borderTop: isMobile ? 'none' : '1px solid #e5e7eb',
+                        marginTop: isMobile ? 'inherit' : '20px',
+                        justifyContent: isMobile ? 'inherit' : 'flex-end',
+                        gap: isMobile ? 'inherit' : '12px'
+                    }}>
+                        <Button 
+                            onClick={() => setMessagesModalOpen(false)} 
+                            sx={{ 
+                                fontSize: isMobile ? 14 : '14px', 
+                                padding: isMobile ? '6px 12px' : '8px 20px',
+                                borderRadius: isMobile ? 'inherit' : '6px'
+                            }}
+                        >
+                            Close
+                        </Button>
                     </DialogActions>
                 </Dialog>
 
