@@ -30,6 +30,7 @@ const PaginatedTable = ({
             if (col === 'voucher_type') return context === 'vouchers' ? 'Book Flight' : 'Voucher Type';
             if (col === 'actual_voucher_type') return 'Voucher Type';
             if (col === 'passenger_info') return 'Passengers';
+            if (col === 'flight_attempts') return 'Attempts';
             const label = col.replace(/_/g, ' ');
             return label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
         }
@@ -396,7 +397,7 @@ const PaginatedTable = ({
                                        id === 'flight_date' ? '200px' :
                                         id === 'pax' ? '80px' :
                                         id === 'paid' ? '120px' :
-                                       id === 'flight_attempts' ? '150px' :
+                                       id === 'flight_attempts' ? '100px' :
                                        id === 'expires' ? '140px' :
                                        id === 'location' ? '140px' :
                                        id === 'redeemed' ? '120px' :
@@ -414,7 +415,7 @@ const PaginatedTable = ({
                                          id === 'flight_date' ? '200px' :
                                         id === 'pax' ? '80px' :
                                         id === 'paid' ? '120px' :
-                                         id === 'flight_attempts' ? '150px' :
+                                         id === 'flight_attempts' ? '100px' :
                                          id === 'expires' ? '140px' :
                                          id === 'location' ? '140px' :
                                          id === 'redeemed' ? '120px' :

@@ -27197,10 +27197,7 @@ function generateBookingConfirmationEmail(booking, template = null) {
         bodyHtml,
         customerName,
         signatureLines: [],
-        footerLinks: [
-            { label: 'View FAQs', url: 'https://flyawayballooning.com/faq' },
-            { label: 'Contact us', url: 'mailto:hello@flyawayballooning.com' }
-        ]
+        footerLinks: []
     });
 }
 
