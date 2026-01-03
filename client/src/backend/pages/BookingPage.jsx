@@ -5199,9 +5199,9 @@ setBookingDetail(finalVoucherDetail);
                                     }}>
                                         {/* Export Button - Only show on desktop */}
                                         {!isMobile && (
-                                            <Button variant="outlined" color="primary" onClick={handleExportCSV} style={{ height: 40 }}>
-                                                Export
-                                            </Button>
+                                        <Button variant="outlined" color="primary" onClick={handleExportCSV} style={{ height: 40 }}>
+                                            Export
+                                        </Button>
                                         )}
                                         <OutlinedInput placeholder="Search by name, email, phone, voucher ref, offer code..." value={filters.search}
                                             onChange={(e) => handleFilterChange("search", e.target.value)} sx={{ fontSize: 14, '& input::placeholder': { fontSize: 14 } }} />
@@ -8927,13 +8927,32 @@ setBookingDetail(finalVoucherDetail);
                 <Dialog 
                     open={emailModalOpen} 
                     onClose={() => setEmailModalOpen(false)}
-                    maxWidth="md"
+                    maxWidth={isMobile ? "md" : "lg"}
                     fullWidth
+                    PaperProps={{
+                        sx: !isMobile ? {
+                            maxWidth: '1200px',
+                            width: '95%',
+                            maxHeight: '90vh',
+                            overflow: 'auto'
+                        } : {}
+                    }}
                 >
-                    <DialogTitle sx={{ color: '#1976d2', fontWeight: 600, fontSize: isMobile ? 18 : 24, padding: isMobile ? '12px 16px' : 'inherit' }}>
+                    <DialogTitle sx={{ 
+                        color: isMobile ? '#1976d2' : '#1f2937',
+                        fontWeight: 600, 
+                        fontSize: isMobile ? 18 : '20px', 
+                        padding: isMobile ? '12px 16px' : '20px 24px',
+                        borderBottom: isMobile ? 'none' : '1px solid #e5e7eb',
+                        margin: isMobile ? 'inherit' : 0
+                    }}>
                         Send a Message
                         {selectedBookingForEmail && (
-                            <Typography variant="subtitle2" color="textSecondary" sx={{ mt: isMobile ? 0.25 : 0.5, fontSize: isMobile ? 12 : 'inherit' }}>
+                            <Typography variant="subtitle2" color="textSecondary" sx={{ 
+                                mt: isMobile ? 0.25 : 0.5, 
+                                fontSize: isMobile ? 12 : '12px',
+                                fontWeight: isMobile ? 'inherit' : 400
+                            }}>
                                 {selectedBookingIds && selectedBookingIds.length > 1 ? (
                                     <>
                                         Bulk to {selectedBookingIds.length} bookings
@@ -8949,18 +8968,35 @@ setBookingDetail(finalVoucherDetail);
                     <DialogContent sx={{ padding: isMobile ? '12px 16px' : '24px' }}>
                         <Grid container spacing={isMobile ? 1 : 2} sx={{ mt: isMobile ? 0 : 1 }}>
                             <Grid item xs={12}>
-                                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
+                                <Typography variant="subtitle2" sx={{ 
+                                    mb: 1, 
+                                    fontWeight: 500,
+                                    fontSize: isMobile ? 'inherit' : '14px',
+                                    color: isMobile ? 'inherit' : '#374151'
+                                }}>
                                     Choose a template:
                                 </Typography>
-                                <FormControl fullWidth size="small">
+                                <FormControl fullWidth size={isMobile ? "small" : "medium"}>
                                     <Select
                                         value={emailForm.template}
                                         onChange={(e) => handleEmailTemplateChange(e.target.value)}
                                         displayEmpty
+                                        sx={{
+                                            fontSize: isMobile ? 'inherit' : '14px',
+                                            '& .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: isMobile ? 'inherit' : '#d1d5db'
+                                            },
+                                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: isMobile ? 'inherit' : '#9ca3af'
+                                            },
+                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: isMobile ? 'inherit' : '#3b82f6'
+                                            }
+                                        }}
                                     >
                                         {/* Database templates */}
                                         {emailTemplates.map((template) => (
-                                            <MenuItem key={template.id} value={template.id}>
+                                            <MenuItem key={template.id} value={template.id} sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>
                                                 {template.name}
                                             </MenuItem>
                                         ))}
@@ -8968,18 +9004,23 @@ setBookingDetail(finalVoucherDetail);
                                         {/* Legacy hardcoded templates (fallback) */}
                                         {emailTemplates.length === 0 && (
                                             <>
-                                                <MenuItem value="to_be_updated">To Be Updated</MenuItem>
-                                        <MenuItem value="custom">Custom Message</MenuItem>
-                                        <MenuItem value="confirmation">Booking Confirmation</MenuItem>
-                                        <MenuItem value="reminder">Flight Reminder</MenuItem>
-                                        <MenuItem value="reschedule">Flight Rescheduling</MenuItem>
+                                                <MenuItem value="to_be_updated" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>To Be Updated</MenuItem>
+                                        <MenuItem value="custom" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Custom Message</MenuItem>
+                                        <MenuItem value="confirmation" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Booking Confirmation</MenuItem>
+                                        <MenuItem value="reminder" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Flight Reminder</MenuItem>
+                                        <MenuItem value="reschedule" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Flight Rescheduling</MenuItem>
                                             </>
                                         )}
                                     </Select>
                                 </FormControl>
                             </Grid>
                             <Grid item xs={12}>
-                                <Typography variant="subtitle2" sx={{ mb: isMobile ? 0.5 : 1, fontWeight: 500, fontSize: isMobile ? 13 : 'inherit' }}>
+                                <Typography variant="subtitle2" sx={{ 
+                                    mb: isMobile ? 0.5 : 1, 
+                                    fontWeight: 500, 
+                                    fontSize: isMobile ? 13 : '14px',
+                                    color: isMobile ? 'inherit' : '#374151'
+                                }}>
                                     Add an optional, personalized note
                                 </Typography>
                                 <TextField
@@ -8993,11 +9034,20 @@ setBookingDetail(finalVoucherDetail);
                                     size={isMobile ? "small" : "medium"}
                                     sx={{ 
                                         '& .MuiOutlinedInput-root': {
-                                            borderRadius: 2,
-                                            fontSize: isMobile ? '14px' : 'inherit'
+                                            borderRadius: isMobile ? 2 : '6px',
+                                            fontSize: isMobile ? '14px' : '14px',
+                                            '& fieldset': {
+                                                borderColor: isMobile ? 'inherit' : '#d1d5db'
+                                            },
+                                            '&:hover fieldset': {
+                                                borderColor: isMobile ? 'inherit' : '#9ca3af'
+                                            },
+                                            '&.Mui-focused fieldset': {
+                                                borderColor: isMobile ? 'inherit' : '#3b82f6'
+                                            }
                                         },
                                         '& .MuiInputLabel-root': {
-                                            fontSize: isMobile ? '14px' : 'inherit'
+                                            fontSize: isMobile ? '14px' : '14px'
                                         }
                                     }}
                                 />
@@ -9005,8 +9055,8 @@ setBookingDetail(finalVoucherDetail);
                             {/* Email Template Preview */}
                             <Grid item xs={12}>
                                 <Box sx={{ 
-                                    border: '1px solid #e0e0e0', 
-                                    borderRadius: 2, 
+                                    border: isMobile ? '1px solid #e0e0e0' : '1px solid #e5e7eb', 
+                                    borderRadius: isMobile ? 2 : '8px', 
                                     p: isMobile ? 1 : 2,
                                     backgroundColor: '#f9f9f9',
                                     position: 'relative',
@@ -9043,11 +9093,25 @@ setBookingDetail(finalVoucherDetail);
                                     </Box>
                                     
                                     {/* Email From */}
-                                    <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: isMobile ? 0.25 : 0.5, fontSize: isMobile ? 10 : 'inherit', wordBreak: 'break-word' }}>
+                                    <Typography variant="caption" sx={{ 
+                                        color: '#666', 
+                                        display: 'block', 
+                                        mb: isMobile ? 0.25 : 0.5, 
+                                        fontSize: isMobile ? 10 : '12px', 
+                                        wordBreak: 'break-word',
+                                        lineHeight: isMobile ? 'inherit' : '1.4'
+                                    }}>
                                         From "Fly Away Ballooning" &lt;info@flyawayballooning.com&gt;
                                     </Typography>
                                     {selectedBookingIds && selectedBookingIds.length > 1 && (
-                                        <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: isMobile ? 0.25 : 0.5, fontSize: isMobile ? 10 : 'inherit', wordBreak: 'break-word' }}>
+                                        <Typography variant="caption" sx={{ 
+                                            color: '#666', 
+                                            display: 'block', 
+                                            mb: isMobile ? 0.25 : 0.5, 
+                                            fontSize: isMobile ? 10 : '12px', 
+                                            wordBreak: 'break-word',
+                                            lineHeight: isMobile ? 'inherit' : '1.4'
+                                        }}>
                                             To:&nbsp;
                                             {booking
                                                 .filter(b => selectedBookingIds.includes(b.id))
@@ -9056,7 +9120,13 @@ setBookingDetail(finalVoucherDetail);
                                                 .join(', ')}
                                         </Typography>
                                     )}
-                                    <Typography variant="caption" sx={{ color: '#999', display: 'block', mb: isMobile ? 1 : 2, fontSize: isMobile ? 10 : 'inherit' }}>
+                                    <Typography variant="caption" sx={{ 
+                                        color: '#999', 
+                                        display: 'block', 
+                                        mb: isMobile ? 1 : 2, 
+                                        fontSize: isMobile ? 10 : '12px',
+                                        lineHeight: isMobile ? 'inherit' : '1.4'
+                                    }}>
                                         {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
                                     </Typography>
                                     
@@ -9068,7 +9138,7 @@ setBookingDetail(finalVoucherDetail);
                                         display: 'flex',
                                         alignItems: 'center',
                                         gap: isMobile ? 0.5 : 1,
-                                        fontSize: isMobile ? 13 : 'inherit',
+                                        fontSize: isMobile ? 13 : '16px',
                                         wordBreak: 'break-word'
                                     }}>
                                         <span style={{ fontSize: isMobile ? 16 : 20 }}>🎈</span> {emailForm.subject || 'Flight update'}
@@ -9132,53 +9202,137 @@ setBookingDetail(finalVoucherDetail);
                             {/* Email Logs */}
                             <Grid item xs={12}>
                                 <Divider sx={{ my: isMobile ? 1 : 2 }} />
-                                <Typography variant="subtitle1" sx={{ mb: isMobile ? 0.5 : 1, fontWeight: 600, fontSize: isMobile ? 14 : 'inherit' }}>
+                                <Typography variant="subtitle1" sx={{ 
+                                    mb: isMobile ? 0.5 : 1, 
+                                    fontWeight: 600, 
+                                    fontSize: isMobile ? 14 : '16px',
+                                    color: isMobile ? 'inherit' : '#374151'
+                                }}>
                                     Sent Emails
                                 </Typography>
                                 {emailLogsLoading ? (
-                                    <Typography variant="body2" sx={{ fontSize: isMobile ? 12 : 'inherit' }}>Loading...</Typography>
+                                    <Typography variant="body2" sx={{ fontSize: isMobile ? 12 : '14px' }}>Loading...</Typography>
                                 ) : (emailLogs && emailLogs.length > 0 ? (
                                     <TableContainer sx={{ maxHeight: isMobile ? '200px' : 'none', overflowX: 'auto' }}>
                                         <Table size={isMobile ? "small" : "small"}>
                                         <TableHead>
                                             <TableRow>
-                                                    <TableCell sx={{ fontSize: isMobile ? 10 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>Date</TableCell>
-                                                    <TableCell sx={{ fontSize: isMobile ? 10 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>To</TableCell>
-                                                    <TableCell sx={{ fontSize: isMobile ? 10 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>Subject</TableCell>
-                                                    <TableCell sx={{ fontSize: isMobile ? 10 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>Status</TableCell>
-                                                    <TableCell align="right" sx={{ fontSize: isMobile ? 10 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>Opens</TableCell>
-                                                    <TableCell align="right" sx={{ fontSize: isMobile ? 10 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>Clicks</TableCell>
+                                                    <TableCell sx={{ 
+                                                        fontSize: isMobile ? 10 : '14px', 
+                                                        padding: isMobile ? '6px 4px' : '16px',
+                                                        fontWeight: isMobile ? 'inherit' : 500,
+                                                        color: isMobile ? 'inherit' : '#374151'
+                                                    }}>
+                                                        Date
+                                                    </TableCell>
+                                                    <TableCell sx={{ 
+                                                        fontSize: isMobile ? 10 : '14px', 
+                                                        padding: isMobile ? '6px 4px' : '16px',
+                                                        fontWeight: isMobile ? 'inherit' : 500,
+                                                        color: isMobile ? 'inherit' : '#374151'
+                                                    }}>
+                                                        To
+                                                    </TableCell>
+                                                    <TableCell sx={{ 
+                                                        fontSize: isMobile ? 10 : '14px', 
+                                                        padding: isMobile ? '6px 4px' : '16px',
+                                                        fontWeight: isMobile ? 'inherit' : 500,
+                                                        color: isMobile ? 'inherit' : '#374151'
+                                                    }}>
+                                                        Subject
+                                                    </TableCell>
+                                                    <TableCell sx={{ 
+                                                        fontSize: isMobile ? 10 : '14px', 
+                                                        padding: isMobile ? '6px 4px' : '16px',
+                                                        fontWeight: isMobile ? 'inherit' : 500,
+                                                        color: isMobile ? 'inherit' : '#374151'
+                                                    }}>
+                                                        Status
+                                                    </TableCell>
+                                                    <TableCell align="right" sx={{ 
+                                                        fontSize: isMobile ? 10 : '14px', 
+                                                        padding: isMobile ? '6px 4px' : '16px',
+                                                        fontWeight: isMobile ? 'inherit' : 500,
+                                                        color: isMobile ? 'inherit' : '#374151'
+                                                    }}>
+                                                        Opens
+                                                    </TableCell>
+                                                    <TableCell align="right" sx={{ 
+                                                        fontSize: isMobile ? 10 : '14px', 
+                                                        padding: isMobile ? '6px 4px' : '16px',
+                                                        fontWeight: isMobile ? 'inherit' : 500,
+                                                        color: isMobile ? 'inherit' : '#374151'
+                                                    }}>
+                                                        Clicks
+                                                    </TableCell>
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
                                             {emailLogs.map((log) => (
                                                 <TableRow key={log.id}>
-                                                        <TableCell sx={{ fontSize: isMobile ? 9 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>{(() => { try { return dayjs(log.sent_at).format('DD/MM/YYYY HH:mm'); } catch { return String(log.sent_at || ''); } })()}</TableCell>
-                                                        <TableCell sx={{ fontSize: isMobile ? 9 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit', wordBreak: 'break-word' }}>{log.recipient_email}</TableCell>
-                                                        <TableCell sx={{ fontSize: isMobile ? 9 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit', wordBreak: 'break-word' }}>{log.subject}</TableCell>
-                                                        <TableCell sx={{ fontSize: isMobile ? 9 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>
+                                                        <TableCell sx={{ 
+                                                            fontSize: isMobile ? 9 : '14px', 
+                                                            padding: isMobile ? '6px 4px' : '16px'
+                                                        }}>
+                                                            {(() => { try { return dayjs(log.sent_at).format('DD/MM/YYYY HH:mm'); } catch { return String(log.sent_at || ''); } })()}
+                                                        </TableCell>
+                                                        <TableCell sx={{ 
+                                                            fontSize: isMobile ? 9 : '14px', 
+                                                            padding: isMobile ? '6px 4px' : '16px', 
+                                                            wordBreak: 'break-word'
+                                                        }}>
+                                                            {log.recipient_email}
+                                                        </TableCell>
+                                                        <TableCell sx={{ 
+                                                            fontSize: isMobile ? 9 : '14px', 
+                                                            padding: isMobile ? '6px 4px' : '16px', 
+                                                            wordBreak: 'break-word'
+                                                        }}>
+                                                            {log.subject}
+                                                        </TableCell>
+                                                        <TableCell sx={{ 
+                                                            fontSize: isMobile ? 9 : '14px', 
+                                                            padding: isMobile ? '6px 4px' : '16px'
+                                                        }}>
                                                         <span style={{
-                                                                padding: isMobile ? '1px 4px' : '2px 6px',
-                                                            borderRadius: 4,
+                                                                padding: isMobile ? '1px 4px' : '4px 8px',
+                                                            borderRadius: isMobile ? 4 : '6px',
                                                             background: log.status === 'delivered' ? '#d4edda' : (log.status === 'open' || log.opens > 0 ? '#e3f2fd' : '#fff3cd'),
                                                             color: '#000',
-                                                                fontSize: isMobile ? 9 : 12
+                                                                fontSize: isMobile ? 9 : '12px',
+                                                                fontWeight: isMobile ? 'inherit' : 500
                                                         }}>{log.last_event || log.status}</span>
                                                     </TableCell>
-                                                        <TableCell align="right" sx={{ fontSize: isMobile ? 9 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>{log.opens || 0}</TableCell>
-                                                        <TableCell align="right" sx={{ fontSize: isMobile ? 9 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>{log.clicks || 0}</TableCell>
+                                                        <TableCell align="right" sx={{ 
+                                                            fontSize: isMobile ? 9 : '14px', 
+                                                            padding: isMobile ? '6px 4px' : '16px'
+                                                        }}>
+                                                            {log.opens || 0}
+                                                        </TableCell>
+                                                        <TableCell align="right" sx={{ 
+                                                            fontSize: isMobile ? 9 : '14px', 
+                                                            padding: isMobile ? '6px 4px' : '16px'
+                                                        }}>
+                                                            {log.clicks || 0}
+                                                        </TableCell>
                                                 </TableRow>
                                             ))}
                                         </TableBody>
                                     </Table>
                                     </TableContainer>
                                 ) : (
-                                    <Typography variant="body2" sx={{ fontSize: isMobile ? 12 : 'inherit' }}>No sent emails yet for this booking.</Typography>
+                                    <Typography variant="body2" sx={{ fontSize: isMobile ? 12 : '14px' }}>No sent emails yet for this booking.</Typography>
                                 ))}
                             </Grid>
                         </Grid>
                     </DialogContent>
-                    <DialogActions sx={{ p: isMobile ? 1.5 : 3, justifyContent: 'flex-end' }}>
+                    <DialogActions sx={{ 
+                        p: isMobile ? 1.5 : '16px 24px', 
+                        justifyContent: 'flex-end',
+                        borderTop: isMobile ? 'none' : '1px solid #e5e7eb',
+                        marginTop: isMobile ? 'inherit' : '20px',
+                        gap: isMobile ? 'inherit' : '12px'
+                    }}>
                         <Button 
                             onClick={handleSendEmail}
                             variant="contained"
@@ -9187,8 +9341,8 @@ setBookingDetail(finalVoucherDetail);
                                 backgroundColor: '#1976d2',
                                 px: isMobile ? 2 : 4,
                                 py: isMobile ? 1 : 1.5,
-                                borderRadius: 2,
-                                fontSize: isMobile ? 14 : 16,
+                                borderRadius: isMobile ? 2 : '6px',
+                                fontSize: isMobile ? 14 : '14px',
                                 fontWeight: 600,
                                 textTransform: 'none',
                                 '&:hover': {
