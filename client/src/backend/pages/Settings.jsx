@@ -10719,10 +10719,36 @@ const Settings = () => {
 
             {/* Create Customer Portal Content Modal */}
             {showCustomerPortalForm && (
-                <div className="modal-overlay">
-                    <div className="modal-content" style={{ maxWidth: '800px', width: '95%', maxHeight: '90vh', overflow: 'auto' }}>
-                        <div className="modal-header">
-                            <h3 style={{ margin: 0, fontSize: '24px', fontWeight: 600 }}>Create Customer Portal Content</h3>
+                <div className="modal-overlay" style={isMobile ? {
+                    padding: '8px',
+                    alignItems: 'flex-start',
+                    overflowY: 'auto'
+                } : {}}>
+                    <div className="modal-content" style={isMobile ? {
+                        maxWidth: 'calc(100vw - 16px)',
+                        width: '100%',
+                        maxHeight: 'calc(100vh - 16px)',
+                        margin: '0',
+                        borderRadius: '8px'
+                    } : {
+                        maxWidth: '800px',
+                        width: '95%',
+                        maxHeight: '90vh',
+                        overflow: 'auto'
+                    }}>
+                        <div className="modal-header" style={isMobile ? {
+                            padding: '10px 12px',
+                            borderBottom: '1px solid #e5e7eb'
+                        } : {}}>
+                            <h3 style={isMobile ? {
+                                margin: 0,
+                                fontSize: '14px',
+                                fontWeight: 600
+                            } : {
+                                margin: 0,
+                                fontSize: '24px',
+                                fontWeight: 600
+                            }}>Create Customer Portal Content</h3>
                             <button
                                 className="close-btn"
                                 onClick={() => {
@@ -10734,6 +10760,11 @@ const Settings = () => {
                                         is_active: true
                                     });
                                 }}
+                                style={isMobile ? {
+                                    fontSize: '18px',
+                                    width: '24px',
+                                    height: '24px'
+                                } : {}}
                             >
                                 ×
                             </button>
@@ -10757,9 +10788,28 @@ const Settings = () => {
                                 alert('Error creating content: ' + (error.response?.data?.message || error.message));
                             }
                         }}>
-                            <div style={{ padding: '24px' }}>
-                                <div style={{ marginBottom: '20px' }}>
-                                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>
+                            <div style={isMobile ? {
+                                padding: '12px'
+                            } : {
+                                padding: '24px'
+                            }}>
+                                <div style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {
+                                    marginBottom: '20px'
+                                }}>
+                                    <label style={isMobile ? {
+                                        display: 'block',
+                                        marginBottom: '4px',
+                                        fontWeight: 600,
+                                        color: '#374151',
+                                        fontSize: '11px'
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151'
+                                    }}>
                                         Header <span style={{ color: '#ef4444' }}>*</span>
                                     </label>
                                     <input
@@ -10768,7 +10818,15 @@ const Settings = () => {
                                         onChange={(e) => setCustomerPortalFormData({ ...customerPortalFormData, header: e.target.value })}
                                         placeholder="Enter header text..."
                                         required
-                                        style={{
+                                        style={isMobile ? {
+                                            width: '100%',
+                                            padding: '6px 8px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '4px',
+                                            fontSize: '13px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {
                                             width: '100%',
                                             padding: '10px 12px',
                                             border: '1px solid #d1d5db',
@@ -10778,20 +10836,63 @@ const Settings = () => {
                                     />
                                 </div>
 
-                                <div style={{ marginBottom: '20px' }}>
-                                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>
+                                <div style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {
+                                    marginBottom: '20px'
+                                }}>
+                                    <label style={isMobile ? {
+                                        display: 'block',
+                                        marginBottom: '4px',
+                                        fontWeight: 600,
+                                        color: '#374151',
+                                        fontSize: '11px'
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151'
+                                    }}>
                                         Body <span style={{ color: '#ef4444' }}>*</span>
                                     </label>
-                                    <RichTextEditor
-                                        value={customerPortalFormData.body}
-                                        onChange={(html) => setCustomerPortalFormData({ ...customerPortalFormData, body: html })}
-                                        placeholder="Enter body content..."
-                                    />
+                                    <div style={isMobile ? {
+                                        fontSize: '13px'
+                                    } : {}}>
+                                        <RichTextEditor
+                                            value={customerPortalFormData.body}
+                                            onChange={(html) => setCustomerPortalFormData({ ...customerPortalFormData, body: html })}
+                                            placeholder="Enter body content..."
+                                        />
+                                    </div>
                                 </div>
 
-                                <div style={{ marginBottom: '20px', display: 'flex', gap: '20px' }}>
-                                    <div style={{ flex: 1 }}>
-                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>
+                                <div style={isMobile ? {
+                                    marginBottom: '12px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '12px'
+                                } : {
+                                    marginBottom: '20px',
+                                    display: 'flex',
+                                    gap: '20px'
+                                }}>
+                                    <div style={isMobile ? {
+                                        width: '100%'
+                                    } : {
+                                        flex: 1
+                                    }}>
+                                        <label style={isMobile ? {
+                                            display: 'block',
+                                            marginBottom: '4px',
+                                            fontWeight: 600,
+                                            color: '#374151',
+                                            fontSize: '11px'
+                                        } : {
+                                            display: 'block',
+                                            marginBottom: '8px',
+                                            fontWeight: 500,
+                                            color: '#374151'
+                                        }}>
                                             Sort Order
                                         </label>
                                         <input
@@ -10799,7 +10900,15 @@ const Settings = () => {
                                             value={customerPortalFormData.sort_order}
                                             onChange={(e) => setCustomerPortalFormData({ ...customerPortalFormData, sort_order: parseInt(e.target.value) || 0 })}
                                             min="0"
-                                            style={{
+                                            style={isMobile ? {
+                                                width: '100%',
+                                                padding: '6px 8px',
+                                                border: '1px solid #d1d5db',
+                                                borderRadius: '4px',
+                                                fontSize: '13px',
+                                                height: '32px',
+                                                boxSizing: 'border-box'
+                                            } : {
                                                 width: '100%',
                                                 padding: '10px 12px',
                                                 border: '1px solid #d1d5db',
@@ -10808,21 +10917,67 @@ const Settings = () => {
                                             }}
                                         />
                                     </div>
-                                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', marginTop: '28px' }}>
-                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                    <div style={isMobile ? {
+                                        width: '100%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        marginTop: '0'
+                                    } : {
+                                        flex: 1,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        marginTop: '28px'
+                                    }}>
+                                        <label style={isMobile ? {
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            cursor: 'pointer'
+                                        } : {
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            cursor: 'pointer'
+                                        }}>
                                             <input
                                                 type="checkbox"
                                                 checked={customerPortalFormData.is_active}
                                                 onChange={(e) => setCustomerPortalFormData({ ...customerPortalFormData, is_active: e.target.checked })}
-                                                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                                style={isMobile ? {
+                                                    width: '14px',
+                                                    height: '14px',
+                                                    cursor: 'pointer'
+                                                } : {
+                                                    width: '18px',
+                                                    height: '18px',
+                                                    cursor: 'pointer'
+                                                }}
                                             />
-                                            <span style={{ color: '#374151', fontSize: '14px' }}>Active</span>
+                                            <span style={isMobile ? {
+                                                color: '#374151',
+                                                fontSize: '11px'
+                                            } : {
+                                                color: '#374151',
+                                                fontSize: '14px'
+                                            }}>Active</span>
                                         </label>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="form-actions" style={{ borderTop: '1px solid #e5e7eb', padding: '16px 24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                            <div className="form-actions" style={isMobile ? {
+                                borderTop: '1px solid #e5e7eb',
+                                padding: '12px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px'
+                            } : {
+                                borderTop: '1px solid #e5e7eb',
+                                padding: '16px 24px',
+                                display: 'flex',
+                                justifyContent: 'flex-end',
+                                gap: '12px'
+                            }}>
                                 <button 
                                     type="button" 
                                     className="btn btn-secondary"
@@ -10835,11 +10990,27 @@ const Settings = () => {
                                             is_active: true
                                         });
                                     }}
-                                    style={{ padding: '8px 20px' }}
+                                    style={isMobile ? {
+                                        padding: '8px 12px',
+                                        fontSize: '12px',
+                                        width: '100%',
+                                        borderRadius: '4px',
+                                        height: '36px'
+                                    } : {
+                                        padding: '8px 20px'
+                                    }}
                                 >
                                     Cancel
                                 </button>
-                                <button type="submit" className="btn btn-primary" style={{ padding: '8px 20px' }}>
+                                <button type="submit" className="btn btn-primary" style={isMobile ? {
+                                    padding: '8px 12px',
+                                    fontSize: '12px',
+                                    width: '100%',
+                                    borderRadius: '4px',
+                                    height: '36px'
+                                } : {
+                                    padding: '8px 20px'
+                                }}>
                                     Create Content
                                 </button>
                             </div>
@@ -10850,10 +11021,36 @@ const Settings = () => {
 
             {/* Edit Customer Portal Content Modal */}
             {showEditCustomerPortalForm && selectedCustomerPortalContent && (
-                <div className="modal-overlay">
-                    <div className="modal-content" style={{ maxWidth: '800px', width: '95%', maxHeight: '90vh', overflow: 'auto' }}>
-                        <div className="modal-header">
-                            <h3 style={{ margin: 0, fontSize: '24px', fontWeight: 600 }}>Edit Customer Portal Content</h3>
+                <div className="modal-overlay" style={isMobile ? {
+                    padding: '8px',
+                    alignItems: 'flex-start',
+                    overflowY: 'auto'
+                } : {}}>
+                    <div className="modal-content" style={isMobile ? {
+                        maxWidth: 'calc(100vw - 16px)',
+                        width: '100%',
+                        maxHeight: 'calc(100vh - 16px)',
+                        margin: '0',
+                        borderRadius: '8px'
+                    } : {
+                        maxWidth: '800px',
+                        width: '95%',
+                        maxHeight: '90vh',
+                        overflow: 'auto'
+                    }}>
+                        <div className="modal-header" style={isMobile ? {
+                            padding: '10px 12px',
+                            borderBottom: '1px solid #e5e7eb'
+                        } : {}}>
+                            <h3 style={isMobile ? {
+                                margin: 0,
+                                fontSize: '14px',
+                                fontWeight: 600
+                            } : {
+                                margin: 0,
+                                fontSize: '24px',
+                                fontWeight: 600
+                            }}>Edit Customer Portal Content</h3>
                             <button
                                 className="close-btn"
                                 onClick={() => {
@@ -10866,6 +11063,11 @@ const Settings = () => {
                                         is_active: true
                                     });
                                 }}
+                                style={isMobile ? {
+                                    fontSize: '18px',
+                                    width: '24px',
+                                    height: '24px'
+                                } : {}}
                             >
                                 ×
                             </button>
@@ -10890,9 +11092,28 @@ const Settings = () => {
                                 alert('Error updating content: ' + (error.response?.data?.message || error.message));
                             }
                         }}>
-                            <div style={{ padding: '24px' }}>
-                                <div style={{ marginBottom: '20px' }}>
-                                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>
+                            <div style={isMobile ? {
+                                padding: '12px'
+                            } : {
+                                padding: '24px'
+                            }}>
+                                <div style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {
+                                    marginBottom: '20px'
+                                }}>
+                                    <label style={isMobile ? {
+                                        display: 'block',
+                                        marginBottom: '4px',
+                                        fontWeight: 600,
+                                        color: '#374151',
+                                        fontSize: '11px'
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151'
+                                    }}>
                                         Header <span style={{ color: '#ef4444' }}>*</span>
                                     </label>
                                     <input
@@ -10901,7 +11122,15 @@ const Settings = () => {
                                         onChange={(e) => setCustomerPortalFormData({ ...customerPortalFormData, header: e.target.value })}
                                         placeholder="Enter header text..."
                                         required
-                                        style={{
+                                        style={isMobile ? {
+                                            width: '100%',
+                                            padding: '6px 8px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '4px',
+                                            fontSize: '13px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {
                                             width: '100%',
                                             padding: '10px 12px',
                                             border: '1px solid #d1d5db',
@@ -10911,20 +11140,63 @@ const Settings = () => {
                                     />
                                 </div>
 
-                                <div style={{ marginBottom: '20px' }}>
-                                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>
+                                <div style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {
+                                    marginBottom: '20px'
+                                }}>
+                                    <label style={isMobile ? {
+                                        display: 'block',
+                                        marginBottom: '4px',
+                                        fontWeight: 600,
+                                        color: '#374151',
+                                        fontSize: '11px'
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151'
+                                    }}>
                                         Body <span style={{ color: '#ef4444' }}>*</span>
                                     </label>
-                                    <RichTextEditor
-                                        value={customerPortalFormData.body}
-                                        onChange={(html) => setCustomerPortalFormData({ ...customerPortalFormData, body: html })}
-                                        placeholder="Enter body content..."
-                                    />
+                                    <div style={isMobile ? {
+                                        fontSize: '13px'
+                                    } : {}}>
+                                        <RichTextEditor
+                                            value={customerPortalFormData.body}
+                                            onChange={(html) => setCustomerPortalFormData({ ...customerPortalFormData, body: html })}
+                                            placeholder="Enter body content..."
+                                        />
+                                    </div>
                                 </div>
 
-                                <div style={{ marginBottom: '20px', display: 'flex', gap: '20px' }}>
-                                    <div style={{ flex: 1 }}>
-                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>
+                                <div style={isMobile ? {
+                                    marginBottom: '12px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '12px'
+                                } : {
+                                    marginBottom: '20px',
+                                    display: 'flex',
+                                    gap: '20px'
+                                }}>
+                                    <div style={isMobile ? {
+                                        width: '100%'
+                                    } : {
+                                        flex: 1
+                                    }}>
+                                        <label style={isMobile ? {
+                                            display: 'block',
+                                            marginBottom: '4px',
+                                            fontWeight: 600,
+                                            color: '#374151',
+                                            fontSize: '11px'
+                                        } : {
+                                            display: 'block',
+                                            marginBottom: '8px',
+                                            fontWeight: 500,
+                                            color: '#374151'
+                                        }}>
                                             Sort Order
                                         </label>
                                         <input
@@ -10932,7 +11204,15 @@ const Settings = () => {
                                             value={customerPortalFormData.sort_order}
                                             onChange={(e) => setCustomerPortalFormData({ ...customerPortalFormData, sort_order: parseInt(e.target.value) || 0 })}
                                             min="0"
-                                            style={{
+                                            style={isMobile ? {
+                                                width: '100%',
+                                                padding: '6px 8px',
+                                                border: '1px solid #d1d5db',
+                                                borderRadius: '4px',
+                                                fontSize: '13px',
+                                                height: '32px',
+                                                boxSizing: 'border-box'
+                                            } : {
                                                 width: '100%',
                                                 padding: '10px 12px',
                                                 border: '1px solid #d1d5db',
@@ -10941,21 +11221,67 @@ const Settings = () => {
                                             }}
                                         />
                                     </div>
-                                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', marginTop: '28px' }}>
-                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                    <div style={isMobile ? {
+                                        width: '100%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        marginTop: '0'
+                                    } : {
+                                        flex: 1,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        marginTop: '28px'
+                                    }}>
+                                        <label style={isMobile ? {
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            cursor: 'pointer'
+                                        } : {
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            cursor: 'pointer'
+                                        }}>
                                             <input
                                                 type="checkbox"
                                                 checked={customerPortalFormData.is_active}
                                                 onChange={(e) => setCustomerPortalFormData({ ...customerPortalFormData, is_active: e.target.checked })}
-                                                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                                style={isMobile ? {
+                                                    width: '14px',
+                                                    height: '14px',
+                                                    cursor: 'pointer'
+                                                } : {
+                                                    width: '18px',
+                                                    height: '18px',
+                                                    cursor: 'pointer'
+                                                }}
                                             />
-                                            <span style={{ color: '#374151', fontSize: '14px' }}>Active</span>
+                                            <span style={isMobile ? {
+                                                color: '#374151',
+                                                fontSize: '11px'
+                                            } : {
+                                                color: '#374151',
+                                                fontSize: '14px'
+                                            }}>Active</span>
                                         </label>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="form-actions" style={{ borderTop: '1px solid #e5e7eb', padding: '16px 24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                            <div className="form-actions" style={isMobile ? {
+                                borderTop: '1px solid #e5e7eb',
+                                padding: '12px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px'
+                            } : {
+                                borderTop: '1px solid #e5e7eb',
+                                padding: '16px 24px',
+                                display: 'flex',
+                                justifyContent: 'flex-end',
+                                gap: '12px'
+                            }}>
                                 <button 
                                     type="button" 
                                     className="btn btn-secondary"
@@ -10969,11 +11295,27 @@ const Settings = () => {
                                             is_active: true
                                         });
                                     }}
-                                    style={{ padding: '8px 20px' }}
+                                    style={isMobile ? {
+                                        padding: '8px 12px',
+                                        fontSize: '12px',
+                                        width: '100%',
+                                        borderRadius: '4px',
+                                        height: '36px'
+                                    } : {
+                                        padding: '8px 20px'
+                                    }}
                                 >
                                     Cancel
                                 </button>
-                                <button type="submit" className="btn btn-primary" style={{ padding: '8px 20px' }}>
+                                <button type="submit" className="btn btn-primary" style={isMobile ? {
+                                    padding: '8px 12px',
+                                    fontSize: '12px',
+                                    width: '100%',
+                                    borderRadius: '4px',
+                                    height: '36px'
+                                } : {
+                                    padding: '8px 20px'
+                                }}>
                                     Update Content
                                 </button>
                             </div>
