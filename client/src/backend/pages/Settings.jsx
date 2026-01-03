@@ -31,6 +31,17 @@ const Settings = () => {
     const [showUsageModal, setShowUsageModal] = useState(false);
     const [selectedVoucher, setSelectedVoucher] = useState(null);
     const [usageData, setUsageData] = useState([]);
+    const [isMobile, setIsMobile] = useState(false);
+
+    // Detect mobile device
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth <= 768);
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
     
     // Experiences state
     const [experiences, setExperiences] = useState([]);
@@ -5503,10 +5514,27 @@ const Settings = () => {
 
             {/* Create/Edit Voucher Form Modal */}
             {(showCreateForm || showEditForm) && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <div className="modal-header">
-                            <h3>{showEditForm ? 'Edit Voucher Code' : 'Create New Voucher Code'}</h3>
+                <div className="modal-overlay" style={isMobile ? {
+                    padding: '8px',
+                    alignItems: 'flex-start',
+                    overflowY: 'auto'
+                } : {}}>
+                    <div className="modal-content" style={isMobile ? {
+                        maxWidth: 'calc(100vw - 16px)',
+                        width: '100%',
+                        maxHeight: 'calc(100vh - 16px)',
+                        margin: '0',
+                        borderRadius: '8px'
+                    } : {}}>
+                        <div className="modal-header" style={isMobile ? {
+                            padding: '12px 16px',
+                            borderBottom: '1px solid #e5e7eb'
+                        } : {}}>
+                            <h3 style={isMobile ? {
+                                fontSize: '16px',
+                                fontWeight: 600,
+                                margin: 0
+                            } : {}}>{showEditForm ? 'Edit Voucher Code' : 'Create New Voucher Code'}</h3>
                             <button 
                                 className="close-btn"
                                 onClick={() => {
@@ -5514,15 +5542,33 @@ const Settings = () => {
                                     setShowEditForm(false);
                                     resetForm();
                                 }}
+                                style={isMobile ? {
+                                    fontSize: '20px',
+                                    width: '28px',
+                                    height: '28px'
+                                } : {}}
                             >
                                 ×
                             </button>
                         </div>
                         
-                        <form onSubmit={handleSubmit} className="voucher-form">
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Voucher Code *</label>
+                        <form onSubmit={handleSubmit} className="voucher-form" style={isMobile ? {
+                            padding: '16px'
+                        } : {}}>
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '12px',
+                                marginBottom: '16px'
+                            } : {}}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '16px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '12px',
+                                        marginBottom: '6px',
+                                        fontWeight: 600
+                                    } : {}}>Voucher Code *</label>
                                     <input
                                         type="text"
                                         value={formData.code}
@@ -5530,58 +5576,129 @@ const Settings = () => {
                                         placeholder="e.g., SUMMER2024"
                                         required
                                         disabled={showEditForm}
+                                        style={isMobile ? {
+                                            padding: '10px 12px',
+                                            fontSize: '14px',
+                                            borderRadius: '6px'
+                                        } : {}}
                                     />
                                 </div>
                                 
-                                <div className="form-group">
-                                    <label>Title *</label>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '16px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '12px',
+                                        marginBottom: '6px',
+                                        fontWeight: 600
+                                    } : {}}>Title *</label>
                                     <input
                                         type="text"
                                         value={formData.title}
                                         onChange={(e) => setFormData({...formData, title: e.target.value})}
                                         placeholder="e.g., Summer Special Discount"
                                         required
+                                        style={isMobile ? {
+                                            padding: '10px 12px',
+                                            fontSize: '14px',
+                                            borderRadius: '6px'
+                                        } : {}}
                                     />
                                 </div>
                             </div>
                             
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Valid From</label>
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '12px',
+                                marginBottom: '16px'
+                            } : {}}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '16px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '12px',
+                                        marginBottom: '6px',
+                                        fontWeight: 600
+                                    } : {}}>Valid From</label>
                                     <input
                                         type="date"
                                         value={formData.valid_from}
                                         onChange={(e) => setFormData({...formData, valid_from: e.target.value})}
+                                        style={isMobile ? {
+                                            padding: '10px 12px',
+                                            fontSize: '16px',
+                                            borderRadius: '6px'
+                                        } : {}}
                                     />
                                 </div>
                                 
-                                <div className="form-group">
-                                    <label>Valid Until</label>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '16px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '12px',
+                                        marginBottom: '6px',
+                                        fontWeight: 600
+                                    } : {}}>Valid Until</label>
                                     <input
                                         type="date"
                                         value={formData.valid_until}
                                         onChange={(e) => setFormData({...formData, valid_until: e.target.value})}
+                                        style={isMobile ? {
+                                            padding: '10px 12px',
+                                            fontSize: '16px',
+                                            borderRadius: '6px'
+                                        } : {}}
                                     />
                                 </div>
                             </div>
                             
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Maximum Uses</label>
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '12px',
+                                marginBottom: '16px'
+                            } : {}}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '16px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '12px',
+                                        marginBottom: '6px',
+                                        fontWeight: 600
+                                    } : {}}>Maximum Uses</label>
                                     <input
                                         type="number"
                                         value={formData.max_uses}
                                         onChange={(e) => setFormData({...formData, max_uses: e.target.value})}
                                         placeholder="Unlimited"
                                         min="1"
+                                        style={isMobile ? {
+                                            padding: '10px 12px',
+                                            fontSize: '14px',
+                                            borderRadius: '6px'
+                                        } : {}}
                                     />
                                 </div>
                                 
-                                <div className="form-group">
-                                    <label>Status</label>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '16px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '12px',
+                                        marginBottom: '6px',
+                                        fontWeight: 600
+                                    } : {}}>Status</label>
                                     <select
                                         value={formData.is_active}
                                         onChange={(e) => setFormData({...formData, is_active: e.target.value === 'true'})}
+                                        style={isMobile ? {
+                                            padding: '10px 12px',
+                                            fontSize: '14px',
+                                            borderRadius: '6px',
+                                            width: '100%'
+                                        } : {}}
                                     >
                                         <option value={true}>Active</option>
                                         <option value={false}>Inactive</option>
@@ -5589,15 +5706,32 @@ const Settings = () => {
                                 </div>
                             </div>
                             
-                            <div className="form-actions">
+                            <div className="form-actions" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '10px',
+                                paddingTop: '16px',
+                                marginTop: '16px',
+                                borderTop: '1px solid #e5e7eb'
+                            } : {}}>
                                 <button type="button" className="btn btn-secondary" onClick={() => {
                                     setShowCreateForm(false);
                                     setShowEditForm(false);
                                     resetForm();
-                                }}>
+                                }} style={isMobile ? {
+                                    padding: '10px 16px',
+                                    fontSize: '13px',
+                                    width: '100%',
+                                    borderRadius: '6px'
+                                } : {}}>
                                     Cancel
                                 </button>
-                                <button type="submit" className="btn btn-primary">
+                                <button type="submit" className="btn btn-primary" style={isMobile ? {
+                                    padding: '10px 16px',
+                                    fontSize: '13px',
+                                    width: '100%',
+                                    borderRadius: '6px'
+                                } : {}}>
                                     {showEditForm ? 'Update Voucher Code' : 'Create Voucher Code'}
                                 </button>
                             </div>
