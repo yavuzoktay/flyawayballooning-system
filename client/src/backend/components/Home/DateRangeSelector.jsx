@@ -148,8 +148,6 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
 
     return (
         <div style={{ padding: "20px", background: "#f9f9f9", borderRadius: "20px" }} className="date-range-selector-container">
-            <h2 style={{ fontFamily: "Gilroy Semi Bold" }}>Date Range Selector</h2>
-
             {/* Date Inputs */}
             <div style={{
                 display: 'flex',
@@ -207,7 +205,6 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
 
             {/* Quick Links */}
             <div style={{ marginTop: "20px" }} className="filter-range-btns">
-                <h3 style={{ fontFamily: "Gilroy Light" }}>Quick Links</h3>
                 <div style={{ 
                     display: 'flex', 
                     flexWrap: 'wrap', 

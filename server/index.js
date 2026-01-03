@@ -5761,7 +5761,76 @@ const con = mysql.createPool({
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-    multipleStatements: true
+    multipleStatements: true,
+    connectTimeout: 60000, // 60 seconds connection timeout
+    acquireTimeout: 60000, // 60 seconds to acquire connection from pool
+    timeout: 60000 // 60 seconds query timeout
+});
+
+// Handle connection errors and reconnection
+con.on('connection', function (connection) {
+    console.log('MySQL: New connection established as id ' + connection.threadId);
+    
+    connection.on('error', function(err) {
+        console.error('MySQL connection error:', err);
+        if(err.code === 'PROTOCOL_CONNECTION_LOST') {
+            console.log('MySQL: Connection lost, attempting to reconnect...');
+        } else if(err.code === 'ECONNREFUSED') {
+            console.error('MySQL: Connection refused. Check if database server is running.');
+        } else if(err.code === 'ETIMEDOUT') {
+            console.error('MySQL: Connection timeout. Check network connectivity and database server status.');
+        }
+    });
+});
+
+con.on('error', function(err) {
+    console.error('MySQL pool error:', err);
+    if(err.code === 'PROTOCOL_CONNECTION_LOST') {
+        console.log('MySQL: Pool connection lost');
+    } else if(err.code === 'ETIMEDOUT') {
+        console.error('MySQL: Pool connection timeout');
+    }
+});
+
+// Test connection on startup with detailed error messages
+con.getConnection((err, connection) => {
+    if (err) {
+        console.error('MySQL: Error getting connection from pool:', err);
+        console.error('MySQL: Error code:', err.code);
+        console.error('MySQL: Error message:', err.message);
+        
+        if (err.code === 'ETIMEDOUT') {
+            console.error('\n=== AWS RDS CONNECTION TIMEOUT TROUBLESHOOTING ===');
+            console.error('1. Check AWS RDS Security Group settings:');
+            console.error('   - Go to AWS Console > RDS > Your Database > Connectivity & security');
+            console.error('   - Check VPC security groups > Inbound rules');
+            console.error('   - Ensure your local IP is whitelisted for port 3306');
+            console.error('2. Verify RDS instance is publicly accessible:');
+            console.error('   - Check "Publicly accessible" setting is "Yes"');
+            console.error('3. Test network connectivity:');
+            console.error('   - Run: telnet trip-booking-database.c9mqyasow9hg.us-east-1.rds.amazonaws.com 3306');
+            console.error('4. Check firewall/VPN settings');
+            console.error('5. See AWS_RDS_CONNECTION_TROUBLESHOOTING.md for detailed guide\n');
+        } else if (err.code === 'ECONNREFUSED') {
+            console.error('\n=== AWS RDS CONNECTION REFUSED TROUBLESHOOTING ===');
+            console.error('1. Check if RDS instance is running (status should be "Available")');
+            console.error('2. Verify the hostname is correct:', process.env.DB_HOST || "trip-booking-database.c9mqyasow9hg.us-east-1.rds.amazonaws.com");
+            console.error('3. Check Security Group allows connections from your IP');
+            console.error('4. Verify port 3306 is correct\n');
+        } else if (err.code === 'ER_ACCESS_DENIED_ERROR' || err.code === 'ER_NOT_SUPPORTED_AUTH_MODE') {
+            console.error('\n=== AWS RDS AUTHENTICATION ERROR ===');
+            console.error('1. Verify DB_USER and DB_PASSWORD in .env file');
+            console.error('2. Check if user has proper permissions');
+            console.error('3. Verify database name is correct\n');
+        } else {
+            console.error('\n=== GENERAL CONNECTION ERROR ===');
+            console.error('See AWS_RDS_CONNECTION_TROUBLESHOOTING.md for troubleshooting steps\n');
+        }
+    } else {
+        console.log('MySQL: Successfully connected to database');
+        console.log('MySQL: Connection ID:', connection.threadId);
+        connection.release();
+    }
 });
 
 // ===== Activity pricing cache (used for passenger inference) =====
