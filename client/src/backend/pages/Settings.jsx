@@ -6746,10 +6746,27 @@ const Settings = () => {
 
             {/* Create/Edit Add to Booking Item Form Modal */}
             {(showAddToBookingForm || showEditAddToBookingForm) && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <div className="modal-header">
-                            <h3>{showEditAddToBookingForm ? 'Edit Add to Booking Item' : 'Create New Add to Booking Item'}</h3>
+                <div className="modal-overlay" style={isMobile ? {
+                    padding: '8px',
+                    alignItems: 'flex-start',
+                    overflowY: 'auto'
+                } : {}}>
+                    <div className="modal-content" style={isMobile ? {
+                        maxWidth: 'calc(100vw - 16px)',
+                        width: '100%',
+                        maxHeight: 'calc(100vh - 16px)',
+                        margin: '0',
+                        borderRadius: '8px'
+                    } : {}}>
+                        <div className="modal-header" style={isMobile ? {
+                            padding: '10px 12px',
+                            borderBottom: '1px solid #e5e7eb'
+                        } : {}}>
+                            <h3 style={isMobile ? {
+                                fontSize: '14px',
+                                fontWeight: 600,
+                                margin: 0
+                            } : {}}>{showEditAddToBookingForm ? 'Edit Add to Booking Item' : 'Create New Add to Booking Item'}</h3>
                             <button 
                                 className="close-btn"
                                 onClick={() => {
@@ -6757,26 +6774,57 @@ const Settings = () => {
                                     setShowEditAddToBookingForm(false);
                                     resetAddToBookingForm();
                                 }}
+                                style={isMobile ? {
+                                    fontSize: '18px',
+                                    width: '24px',
+                                    height: '24px'
+                                } : {}}
                             >
                                 ×
                             </button>
                         </div>
                         
-                        <form onSubmit={handleAddToBookingSubmit} className="add-to-booking-form">
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Title *</label>
+                        <form onSubmit={handleAddToBookingSubmit} className="add-to-booking-form" style={isMobile ? {
+                            padding: '12px'
+                        } : {}}>
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                marginBottom: '12px'
+                            } : {}}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Title *</label>
                                     <input
                                         type="text"
                                         value={addToBookingFormData.title}
                                         onChange={(e) => setAddToBookingFormData({...addToBookingFormData, title: e.target.value})}
                                         placeholder="e.g., FAB Cap, FAB Mug"
                                         required
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     />
                                 </div>
                                 
-                                <div className="form-group">
-                                    <label>Price *</label>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Price *</label>
                                     <input
                                         type="number"
                                         step="0.01"
@@ -6784,16 +6832,42 @@ const Settings = () => {
                                         onChange={(e) => setAddToBookingFormData({...addToBookingFormData, price: e.target.value})}
                                         placeholder="e.g., 20.00"
                                         required
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     />
                                 </div>
                             </div>
                             
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Price Unit</label>
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                marginBottom: '12px'
+                            } : {}}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Price Unit</label>
                                     <select
                                         value={addToBookingFormData.price_unit}
                                         onChange={(e) => setAddToBookingFormData({...addToBookingFormData, price_unit: e.target.value})}
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            width: '100%',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     >
                                         <option value="fixed">Fixed Price</option>
                                         <option value="pp">Per Person</option>
@@ -6803,70 +6877,161 @@ const Settings = () => {
                                 {/* Category field removed */}
                             </div>
                             
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Sort Order</label>
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                marginBottom: '12px'
+                            } : {}}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Sort Order</label>
                                     <input
                                         type="number"
                                         value={addToBookingFormData.sort_order}
                                         onChange={(e) => setAddToBookingFormData({...addToBookingFormData, sort_order: e.target.value})}
                                         placeholder="0"
                                         min="0"
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     />
                                 </div>
                                 
                                 {/* Physical Item field removed */}
                             </div>
                             
-                            <div className="form-group">
-                                <label>Description *</label>
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '12px'
+                            } : {}}>
+                                <label style={isMobile ? {
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
+                                    fontWeight: 600
+                                } : {}}>Description *</label>
                                 <textarea
                                     value={addToBookingFormData.description}
                                     onChange={(e) => setAddToBookingFormData({...addToBookingFormData, description: e.target.value})}
                                     placeholder="Detailed description of the item..."
-                                    rows="4"
+                                    rows={isMobile ? 3 : 4}
                                     required
+                                    style={isMobile ? {
+                                        padding: '6px 8px',
+                                        fontSize: '13px',
+                                        borderRadius: '4px',
+                                        minHeight: '70px',
+                                        resize: 'vertical',
+                                        boxSizing: 'border-box'
+                                    } : {}}
                                 />
                             </div>
                             
-                            <div className="form-group">
-                                <label>Image</label>
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '12px'
+                            } : {}}>
+                                <label style={isMobile ? {
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
+                                    fontWeight: 600
+                                } : {}}>Image</label>
                                 <input
                                     type="file"
                                     accept="image/*"
                                     onChange={(e) => setAddToBookingFormData({...addToBookingFormData, image_file: e.target.files[0]})}
+                                    style={isMobile ? {
+                                        padding: '6px 8px',
+                                        fontSize: '11px',
+                                        height: '32px',
+                                        boxSizing: 'border-box'
+                                    } : {}}
                                 />
                                 {addToBookingFormData.image_url && !addToBookingFormData.image_file && (
-                                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>
+                                    <div style={isMobile ? {
+                                        fontSize: '10px',
+                                        color: '#6b7280',
+                                        marginTop: '4px',
+                                        wordBreak: 'break-word'
+                                    } : {
+                                        fontSize: '12px',
+                                        color: '#6b7280',
+                                        marginTop: '6px'
+                                    }}>
                                         Current image: {addToBookingFormData.image_url}
                                     </div>
                                 )}
                             </div>
                             
-                            <div className="form-group">
-                                <label>Status</label>
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '12px'
+                            } : {}}>
+                                <label style={isMobile ? {
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
+                                    fontWeight: 600
+                                } : {}}>Status</label>
                                 <select
                                     value={addToBookingFormData.is_active}
                                     onChange={(e) => setAddToBookingFormData({...addToBookingFormData, is_active: e.target.value === 'true'})}
+                                    style={isMobile ? {
+                                        padding: '6px 8px',
+                                        fontSize: '13px',
+                                        borderRadius: '4px',
+                                        width: '100%',
+                                        height: '32px',
+                                        boxSizing: 'border-box'
+                                    } : {}}
                                 >
                                     <option value={true}>Active</option>
                                     <option value={false}>Inactive</option>
                                 </select>
                             </div>
                             
-                            <div className="form-group">
-                                <label>Journey Types *</label>
-                                <div style={{ 
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '12px'
+                            } : {}}>
+                                <label style={isMobile ? {
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
+                                    fontWeight: 600
+                                } : {}}>Journey Types *</label>
+                                <div style={isMobile ? {
+                                    border: '1px solid #d1d5db', 
+                                    borderRadius: '6px', 
+                                    padding: '10px',
+                                    background: '#f9fafb'
+                                } : {
                                     border: '1px solid #d1d5db', 
                                     borderRadius: '8px', 
                                     padding: '16px',
                                     background: '#f9fafb'
                                 }}>
-                                    <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
+                                    <div style={isMobile ? {
+                                        marginBottom: '8px',
+                                        fontSize: '11px',
+                                        color: '#374151'
+                                    } : {
+                                        marginBottom: '12px',
+                                        fontSize: '14px',
+                                        color: '#374151'
+                                    }}>
                                         Select which journey types this item applies to:
                                     </div>
                                     {journeyTypes.map((journeyType) => (
-                                        <label key={journeyType} style={{ 
+                                        <label key={journeyType} style={isMobile ? {
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            marginBottom: '6px',
+                                            cursor: 'pointer'
+                                        } : {
                                             display: 'flex', 
                                             alignItems: 'center', 
                                             marginBottom: '8px',
@@ -6888,32 +7053,76 @@ const Settings = () => {
                                                         });
                                                     }
                                                 }}
-                                                style={{ marginRight: '8px' }}
+                                                style={isMobile ? {
+                                                    marginRight: '6px',
+                                                    width: '14px',
+                                                    height: '14px'
+                                                } : {
+                                                    marginRight: '8px'
+                                                }}
                                             />
-                                            <span style={{ fontSize: '14px', color: '#374151' }}>{journeyType}</span>
+                                            <span style={isMobile ? {
+                                                fontSize: '11px',
+                                                color: '#374151'
+                                            } : {
+                                                fontSize: '14px',
+                                                color: '#374151'
+                                            }}>{journeyType}</span>
                                         </label>
                                     ))}
                                     {addToBookingFormData.journey_types.length === 0 && (
-                                        <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '8px' }}>
+                                        <div style={isMobile ? {
+                                            fontSize: '10px',
+                                            color: '#ef4444',
+                                            marginTop: '6px'
+                                        } : {
+                                            fontSize: '12px',
+                                            color: '#ef4444',
+                                            marginTop: '8px'
+                                        }}>
                                             Please select at least one journey type.
                                         </div>
                                     )}
                                 </div>
                             </div>
                             
-                            <div className="form-group">
-                                <label>Locations *</label>
-                                <div style={{ 
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '12px'
+                            } : {}}>
+                                <label style={isMobile ? {
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
+                                    fontWeight: 600
+                                } : {}}>Locations *</label>
+                                <div style={isMobile ? {
+                                    border: '1px solid #d1d5db', 
+                                    borderRadius: '6px', 
+                                    padding: '10px',
+                                    background: '#f9fafb'
+                                } : {
                                     border: '1px solid #d1d5db', 
                                     borderRadius: '8px', 
                                     padding: '16px',
                                     background: '#f9fafb'
                                 }}>
-                                    <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
+                                    <div style={isMobile ? {
+                                        marginBottom: '8px',
+                                        fontSize: '11px',
+                                        color: '#374151'
+                                    } : {
+                                        marginBottom: '12px',
+                                        fontSize: '14px',
+                                        color: '#374151'
+                                    }}>
                                         Select which locations this item applies to:
                                     </div>
                                     {activityLocations.map((location) => (
-                                        <label key={location} style={{ 
+                                        <label key={location} style={isMobile ? {
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            marginBottom: '6px',
+                                            cursor: 'pointer'
+                                        } : {
                                             display: 'flex', 
                                             alignItems: 'center', 
                                             marginBottom: '8px',
@@ -6935,13 +7144,33 @@ const Settings = () => {
                                                         });
                                                     }
                                                 }}
-                                                style={{ marginRight: '8px' }}
+                                                style={isMobile ? {
+                                                    marginRight: '6px',
+                                                    width: '14px',
+                                                    height: '14px'
+                                                } : {
+                                                    marginRight: '8px'
+                                                }}
                                             />
-                                            <span style={{ fontSize: '14px', color: '#374151' }}>{location}</span>
+                                            <span style={isMobile ? {
+                                                fontSize: '11px',
+                                                color: '#374151'
+                                            } : {
+                                                fontSize: '14px',
+                                                color: '#374151'
+                                            }}>{location}</span>
                                         </label>
                                     ))}
                                     {addToBookingFormData.locations.length === 0 && (
-                                        <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '8px' }}>
+                                        <div style={isMobile ? {
+                                            fontSize: '10px',
+                                            color: '#ef4444',
+                                            marginTop: '6px'
+                                        } : {
+                                            fontSize: '12px',
+                                            color: '#ef4444',
+                                            marginTop: '8px'
+                                        }}>
                                             Please select at least one location.
                                         </div>
                                     )}
@@ -6949,19 +7178,43 @@ const Settings = () => {
                             </div>
                             
                             {/* Experience Types Section */}
-                            <div className="form-group">
-                                <label>Experience Types *</label>
-                                <div style={{ 
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '12px'
+                            } : {}}>
+                                <label style={isMobile ? {
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
+                                    fontWeight: 600
+                                } : {}}>Experience Types *</label>
+                                <div style={isMobile ? {
+                                    border: '1px solid #d1d5db', 
+                                    borderRadius: '6px', 
+                                    padding: '10px',
+                                    backgroundColor: '#f9fafb'
+                                } : {
                                     border: '1px solid #d1d5db', 
                                     borderRadius: '6px', 
                                     padding: '12px',
                                     backgroundColor: '#f9fafb'
                                 }}>
-                                    <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '12px' }}>
+                                    <div style={isMobile ? {
+                                        fontSize: '11px',
+                                        color: '#6b7280',
+                                        marginBottom: '8px'
+                                    } : {
+                                        fontSize: '14px',
+                                        color: '#6b7280',
+                                        marginBottom: '12px'
+                                    }}>
                                         Select which experience types this item applies to:
                                     </div>
                                     {experienceTypes.map((experienceType) => (
-                                        <label key={experienceType} style={{ 
+                                        <label key={experienceType} style={isMobile ? {
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            marginBottom: '6px',
+                                            cursor: 'pointer'
+                                        } : {
                                             display: 'flex', 
                                             alignItems: 'center', 
                                             marginBottom: '8px',
@@ -6983,28 +7236,67 @@ const Settings = () => {
                                                         });
                                                     }
                                                 }}
-                                                style={{ marginRight: '8px' }}
+                                                style={isMobile ? {
+                                                    marginRight: '6px',
+                                                    width: '14px',
+                                                    height: '14px'
+                                                } : {
+                                                    marginRight: '8px'
+                                                }}
                                             />
-                                            <span style={{ fontSize: '14px', color: '#374151' }}>{experienceType}</span>
+                                            <span style={isMobile ? {
+                                                fontSize: '11px',
+                                                color: '#374151'
+                                            } : {
+                                                fontSize: '14px',
+                                                color: '#374151'
+                                            }}>{experienceType}</span>
                                         </label>
                                     ))}
                                     {addToBookingFormData.experience_types.length === 0 && (
-                                        <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '8px' }}>
+                                        <div style={isMobile ? {
+                                            fontSize: '10px',
+                                            color: '#ef4444',
+                                            marginTop: '6px'
+                                        } : {
+                                            fontSize: '12px',
+                                            color: '#ef4444',
+                                            marginTop: '8px'
+                                        }}>
                                             Please select at least one experience type.
                                         </div>
                                     )}
                                 </div>
                             </div>
                             
-                            <div className="form-actions">
+                            <div className="form-actions" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                paddingTop: '12px',
+                                marginTop: '12px',
+                                borderTop: '1px solid #e5e7eb'
+                            } : {}}>
                                 <button type="button" className="btn btn-secondary" onClick={() => {
                                     setShowAddToBookingForm(false);
                                     setShowEditAddToBookingForm(false);
                                     resetAddToBookingForm();
-                                }}>
+                                }} style={isMobile ? {
+                                    padding: '8px 12px',
+                                    fontSize: '12px',
+                                    width: '100%',
+                                    borderRadius: '4px',
+                                    height: '36px'
+                                } : {}}>
                                     Cancel
                                 </button>
-                                <button type="submit" className="btn btn-primary">
+                                <button type="submit" className="btn btn-primary" style={isMobile ? {
+                                    padding: '8px 12px',
+                                    fontSize: '12px',
+                                    width: '100%',
+                                    borderRadius: '4px',
+                                    height: '36px'
+                                } : {}}>
                                     {showEditAddToBookingForm ? 'Update Item' : 'Create Item'}
                                 </button>
                             </div>
