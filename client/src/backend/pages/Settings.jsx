@@ -9464,10 +9464,36 @@ const Settings = () => {
 
             {/* Create Email Template Modal */}
             {showEmailTemplateForm && (
-                <div className="modal-overlay">
-                    <div className="modal-content" style={{ maxWidth: '1200px', width: '95%', maxHeight: '90vh', overflow: 'auto' }}>
-                        <div className="modal-header">
-                            <h3 style={{ margin: 0, fontSize: '24px', fontWeight: 600 }}>Message Template</h3>
+                <div className="modal-overlay" style={isMobile ? {
+                    padding: '8px',
+                    alignItems: 'flex-start',
+                    overflowY: 'auto'
+                } : {}}>
+                    <div className="modal-content" style={isMobile ? {
+                        maxWidth: 'calc(100vw - 16px)',
+                        width: '100%',
+                        maxHeight: 'calc(100vh - 16px)',
+                        margin: '0',
+                        borderRadius: '8px'
+                    } : {
+                        maxWidth: '1200px',
+                        width: '95%',
+                        maxHeight: '90vh',
+                        overflow: 'auto'
+                    }}>
+                        <div className="modal-header" style={isMobile ? {
+                            padding: '10px 12px',
+                            borderBottom: '1px solid #e5e7eb'
+                        } : {}}>
+                            <h3 style={isMobile ? {
+                                margin: 0,
+                                fontSize: '14px',
+                                fontWeight: 600
+                            } : {
+                                margin: 0,
+                                fontSize: '24px',
+                                fontWeight: 600
+                            }}>Message Template</h3>
                             <button 
                                 className="close-btn"
                                 onClick={() => {
@@ -9479,6 +9505,11 @@ const Settings = () => {
                                         category: 'User Defined Message'
                                     });
                                 }}
+                                style={isMobile ? {
+                                    fontSize: '18px',
+                                    width: '24px',
+                                    height: '24px'
+                                } : {}}
                             >
                                 ×
                             </button>
@@ -9502,62 +9533,201 @@ const Settings = () => {
                                 alert('Error creating template: ' + (error.response?.data?.message || error.message));
                             }
                         }}>
-                            <div className="modal-body" style={{ display: 'flex', gap: '24px', padding: '24px' }}>
+                            <div className="modal-body" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '12px',
+                                padding: '12px'
+                            } : {
+                                display: 'flex',
+                                gap: '24px',
+                                padding: '24px'
+                            }}>
                                 {/* Left Column - Form */}
-                                <div style={{ flex: '0 0 350px' }}>
-                                    <div className="form-group" style={{ marginBottom: '20px' }}>
-                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>Name</label>
+                                <div style={isMobile ? {
+                                    flex: '1 1 auto',
+                                    width: '100%'
+                                } : {
+                                    flex: '0 0 350px'
+                                }}>
+                                    <div className="form-group" style={isMobile ? {
+                                        marginBottom: '12px'
+                                    } : {
+                                        marginBottom: '20px'
+                                    }}>
+                                        <label style={isMobile ? {
+                                            display: 'block',
+                                            marginBottom: '4px',
+                                            fontWeight: 600,
+                                            color: '#374151',
+                                            fontSize: '11px'
+                                        } : {
+                                            display: 'block',
+                                            marginBottom: '8px',
+                                            fontWeight: 500,
+                                            color: '#374151'
+                                        }}>Name</label>
                                         <input
                                             type="text"
                                             value={emailTemplateFormData.name}
                                             onChange={(e) => setEmailTemplateFormData({ ...emailTemplateFormData, name: e.target.value })}
                                             placeholder="test"
                                             required
-                                            style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px' }}
+                                            style={isMobile ? {
+                                                width: '100%',
+                                                padding: '6px 8px',
+                                                border: '1px solid #d1d5db',
+                                                borderRadius: '4px',
+                                                fontSize: '13px',
+                                                height: '32px',
+                                                boxSizing: 'border-box'
+                                            } : {
+                                                width: '100%',
+                                                padding: '8px 12px',
+                                                border: '1px solid #d1d5db',
+                                                borderRadius: '6px',
+                                                fontSize: '14px'
+                                            }}
                                         />
-                                        <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>
+                                        <p style={isMobile ? {
+                                            fontSize: '10px',
+                                            color: '#6b7280',
+                                            marginTop: '4px',
+                                            marginBottom: 0,
+                                            lineHeight: '1.3'
+                                        } : {
+                                            fontSize: '12px',
+                                            color: '#6b7280',
+                                            marginTop: '4px',
+                                            marginBottom: 0
+                                        }}>
                                             This will help you identify this message when choosing from your list of messages. Not visible to the recipient.
                                         </p>
                                     </div>
                                 </div>
 
                                 {/* Right Column - Email Preview */}
-                                <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={isMobile ? {
+                                    flex: '1 1 auto',
+                                    width: '100%',
+                                    minWidth: 0
+                                } : {
+                                    flex: 1,
+                                    minWidth: 0
+                                }}>
                                     {/* Email Preview Container */}
-                                    <div style={{ 
+                                    <div style={isMobile ? {
+                                        border: '1px solid #e5e7eb',
+                                        borderRadius: '6px',
+                                        backgroundColor: '#f9fafb',
+                                        overflow: 'hidden'
+                                    } : {
                                         border: '1px solid #e5e7eb',
                                         borderRadius: '8px',
                                         backgroundColor: '#f9fafb',
                                         overflow: 'hidden'
                                     }}>
                                         {/* Email Header */}
-                                        <div style={{ 
+                                        <div style={isMobile ? {
+                                            padding: '10px',
+                                            borderBottom: '1px solid #e5e7eb',
+                                            backgroundColor: '#fff'
+                                        } : {
                                             padding: '16px',
                                             borderBottom: '1px solid #e5e7eb',
                                             backgroundColor: '#fff'
                                         }}>
-                                            <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
-                                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#ef4444' }}></div>
-                                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#fbbf24' }}></div>
-                                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#10b981' }}></div>
+                                            <div style={isMobile ? {
+                                                display: 'flex',
+                                                gap: '4px',
+                                                marginBottom: '8px'
+                                            } : {
+                                                display: 'flex',
+                                                gap: '6px',
+                                                marginBottom: '12px'
+                                            }}>
+                                                <div style={isMobile ? {
+                                                    width: '8px',
+                                                    height: '8px',
+                                                    borderRadius: '50%',
+                                                    backgroundColor: '#ef4444'
+                                                } : {
+                                                    width: '12px',
+                                                    height: '12px',
+                                                    borderRadius: '50%',
+                                                    backgroundColor: '#ef4444'
+                                                }}></div>
+                                                <div style={isMobile ? {
+                                                    width: '8px',
+                                                    height: '8px',
+                                                    borderRadius: '50%',
+                                                    backgroundColor: '#fbbf24'
+                                                } : {
+                                                    width: '12px',
+                                                    height: '12px',
+                                                    borderRadius: '50%',
+                                                    backgroundColor: '#fbbf24'
+                                                }}></div>
+                                                <div style={isMobile ? {
+                                                    width: '8px',
+                                                    height: '8px',
+                                                    borderRadius: '50%',
+                                                    backgroundColor: '#10b981'
+                                                } : {
+                                                    width: '12px',
+                                                    height: '12px',
+                                                    borderRadius: '50%',
+                                                    backgroundColor: '#10b981'
+                                                }}></div>
                                             </div>
-                                            <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>
+                                            <div style={isMobile ? {
+                                                fontSize: '9px',
+                                                color: '#6b7280',
+                                                marginBottom: '2px',
+                                                wordBreak: 'break-word'
+                                            } : {
+                                                fontSize: '11px',
+                                                color: '#6b7280',
+                                                marginBottom: '4px'
+                                            }}>
                                                 From "Hugo Hall" &lt;info@flyawayballooning.com&gt;
                                             </div>
-                                            <div style={{ fontSize: '11px', color: '#9ca3af' }}>
+                                            <div style={isMobile ? {
+                                                fontSize: '9px',
+                                                color: '#9ca3af'
+                                            } : {
+                                                fontSize: '11px',
+                                                color: '#9ca3af'
+                                            }}>
                                                 Sent at Nov 09, 2025 4:00pm
                                             </div>
                                         </div>
 
                                         {/* Email Subject */}
-                                        <div style={{ padding: '16px', backgroundColor: '#fff', borderBottom: '1px solid #e5e7eb' }}>
+                                        <div style={isMobile ? {
+                                            padding: '10px',
+                                            backgroundColor: '#fff',
+                                            borderBottom: '1px solid #e5e7eb'
+                                        } : {
+                                            padding: '16px',
+                                            backgroundColor: '#fff',
+                                            borderBottom: '1px solid #e5e7eb'
+                                        }}>
                                             <input
                                                 type="text"
                                                 value={emailTemplateFormData.subject}
                                                 onChange={(e) => setEmailTemplateFormData({ ...emailTemplateFormData, subject: e.target.value })}
                                                 placeholder="Enter subject..."
                                                 required
-                                                style={{ 
+                                                style={isMobile ? {
+                                                    width: '100%',
+                                                    border: 'none',
+                                                    outline: 'none',
+                                                    fontSize: '13px',
+                                                    fontWeight: 500,
+                                                    padding: '2px 0',
+                                                    color: '#111827'
+                                                } : {
                                                     width: '100%',
                                                     border: 'none',
                                                     outline: 'none',
@@ -9567,13 +9737,28 @@ const Settings = () => {
                                                     color: '#111827'
                                                 }}
                                             />
-                                            <div style={{ 
+                                            <div style={isMobile ? {
+                                                display: 'flex',
+                                                gap: '6px',
+                                                marginTop: '6px',
+                                                alignItems: 'center'
+                                            } : {
                                                 display: 'flex',
                                                 gap: '8px',
                                                 marginTop: '8px',
                                                 alignItems: 'center'
                                             }}>
-                                                <span style={{ 
+                                                <span style={isMobile ? {
+                                                    width: '16px',
+                                                    height: '16px',
+                                                    borderRadius: '50%',
+                                                    backgroundColor: '#10b981',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    color: '#fff',
+                                                    fontSize: '10px'
+                                                } : {
                                                     width: '20px',
                                                     height: '20px',
                                                     borderRadius: '50%',
@@ -9584,7 +9769,17 @@ const Settings = () => {
                                                     color: '#fff',
                                                     fontSize: '12px'
                                                 }}>✓</span>
-                                                <span style={{ 
+                                                <span style={isMobile ? {
+                                                    width: '16px',
+                                                    height: '16px',
+                                                    borderRadius: '50%',
+                                                    backgroundColor: '#10b981',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    color: '#fff',
+                                                    fontSize: '10px'
+                                                } : {
                                                     width: '20px',
                                                     height: '20px',
                                                     borderRadius: '50%',
@@ -9601,7 +9796,15 @@ const Settings = () => {
                                         {/* Email Body */}
                                         <div style={{ padding: '0' }}>
                                             {/* Editable Content Area */}
-                                            <div style={{ padding: '24px', backgroundColor: '#fff', minHeight: '200px' }}>
+                                            <div style={isMobile ? {
+                                                padding: '12px',
+                                                backgroundColor: '#fff',
+                                                minHeight: '150px'
+                                            } : {
+                                                padding: '24px',
+                                                backgroundColor: '#fff',
+                                                minHeight: '200px'
+                                            }}>
                                                 <RichTextEditor
                                                     value={emailTemplateFormData.body}
                                                     onChange={(html) => setEmailTemplateFormData({ ...emailTemplateFormData, body: html })}
@@ -9613,7 +9816,19 @@ const Settings = () => {
                                 </div>
                             </div>
 
-                            <div className="form-actions" style={{ borderTop: '1px solid #e5e7eb', padding: '16px 24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                            <div className="form-actions" style={isMobile ? {
+                                borderTop: '1px solid #e5e7eb',
+                                padding: '12px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px'
+                            } : {
+                                borderTop: '1px solid #e5e7eb',
+                                padding: '16px 24px',
+                                display: 'flex',
+                                justifyContent: 'flex-end',
+                                gap: '12px'
+                            }}>
                                 <button 
                                     type="button" 
                                     className="btn btn-secondary"
@@ -9626,11 +9841,27 @@ const Settings = () => {
                                             category: 'User Defined Message',
                                         });
                                     }}
-                                    style={{ padding: '8px 20px' }}
+                                    style={isMobile ? {
+                                        padding: '8px 12px',
+                                        fontSize: '12px',
+                                        width: '100%',
+                                        borderRadius: '4px',
+                                        height: '36px'
+                                    } : {
+                                        padding: '8px 20px'
+                                    }}
                                 >
                                     Cancel
                                 </button>
-                                <button type="submit" className="btn btn-primary" style={{ padding: '8px 20px' }}>
+                                <button type="submit" className="btn btn-primary" style={isMobile ? {
+                                    padding: '8px 12px',
+                                    fontSize: '12px',
+                                    width: '100%',
+                                    borderRadius: '4px',
+                                    height: '36px'
+                                } : {
+                                    padding: '8px 20px'
+                                }}>
                                     Create Template
                                 </button>
                             </div>
