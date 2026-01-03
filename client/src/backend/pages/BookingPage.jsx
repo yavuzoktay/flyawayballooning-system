@@ -8928,76 +8928,133 @@ setBookingDetail(finalVoucherDetail);
                 <Dialog
                     open={userSessionModalOpen}
                     onClose={() => setUserSessionModalOpen(false)}
-                    maxWidth="md"
+                    maxWidth={isMobile ? "md" : "lg"}
                     fullWidth
+                    PaperProps={{
+                        sx: !isMobile ? {
+                            maxWidth: '1200px',
+                            width: '95%',
+                            maxHeight: '90vh',
+                            overflow: 'auto'
+                        } : {}
+                    }}
                 >
-                    <DialogTitle sx={{ fontWeight: 700, fontSize: 24 }}>
+                    <DialogTitle sx={{ 
+                        fontWeight: 700, 
+                        fontSize: isMobile ? 24 : '20px',
+                        padding: isMobile ? 'inherit' : '20px 24px',
+                        color: isMobile ? 'inherit' : '#1f2937',
+                        borderBottom: isMobile ? 'none' : '1px solid #e5e7eb',
+                        margin: isMobile ? 'inherit' : 0
+                    }}>
                         User Session
                     </DialogTitle>
-                    <DialogContent dividers sx={{ background: '#f5f7fb' }}>
+                    <DialogContent dividers sx={{ background: '#f5f7fb', padding: isMobile ? 'inherit' : '24px' }}>
                         {userSessionLoading ? (
-                            <Box sx={{ p: 3, textAlign: 'center' }}>
-                                <Typography variant="body2">Loading user session...</Typography>
+                            <Box sx={{ p: isMobile ? 3 : 3, textAlign: 'center' }}>
+                                <Typography variant="body2" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Loading user session...</Typography>
                             </Box>
                         ) : !userSession ? (
-                            <Box sx={{ p: 3, textAlign: 'center' }}>
-                                <Typography variant="body2" color="text.secondary">
+                            <Box sx={{ p: isMobile ? 3 : 3, textAlign: 'center' }}>
+                                <Typography variant="body2" color="text.secondary" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>
                                     No user session data available for this booking.
                                 </Typography>
                             </Box>
                         ) : (
-                            <Box sx={{ p: 2 }}>
-                                <Grid container spacing={3}>
+                            <Box sx={{ p: isMobile ? 2 : 2 }}>
+                                <Grid container spacing={isMobile ? 3 : 3}>
                                     {/* Session Activity Metrics */}
                                     <Grid item xs={12}>
-                                        <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                                        <Typography variant="h6" sx={{ 
+                                            mb: 2, 
+                                            fontWeight: 600,
+                                            fontSize: isMobile ? 'inherit' : '18px',
+                                            color: isMobile ? 'inherit' : '#1f2937'
+                                        }}>
                                             Session Activity
                                         </Typography>
-                                        <Grid container spacing={2}>
+                                        <Grid container spacing={isMobile ? 2 : 2}>
                                             <Grid item xs={6}>
                                                 <Box sx={{ 
-                                                    p: 2, 
-                                                    borderRadius: 2, 
+                                                    p: isMobile ? 2 : 2, 
+                                                    borderRadius: isMobile ? 2 : '8px', 
                                                     background: '#ffffff',
-                                                    border: '1px solid #e2e8f0'
+                                                    border: isMobile ? '1px solid #e2e8f0' : '1px solid #e5e7eb'
                                                 }}>
-                                                    <Typography variant="caption" color="text.secondary">
+                                                    <Typography variant="caption" color="text.secondary" sx={{ 
+                                                        fontSize: isMobile ? 'inherit' : '12px',
+                                                        fontWeight: isMobile ? 'inherit' : 500,
+                                                        color: isMobile ? 'inherit' : '#6b7280',
+                                                        display: 'block',
+                                                        marginBottom: isMobile ? 'inherit' : '4px'
+                                                    }}>
                                                         Booking Clicks
                                                     </Typography>
-                                                    <Typography variant="h5" sx={{ fontWeight: 600, mt: 0.5 }}>
+                                                    <Typography variant="h5" sx={{ 
+                                                        fontWeight: 600, 
+                                                        mt: 0.5,
+                                                        fontSize: isMobile ? 'inherit' : '24px',
+                                                        color: isMobile ? 'inherit' : '#1f2937'
+                                                    }}>
                                                         {userSession.booking_clicks || 0}
                                                     </Typography>
                                                 </Box>
                                             </Grid>
                                             <Grid item xs={6}>
                                                 <Box sx={{ 
-                                                    p: 2, 
-                                                    borderRadius: 2, 
+                                                    p: isMobile ? 2 : 2, 
+                                                    borderRadius: isMobile ? 2 : '8px', 
                                                     background: '#ffffff',
-                                                    border: '1px solid #e2e8f0'
+                                                    border: isMobile ? '1px solid #e2e8f0' : '1px solid #e5e7eb'
                                                 }}>
-                                                    <Typography variant="caption" color="text.secondary">
+                                                    <Typography variant="caption" color="text.secondary" sx={{ 
+                                                        fontSize: isMobile ? 'inherit' : '12px',
+                                                        fontWeight: isMobile ? 'inherit' : 500,
+                                                        color: isMobile ? 'inherit' : '#6b7280',
+                                                        display: 'block',
+                                                        marginBottom: isMobile ? 'inherit' : '4px'
+                                                    }}>
                                                         Site Page Views
                                                     </Typography>
-                                                    <Typography variant="h5" sx={{ fontWeight: 600, mt: 0.5 }}>
+                                                    <Typography variant="h5" sx={{ 
+                                                        fontWeight: 600, 
+                                                        mt: 0.5,
+                                                        fontSize: isMobile ? 'inherit' : '24px',
+                                                        color: isMobile ? 'inherit' : '#1f2937'
+                                                    }}>
                                                         {userSession.site_page_views || 0}
                                                     </Typography>
                                                 </Box>
                                             </Grid>
                                             <Grid item xs={12}>
                                                 <Box sx={{ 
-                                                    p: 2, 
-                                                    borderRadius: 2, 
+                                                    p: isMobile ? 2 : 2, 
+                                                    borderRadius: isMobile ? 2 : '8px', 
                                                     background: '#ffffff',
-                                                    border: '1px solid #e2e8f0'
+                                                    border: isMobile ? '1px solid #e2e8f0' : '1px solid #e5e7eb'
                                                 }}>
-                                                    <Typography variant="caption" color="text.secondary">
+                                                    <Typography variant="caption" color="text.secondary" sx={{ 
+                                                        fontSize: isMobile ? 'inherit' : '12px',
+                                                        fontWeight: isMobile ? 'inherit' : 500,
+                                                        color: isMobile ? 'inherit' : '#6b7280',
+                                                        display: 'block',
+                                                        marginBottom: isMobile ? 'inherit' : '4px'
+                                                    }}>
                                                         First Seen
                                                     </Typography>
-                                                    <Typography variant="body1" sx={{ fontWeight: 500, mt: 0.5 }}>
+                                                    <Typography variant="body1" sx={{ 
+                                                        fontWeight: 500, 
+                                                        mt: 0.5,
+                                                        fontSize: isMobile ? 'inherit' : '14px',
+                                                        color: isMobile ? 'inherit' : '#374151'
+                                                    }}>
                                                         {userSession.first_seen ? dayjs(userSession.first_seen).format('MMMM D, YYYY, h:mm A') : 'N/A'}
                                                         {userSession.days_ago !== null && (
-                                                            <Typography variant="caption" color="text.secondary" display="block">
+                                                            <Typography variant="caption" color="text.secondary" display="block" sx={{ 
+                                                                fontSize: isMobile ? 'inherit' : '12px',
+                                                                lineHeight: isMobile ? 'inherit' : '1.4',
+                                                                marginTop: isMobile ? 'inherit' : '4px'
+                                                            }}>
                                                                 ({userSession.days_ago} {userSession.days_ago === 1 ? 'day' : 'days'} ago)
                                                             </Typography>
                                                         )}
@@ -9010,21 +9067,34 @@ setBookingDetail(finalVoucherDetail);
                                     {/* Location Information */}
                                     {(userSession.location_city || userSession.location_country) && (
                                         <Grid item xs={12}>
-                                            <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                                            <Typography variant="h6" sx={{ 
+                                                mb: 2, 
+                                                fontWeight: 600,
+                                                fontSize: isMobile ? 'inherit' : '18px',
+                                                color: isMobile ? 'inherit' : '#1f2937'
+                                            }}>
                                                 Location
                                             </Typography>
                                             <Box sx={{ 
-                                                p: 2, 
-                                                borderRadius: 2, 
+                                                p: isMobile ? 2 : 2, 
+                                                borderRadius: isMobile ? 2 : '8px', 
                                                 background: '#ffffff',
-                                                border: '1px solid #e2e8f0'
+                                                border: isMobile ? '1px solid #e2e8f0' : '1px solid #e5e7eb'
                                             }}>
-                                                <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                                                <Typography variant="body1" sx={{ 
+                                                    fontWeight: 500,
+                                                    fontSize: isMobile ? 'inherit' : '14px',
+                                                    color: isMobile ? 'inherit' : '#374151'
+                                                }}>
                                                     {[userSession.location_city, userSession.location_country].filter(Boolean).join(', ') || 'N/A'}
                                                 </Typography>
                                             {userSession.coordinates_lat && userSession.coordinates_lng && (
                                                 <>
-                                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                                    <Typography variant="body2" color="text.secondary" sx={{ 
+                                                        mt: 1,
+                                                        fontSize: isMobile ? 'inherit' : '12px',
+                                                        lineHeight: isMobile ? 'inherit' : '1.4'
+                                                    }}>
                                                         {userSession.coordinates_lat}°N {userSession.coordinates_lng}°W
                                                     </Typography>
                                                     <Box sx={{ mt: 2 }}>
@@ -9034,12 +9104,13 @@ setBookingDetail(finalVoucherDetail);
                                                             rel="noopener noreferrer"
                                                             style={{ 
                                                                 display: 'inline-block',
-                                                                padding: '8px 16px',
+                                                                padding: isMobile ? '8px 16px' : '8px 16px',
                                                                 background: '#1976d2',
                                                                 color: '#fff',
                                                                 textDecoration: 'none',
-                                                                borderRadius: '4px',
-                                                                fontWeight: 500
+                                                                borderRadius: isMobile ? '4px' : '6px',
+                                                                fontWeight: 500,
+                                                                fontSize: isMobile ? 'inherit' : '14px'
                                                             }}
                                                         >
                                                             View on Google Maps
@@ -9053,76 +9124,147 @@ setBookingDetail(finalVoucherDetail);
 
                                     {/* Technical Details */}
                                     <Grid item xs={12}>
-                                        <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                                        <Typography variant="h6" sx={{ 
+                                            mb: 2, 
+                                            fontWeight: 600,
+                                            fontSize: isMobile ? 'inherit' : '18px',
+                                            color: isMobile ? 'inherit' : '#1f2937'
+                                        }}>
                                             Technical Details
                                         </Typography>
-                                        <Grid container spacing={2}>
+                                        <Grid container spacing={isMobile ? 2 : 2}>
                                             {userSession.ip_address && (
                                                 <Grid item xs={6}>
-                                                    <Typography variant="caption" color="text.secondary">
+                                                    <Typography variant="caption" color="text.secondary" sx={{ 
+                                                        fontSize: isMobile ? 'inherit' : '12px',
+                                                        fontWeight: isMobile ? 'inherit' : 500,
+                                                        color: isMobile ? 'inherit' : '#6b7280',
+                                                        display: 'block',
+                                                        marginBottom: isMobile ? 'inherit' : '4px'
+                                                    }}>
                                                         IP Address
                                                     </Typography>
-                                                    <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                                                    <Typography variant="body2" sx={{ 
+                                                        fontFamily: 'monospace',
+                                                        fontSize: isMobile ? 'inherit' : '14px',
+                                                        color: isMobile ? 'inherit' : '#374151'
+                                                    }}>
                                                         {userSession.ip_address}
                                                     </Typography>
                                                 </Grid>
                                             )}
                                             {userSession.browser && (
                                                 <Grid item xs={6}>
-                                                    <Typography variant="caption" color="text.secondary">
+                                                    <Typography variant="caption" color="text.secondary" sx={{ 
+                                                        fontSize: isMobile ? 'inherit' : '12px',
+                                                        fontWeight: isMobile ? 'inherit' : 500,
+                                                        color: isMobile ? 'inherit' : '#6b7280',
+                                                        display: 'block',
+                                                        marginBottom: isMobile ? 'inherit' : '4px'
+                                                    }}>
                                                         Browser
                                                     </Typography>
-                                                    <Typography variant="body2">
+                                                    <Typography variant="body2" sx={{ 
+                                                        fontSize: isMobile ? 'inherit' : '14px',
+                                                        color: isMobile ? 'inherit' : '#374151'
+                                                    }}>
                                                         {userSession.browser}
                                                     </Typography>
                                                 </Grid>
                                             )}
                                             {userSession.browser_size && (
                                                 <Grid item xs={6}>
-                                                    <Typography variant="caption" color="text.secondary">
+                                                    <Typography variant="caption" color="text.secondary" sx={{ 
+                                                        fontSize: isMobile ? 'inherit' : '12px',
+                                                        fontWeight: isMobile ? 'inherit' : 500,
+                                                        color: isMobile ? 'inherit' : '#6b7280',
+                                                        display: 'block',
+                                                        marginBottom: isMobile ? 'inherit' : '4px'
+                                                    }}>
                                                         Browser Size
                                                     </Typography>
-                                                    <Typography variant="body2">
+                                                    <Typography variant="body2" sx={{ 
+                                                        fontSize: isMobile ? 'inherit' : '14px',
+                                                        color: isMobile ? 'inherit' : '#374151'
+                                                    }}>
                                                         {userSession.browser_size}
                                                     </Typography>
                                                 </Grid>
                                             )}
                                             {userSession.language && (
                                                 <Grid item xs={6}>
-                                                    <Typography variant="caption" color="text.secondary">
+                                                    <Typography variant="caption" color="text.secondary" sx={{ 
+                                                        fontSize: isMobile ? 'inherit' : '12px',
+                                                        fontWeight: isMobile ? 'inherit' : 500,
+                                                        color: isMobile ? 'inherit' : '#6b7280',
+                                                        display: 'block',
+                                                        marginBottom: isMobile ? 'inherit' : '4px'
+                                                    }}>
                                                         Language
                                                     </Typography>
-                                                    <Typography variant="body2">
+                                                    <Typography variant="body2" sx={{ 
+                                                        fontSize: isMobile ? 'inherit' : '14px',
+                                                        color: isMobile ? 'inherit' : '#374151'
+                                                    }}>
                                                         {userSession.language}
                                                     </Typography>
                                                 </Grid>
                                             )}
                                             {userSession.operating_system && (
                                                 <Grid item xs={6}>
-                                                    <Typography variant="caption" color="text.secondary">
+                                                    <Typography variant="caption" color="text.secondary" sx={{ 
+                                                        fontSize: isMobile ? 'inherit' : '12px',
+                                                        fontWeight: isMobile ? 'inherit' : 500,
+                                                        color: isMobile ? 'inherit' : '#6b7280',
+                                                        display: 'block',
+                                                        marginBottom: isMobile ? 'inherit' : '4px'
+                                                    }}>
                                                         Operating System
                                                     </Typography>
-                                                    <Typography variant="body2">
+                                                    <Typography variant="body2" sx={{ 
+                                                        fontSize: isMobile ? 'inherit' : '14px',
+                                                        color: isMobile ? 'inherit' : '#374151'
+                                                    }}>
                                                         {userSession.operating_system}
                                                     </Typography>
                                                 </Grid>
                                             )}
                                             {userSession.device_type && (
                                                 <Grid item xs={6}>
-                                                    <Typography variant="caption" color="text.secondary">
+                                                    <Typography variant="caption" color="text.secondary" sx={{ 
+                                                        fontSize: isMobile ? 'inherit' : '12px',
+                                                        fontWeight: isMobile ? 'inherit' : 500,
+                                                        color: isMobile ? 'inherit' : '#6b7280',
+                                                        display: 'block',
+                                                        marginBottom: isMobile ? 'inherit' : '4px'
+                                                    }}>
                                                         Device Type
                                                     </Typography>
-                                                    <Typography variant="body2">
+                                                    <Typography variant="body2" sx={{ 
+                                                        fontSize: isMobile ? 'inherit' : '14px',
+                                                        color: isMobile ? 'inherit' : '#374151'
+                                                    }}>
                                                         {userSession.device_type}
                                                     </Typography>
                                                 </Grid>
                                             )}
                                             {userSession.user_agent && (
                                                 <Grid item xs={12}>
-                                                    <Typography variant="caption" color="text.secondary">
+                                                    <Typography variant="caption" color="text.secondary" sx={{ 
+                                                        fontSize: isMobile ? 'inherit' : '12px',
+                                                        fontWeight: isMobile ? 'inherit' : 500,
+                                                        color: isMobile ? 'inherit' : '#6b7280',
+                                                        display: 'block',
+                                                        marginBottom: isMobile ? 'inherit' : '4px'
+                                                    }}>
                                                         User Agent
                                                     </Typography>
-                                                    <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem', wordBreak: 'break-all' }}>
+                                                    <Typography variant="body2" sx={{ 
+                                                        fontFamily: 'monospace', 
+                                                        fontSize: isMobile ? '0.75rem' : '12px', 
+                                                        wordBreak: 'break-all',
+                                                        color: isMobile ? 'inherit' : '#374151'
+                                                    }}>
                                                         {userSession.user_agent}
                                                     </Typography>
                                                 </Grid>
@@ -9133,26 +9275,51 @@ setBookingDetail(finalVoucherDetail);
                                     {/* Referral and Navigation */}
                                     {(userSession.referrer || userSession.landing_page) && (
                                         <Grid item xs={12}>
-                                            <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                                            <Typography variant="h6" sx={{ 
+                                                mb: 2, 
+                                                fontWeight: 600,
+                                                fontSize: isMobile ? 'inherit' : '18px',
+                                                color: isMobile ? 'inherit' : '#1f2937'
+                                            }}>
                                                 Referral and Navigation
                                             </Typography>
-                                            <Grid container spacing={2}>
+                                            <Grid container spacing={isMobile ? 2 : 2}>
                                                 {userSession.referrer && (
                                                     <Grid item xs={12}>
-                                                        <Typography variant="caption" color="text.secondary">
+                                                        <Typography variant="caption" color="text.secondary" sx={{ 
+                                                            fontSize: isMobile ? 'inherit' : '12px',
+                                                            fontWeight: isMobile ? 'inherit' : 500,
+                                                            color: isMobile ? 'inherit' : '#6b7280',
+                                                            display: 'block',
+                                                            marginBottom: isMobile ? 'inherit' : '4px'
+                                                        }}>
                                                             Referrer
                                                         </Typography>
-                                                        <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
+                                                        <Typography variant="body2" sx={{ 
+                                                            wordBreak: 'break-all',
+                                                            fontSize: isMobile ? 'inherit' : '14px',
+                                                            color: isMobile ? 'inherit' : '#374151'
+                                                        }}>
                                                             {userSession.referrer}
                                                         </Typography>
                                                     </Grid>
                                                 )}
                                                 {userSession.landing_page && (
                                                     <Grid item xs={12}>
-                                                        <Typography variant="caption" color="text.secondary">
+                                                        <Typography variant="caption" color="text.secondary" sx={{ 
+                                                            fontSize: isMobile ? 'inherit' : '12px',
+                                                            fontWeight: isMobile ? 'inherit' : 500,
+                                                            color: isMobile ? 'inherit' : '#6b7280',
+                                                            display: 'block',
+                                                            marginBottom: isMobile ? 'inherit' : '4px'
+                                                        }}>
                                                             Landing Page
                                                         </Typography>
-                                                        <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
+                                                        <Typography variant="body2" sx={{ 
+                                                            wordBreak: 'break-all',
+                                                            fontSize: isMobile ? 'inherit' : '14px',
+                                                            color: isMobile ? 'inherit' : '#374151'
+                                                        }}>
                                                             {userSession.landing_page}
                                                         </Typography>
                                                     </Grid>
@@ -9164,8 +9331,23 @@ setBookingDetail(finalVoucherDetail);
                             </Box>
                         )}
                     </DialogContent>
-                    <DialogActions>
-                        <Button onClick={() => setUserSessionModalOpen(false)}>Close</Button>
+                    <DialogActions sx={{ 
+                        padding: isMobile ? 'inherit' : '16px 24px',
+                        borderTop: isMobile ? 'none' : '1px solid #e5e7eb',
+                        marginTop: isMobile ? 'inherit' : '20px',
+                        justifyContent: isMobile ? 'inherit' : 'flex-end',
+                        gap: isMobile ? 'inherit' : '12px'
+                    }}>
+                        <Button 
+                            onClick={() => setUserSessionModalOpen(false)} 
+                            sx={{ 
+                                fontSize: isMobile ? 'inherit' : '14px',
+                                padding: isMobile ? 'inherit' : '8px 20px',
+                                borderRadius: isMobile ? 'inherit' : '6px'
+                            }}
+                        >
+                            Close
+                        </Button>
                     </DialogActions>
                 </Dialog>
 
