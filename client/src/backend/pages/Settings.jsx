@@ -9657,16 +9657,29 @@ const Settings = () => {
                         maxHeight: 'calc(100vh - 16px)',
                         margin: '0',
                         borderRadius: '8px'
-                    } : {}}>
+                    } : {
+                        maxWidth: '800px',
+                        width: '90%',
+                        maxHeight: '90vh',
+                        overflow: 'auto'
+                    }}>
                         <div className="modal-header" style={isMobile ? {
                             padding: '10px 12px',
                             borderBottom: '1px solid #e5e7eb'
-                        } : {}}>
+                        } : {
+                            padding: '20px 24px',
+                            borderBottom: '1px solid #e5e7eb'
+                        }}>
                             <h3 style={isMobile ? {
                                 fontSize: '14px',
                                 fontWeight: 600,
                                 margin: 0
-                            } : {}}>{
+                            } : {
+                                fontSize: '20px',
+                                fontWeight: 600,
+                                margin: 0,
+                                color: '#1f2937'
+                            }}>{
                                 showPassengerTermsForm
                                     ? 'Create Terms & Conditions for Passenger Information'
                                     : showEditPassengerTermsForm
@@ -9686,7 +9699,11 @@ const Settings = () => {
                                     fontSize: '18px',
                                     width: '24px',
                                     height: '24px'
-                                } : {}}
+                                } : {
+                                    fontSize: '24px',
+                                    width: '32px',
+                                    height: '32px'
+                                }}
                             >
                                 ×
                             </button>
@@ -9694,21 +9711,36 @@ const Settings = () => {
                         
                         <form onSubmit={(showPassengerTermsForm || showEditPassengerTermsForm) ? handlePassengerTermsSubmit : handleTermsSubmit} className="terms-form" style={isMobile ? {
                             padding: '12px'
-                        } : {}}>
+                        } : {
+                            padding: '24px'
+                        }}>
                             <div className="form-row" style={isMobile ? {
                                 display: 'flex',
                                 flexDirection: 'column',
                                 gap: '8px',
                                 marginBottom: '12px'
-                            } : {}}>
+                            } : {
+                                display: 'flex',
+                                gap: '20px',
+                                marginBottom: '20px'
+                            }}>
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    flex: 1,
+                                    marginBottom: 0
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Title *</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Title *</label>
                                     <input
                                         type="text"
                                         value={(showPassengerTermsForm || showEditPassengerTermsForm) ? passengerTermsFormData.title : termsFormData.title}
@@ -9726,19 +9758,36 @@ const Settings = () => {
                                             fontSize: '13px',
                                             borderRadius: '4px',
                                             height: '32px',
+                                            boxSizing: 'border-box',
+                                            width: '100%'
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
                                             boxSizing: 'border-box'
-                                        } : {}}
+                                        }}
                                     />
                                 </div>
                                 
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    flex: 1,
+                                    marginBottom: 0
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Sort Order</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Sort Order</label>
                                     <input
                                         type="number"
                                         value={(showPassengerTermsForm || showEditPassengerTermsForm) ? passengerTermsFormData.sort_order : termsFormData.sort_order}
@@ -9757,20 +9806,36 @@ const Settings = () => {
                                             fontSize: '13px',
                                             borderRadius: '4px',
                                             height: '32px',
+                                            boxSizing: 'border-box',
+                                            width: '100%'
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
                                             boxSizing: 'border-box'
-                                        } : {}}
+                                        }}
                                     />
                                 </div>
                             </div>
                             
                             <div className="form-group" style={isMobile ? {
                                 marginBottom: '12px'
-                            } : {}}>
+                            } : {
+                                marginBottom: '20px'
+                            }}>
                                 <label style={isMobile ? {
                                     fontSize: '11px',
                                     marginBottom: '4px',
                                     fontWeight: 600
-                                } : {}}>Content *</label>
+                                } : {
+                                    display: 'block',
+                                    marginBottom: '8px',
+                                    fontWeight: 500,
+                                    color: '#374151',
+                                    fontSize: '14px'
+                                }}>Content *</label>
                                 <textarea
                                     value={(showPassengerTermsForm || showEditPassengerTermsForm) ? passengerTermsFormData.content : termsFormData.content}
                                     onChange={(e) => {
@@ -9791,10 +9856,18 @@ const Settings = () => {
                                         borderRadius: '4px',
                                         minHeight: '120px',
                                         resize: 'vertical',
-                                        boxSizing: 'border-box'
+                                        boxSizing: 'border-box',
+                                        width: '100%'
                                     } : {
+                                        width: '100%',
+                                        padding: '10px 12px',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '6px',
+                                        fontSize: '14px',
+                                        resize: 'vertical',
                                         fontFamily: 'inherit',
-                                        lineHeight: '1.5'
+                                        lineHeight: '1.5',
+                                        boxSizing: 'border-box'
                                     }}
                                 />
                                 <div style={isMobile ? {
@@ -9814,12 +9887,20 @@ const Settings = () => {
                                 // Original experiences/voucher type UI for regular Terms & Conditions
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    marginBottom: '20px'
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Experiences *</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Experiences *</label>
                                     <div style={isMobile ? {
                                         border: '1px solid #d1d5db',
                                         borderRadius: '6px',
@@ -9874,7 +9955,11 @@ const Settings = () => {
                                                         style={isMobile ? {
                                                             width: '14px',
                                                             height: '14px'
-                                                        } : {}}
+                                                        } : {
+                                                            width: '18px',
+                                                            height: '18px',
+                                                            cursor: 'pointer'
+                                                        }}
                                                     />
                                                     <span style={isMobile ? {
                                                         fontSize: '11px',
@@ -9907,12 +9992,20 @@ const Settings = () => {
                                 // Passenger Information: Journey Types (Flight Types)
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    marginBottom: '20px'
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Flight Type *</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Flight Type *</label>
                                     <div style={isMobile ? {
                                         border: '1px solid #d1d5db',
                                         borderRadius: '6px',
@@ -9961,7 +10054,11 @@ const Settings = () => {
                                                         style={isMobile ? {
                                                             width: '14px',
                                                             height: '14px'
-                                                        } : {}}
+                                                        } : {
+                                                            width: '18px',
+                                                            height: '18px',
+                                                            cursor: 'pointer'
+                                                        }}
                                                     />
                                                     <span style={isMobile ? {
                                                         fontSize: '11px',
@@ -9981,12 +10078,20 @@ const Settings = () => {
                             {!(showPassengerTermsForm || showEditPassengerTermsForm) && termsFormData.showVoucherTypes && (
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    marginBottom: '20px'
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Voucher Types *</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Voucher Types *</label>
                                     <div style={isMobile ? {
                                         border: '1px solid #d1d5db',
                                         borderRadius: '6px',
@@ -10029,10 +10134,13 @@ const Settings = () => {
                                                 boxSizing: 'border-box'
                                             } : {
                                                 width: '100%',
-                                                padding: '8px',
-                                                borderRadius: '6px',
+                                                padding: '10px 12px',
                                                 border: '1px solid #d1d5db',
-                                                background: '#fff'
+                                                borderRadius: '6px',
+                                                fontSize: '14px',
+                                                backgroundColor: '#fff',
+                                                cursor: 'pointer',
+                                                boxSizing: 'border-box'
                                             }}
                                         >
                                             <option value="">Select a voucher type</option>
@@ -10065,12 +10173,20 @@ const Settings = () => {
                             {!(showPassengerTermsForm || showEditPassengerTermsForm) && termsFormData.showPrivateVoucherTypes && (
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    marginBottom: '20px'
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Private Voucher Types</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Private Voucher Types</label>
                                     <div style={isMobile ? {
                                         border: '1px solid #d1d5db',
                                         borderRadius: '6px',
@@ -10118,10 +10234,13 @@ const Settings = () => {
                                                 boxSizing: 'border-box'
                                             } : {
                                                 width: '100%',
-                                                padding: '8px',
-                                                borderRadius: '6px',
+                                                padding: '10px 12px',
                                                 border: '1px solid #d1d5db',
-                                                background: '#fff'
+                                                borderRadius: '6px',
+                                                fontSize: '14px',
+                                                backgroundColor: '#fff',
+                                                cursor: 'pointer',
+                                                boxSizing: 'border-box'
                                             }}
                                         >
                                             <option value="">Select a private charter voucher type</option>
@@ -10152,12 +10271,20 @@ const Settings = () => {
                             
                             <div className="form-group" style={isMobile ? {
                                 marginBottom: '12px'
-                            } : {}}>
+                            } : {
+                                marginBottom: '20px'
+                            }}>
                                 <label style={isMobile ? {
                                     fontSize: '11px',
                                     marginBottom: '4px',
                                     fontWeight: 600
-                                } : {}}>Status</label>
+                                } : {
+                                    display: 'block',
+                                    marginBottom: '8px',
+                                    fontWeight: 500,
+                                    color: '#374151',
+                                    fontSize: '14px'
+                                }}>Status</label>
                                 <select
                                     value={termsFormData.is_active}
                                     onChange={(e) => setTermsFormData({...termsFormData, is_active: e.target.value === 'true'})}
@@ -10168,7 +10295,16 @@ const Settings = () => {
                                         width: '100%',
                                         height: '32px',
                                         boxSizing: 'border-box'
-                                    } : {}}
+                                    } : {
+                                        width: '100%',
+                                        padding: '10px 12px',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '6px',
+                                        fontSize: '14px',
+                                        boxSizing: 'border-box',
+                                        backgroundColor: '#fff',
+                                        cursor: 'pointer'
+                                    }}
                                 >
                                     <option value={true}>Active</option>
                                     <option value={false}>Inactive</option>
@@ -10182,7 +10318,14 @@ const Settings = () => {
                                 paddingTop: '12px',
                                 marginTop: '12px',
                                 borderTop: '1px solid #e5e7eb'
-                            } : {}}>
+                            } : {
+                                borderTop: '1px solid #e5e7eb',
+                                padding: '16px 24px',
+                                display: 'flex',
+                                justifyContent: 'flex-end',
+                                gap: '12px',
+                                marginTop: '20px'
+                            }}>
                                 <button type="button" className="btn btn-secondary" onClick={() => {
                                     setShowTermsForm(false);
                                     setShowEditTermsForm(false);
@@ -10193,7 +10336,11 @@ const Settings = () => {
                                     width: '100%',
                                     borderRadius: '4px',
                                     height: '36px'
-                                } : {}}>
+                                } : {
+                                    padding: '8px 20px',
+                                    fontSize: '14px',
+                                    borderRadius: '6px'
+                                }}>
                                     Cancel
                                 </button>
                                 <button type="submit" className="btn btn-primary" style={isMobile ? {
@@ -10202,7 +10349,11 @@ const Settings = () => {
                                     width: '100%',
                                     borderRadius: '4px',
                                     height: '36px'
-                                } : {}}>
+                                } : {
+                                    padding: '8px 20px',
+                                    fontSize: '14px',
+                                    borderRadius: '6px'
+                                }}>
                                     {showEditTermsForm ? 'Update Terms' : 'Create Terms'}
                                 </button>
                             </div>
