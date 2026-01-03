@@ -25666,8 +25666,23 @@ app.post('/api/pilot-assignment', (req, res) => {
                         AND google_calendar_event_id IS NOT NULL
                     `;
                     
+                    console.log('📅 [pilot-assignment] Querying bookings with params:', {
+                        activityId: normalizedActivityId,
+                        date: date,
+                        time: time,
+                        pilotMember: pilotMember
+                    });
+                    
                     con.query(getBookingsSql, [normalizedActivityId, date, time, time], async (bookingsErr, bookingsResult) => {
-                        if (!bookingsErr && bookingsResult && bookingsResult.length > 0) {
+                        if (bookingsErr) {
+                            console.error('❌ [pilot-assignment] Error querying bookings:', bookingsErr);
+                            return;
+                        }
+                        
+                        console.log('📅 [pilot-assignment] Found bookings:', bookingsResult.length);
+                        console.log('📅 [pilot-assignment] Bookings details:', JSON.stringify(bookingsResult, null, 2));
+                        
+                        if (bookingsResult && bookingsResult.length > 0) {
                             // Get total passenger count for this flight slot
                             const getTotalPassengersSql = `
                                 SELECT SUM(pax) as total_passengers 
@@ -25699,6 +25714,12 @@ app.post('/api/pilot-assignment', (req, res) => {
                                     if (!crewErr && crewResult && crewResult.length > 0) {
                                         crewMember = `${crewResult[0].first_name} ${crewResult[0].last_name}`;
                                     }
+                                    
+                                    console.log('📅 [pilot-assignment] Final data before update:', {
+                                        pilotMember: pilotMember,
+                                        crewMember: crewMember,
+                                        totalPassengers: totalPassengers
+                                    });
                                     
                                     // Update all Google Calendar events for this flight slot
                                     console.log(`📅 [pilot-assignment] Updating ${bookingsResult.length} Google Calendar event(s) with pilot: ${pilotMember || 'None'}, crew: ${crewMember || 'None'}`);
