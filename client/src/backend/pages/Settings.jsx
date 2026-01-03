@@ -5742,10 +5742,27 @@ const Settings = () => {
 
             {/* Create/Edit Experience Form Modal */}
             {(showExperiencesForm || showEditExperienceForm) && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <div className="modal-header">
-                            <h3>{showEditExperienceForm ? 'Edit Experience' : 'Create New Experience'}</h3>
+                <div className="modal-overlay" style={isMobile ? {
+                    padding: '8px',
+                    alignItems: 'flex-start',
+                    overflowY: 'auto'
+                } : {}}>
+                    <div className="modal-content" style={isMobile ? {
+                        maxWidth: 'calc(100vw - 16px)',
+                        width: '100%',
+                        maxHeight: 'calc(100vh - 16px)',
+                        margin: '0',
+                        borderRadius: '8px'
+                    } : {}}>
+                        <div className="modal-header" style={isMobile ? {
+                            padding: '12px 16px',
+                            borderBottom: '1px solid #e5e7eb'
+                        } : {}}>
+                            <h3 style={isMobile ? {
+                                fontSize: '16px',
+                                fontWeight: 600,
+                                margin: 0
+                            } : {}}>{showEditExperienceForm ? 'Edit Experience' : 'Create New Experience'}</h3>
                             <button 
                                 className="close-btn"
                                 onClick={() => {
@@ -5753,50 +5770,113 @@ const Settings = () => {
                                     setShowEditExperienceForm(false);
                                     resetExperienceForm();
                                 }}
+                                style={isMobile ? {
+                                    fontSize: '20px',
+                                    width: '28px',
+                                    height: '28px'
+                                } : {}}
                             >
                                 ×
                             </button>
                         </div>
                         
-                        <form onSubmit={handleExperienceSubmit} className="experience-form">
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Title *</label>
+                        <form onSubmit={handleExperienceSubmit} className="experience-form" style={isMobile ? {
+                            padding: '16px'
+                        } : {}}>
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '12px',
+                                marginBottom: '16px'
+                            } : {}}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '16px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '12px',
+                                        marginBottom: '6px',
+                                        fontWeight: 600
+                                    } : {}}>Title *</label>
                                     <input
                                         type="text"
                                         value={experienceFormData.title}
                                         onChange={(e) => setExperienceFormData({...experienceFormData, title: e.target.value})}
                                         placeholder="e.g., Shared Flight"
                                         required
+                                        style={isMobile ? {
+                                            padding: '10px 12px',
+                                            fontSize: '14px',
+                                            borderRadius: '6px'
+                                        } : {}}
                                     />
                                 </div>
                                 
-                                <div className="form-group">
-                                    <label>Max Passengers</label>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '16px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '12px',
+                                        marginBottom: '6px',
+                                        fontWeight: 600
+                                    } : {}}>Max Passengers</label>
                                     <input
                                         type="number"
                                         value={experienceFormData.max_passengers}
                                         onChange={(e) => setExperienceFormData({...experienceFormData, max_passengers: parseInt(e.target.value)})}
                                         placeholder="8"
                                         min="1"
+                                        style={isMobile ? {
+                                            padding: '10px 12px',
+                                            fontSize: '14px',
+                                            borderRadius: '6px'
+                                        } : {}}
                                     />
                                 </div>
                             </div>
                             
-                            <div className="form-group">
-                                <label>Description *</label>
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '16px'
+                            } : {}}>
+                                <label style={isMobile ? {
+                                    fontSize: '12px',
+                                    marginBottom: '6px',
+                                    fontWeight: 600
+                                } : {}}>Description *</label>
                                 <textarea
                                     value={experienceFormData.description}
                                     onChange={(e) => setExperienceFormData({...experienceFormData, description: e.target.value})}
                                     placeholder="Describe the experience..."
-                                    rows="4"
+                                    rows={isMobile ? 3 : 4}
                                     required
+                                    style={isMobile ? {
+                                        padding: '10px 12px',
+                                        fontSize: '14px',
+                                        borderRadius: '6px',
+                                        minHeight: '80px',
+                                        resize: 'vertical'
+                                    } : {}}
                                 />
                             </div>
                             
-                            <div className="form-group">
-                                <label>Experience Image</label>
-                                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '16px'
+                            } : {}}>
+                                <label style={isMobile ? {
+                                    fontSize: '12px',
+                                    marginBottom: '6px',
+                                    fontWeight: 600
+                                } : {}}>Experience Image</label>
+                                <div style={isMobile ? {
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '8px',
+                                    alignItems: 'stretch'
+                                } : {
+                                    display: 'flex',
+                                    gap: '12px',
+                                    alignItems: 'center',
+                                    flexWrap: 'wrap'
+                                }}>
                                     <input
                                         type="file"
                                         accept="image/*"
@@ -5806,11 +5886,31 @@ const Settings = () => {
                                                 setExperienceFormData({...experienceFormData, image_file: file});
                                             }
                                         }}
-                                        style={{ flex: 1, minWidth: '200px' }}
+                                        style={isMobile ? {
+                                            flex: 1,
+                                            minWidth: '0',
+                                            padding: '8px 10px',
+                                            fontSize: '12px'
+                                        } : {
+                                            flex: 1,
+                                            minWidth: '200px'
+                                        }}
                                     />
                                     {experienceFormData.image_url && (
                                         <>
-                                            <div style={{ fontSize: '12px', color: '#6b7280', flex: '1', minWidth: '200px' }}>
+                                            <div style={isMobile ? {
+                                                fontSize: '11px',
+                                                color: '#6b7280',
+                                                wordBreak: 'break-word',
+                                                padding: '8px',
+                                                background: '#f9fafb',
+                                                borderRadius: '4px'
+                                            } : {
+                                                fontSize: '12px',
+                                                color: '#6b7280',
+                                                flex: '1',
+                                                minWidth: '200px'
+                                            }}>
                                                 Current: {experienceFormData.image_url}
                                             </div>
                                             <button
@@ -5828,7 +5928,17 @@ const Settings = () => {
                                                         }
                                                     }
                                                 }}
-                                                style={{
+                                                style={isMobile ? {
+                                                    padding: '8px 12px',
+                                                    backgroundColor: '#dc2626',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    cursor: 'pointer',
+                                                    fontSize: '12px',
+                                                    fontWeight: '500',
+                                                    width: '100%'
+                                                } : {
                                                     padding: '8px 16px',
                                                     backgroundColor: '#dc2626',
                                                     color: 'white',
@@ -5839,8 +5949,8 @@ const Settings = () => {
                                                     fontWeight: '500',
                                                     transition: 'background-color 0.2s'
                                                 }}
-                                                onMouseOver={(e) => e.target.style.backgroundColor = '#b91c1c'}
-                                                onMouseOut={(e) => e.target.style.backgroundColor = '#dc2626'}
+                                                onMouseOver={!isMobile ? ((e) => e.target.style.backgroundColor = '#b91c1c') : undefined}
+                                                onMouseOut={!isMobile ? ((e) => e.target.style.backgroundColor = '#dc2626') : undefined}
                                             >
                                                 Delete Image
                                             </button>
@@ -5849,23 +5959,51 @@ const Settings = () => {
                                 </div>
                             </div>
                             
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Sort Order</label>
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '12px',
+                                marginBottom: '16px'
+                            } : {}}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '16px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '12px',
+                                        marginBottom: '6px',
+                                        fontWeight: 600
+                                    } : {}}>Sort Order</label>
                                     <input
                                         type="number"
                                         value={experienceFormData.sort_order}
                                         onChange={(e) => setExperienceFormData({...experienceFormData, sort_order: parseInt(e.target.value)})}
                                         placeholder="0"
                                         min="0"
+                                        style={isMobile ? {
+                                            padding: '10px 12px',
+                                            fontSize: '14px',
+                                            borderRadius: '6px'
+                                        } : {}}
                                     />
                                 </div>
                                 
-                                <div className="form-group">
-                                    <label>Status</label>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '16px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '12px',
+                                        marginBottom: '6px',
+                                        fontWeight: 600
+                                    } : {}}>Status</label>
                                     <select
                                         value={experienceFormData.is_active}
                                         onChange={(e) => setExperienceFormData({...experienceFormData, is_active: e.target.value === 'true'})}
+                                        style={isMobile ? {
+                                            padding: '10px 12px',
+                                            fontSize: '14px',
+                                            borderRadius: '6px',
+                                            width: '100%'
+                                        } : {}}
                                     >
                                         <option value={true}>Active</option>
                                         <option value={false}>Inactive</option>
@@ -5873,15 +6011,32 @@ const Settings = () => {
                                 </div>
                             </div>
                             
-                            <div className="form-actions">
+                            <div className="form-actions" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '10px',
+                                paddingTop: '16px',
+                                marginTop: '16px',
+                                borderTop: '1px solid #e5e7eb'
+                            } : {}}>
                                 <button type="button" className="btn btn-secondary" onClick={() => {
                                     setShowExperiencesForm(false);
                                     setShowEditExperienceForm(false);
                                     resetExperienceForm();
-                                }}>
+                                }} style={isMobile ? {
+                                    padding: '10px 16px',
+                                    fontSize: '13px',
+                                    width: '100%',
+                                    borderRadius: '6px'
+                                } : {}}>
                                     Cancel
                                 </button>
-                                <button type="submit" className="btn btn-primary">
+                                <button type="submit" className="btn btn-primary" style={isMobile ? {
+                                    padding: '10px 16px',
+                                    fontSize: '13px',
+                                    width: '100%',
+                                    borderRadius: '6px'
+                                } : {}}>
                                     {showEditExperienceForm ? 'Update Experience' : 'Create Experience'}
                                 </button>
                             </div>
