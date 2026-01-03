@@ -9360,13 +9360,32 @@ setBookingDetail(finalVoucherDetail);
                 <Dialog 
                     open={smsModalOpen} 
                     onClose={() => setSmsModalOpen(false)}
-                    maxWidth="md"
+                    maxWidth={isMobile ? "md" : "lg"}
                     fullWidth
+                    PaperProps={{
+                        sx: !isMobile ? {
+                            maxWidth: '1200px',
+                            width: '95%',
+                            maxHeight: '90vh',
+                            overflow: 'auto'
+                        } : {}
+                    }}
                 >
-                    <DialogTitle sx={{ color: '#1976d2', fontWeight: 600, fontSize: isMobile ? 18 : 24, padding: isMobile ? '12px 16px' : 'inherit' }}>
+                    <DialogTitle sx={{ 
+                        color: isMobile ? '#1976d2' : '#1f2937',
+                        fontWeight: 600, 
+                        fontSize: isMobile ? 18 : '20px', 
+                        padding: isMobile ? '12px 16px' : '20px 24px',
+                        borderBottom: isMobile ? 'none' : '1px solid #e5e7eb',
+                        margin: isMobile ? 'inherit' : 0
+                    }}>
                         Send a SMS
                         {selectedBookingForEmail && (
-                            <Typography variant="subtitle2" color="textSecondary" sx={{ mt: isMobile ? 0.25 : 0.5, fontSize: isMobile ? 12 : 'inherit' }}>
+                            <Typography variant="subtitle2" color="textSecondary" sx={{ 
+                                mt: isMobile ? 0.25 : 0.5, 
+                                fontSize: isMobile ? 12 : '12px',
+                                fontWeight: isMobile ? 'inherit' : 400
+                            }}>
                                 {selectedBookingIds && selectedBookingIds.length > 1 
                                     ? `Bulk SMS to ${selectedBookingIds.length} bookings`
                                     : `Booking: ${selectedBookingForEmail.name} (${selectedBookingForEmail.id})`
@@ -9377,10 +9396,15 @@ setBookingDetail(finalVoucherDetail);
                     <DialogContent sx={{ padding: isMobile ? '12px 16px' : '24px' }}>
                         <Grid container spacing={isMobile ? 1 : 2} sx={{ mt: isMobile ? 0 : 1 }}>
                             <Grid item xs={12}>
-                                <Typography variant="subtitle2" sx={{ mb: isMobile ? 0.5 : 1, fontWeight: 500, fontSize: isMobile ? 13 : 'inherit' }}>
+                                <Typography variant="subtitle2" sx={{ 
+                                    mb: isMobile ? 0.5 : 1, 
+                                    fontWeight: 500, 
+                                    fontSize: isMobile ? 13 : '14px',
+                                    color: isMobile ? 'inherit' : '#374151'
+                                }}>
                                     Choose a template:
                                 </Typography>
-                                <FormControl fullWidth size={isMobile ? "small" : "small"}>
+                                <FormControl fullWidth size={isMobile ? "small" : "medium"}>
                                     <Select
                                         value={smsForm.template || 'custom'}
                                         onChange={(e) => {
@@ -9397,28 +9421,42 @@ setBookingDetail(finalVoucherDetail);
                                             },
                                         }}
                                         sx={{
-                                            fontSize: isMobile ? '14px' : 'inherit'
+                                            fontSize: isMobile ? '14px' : '14px',
+                                            '& .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: isMobile ? 'inherit' : '#d1d5db'
+                                            },
+                                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: isMobile ? 'inherit' : '#9ca3af'
+                                            },
+                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: isMobile ? 'inherit' : '#3b82f6'
+                                            }
                                         }}
                                     >
                                         {smsTemplates.length === 0 ? (
-                                            <MenuItem value="custom">Custom Message</MenuItem>
+                                            <MenuItem value="custom" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Custom Message</MenuItem>
                                         ) : (
                                             [
                                                 // Database SMS templates
                                                 ...smsTemplates.map((template) => (
-                                                    <MenuItem key={template.id} value={String(template.id)}>
+                                                    <MenuItem key={template.id} value={String(template.id)} sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>
                                                         {template.name}
                                                     </MenuItem>
                                                 )),
                                                 // Custom Message option (always available)
-                                                <MenuItem key="custom" value="custom">Custom Message</MenuItem>
+                                                <MenuItem key="custom" value="custom" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Custom Message</MenuItem>
                                             ]
                                         )}
                                     </Select>
                                 </FormControl>
                             </Grid>
                             <Grid item xs={12}>
-                                <Typography variant="subtitle2" sx={{ mb: isMobile ? 0.5 : 1, fontWeight: 500, fontSize: isMobile ? 13 : 'inherit' }}>
+                                <Typography variant="subtitle2" sx={{ 
+                                    mb: isMobile ? 0.5 : 1, 
+                                    fontWeight: 500, 
+                                    fontSize: isMobile ? 13 : '14px',
+                                    color: isMobile ? 'inherit' : '#374151'
+                                }}>
                                     Message
                                 </Typography>
                                 <TextField
@@ -9432,17 +9470,31 @@ setBookingDetail(finalVoucherDetail);
                                     size={isMobile ? "small" : "medium"}
                                     sx={{ 
                                         '& .MuiOutlinedInput-root': {
-                                            borderRadius: 2,
-                                            fontSize: isMobile ? '14px' : 'inherit'
+                                            borderRadius: isMobile ? 2 : '6px',
+                                            fontSize: isMobile ? '14px' : '14px',
+                                            '& fieldset': {
+                                                borderColor: isMobile ? 'inherit' : '#d1d5db'
+                                            },
+                                            '&:hover fieldset': {
+                                                borderColor: isMobile ? 'inherit' : '#9ca3af'
+                                            },
+                                            '&.Mui-focused fieldset': {
+                                                borderColor: isMobile ? 'inherit' : '#3b82f6'
+                                            }
                                         },
                                         '& .MuiInputLabel-root': {
-                                            fontSize: isMobile ? '14px' : 'inherit'
+                                            fontSize: isMobile ? '14px' : '14px'
                                         }
                                     }}
                                 />
                             </Grid>
                             <Grid item xs={12}>
-                                <Typography variant="subtitle2" sx={{ mb: isMobile ? 0.5 : 1, fontWeight: 500, fontSize: isMobile ? 13 : 'inherit' }}>
+                                <Typography variant="subtitle2" sx={{ 
+                                    mb: isMobile ? 0.5 : 1, 
+                                    fontWeight: 500, 
+                                    fontSize: isMobile ? 13 : '14px',
+                                    color: isMobile ? 'inherit' : '#374151'
+                                }}>
                                     Add an optional, personalized note
                                 </Typography>
                                 <TextField
@@ -9456,11 +9508,20 @@ setBookingDetail(finalVoucherDetail);
                                     size={isMobile ? "small" : "medium"}
                                     sx={{ 
                                         '& .MuiOutlinedInput-root': {
-                                            borderRadius: 2,
-                                            fontSize: isMobile ? '14px' : 'inherit'
+                                            borderRadius: isMobile ? 2 : '6px',
+                                            fontSize: isMobile ? '14px' : '14px',
+                                            '& fieldset': {
+                                                borderColor: isMobile ? 'inherit' : '#d1d5db'
+                                            },
+                                            '&:hover fieldset': {
+                                                borderColor: isMobile ? 'inherit' : '#9ca3af'
+                                            },
+                                            '&.Mui-focused fieldset': {
+                                                borderColor: isMobile ? 'inherit' : '#3b82f6'
+                                            }
                                         },
                                         '& .MuiInputLabel-root': {
-                                            fontSize: isMobile ? '14px' : 'inherit'
+                                            fontSize: isMobile ? '14px' : '14px'
                                         }
                                     }}
                                 />
@@ -9468,8 +9529,8 @@ setBookingDetail(finalVoucherDetail);
                             {/* SMS Preview - Mobile Device */}
                             <Grid item xs={12}>
                                 <Box sx={{ 
-                                    border: '1px solid #e0e0e0', 
-                                    borderRadius: 2, 
+                                    border: isMobile ? '1px solid #e0e0e0' : '1px solid #e5e7eb', 
+                                    borderRadius: isMobile ? 2 : '8px', 
                                     p: isMobile ? 1 : 2,
                                     backgroundColor: '#f9f9f9',
                                     display: 'flex',
@@ -9552,37 +9613,85 @@ setBookingDetail(finalVoucherDetail);
                             {/* SMS Logs */}
                             <Grid item xs={12}>
                                 <Divider sx={{ my: isMobile ? 1 : 2 }} />
-                                <Typography variant="subtitle1" sx={{ mb: isMobile ? 0.5 : 1, fontWeight: 600, fontSize: isMobile ? 14 : 'inherit' }}>
+                                <Typography variant="subtitle1" sx={{ 
+                                    mb: isMobile ? 0.5 : 1, 
+                                    fontWeight: 600, 
+                                    fontSize: isMobile ? 14 : '16px',
+                                    color: isMobile ? 'inherit' : '#374151'
+                                }}>
                                     Sent SMS
                                 </Typography>
                                 {smsLogsLoading ? (
-                                    <Typography variant="body2" sx={{ fontSize: isMobile ? 12 : 'inherit' }}>Loading...</Typography>
+                                    <Typography variant="body2" sx={{ fontSize: isMobile ? 12 : '14px' }}>Loading...</Typography>
                                 ) : (smsLogs && smsLogs.length > 0 ? (
                                     <TableContainer sx={{ maxHeight: isMobile ? '200px' : 'none', overflowX: 'auto' }}>
                                         <Table size={isMobile ? "small" : "small"}>
                                         <TableHead>
                                             <TableRow>
-                                                    <TableCell sx={{ fontSize: isMobile ? 10 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>Date</TableCell>
-                                                    <TableCell sx={{ fontSize: isMobile ? 10 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>To</TableCell>
-                                                    <TableCell sx={{ fontSize: isMobile ? 10 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>Status</TableCell>
+                                                    <TableCell sx={{ 
+                                                        fontSize: isMobile ? 10 : '14px', 
+                                                        padding: isMobile ? '6px 4px' : '16px',
+                                                        fontWeight: isMobile ? 'inherit' : 500,
+                                                        color: isMobile ? 'inherit' : '#374151'
+                                                    }}>
+                                                        Date
+                                                    </TableCell>
+                                                    <TableCell sx={{ 
+                                                        fontSize: isMobile ? 10 : '14px', 
+                                                        padding: isMobile ? '6px 4px' : '16px',
+                                                        fontWeight: isMobile ? 'inherit' : 500,
+                                                        color: isMobile ? 'inherit' : '#374151'
+                                                    }}>
+                                                        To
+                                                    </TableCell>
+                                                    <TableCell sx={{ 
+                                                        fontSize: isMobile ? 10 : '14px', 
+                                                        padding: isMobile ? '6px 4px' : '16px',
+                                                        fontWeight: isMobile ? 'inherit' : 500,
+                                                        color: isMobile ? 'inherit' : '#374151'
+                                                    }}>
+                                                        Status
+                                                    </TableCell>
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
                                             {smsLogs.map((log) => (
                                                 <TableRow key={log.id}>
-                                                        <TableCell sx={{ fontSize: isMobile ? 9 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>{(() => { try { return dayjs(log.sent_at).format('DD/MM/YYYY HH:mm'); } catch { return String(log.sent_at || ''); } })()}</TableCell>
-                                                        <TableCell sx={{ fontSize: isMobile ? 9 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit', wordBreak: 'break-word' }}>{log.to_number}</TableCell>
-                                                        <TableCell sx={{ fontSize: isMobile ? 9 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>{log.status}</TableCell>
+                                                        <TableCell sx={{ 
+                                                            fontSize: isMobile ? 9 : '14px', 
+                                                            padding: isMobile ? '6px 4px' : '16px'
+                                                        }}>
+                                                            {(() => { try { return dayjs(log.sent_at).format('DD/MM/YYYY HH:mm'); } catch { return String(log.sent_at || ''); } })()}
+                                                        </TableCell>
+                                                        <TableCell sx={{ 
+                                                            fontSize: isMobile ? 9 : '14px', 
+                                                            padding: isMobile ? '6px 4px' : '16px', 
+                                                            wordBreak: 'break-word'
+                                                        }}>
+                                                            {log.to_number}
+                                                        </TableCell>
+                                                        <TableCell sx={{ 
+                                                            fontSize: isMobile ? 9 : '14px', 
+                                                            padding: isMobile ? '6px 4px' : '16px'
+                                                        }}>
+                                                            {log.status}
+                                                        </TableCell>
                                                 </TableRow>
                                             ))}
                                         </TableBody>
                                     </Table>
                                     </TableContainer>
-                                ) : (<Typography variant="body2" sx={{ fontSize: isMobile ? 12 : 'inherit' }}>No SMS sent yet.</Typography>))}
+                                ) : (<Typography variant="body2" sx={{ fontSize: isMobile ? 12 : '14px' }}>No SMS sent yet.</Typography>))}
                             </Grid>
                         </Grid>
                     </DialogContent>
-                    <DialogActions sx={{ p: isMobile ? 1.5 : 3, justifyContent: 'flex-end' }}>
+                    <DialogActions sx={{ 
+                        p: isMobile ? 1.5 : '16px 24px', 
+                        justifyContent: 'flex-end',
+                        borderTop: isMobile ? 'none' : '1px solid #e5e7eb',
+                        marginTop: isMobile ? 'inherit' : '20px',
+                        gap: isMobile ? 'inherit' : '12px'
+                    }}>
                         <Button 
                             onClick={handleSendSms}
                             variant="contained"
@@ -9591,10 +9700,10 @@ setBookingDetail(finalVoucherDetail);
                                 backgroundColor: '#17a2b8',
                                 px: isMobile ? 2 : 4,
                                 py: isMobile ? 1 : 1.5,
-                                borderRadius: 2,
+                                borderRadius: isMobile ? 2 : '6px',
                                 fontWeight: 600,
                                 textTransform: 'none',
-                                fontSize: isMobile ? 14 : 16,
+                                fontSize: isMobile ? 14 : '14px',
                                 '&:hover': {
                                     backgroundColor: '#138496'
                                 }
