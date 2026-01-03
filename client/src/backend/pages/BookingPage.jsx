@@ -7474,35 +7474,92 @@ setBookingDetail(finalVoucherDetail);
                     </DialogActions>
                 </Dialog>
                 <Dialog open={addGuestDialogOpen} onClose={() => setAddGuestDialogOpen(false)} maxWidth="sm" fullWidth>
-                    <DialogTitle>Add Guest</DialogTitle>
-                    <DialogContent>
-                        <Typography sx={{ mb: 2 }}>Experience: <b>{guestType}</b></Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                            <Typography>How many guests to add?</Typography>
-                            <Button variant="outlined" onClick={() => setGuestCount(Math.max(guestCount - 1, 0))}>-</Button>
-                            <Typography>{guestCount}</Typography>
-                            <Button variant="outlined" onClick={() => setGuestCount(guestCount + 1)}>+</Button>
+                    <DialogTitle sx={{ fontSize: isMobile ? 16 : 'inherit', padding: isMobile ? '12px 16px' : 'inherit' }}>Add Guest</DialogTitle>
+                    <DialogContent sx={{ padding: isMobile ? '12px 16px' : '24px' }}>
+                        <Typography sx={{ mb: isMobile ? 1 : 2, fontSize: isMobile ? 14 : 'inherit' }}>Experience: <b>{guestType}</b></Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: isMobile ? 1 : 2, mb: isMobile ? 1 : 2 }}>
+                            <Typography sx={{ fontSize: isMobile ? 14 : 'inherit' }}>How many guests to add?</Typography>
+                            <Button variant="outlined" onClick={() => setGuestCount(Math.max(guestCount - 1, 0))} sx={{ minWidth: isMobile ? '32px' : 'auto', padding: isMobile ? '4px 8px' : 'inherit' }}>-</Button>
+                            <Typography sx={{ fontSize: isMobile ? 14 : 'inherit' }}>{guestCount}</Typography>
+                            <Button variant="outlined" onClick={() => setGuestCount(guestCount + 1)} sx={{ minWidth: isMobile ? '32px' : 'auto', padding: isMobile ? '4px 8px' : 'inherit' }}>+</Button>
                         </Box>
                         {guestForms.map((g, idx) => (
-                            <Box key={idx} sx={{ mb: 2, p: 2, border: '1px solid #eee', borderRadius: 2 }}>
-                                <Typography sx={{ fontWeight: 600, mb: 1 }}>Guest {idx + 1}</Typography>
-                                <TextField label="First Name" value={g.firstName} onChange={e => handleGuestFormChange(idx, 'firstName', e.target.value)} fullWidth margin="dense" />
-                                <TextField label="Last Name" value={g.lastName} onChange={e => handleGuestFormChange(idx, 'lastName', e.target.value)} fullWidth margin="dense" />
-                                <TextField label="Weight (kg)" value={g.weight} onChange={e => handleGuestFormChange(idx, 'weight', e.target.value)} fullWidth margin="dense" />
+                            <Box key={idx} sx={{ mb: isMobile ? 1 : 2, p: isMobile ? 1 : 2, border: '1px solid #eee', borderRadius: 2 }}>
+                                <Typography sx={{ fontWeight: 600, mb: isMobile ? 0.5 : 1, fontSize: isMobile ? 14 : 'inherit' }}>Guest {idx + 1}</Typography>
+                                <TextField 
+                                    label="First Name" 
+                                    value={g.firstName} 
+                                    onChange={e => handleGuestFormChange(idx, 'firstName', e.target.value)} 
+                                    fullWidth 
+                                    size={isMobile ? "small" : "medium"}
+                                    sx={{
+                                        '& .MuiInputBase-root': {
+                                            fontSize: isMobile ? '14px' : 'inherit',
+                                            height: isMobile ? '40px' : 'auto'
+                                        },
+                                        '& .MuiInputLabel-root': {
+                                            fontSize: isMobile ? '14px' : 'inherit'
+                                        },
+                                        mb: isMobile ? 1 : 1.5
+                                    }}
+                                />
+                                <TextField 
+                                    label="Last Name" 
+                                    value={g.lastName} 
+                                    onChange={e => handleGuestFormChange(idx, 'lastName', e.target.value)} 
+                                    fullWidth 
+                                    size={isMobile ? "small" : "medium"}
+                                    sx={{
+                                        '& .MuiInputBase-root': {
+                                            fontSize: isMobile ? '14px' : 'inherit',
+                                            height: isMobile ? '40px' : 'auto'
+                                        },
+                                        '& .MuiInputLabel-root': {
+                                            fontSize: isMobile ? '14px' : 'inherit'
+                                        },
+                                        mb: isMobile ? 1 : 1.5
+                                    }}
+                                />
+                                <TextField 
+                                    label="Weight (kg)" 
+                                    value={g.weight} 
+                                    onChange={e => handleGuestFormChange(idx, 'weight', e.target.value)} 
+                                    fullWidth 
+                                    size={isMobile ? "small" : "medium"}
+                                    sx={{
+                                        '& .MuiInputBase-root': {
+                                            fontSize: isMobile ? '14px' : 'inherit',
+                                            height: isMobile ? '40px' : 'auto'
+                                        },
+                                        '& .MuiInputLabel-root': {
+                                            fontSize: isMobile ? '14px' : 'inherit'
+                                        },
+                                        mb: isMobile ? 1 : 1.5
+                                    }}
+                                />
                                 {guestType && guestType.toLowerCase().includes('shared') && (
-                                    <Box sx={{ mt: 2, p: 2, backgroundColor: '#f5f9ff', borderRadius: 2, border: '1px solid #dbeafe' }}>
+                                    <Box sx={{ mt: isMobile ? 1 : 2, p: isMobile ? 1 : 2, backgroundColor: '#f5f9ff', borderRadius: 2, border: '1px solid #dbeafe' }}>
                                         <FormControlLabel
                                             control={
                                                 <Switch
                                                     checked={Boolean(g.weatherRefund)}
                                                     onChange={(_, checked) => handleGuestFormChange(idx, 'weatherRefund', checked)}
                                                     color="primary"
+                                                    size={isMobile ? "small" : "medium"}
                                                 />
                                             }
                                             label={`Weather Refundable (+£47.50)`}
-                                            sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', margin: 0 }}
+                                            sx={{ 
+                                                display: 'flex', 
+                                                justifyContent: 'space-between', 
+                                                width: '100%', 
+                                                margin: 0,
+                                                '& .MuiFormControlLabel-label': {
+                                                    fontSize: isMobile ? '13px' : 'inherit'
+                                                }
+                                            }}
                                         />
-                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                        <Typography variant="body2" color="text.secondary" sx={{ mt: isMobile ? 0.5 : 1, fontSize: isMobile ? '11px' : 'inherit' }}>
                                             Provides weather protection for this guest. Charged per passenger.
                                         </Typography>
                                     </Box>
@@ -7510,9 +7567,9 @@ setBookingDetail(finalVoucherDetail);
                             </Box>
                         ))}
                     </DialogContent>
-                    <DialogActions>
-                        <Button onClick={() => setAddGuestDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleSaveGuests} variant="contained" color="primary">Save</Button>
+                    <DialogActions sx={{ padding: isMobile ? '8px 16px' : 'inherit' }}>
+                        <Button onClick={() => setAddGuestDialogOpen(false)} sx={{ fontSize: isMobile ? '14px' : 'inherit', padding: isMobile ? '6px 12px' : 'inherit' }}>Cancel</Button>
+                        <Button onClick={handleSaveGuests} variant="contained" color="primary" sx={{ fontSize: isMobile ? '14px' : 'inherit', padding: isMobile ? '6px 12px' : 'inherit' }}>Save</Button>
                     </DialogActions>
                 </Dialog>
                 <RebookAvailabilityModal
@@ -7530,19 +7587,19 @@ setBookingDetail(finalVoucherDetail);
                     maxWidth="md"
                     fullWidth
                 >
-                    <DialogTitle sx={{ fontWeight: 700, fontSize: 24 }}>
+                    <DialogTitle sx={{ fontWeight: 700, fontSize: isMobile ? 18 : 24, padding: isMobile ? '12px 16px' : 'inherit' }}>
                         Messages
                         {selectedBookingForEmail && (
-                            <Typography variant="subtitle2" color="textSecondary" sx={{ mt: 0.5 }}>
+                            <Typography variant="subtitle2" color="textSecondary" sx={{ mt: isMobile ? 0.25 : 0.5, fontSize: isMobile ? 12 : 'inherit' }}>
                                 Booking: {selectedBookingForEmail.name} ({selectedBookingForEmail.id})
                             </Typography>
                         )}
                     </DialogTitle>
-                    <DialogContent dividers sx={{ background: '#f5f7fb' }}>
+                    <DialogContent dividers sx={{ background: '#f5f7fb', padding: isMobile ? '12px 16px' : '24px' }}>
                         {messagesLoading ? (
-                            <Typography variant="body2">Loading messages...</Typography>
+                            <Typography variant="body2" sx={{ fontSize: isMobile ? 14 : 'inherit' }}>Loading messages...</Typography>
                         ) : messageLogs.length === 0 ? (
-                            <Typography variant="body2" color="text.secondary">
+                            <Typography variant="body2" color="text.secondary" sx={{ fontSize: isMobile ? 14 : 'inherit' }}>
                                 No messages have been sent for this booking yet.
                             </Typography>
                         ) : (
@@ -7562,8 +7619,8 @@ setBookingDetail(finalVoucherDetail);
                                         <Box
                                             key={log.id || index}
                                             sx={{
-                                                mb: 3,
-                                                borderRadius: 3,
+                                                mb: isMobile ? 1.5 : 3,
+                                                borderRadius: isMobile ? 2 : 3,
                                                 background: '#ffffff',
                                                 boxShadow: '0 10px 30px rgba(15, 23, 42, 0.08)',
                                                 overflow: 'hidden',
@@ -7573,88 +7630,110 @@ setBookingDetail(finalVoucherDetail);
                                             <Box
                                                 sx={{
                                                     display: 'flex',
+                                                    flexDirection: isMobile ? 'column' : 'row',
                                                     justifyContent: 'space-between',
-                                                    alignItems: 'flex-start',
-                                                    p: 3,
-                                                    borderBottom: '1px solid #f1f5f9'
+                                                    alignItems: isMobile ? 'flex-start' : 'flex-start',
+                                                    p: isMobile ? 1.5 : 3,
+                                                    borderBottom: '1px solid #f1f5f9',
+                                                    gap: isMobile ? 1 : 0
                                                 }}
                                             >
-                                                <Box sx={{ display: 'flex', gap: 2 }}>
+                                                <Box sx={{ display: 'flex', gap: isMobile ? 1 : 2, flex: 1, width: isMobile ? '100%' : 'auto' }}>
                                                     <Box
                                                         sx={{
-                                                            width: 42,
-                                                            height: 42,
+                                                            width: isMobile ? 32 : 42,
+                                                            height: isMobile ? 32 : 42,
                                                             borderRadius: '50%',
                                                             background: '#eef2ff',
                                                             display: 'flex',
                                                             alignItems: 'center',
                                                             justifyContent: 'center',
-                                                            color: '#4f46e5'
+                                                            color: '#4f46e5',
+                                                            flexShrink: 0
                                                         }}
                                                     >
-                                                        <MailOutlineIcon />
+                                                        <MailOutlineIcon sx={{ fontSize: isMobile ? 18 : 24 }} />
                                                     </Box>
-                                                    <Box>
-                                                        <Typography sx={{ fontWeight: 700, fontSize: 18, mb: 0.5 }}>
+                                                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                                                        <Typography sx={{ fontWeight: 700, fontSize: isMobile ? 14 : 18, mb: isMobile ? 0.25 : 0.5, wordBreak: 'break-word' }}>
                                                             {log.subject || 'Email'}
                                                         </Typography>
-                                                        <Typography variant="body2" color="text.secondary">
+                                                        <Typography variant="body2" color="text.secondary" sx={{ fontSize: isMobile ? 11 : 'inherit', mb: isMobile ? 0.25 : 0 }}>
                                                             {log.sent_at
                                                                 ? dayjs(log.sent_at).format('dddd, MMMM D, YYYY h:mm A')
                                                                 : 'Unknown send date'}
                                                         </Typography>
-                                                        <Typography variant="body2" color="text.secondary">
+                                                        <Typography variant="body2" color="text.secondary" sx={{ fontSize: isMobile ? 11 : 'inherit', wordBreak: 'break-word' }}>
                                                             To: {log.recipient_email || '—'}
                                                         </Typography>
                                                     </Box>
                                                 </Box>
-                                                <Box sx={{ textAlign: 'right' }}>
+                                                <Box sx={{ textAlign: isMobile ? 'left' : 'right', mt: isMobile ? 1 : 0, width: isMobile ? '100%' : 'auto' }}>
                                                     <Box
                                                         sx={{
                                                             display: 'inline-flex',
                                                             alignItems: 'center',
-                                                            px: 1.5,
-                                                            py: 0.5,
+                                                            px: isMobile ? 1 : 1.5,
+                                                            py: isMobile ? 0.25 : 0.5,
                                                             borderRadius: 999,
-                                                            fontSize: 12,
+                                                            fontSize: isMobile ? 10 : 12,
                                                             fontWeight: 600,
                                                             color: '#fff',
-                                                            backgroundColor: statusInfo.color
+                                                            backgroundColor: statusInfo.color,
+                                                            mb: isMobile ? 0.5 : 0
                                                         }}
                                                     >
                                                         {statusInfo.label}
                                                     </Box>
-                                                    <Typography variant="caption" display="block" sx={{ mt: 1, color: '#64748b' }}>
+                                                    <Typography variant="caption" display="block" sx={{ mt: isMobile ? 0.5 : 1, color: '#64748b', fontSize: isMobile ? 9 : 'inherit' }}>
                                                         Category: {log.template_type || 'Custom'}
                                                     </Typography>
-                                                    <Typography variant="caption" display="block" sx={{ color: '#64748b' }}>
+                                                    <Typography variant="caption" display="block" sx={{ color: '#64748b', fontSize: isMobile ? 9 : 'inherit' }}>
                                                         Opens: {log.opens || 0} · Clicks: {log.clicks || 0}
                                                     </Typography>
                                                 </Box>
                                             </Box>
-                                            <Box sx={{ p: 3 }}>
+                                            <Box sx={{ p: isMobile ? 1.5 : 3 }}>
                                                 {expanded ? (
                                                     <Box
                                                         sx={{
                                                             background: '#f8fafc',
                                                             borderRadius: 2,
-                                                            p: 2,
-                                                            maxHeight: 400,
-                                                            overflowY: 'auto'
+                                                            p: isMobile ? 1 : 2,
+                                                            maxHeight: isMobile ? 250 : 400,
+                                                            overflowY: 'auto',
+                                                            fontSize: isMobile ? '12px' : 'inherit',
+                                                            '& *': {
+                                                                fontSize: isMobile ? '12px !important' : 'inherit',
+                                                                maxWidth: '100%'
+                                                            }
                                                         }}
                                                         dangerouslySetInnerHTML={{ __html: expandedPreviewHtml }}
                                                     />
                                                 ) : (
                                                     <Box
-                                                        sx={{ color: '#475569', lineHeight: 1.6 }}
+                                                        sx={{ 
+                                                            color: '#475569', 
+                                                            lineHeight: 1.6,
+                                                            fontSize: isMobile ? '12px' : 'inherit',
+                                                            '& *': {
+                                                                fontSize: isMobile ? '12px !important' : 'inherit',
+                                                                maxWidth: '100%',
+                                                                wordBreak: 'break-word'
+                                                            }
+                                                        }}
                                                         dangerouslySetInnerHTML={{ __html: collapsedPreviewHtml }}
                                                     />
                                                 )}
-                                                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                                                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: isMobile ? 1 : 2 }}>
                                                     <Button
                                                         size="small"
                                                         onClick={() => toggleMessageExpand(log.id || index)}
-                                                        sx={{ textTransform: 'none' }}
+                                                        sx={{ 
+                                                            textTransform: 'none',
+                                                            fontSize: isMobile ? 12 : 'inherit',
+                                                            padding: isMobile ? '4px 8px' : 'inherit'
+                                                        }}
                                                     >
                                                         {expanded ? 'Collapse' : 'Expand'}
                                                     </Button>
@@ -7665,8 +7744,8 @@ setBookingDetail(finalVoucherDetail);
                                 })
                         )}
                     </DialogContent>
-                    <DialogActions>
-                        <Button onClick={() => setMessagesModalOpen(false)}>Close</Button>
+                    <DialogActions sx={{ padding: isMobile ? '8px 16px' : 'inherit' }}>
+                        <Button onClick={() => setMessagesModalOpen(false)} sx={{ fontSize: isMobile ? 14 : 'inherit', padding: isMobile ? '6px 12px' : 'inherit' }}>Close</Button>
                     </DialogActions>
                 </Dialog>
 
@@ -7682,48 +7761,70 @@ setBookingDetail(finalVoucherDetail);
                 >
                     <DialogTitle sx={{ 
                         fontWeight: 700, 
-                        fontSize: 24,
+                        fontSize: isMobile ? 18 : 24,
                         display: 'flex',
+                        flexDirection: isMobile ? 'column' : 'row',
                         justifyContent: 'space-between',
-                        alignItems: 'center',
-                        pb: 2
+                        alignItems: isMobile ? 'flex-start' : 'center',
+                        pb: isMobile ? 1 : 2,
+                        padding: isMobile ? '12px 16px' : 'inherit',
+                        gap: isMobile ? 1 : 0
                     }}>
-                        <Box component="span" sx={{ fontWeight: 700, fontSize: '1.5rem' }}>
+                        <Box component="span" sx={{ fontWeight: 700, fontSize: isMobile ? '1.125rem' : '1.5rem' }}>
                             Payments / Promos
                         </Box>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Box sx={{ display: 'flex', gap: isMobile ? 0.5 : 1, flexWrap: isMobile ? 'wrap' : 'nowrap', width: isMobile ? '100%' : 'auto' }}>
                             <Button 
                                 variant="outlined" 
-                                size="small"
-                                sx={{ textTransform: 'none', borderRadius: 1 }}
+                                size={isMobile ? "small" : "small"}
+                                sx={{ 
+                                    textTransform: 'none', 
+                                    borderRadius: 1,
+                                    fontSize: isMobile ? 12 : 'inherit',
+                                    padding: isMobile ? '4px 8px' : 'inherit',
+                                    minWidth: isMobile ? 'auto' : 'inherit'
+                                }}
                             >
                                 + Payment
                             </Button>
                             <Button 
                                 variant="outlined" 
-                                size="small"
-                                sx={{ textTransform: 'none', borderRadius: 1 }}
+                                size={isMobile ? "small" : "small"}
+                                sx={{ 
+                                    textTransform: 'none', 
+                                    borderRadius: 1,
+                                    fontSize: isMobile ? 12 : 'inherit',
+                                    padding: isMobile ? '4px 8px' : 'inherit',
+                                    minWidth: isMobile ? 'auto' : 'inherit'
+                                }}
                             >
                                 + Promo
                             </Button>
                             <Button 
                                 variant="outlined" 
-                                size="small"
-                                startIcon={<span>🕐</span>}
-                                sx={{ textTransform: 'none', borderRadius: 1 }}
+                                size={isMobile ? "small" : "small"}
+                                startIcon={<span style={{ fontSize: isMobile ? 14 : 'inherit' }}>🕐</span>}
+                                sx={{ 
+                                    textTransform: 'none', 
+                                    borderRadius: 1,
+                                    fontSize: isMobile ? 11 : 'inherit',
+                                    padding: isMobile ? '4px 6px' : 'inherit',
+                                    minWidth: isMobile ? 'auto' : 'inherit',
+                                    whiteSpace: isMobile ? 'normal' : 'nowrap'
+                                }}
                             >
                                 Save Card & Charge Later
                             </Button>
                         </Box>
                     </DialogTitle>
-                    <DialogContent dividers sx={{ background: '#ffffff', p: 0 }}>
+                    <DialogContent dividers sx={{ background: '#ffffff', p: 0, padding: isMobile ? '0' : '0' }}>
                         {paymentHistoryLoading ? (
-                            <Box sx={{ p: 3, textAlign: 'center' }}>
-                                <Typography variant="body2">Loading payment history...</Typography>
+                            <Box sx={{ p: isMobile ? 2 : 3, textAlign: 'center' }}>
+                                <Typography variant="body2" sx={{ fontSize: isMobile ? 14 : 'inherit' }}>Loading payment history...</Typography>
                             </Box>
                         ) : paymentHistory.length === 0 ? (
-                            <Box sx={{ p: 3, textAlign: 'center' }}>
-                                <Typography variant="body2" color="text.secondary">
+                            <Box sx={{ p: isMobile ? 2 : 3, textAlign: 'center' }}>
+                                <Typography variant="body2" color="text.secondary" sx={{ fontSize: isMobile ? 14 : 'inherit' }}>
                                     No payment history available for this booking.
                                 </Typography>
                             </Box>
@@ -7731,19 +7832,19 @@ setBookingDetail(finalVoucherDetail);
                             <Box>
                                 {/* Table Header */}
                                 <Box sx={{ 
-                                    display: 'flex', 
-                                    px: 3, 
-                                    py: 1.5, 
+                                    display: isMobile ? 'none' : 'flex', 
+                                    px: isMobile ? 1.5 : 3, 
+                                    py: isMobile ? 1 : 1.5, 
                                     borderBottom: '1px solid #e2e8f0',
                                     background: '#f8f9fa'
                                 }}>
-                                    <Box sx={{ flex: '0 0 200px', color: '#6c757d', fontSize: '0.875rem', fontWeight: 500 }}>
+                                    <Box sx={{ flex: '0 0 200px', color: '#6c757d', fontSize: isMobile ? '0.7rem' : '0.875rem', fontWeight: 500 }}>
                                         DATE
                                     </Box>
-                                    <Box sx={{ flex: 1, textAlign: 'center', color: '#6c757d', fontSize: '0.875rem', fontWeight: 500 }}>
+                                    <Box sx={{ flex: 1, textAlign: 'center', color: '#6c757d', fontSize: isMobile ? '0.7rem' : '0.875rem', fontWeight: 500 }}>
                                         DETAILS
                                     </Box>
-                                    <Box sx={{ flex: '0 0 150px', textAlign: 'right', color: '#6c757d', fontSize: '0.875rem', fontWeight: 500 }}>
+                                    <Box sx={{ flex: '0 0 150px', textAlign: 'right', color: '#6c757d', fontSize: isMobile ? '0.7rem' : '0.875rem', fontWeight: 500 }}>
                                         AMOUNT
                                     </Box>
                                     <Box sx={{ flex: '0 0 100px' }}></Box>
@@ -7777,40 +7878,52 @@ setBookingDetail(finalVoucherDetail);
                                         <Box key={payment.id || index} sx={{ borderBottom: '1px solid #e2e8f0' }}>
                                             {/* Main Payment Row */}
                                             <Box sx={{ 
-                                                display: 'flex', 
-                                                px: 3, 
-                                                py: 2,
-                                                alignItems: 'center',
+                                                display: isMobile ? 'block' : 'flex', 
+                                                px: isMobile ? 1.5 : 3, 
+                                                py: isMobile ? 1.5 : 2,
+                                                alignItems: isMobile ? 'flex-start' : 'center',
                                                 cursor: 'pointer',
                                                 '&:hover': { background: '#f8f9fa' }
                                             }}
                                             onClick={() => togglePaymentExpand(payment.id || index)}
                                             >
-                                                <Box sx={{ flex: '0 0 200px' }}>
+                                                <Box sx={{ 
+                                                    flex: isMobile ? 'none' : '0 0 200px',
+                                                    mb: isMobile ? 1 : 0,
+                                                    width: isMobile ? '100%' : 'auto'
+                                                }}>
                                                     {paymentDate && (
                                                         <>
-                                                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                                            <Typography variant="body2" sx={{ fontWeight: 500, fontSize: isMobile ? 13 : 'inherit' }}>
                                                                 {paymentDate.format('MMM D, YYYY')}
                                                             </Typography>
-                                                            <Typography variant="caption" color="text.secondary">
+                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 11 : 'inherit', display: 'block' }}>
                                                                 {paymentDate.format('h:mm A')}
                                                             </Typography>
                                                             {daysAgo !== null && (
-                                                                <Typography variant="caption" color="text.secondary" display="block">
+                                                                <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
                                                                     {daysAgo} {daysAgo === 1 ? 'day' : 'days'} ago
                                                                 </Typography>
                                                             )}
                                                         </>
                                                     )}
                                                 </Box>
-                                                <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'center' }}>
+                                                <Box sx={{ 
+                                                    flex: isMobile ? 'none' : 1, 
+                                                    display: 'flex', 
+                                                    alignItems: 'center', 
+                                                    gap: isMobile ? 0.5 : 1, 
+                                                    justifyContent: isMobile ? 'flex-start' : 'center',
+                                                    mb: isMobile ? 1 : 0,
+                                                    width: isMobile ? '100%' : 'auto'
+                                                }}>
                                                     {payment.payment_status === 'refunded' || payment.origin === 'refund' ? (
                                                         <Typography variant="body2" sx={{ 
                                                             fontWeight: 600,
                                                             textTransform: 'uppercase',
-                                                            fontSize: '0.75rem',
-                                                            px: 1,
-                                                            py: 0.5,
+                                                            fontSize: isMobile ? '0.65rem' : '0.75rem',
+                                                            px: isMobile ? 0.5 : 1,
+                                                            py: isMobile ? 0.25 : 0.5,
                                                             borderRadius: 1,
                                                             background: '#fee',
                                                             color: '#c33'
@@ -7822,37 +7935,46 @@ setBookingDetail(finalVoucherDetail);
                                                     <Typography variant="body2" sx={{ 
                                                         fontWeight: 600,
                                                         textTransform: 'uppercase',
-                                                        fontSize: '0.75rem',
-                                                        px: 1,
-                                                        py: 0.5,
+                                                        fontSize: isMobile ? '0.65rem' : '0.75rem',
+                                                        px: isMobile ? 0.5 : 1,
+                                                        py: isMobile ? 0.25 : 0.5,
                                                         borderRadius: 1,
                                                         background: '#f0f0f0'
                                                     }}>
                                                         {getCardBrandLogo(payment.card_brand)}
                                                     </Typography>
-                                                    <Typography variant="body2">
+                                                    <Typography variant="body2" sx={{ fontSize: isMobile ? 13 : 'inherit' }}>
                                                         **** {payment.card_last4 || 'N/A'}
                                                     </Typography>
                                                         </>
                                                     )}
                                                 </Box>
-                                                <Box sx={{ flex: '0 0 150px', textAlign: 'right' }}>
+                                                <Box sx={{ 
+                                                    flex: isMobile ? 'none' : '0 0 150px', 
+                                                    textAlign: isMobile ? 'left' : 'right',
+                                                    mb: isMobile ? 1 : 0,
+                                                    width: isMobile ? '100%' : 'auto',
+                                                    display: 'flex',
+                                                    justifyContent: isMobile ? 'space-between' : 'flex-end',
+                                                    alignItems: 'center'
+                                                }}>
                                                     <Typography variant="body1" sx={{ 
                                                         fontWeight: 600,
-                                                        color: (payment.payment_status === 'refunded' || payment.origin === 'refund') ? '#c33' : 'inherit'
+                                                        color: (payment.payment_status === 'refunded' || payment.origin === 'refund') ? '#c33' : 'inherit',
+                                                        fontSize: isMobile ? 15 : 'inherit'
                                                     }}>
                                                         £{Math.abs(parseFloat(payment.amount || 0)).toFixed(2)}
                                                     </Typography>
-                                                </Box>
-                                                <Box sx={{ flex: '0 0 100px', textAlign: 'right' }}>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                                     <IconButton 
                                                         size="small"
+                                                            sx={{ padding: isMobile ? '4px' : '8px' }}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             togglePaymentExpand(payment.id || index);
                                                         }}
                                                     >
-                                                        {isExpanded ? '▼' : '▶'}
+                                                            <span style={{ fontSize: isMobile ? 12 : 'inherit' }}>{isExpanded ? '▼' : '▶'}</span>
                                                     </IconButton>
                                                     {payment.payment_status === 'succeeded' && 
                                                      // Show refund button for:
@@ -7865,7 +7987,13 @@ setBookingDetail(finalVoucherDetail);
                                                         <Button 
                                                             size="small" 
                                                             variant="outlined"
-                                                            sx={{ ml: 1, textTransform: 'none' }}
+                                                                sx={{ 
+                                                                    ml: isMobile ? 0 : 1, 
+                                                                    textTransform: 'none',
+                                                                    fontSize: isMobile ? 11 : 'inherit',
+                                                                    padding: isMobile ? '4px 8px' : 'inherit',
+                                                                    minWidth: isMobile ? 'auto' : 'inherit'
+                                                                }}
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 handleRefundClick(payment);
@@ -7874,129 +8002,131 @@ setBookingDetail(finalVoucherDetail);
                                                             Refund...
                                                         </Button>
                                                     )}
+                                                    </Box>
                                                 </Box>
                                             </Box>
                                             
                                             {/* Expanded Details */}
                                             {isExpanded && (
                                                 <Box sx={{ 
-                                                    px: 3, 
-                                                    py: 2, 
+                                                    px: isMobile ? 1.5 : 3, 
+                                                    py: isMobile ? 1.5 : 2, 
                                                     background: '#ffffff',
                                                     borderTop: '1px solid #e2e8f0'
                                                 }}>
-                                                    <Grid container spacing={2}>
-                                                        <Grid item xs={6}>
-                                                            <Typography variant="caption" color="text.secondary">
+                                                    <Grid container spacing={isMobile ? 1.5 : 2}>
+                                                        <Grid item xs={isMobile ? 12 : 6}>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
                                                                 Created
                                                             </Typography>
-                                                            <Typography variant="body2">
+                                                            <Typography variant="body2" sx={{ fontSize: isMobile ? 12 : 'inherit', wordBreak: 'break-word' }}>
                                                                 {paymentDate ? `${paymentDate.format('MMM D, YYYY h:mm A')} (${daysAgo} ${daysAgo === 1 ? 'day' : 'days'} ago)` : 'N/A'}
                                                             </Typography>
                                                         </Grid>
-                                                        <Grid item xs={6}>
-                                                            <Typography variant="caption" color="text.secondary">
+                                                        <Grid item xs={isMobile ? 12 : 6}>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
                                                                 {payment.payment_status === 'refunded' || payment.origin === 'refund' ? 'Refund Amount' : 'Guest Charge'}
                                                             </Typography>
                                                             <Typography variant="body2" sx={{ 
                                                                 fontWeight: 600,
-                                                                color: (payment.payment_status === 'refunded' || payment.origin === 'refund') ? '#c33' : 'inherit'
+                                                                color: (payment.payment_status === 'refunded' || payment.origin === 'refund') ? '#c33' : 'inherit',
+                                                                fontSize: isMobile ? 12 : 'inherit'
                                                             }}>
                                                                 £{Math.abs(parseFloat(payment.amount || 0)).toFixed(2)}
                                                             </Typography>
                                                         </Grid>
-                                                        <Grid item xs={6}>
-                                                            <Typography variant="caption" color="text.secondary">
+                                                        <Grid item xs={isMobile ? 12 : 6}>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
                                                                 Card Type
                                                             </Typography>
-                                                            <Typography variant="body2">
+                                                            <Typography variant="body2" sx={{ fontSize: isMobile ? 12 : 'inherit' }}>
                                                                 Credit Card **** {payment.card_last4 || 'N/A'}
                                                             </Typography>
                                                         </Grid>
-                                                        <Grid item xs={6}>
-                                                            <Typography variant="caption" color="text.secondary">
+                                                        <Grid item xs={isMobile ? 12 : 6}>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
                                                                 Wallet Type
                                                             </Typography>
-                                                            <Typography variant="body2">
+                                                            <Typography variant="body2" sx={{ fontSize: isMobile ? 12 : 'inherit' }}>
                                                                 {payment.wallet_type || 'N/A'}
                                                                 {payment.wallet_type === 'apple_pay' && ' 🍎'}
                                                             </Typography>
                                                         </Grid>
-                                                        <Grid item xs={6}>
-                                                            <Typography variant="caption" color="text.secondary">
+                                                        <Grid item xs={isMobile ? 12 : 6}>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
                                                                 Fingerprint
                                                             </Typography>
-                                                            <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                                                            <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: isMobile ? '0.65rem' : '0.75rem', wordBreak: 'break-word' }}>
                                                                 {payment.fingerprint || 'N/A'}
                                                             </Typography>
                                                         </Grid>
-                                                        <Grid item xs={6}>
-                                                            <Typography variant="caption" color="text.secondary">
+                                                        <Grid item xs={isMobile ? 12 : 6}>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
                                                                 Origin
                                                             </Typography>
-                                                            <Typography variant="body2">
+                                                            <Typography variant="body2" sx={{ fontSize: isMobile ? 12 : 'inherit' }}>
                                                                 {payment.origin || 'N/A'}
                                                             </Typography>
                                                         </Grid>
-                                                        <Grid item xs={6}>
-                                                            <Typography variant="caption" color="text.secondary">
+                                                        <Grid item xs={isMobile ? 12 : 6}>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
                                                                 Transaction ID
                                                             </Typography>
-                                                            <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                                                            <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: isMobile ? '0.65rem' : '0.75rem', wordBreak: 'break-word' }}>
                                                                 {payment.transaction_id || payment.stripe_charge_id || 'N/A'}
                                                             </Typography>
                                                         </Grid>
-                                                        <Grid item xs={6}>
-                                                            <Typography variant="caption" color="text.secondary">
+                                                        <Grid item xs={isMobile ? 12 : 6}>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
                                                                 Card Present
                                                             </Typography>
-                                                            <Typography variant="body2">
+                                                            <Typography variant="body2" sx={{ fontSize: isMobile ? 12 : 'inherit' }}>
                                                                 {payment.card_present ? 'Yes' : 'No'}
                                                             </Typography>
                                                         </Grid>
                                                         {(payment.payment_status === 'refunded' || payment.origin === 'refund') && payment.refund_comment && (
                                                             <Grid item xs={12}>
-                                                                <Typography variant="caption" color="text.secondary">
+                                                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
                                                                     Refund Comment
                                                                 </Typography>
-                                                                <Typography variant="body2">
+                                                                <Typography variant="body2" sx={{ fontSize: isMobile ? 12 : 'inherit', wordBreak: 'break-word' }}>
                                                                     {payment.refund_comment}
                                                                 </Typography>
                                                             </Grid>
                                                         )}
-                                                        <Grid item xs={6}>
-                                                            <Typography variant="caption" color="text.secondary">
+                                                        <Grid item xs={isMobile ? 12 : 6}>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
                                                                 Status
                                                             </Typography>
                                                             <Box sx={{ 
                                                                 display: 'inline-block',
-                                                                px: 1,
-                                                                py: 0.5,
+                                                                px: isMobile ? 0.75 : 1,
+                                                                py: isMobile ? 0.25 : 0.5,
                                                                 borderRadius: 1,
                                                                 background: payment.payment_status === 'succeeded' ? '#28a745' : '#6c757d',
                                                                 color: '#fff',
-                                                                fontSize: '0.75rem',
+                                                                fontSize: isMobile ? '0.65rem' : '0.75rem',
                                                                 fontWeight: 600
                                                             }}>
                                                                 {payment.payment_status === 'succeeded' ? 'Successful' : payment.payment_status || 'Pending'}
                                                             </Box>
                                                         </Grid>
                                                         {payment.payout_id && (
-                                                            <Grid item xs={6}>
-                                                                <Typography variant="caption" color="text.secondary">
+                                                            <Grid item xs={isMobile ? 12 : 6}>
+                                                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
                                                                     Payout
                                                                 </Typography>
-                                                                <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                                                                <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: isMobile ? '0.65rem' : '0.75rem', wordBreak: 'break-word' }}>
                                                                     {payment.payout_id}
                                                                 </Typography>
                                                             </Grid>
                                                         )}
                                                         {payment.arriving_on && (
-                                                            <Grid item xs={6}>
-                                                                <Typography variant="caption" color="text.secondary">
+                                                            <Grid item xs={isMobile ? 12 : 6}>
+                                                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: isMobile ? 10 : 'inherit' }}>
                                                                     Arriving on
                                                                 </Typography>
-                                                                <Typography variant="body2">
+                                                                <Typography variant="body2" sx={{ fontSize: isMobile ? 12 : 'inherit' }}>
                                                                     {dayjs(payment.arriving_on).format('MMM D, YYYY')}
                                                                 </Typography>
                                                             </Grid>
@@ -8010,11 +8140,11 @@ setBookingDetail(finalVoucherDetail);
                             </Box>
                         )}
                     </DialogContent>
-                    <DialogActions>
+                    <DialogActions sx={{ padding: isMobile ? '8px 16px' : 'inherit' }}>
                         <Button onClick={() => {
                             setPaymentHistoryModalOpen(false);
                             setExpandedPaymentIds({});
-                        }}>Close</Button>
+                        }} sx={{ fontSize: isMobile ? 14 : 'inherit', padding: isMobile ? '6px 12px' : 'inherit' }}>Close</Button>
                     </DialogActions>
                 </Dialog>
 
@@ -8402,10 +8532,10 @@ setBookingDetail(finalVoucherDetail);
                     maxWidth="md"
                     fullWidth
                 >
-                    <DialogTitle sx={{ color: '#1976d2', fontWeight: 600, fontSize: 24 }}>
+                    <DialogTitle sx={{ color: '#1976d2', fontWeight: 600, fontSize: isMobile ? 18 : 24, padding: isMobile ? '12px 16px' : 'inherit' }}>
                         Send a Message
                         {selectedBookingForEmail && (
-                            <Typography variant="subtitle2" color="textSecondary" sx={{ mt: 0.5 }}>
+                            <Typography variant="subtitle2" color="textSecondary" sx={{ mt: isMobile ? 0.25 : 0.5, fontSize: isMobile ? 12 : 'inherit' }}>
                                 {selectedBookingIds && selectedBookingIds.length > 1 ? (
                                     <>
                                         Bulk to {selectedBookingIds.length} bookings
@@ -8418,8 +8548,8 @@ setBookingDetail(finalVoucherDetail);
                             </Typography>
                         )}
                     </DialogTitle>
-                    <DialogContent>
-                        <Grid container spacing={2} sx={{ mt: 1 }}>
+                    <DialogContent sx={{ padding: isMobile ? '12px 16px' : '24px' }}>
+                        <Grid container spacing={isMobile ? 1 : 2} sx={{ mt: isMobile ? 0 : 1 }}>
                             <Grid item xs={12}>
                                 <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
                                     Choose a template:
@@ -8451,7 +8581,7 @@ setBookingDetail(finalVoucherDetail);
                                 </FormControl>
                             </Grid>
                             <Grid item xs={12}>
-                                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
+                                <Typography variant="subtitle2" sx={{ mb: isMobile ? 0.5 : 1, fontWeight: 500, fontSize: isMobile ? 13 : 'inherit' }}>
                                     Add an optional, personalized note
                                 </Typography>
                                 <TextField
@@ -8460,11 +8590,16 @@ setBookingDetail(finalVoucherDetail);
                                     value={personalNote}
                                     onChange={(e) => setPersonalNote(e.target.value)}
                                     multiline
-                                    rows={6}
+                                    rows={isMobile ? 4 : 6}
                                     variant="outlined"
+                                    size={isMobile ? "small" : "medium"}
                                     sx={{ 
                                         '& .MuiOutlinedInput-root': {
-                                            borderRadius: 2
+                                            borderRadius: 2,
+                                            fontSize: isMobile ? '14px' : 'inherit'
+                                        },
+                                        '& .MuiInputLabel-root': {
+                                            fontSize: isMobile ? '14px' : 'inherit'
                                         }
                                     }}
                                 />
@@ -8474,47 +8609,47 @@ setBookingDetail(finalVoucherDetail);
                                 <Box sx={{ 
                                     border: '1px solid #e0e0e0', 
                                     borderRadius: 2, 
-                                    p: 2,
+                                    p: isMobile ? 1 : 2,
                                     backgroundColor: '#f9f9f9',
                                     position: 'relative',
                                     overflow: 'auto',
-                                    maxHeight: '600px'
+                                    maxHeight: isMobile ? '300px' : '600px'
                                 }}>
                                     {/* Email Header */}
                                     <Box sx={{ 
                                         display: 'flex', 
                                         alignItems: 'center', 
-                                        gap: 1,
-                                        mb: 2,
-                                        pb: 2,
+                                        gap: isMobile ? 0.5 : 1,
+                                        mb: isMobile ? 1 : 2,
+                                        pb: isMobile ? 1 : 2,
                                         borderBottom: '1px solid #e0e0e0'
                                     }}>
                                         <Box sx={{ 
-                                            width: 12, 
-                                            height: 12, 
+                                            width: isMobile ? 8 : 12, 
+                                            height: isMobile ? 8 : 12, 
                                             borderRadius: '50%', 
                                             backgroundColor: '#ff5f57' 
                                         }} />
                                         <Box sx={{ 
-                                            width: 12, 
-                                            height: 12, 
+                                            width: isMobile ? 8 : 12, 
+                                            height: isMobile ? 8 : 12, 
                                             borderRadius: '50%', 
                                             backgroundColor: '#ffbd2e' 
                                         }} />
                                         <Box sx={{ 
-                                            width: 12, 
-                                            height: 12, 
+                                            width: isMobile ? 8 : 12, 
+                                            height: isMobile ? 8 : 12, 
                                             borderRadius: '50%', 
                                             backgroundColor: '#28ca42' 
                                         }} />
                                     </Box>
                                     
                                     {/* Email From */}
-                                    <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 0.5 }}>
+                                    <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: isMobile ? 0.25 : 0.5, fontSize: isMobile ? 10 : 'inherit', wordBreak: 'break-word' }}>
                                         From "Fly Away Ballooning" &lt;info@flyawayballooning.com&gt;
                                     </Typography>
                                     {selectedBookingIds && selectedBookingIds.length > 1 && (
-                                        <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 0.5 }}>
+                                        <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: isMobile ? 0.25 : 0.5, fontSize: isMobile ? 10 : 'inherit', wordBreak: 'break-word' }}>
                                             To:&nbsp;
                                             {booking
                                                 .filter(b => selectedBookingIds.includes(b.id))
@@ -8523,7 +8658,7 @@ setBookingDetail(finalVoucherDetail);
                                                 .join(', ')}
                                         </Typography>
                                     )}
-                                    <Typography variant="caption" sx={{ color: '#999', display: 'block', mb: 2 }}>
+                                    <Typography variant="caption" sx={{ color: '#999', display: 'block', mb: isMobile ? 1 : 2, fontSize: isMobile ? 10 : 'inherit' }}>
                                         {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
                                     </Typography>
                                     
@@ -8531,12 +8666,14 @@ setBookingDetail(finalVoucherDetail);
                                     <Typography sx={{ 
                                         color: '#d32f2f', 
                                         fontWeight: 600, 
-                                        mb: 2,
+                                        mb: isMobile ? 1 : 2,
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: 1
+                                        gap: isMobile ? 0.5 : 1,
+                                        fontSize: isMobile ? 13 : 'inherit',
+                                        wordBreak: 'break-word'
                                     }}>
-                                        <span style={{ fontSize: 20 }}>🎈</span> {emailForm.subject || 'Flight update'}
+                                        <span style={{ fontSize: isMobile ? 16 : 20 }}>🎈</span> {emailForm.subject || 'Flight update'}
                                     </Typography>
                                     
                                     {/* Email Body Preview */}
@@ -8552,12 +8689,12 @@ setBookingDetail(finalVoucherDetail);
                                         >
                                             <Box
                                                 sx={{
-                                                    transform: 'scale(0.75)',
+                                                    transform: isMobile ? 'scale(0.5)' : 'scale(0.75)',
                                                     transformOrigin: 'top center',
-                                                    width: '133.33%',
+                                                    width: isMobile ? '200%' : '133.33%',
                                                     maxWidth: '100%',
                                                     overflow: 'visible',
-                                                    marginBottom: '-25%',
+                                                    marginBottom: isMobile ? '-50%' : '-25%',
                                                     '& table': {
                                                         maxWidth: '100% !important',
                                                         width: '100% !important',
@@ -8568,7 +8705,7 @@ setBookingDetail(finalVoucherDetail);
                                                         height: 'auto !important'
                                                     },
                                                     '& *': {
-                                                        fontSize: 'inherit !important',
+                                                        fontSize: isMobile ? '12px !important' : 'inherit !important',
                                                         lineHeight: 'inherit !important'
                                                     },
                                                     '& body': {
@@ -8576,14 +8713,14 @@ setBookingDetail(finalVoucherDetail);
                                                         padding: '0 !important'
                                                     },
                                                     '& td': {
-                                                        padding: '16px !important'
+                                                        padding: isMobile ? '8px !important' : '16px !important'
                                                     },
                                                     '& table[role="presentation"]': {
                                                         margin: '0 !important',
                                                         marginBottom: '0 !important'
                                                     },
                                                     '& tr:last-child td': {
-                                                        paddingBottom: '16px !important'
+                                                        paddingBottom: isMobile ? '8px !important' : '16px !important'
                                                     }
                                                 }}
                                                 dangerouslySetInnerHTML={{ __html: previewHtml }}
@@ -8596,64 +8733,66 @@ setBookingDetail(finalVoucherDetail);
                             <input type="hidden" value={emailForm.subject} />
                             {/* Email Logs */}
                             <Grid item xs={12}>
-                                <Divider sx={{ my: 2 }} />
-                                <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
+                                <Divider sx={{ my: isMobile ? 1 : 2 }} />
+                                <Typography variant="subtitle1" sx={{ mb: isMobile ? 0.5 : 1, fontWeight: 600, fontSize: isMobile ? 14 : 'inherit' }}>
                                     Sent Emails
                                 </Typography>
                                 {emailLogsLoading ? (
-                                    <Typography variant="body2">Loading...</Typography>
+                                    <Typography variant="body2" sx={{ fontSize: isMobile ? 12 : 'inherit' }}>Loading...</Typography>
                                 ) : (emailLogs && emailLogs.length > 0 ? (
-                                    <Table size="small">
+                                    <TableContainer sx={{ maxHeight: isMobile ? '200px' : 'none', overflowX: 'auto' }}>
+                                        <Table size={isMobile ? "small" : "small"}>
                                         <TableHead>
                                             <TableRow>
-                                                <TableCell>Date</TableCell>
-                                                <TableCell>To</TableCell>
-                                                <TableCell>Subject</TableCell>
-                                                <TableCell>Status</TableCell>
-                                                <TableCell align="right">Opens</TableCell>
-                                                <TableCell align="right">Clicks</TableCell>
+                                                    <TableCell sx={{ fontSize: isMobile ? 10 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>Date</TableCell>
+                                                    <TableCell sx={{ fontSize: isMobile ? 10 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>To</TableCell>
+                                                    <TableCell sx={{ fontSize: isMobile ? 10 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>Subject</TableCell>
+                                                    <TableCell sx={{ fontSize: isMobile ? 10 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>Status</TableCell>
+                                                    <TableCell align="right" sx={{ fontSize: isMobile ? 10 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>Opens</TableCell>
+                                                    <TableCell align="right" sx={{ fontSize: isMobile ? 10 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>Clicks</TableCell>
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
                                             {emailLogs.map((log) => (
                                                 <TableRow key={log.id}>
-                                                    <TableCell>{(() => { try { return dayjs(log.sent_at).format('DD/MM/YYYY HH:mm'); } catch { return String(log.sent_at || ''); } })()}</TableCell>
-                                                    <TableCell>{log.recipient_email}</TableCell>
-                                                    <TableCell>{log.subject}</TableCell>
-                                                    <TableCell>
+                                                        <TableCell sx={{ fontSize: isMobile ? 9 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>{(() => { try { return dayjs(log.sent_at).format('DD/MM/YYYY HH:mm'); } catch { return String(log.sent_at || ''); } })()}</TableCell>
+                                                        <TableCell sx={{ fontSize: isMobile ? 9 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit', wordBreak: 'break-word' }}>{log.recipient_email}</TableCell>
+                                                        <TableCell sx={{ fontSize: isMobile ? 9 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit', wordBreak: 'break-word' }}>{log.subject}</TableCell>
+                                                        <TableCell sx={{ fontSize: isMobile ? 9 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>
                                                         <span style={{
-                                                            padding: '2px 6px',
+                                                                padding: isMobile ? '1px 4px' : '2px 6px',
                                                             borderRadius: 4,
                                                             background: log.status === 'delivered' ? '#d4edda' : (log.status === 'open' || log.opens > 0 ? '#e3f2fd' : '#fff3cd'),
                                                             color: '#000',
-                                                            fontSize: 12
+                                                                fontSize: isMobile ? 9 : 12
                                                         }}>{log.last_event || log.status}</span>
                                                     </TableCell>
-                                                    <TableCell align="right">{log.opens || 0}</TableCell>
-                                                    <TableCell align="right">{log.clicks || 0}</TableCell>
+                                                        <TableCell align="right" sx={{ fontSize: isMobile ? 9 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>{log.opens || 0}</TableCell>
+                                                        <TableCell align="right" sx={{ fontSize: isMobile ? 9 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>{log.clicks || 0}</TableCell>
                                                 </TableRow>
                                             ))}
                                         </TableBody>
                                     </Table>
+                                    </TableContainer>
                                 ) : (
-                                    <Typography variant="body2">No sent emails yet for this booking.</Typography>
+                                    <Typography variant="body2" sx={{ fontSize: isMobile ? 12 : 'inherit' }}>No sent emails yet for this booking.</Typography>
                                 ))}
                             </Grid>
                         </Grid>
                     </DialogContent>
-                    <DialogActions sx={{ p: 3, justifyContent: 'flex-end' }}>
+                    <DialogActions sx={{ p: isMobile ? 1.5 : 3, justifyContent: 'flex-end' }}>
                         <Button 
                             onClick={handleSendEmail}
                             variant="contained"
                             startIcon={<span>✈️</span>}
                             sx={{ 
                                 backgroundColor: '#1976d2',
-                                px: 4,
-                                py: 1.5,
+                                px: isMobile ? 2 : 4,
+                                py: isMobile ? 1 : 1.5,
                                 borderRadius: 2,
+                                fontSize: isMobile ? 14 : 16,
                                 fontWeight: 600,
                                 textTransform: 'none',
-                                fontSize: 16,
                                 '&:hover': {
                                     backgroundColor: '#1565c0'
                                 }
@@ -8672,10 +8811,10 @@ setBookingDetail(finalVoucherDetail);
                     maxWidth="md"
                     fullWidth
                 >
-                    <DialogTitle sx={{ color: '#1976d2', fontWeight: 600, fontSize: 24 }}>
+                    <DialogTitle sx={{ color: '#1976d2', fontWeight: 600, fontSize: isMobile ? 18 : 24, padding: isMobile ? '12px 16px' : 'inherit' }}>
                         Send a SMS
                         {selectedBookingForEmail && (
-                            <Typography variant="subtitle2" color="textSecondary" sx={{ mt: 0.5 }}>
+                            <Typography variant="subtitle2" color="textSecondary" sx={{ mt: isMobile ? 0.25 : 0.5, fontSize: isMobile ? 12 : 'inherit' }}>
                                 {selectedBookingIds && selectedBookingIds.length > 1 
                                     ? `Bulk SMS to ${selectedBookingIds.length} bookings`
                                     : `Booking: ${selectedBookingForEmail.name} (${selectedBookingForEmail.id})`
@@ -8683,13 +8822,13 @@ setBookingDetail(finalVoucherDetail);
                             </Typography>
                         )}
                     </DialogTitle>
-                    <DialogContent>
-                        <Grid container spacing={2} sx={{ mt: 1 }}>
+                    <DialogContent sx={{ padding: isMobile ? '12px 16px' : '24px' }}>
+                        <Grid container spacing={isMobile ? 1 : 2} sx={{ mt: isMobile ? 0 : 1 }}>
                             <Grid item xs={12}>
-                                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
+                                <Typography variant="subtitle2" sx={{ mb: isMobile ? 0.5 : 1, fontWeight: 500, fontSize: isMobile ? 13 : 'inherit' }}>
                                     Choose a template:
                                 </Typography>
-                                <FormControl fullWidth size="small">
+                                <FormControl fullWidth size={isMobile ? "small" : "small"}>
                                     <Select
                                         value={smsForm.template || 'custom'}
                                         onChange={(e) => {
@@ -8704,6 +8843,9 @@ setBookingDetail(finalVoucherDetail);
                                                     maxHeight: 300,
                                                 },
                                             },
+                                        }}
+                                        sx={{
+                                            fontSize: isMobile ? '14px' : 'inherit'
                                         }}
                                     >
                                         {smsTemplates.length === 0 ? (
@@ -8724,7 +8866,7 @@ setBookingDetail(finalVoucherDetail);
                                 </FormControl>
                             </Grid>
                             <Grid item xs={12}>
-                                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
+                                <Typography variant="subtitle2" sx={{ mb: isMobile ? 0.5 : 1, fontWeight: 500, fontSize: isMobile ? 13 : 'inherit' }}>
                                     Message
                                 </Typography>
                                 <TextField
@@ -8733,17 +8875,22 @@ setBookingDetail(finalVoucherDetail);
                                     value={smsForm.message || ''}
                                     onChange={(e) => setSmsForm(prev => ({ ...prev, message: e.target.value }))}
                                     multiline
-                                    rows={6}
+                                    rows={isMobile ? 4 : 6}
                                     variant="outlined"
+                                    size={isMobile ? "small" : "medium"}
                                     sx={{ 
                                         '& .MuiOutlinedInput-root': {
-                                            borderRadius: 2
+                                            borderRadius: 2,
+                                            fontSize: isMobile ? '14px' : 'inherit'
+                                        },
+                                        '& .MuiInputLabel-root': {
+                                            fontSize: isMobile ? '14px' : 'inherit'
                                         }
                                     }}
                                 />
                             </Grid>
                             <Grid item xs={12}>
-                                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
+                                <Typography variant="subtitle2" sx={{ mb: isMobile ? 0.5 : 1, fontWeight: 500, fontSize: isMobile ? 13 : 'inherit' }}>
                                     Add an optional, personalized note
                                 </Typography>
                                 <TextField
@@ -8752,11 +8899,16 @@ setBookingDetail(finalVoucherDetail);
                                     value={smsPersonalNote}
                                     onChange={(e) => setSmsPersonalNote(e.target.value)}
                                     multiline
-                                    rows={4}
+                                    rows={isMobile ? 3 : 4}
                                     variant="outlined"
+                                    size={isMobile ? "small" : "medium"}
                                     sx={{ 
                                         '& .MuiOutlinedInput-root': {
-                                            borderRadius: 2
+                                            borderRadius: 2,
+                                            fontSize: isMobile ? '14px' : 'inherit'
+                                        },
+                                        '& .MuiInputLabel-root': {
+                                            fontSize: isMobile ? '14px' : 'inherit'
                                         }
                                     }}
                                 />
@@ -8766,7 +8918,7 @@ setBookingDetail(finalVoucherDetail);
                                 <Box sx={{ 
                                     border: '1px solid #e0e0e0', 
                                     borderRadius: 2, 
-                                    p: 2,
+                                    p: isMobile ? 1 : 2,
                                     backgroundColor: '#f9f9f9',
                                     display: 'flex',
                                     justifyContent: 'center',
@@ -8774,44 +8926,44 @@ setBookingDetail(finalVoucherDetail);
                                 }}>
                                     {/* Mobile Device Preview */}
                                     <Box sx={{ 
-                                        width: '320px',
+                                        width: isMobile ? '240px' : '320px',
                                         maxWidth: '100%',
                                         background: '#000',
-                                        borderRadius: '24px',
-                                        padding: '12px',
+                                        borderRadius: isMobile ? '18px' : '24px',
+                                        padding: isMobile ? '8px' : '12px',
                                         boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)'
                                     }}>
                                         {/* Phone Screen */}
                                         <Box sx={{
                                             background: '#f5f5f5',
-                                            borderRadius: '20px',
-                                            padding: '8px',
-                                            minHeight: '400px'
+                                            borderRadius: isMobile ? '14px' : '20px',
+                                            padding: isMobile ? '6px' : '8px',
+                                            minHeight: isMobile ? '280px' : '400px'
                                         }}>
                                             {/* Status Bar */}
                                             <Box sx={{
                                                 display: 'flex',
                                                 justifyContent: 'space-between',
                                                 alignItems: 'center',
-                                                padding: '8px 12px',
-                                                fontSize: '10px',
+                                                padding: isMobile ? '6px 8px' : '8px 12px',
+                                                fontSize: isMobile ? '8px' : '10px',
                                                 color: '#000',
                                                 background: '#fff',
-                                                borderRadius: '12px 12px 0 0'
+                                                borderRadius: isMobile ? '8px 8px 0 0' : '12px 12px 0 0'
                                             }}>
                                                 <span>9:41</span>
-                                                <Box sx={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                                    <span style={{ fontSize: '12px' }}>🔗</span>
-                                                    <span style={{ fontSize: '12px' }}>⌨️</span>
+                                                <Box sx={{ display: 'flex', gap: isMobile ? '2px' : '4px', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: isMobile ? '10px' : '12px' }}>🔗</span>
+                                                    <span style={{ fontSize: isMobile ? '10px' : '12px' }}>⌨️</span>
                                                 </Box>
                                             </Box>
 
                                             {/* Message Preview */}
                                             <Box sx={{
-                                                padding: '16px',
+                                                padding: isMobile ? '12px' : '16px',
                                                 background: '#fff',
-                                                borderRadius: '0 0 12px 12px',
-                                                minHeight: '300px',
+                                                borderRadius: isMobile ? '0 0 8px 8px' : '0 0 12px 12px',
+                                                minHeight: isMobile ? '200px' : '300px',
                                                 display: 'flex',
                                                 flexDirection: 'column',
                                                 justifyContent: 'flex-start'
@@ -8819,13 +8971,13 @@ setBookingDetail(finalVoucherDetail);
                                                 {/* Message Bubble */}
                                                 <Box sx={{
                                                     background: '#e5e7eb',
-                                                    borderRadius: '16px',
-                                                    padding: '12px 16px',
-                                                    marginBottom: '8px',
+                                                    borderRadius: isMobile ? '12px' : '16px',
+                                                    padding: isMobile ? '8px 12px' : '12px 16px',
+                                                    marginBottom: isMobile ? '6px' : '8px',
                                                     maxWidth: '85%',
                                                     alignSelf: 'flex-start',
                                                     wordWrap: 'break-word',
-                                                    fontSize: '14px',
+                                                    fontSize: isMobile ? '12px' : '14px',
                                                     lineHeight: '1.5',
                                                     color: '#111827',
                                                     whiteSpace: 'pre-wrap'
@@ -8847,48 +8999,50 @@ setBookingDetail(finalVoucherDetail);
                             </Grid>
                             {/* SMS Logs */}
                             <Grid item xs={12}>
-                                <Divider sx={{ my: 2 }} />
-                                <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
+                                <Divider sx={{ my: isMobile ? 1 : 2 }} />
+                                <Typography variant="subtitle1" sx={{ mb: isMobile ? 0.5 : 1, fontWeight: 600, fontSize: isMobile ? 14 : 'inherit' }}>
                                     Sent SMS
                                 </Typography>
                                 {smsLogsLoading ? (
-                                    <Typography variant="body2">Loading...</Typography>
+                                    <Typography variant="body2" sx={{ fontSize: isMobile ? 12 : 'inherit' }}>Loading...</Typography>
                                 ) : (smsLogs && smsLogs.length > 0 ? (
-                                    <Table size="small">
-                                        <TableHead>
-                                            <TableRow>
-                                                <TableCell>Date</TableCell>
-                                                <TableCell>To</TableCell>
-                                                <TableCell>Status</TableCell>
-                                            </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                            {smsLogs.map((log) => (
-                                                <TableRow key={log.id}>
-                                                    <TableCell>{(() => { try { return dayjs(log.sent_at).format('DD/MM/YYYY HH:mm'); } catch { return String(log.sent_at || ''); } })()}</TableCell>
-                                                    <TableCell>{log.to_number}</TableCell>
-                                                    <TableCell>{log.status}</TableCell>
+                                    <TableContainer sx={{ maxHeight: isMobile ? '200px' : 'none', overflowX: 'auto' }}>
+                                        <Table size={isMobile ? "small" : "small"}>
+                                            <TableHead>
+                                                <TableRow>
+                                                    <TableCell sx={{ fontSize: isMobile ? 10 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>Date</TableCell>
+                                                    <TableCell sx={{ fontSize: isMobile ? 10 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>To</TableCell>
+                                                    <TableCell sx={{ fontSize: isMobile ? 10 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>Status</TableCell>
                                                 </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                ) : (<Typography variant="body2">No SMS sent yet.</Typography>))}
+                                            </TableHead>
+                                            <TableBody>
+                                                {smsLogs.map((log) => (
+                                                    <TableRow key={log.id}>
+                                                        <TableCell sx={{ fontSize: isMobile ? 9 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>{(() => { try { return dayjs(log.sent_at).format('DD/MM/YYYY HH:mm'); } catch { return String(log.sent_at || ''); } })()}</TableCell>
+                                                        <TableCell sx={{ fontSize: isMobile ? 9 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit', wordBreak: 'break-word' }}>{log.to_number}</TableCell>
+                                                        <TableCell sx={{ fontSize: isMobile ? 9 : 'inherit', padding: isMobile ? '6px 4px' : 'inherit' }}>{log.status}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
+                                ) : (<Typography variant="body2" sx={{ fontSize: isMobile ? 12 : 'inherit' }}>No SMS sent yet.</Typography>))}
                             </Grid>
                         </Grid>
                     </DialogContent>
-                    <DialogActions sx={{ p: 3, justifyContent: 'flex-end' }}>
+                    <DialogActions sx={{ p: isMobile ? 1.5 : 3, justifyContent: 'flex-end' }}>
                         <Button 
                             onClick={handleSendSms}
                             variant="contained"
-                            startIcon={<span>📱</span>}
+                            startIcon={<span style={{ fontSize: isMobile ? 16 : 'inherit' }}>📱</span>}
                             sx={{ 
                                 backgroundColor: '#17a2b8',
-                                px: 4,
-                                py: 1.5,
+                                px: isMobile ? 2 : 4,
+                                py: isMobile ? 1 : 1.5,
                                 borderRadius: 2,
                                 fontWeight: 600,
                                 textTransform: 'none',
-                                fontSize: 16,
+                                fontSize: isMobile ? 14 : 16,
                                 '&:hover': {
                                     backgroundColor: '#138496'
                                 }
