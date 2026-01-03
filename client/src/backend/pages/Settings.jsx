@@ -7811,10 +7811,27 @@ const Settings = () => {
 
             {/* Create/Edit Crew Form Modal */}
             {(showCrewForm || showEditCrewForm) && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <div className="modal-header">
-                            <h3>{showEditCrewForm ? 'Edit Crew Member' : 'Add New Crew Member'}</h3>
+                <div className="modal-overlay" style={isMobile ? {
+                    padding: '8px',
+                    alignItems: 'flex-start',
+                    overflowY: 'auto'
+                } : {}}>
+                    <div className="modal-content" style={isMobile ? {
+                        maxWidth: 'calc(100vw - 16px)',
+                        width: '100%',
+                        maxHeight: 'calc(100vh - 16px)',
+                        margin: '0',
+                        borderRadius: '8px'
+                    } : {}}>
+                        <div className="modal-header" style={isMobile ? {
+                            padding: '10px 12px',
+                            borderBottom: '1px solid #e5e7eb'
+                        } : {}}>
+                            <h3 style={isMobile ? {
+                                fontSize: '14px',
+                                fontWeight: 600,
+                                margin: 0
+                            } : {}}>{showEditCrewForm ? 'Edit Crew Member' : 'Add New Crew Member'}</h3>
                             <button 
                                 className="close-btn"
                                 onClick={() => {
@@ -7822,78 +7839,180 @@ const Settings = () => {
                                     setShowEditCrewForm(false);
                                     resetCrewForm();
                                 }}
+                                style={isMobile ? {
+                                    fontSize: '18px',
+                                    width: '24px',
+                                    height: '24px'
+                                } : {}}
                             >
                                 ×
                             </button>
                         </div>
                         
-                        <form onSubmit={handleCrewSubmit} className="crew-form">
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>First Name *</label>
+                        <form onSubmit={handleCrewSubmit} className="crew-form" style={isMobile ? {
+                            padding: '12px'
+                        } : {}}>
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                marginBottom: '12px'
+                            } : {}}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>First Name *</label>
                                     <input
                                         type="text"
                                         value={crewFormData.first_name}
                                         onChange={(e) => setCrewFormData({...crewFormData, first_name: e.target.value})}
                                         placeholder="e.g., John"
                                         required
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     />
                                 </div>
                                 
-                                <div className="form-group">
-                                    <label>Last Name *</label>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Last Name *</label>
                                     <input
                                         type="text"
                                         value={crewFormData.last_name}
                                         onChange={(e) => setCrewFormData({...crewFormData, last_name: e.target.value})}
                                         placeholder="e.g., Smith"
                                         required
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     />
                                 </div>
                             </div>
                             
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Email</label>
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                marginBottom: '12px'
+                            } : {}}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Email</label>
                                     <input
                                         type="email"
                                         value={crewFormData.email}
                                         onChange={(e) => setCrewFormData({...crewFormData, email: e.target.value})}
                                         placeholder="e.g., john.smith@example.com"
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     />
                                 </div>
                                 
-                                <div className="form-group">
-                                    <label>Phone Number</label>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Phone Number</label>
                                     <input
                                         type="tel"
                                         value={crewFormData.phone}
                                         onChange={(e) => setCrewFormData({...crewFormData, phone: e.target.value})}
                                         placeholder="e.g., +44 123 456 7890"
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     />
                                 </div>
                             </div>
                             
-                            <div className="form-group">
-                                <label>Status</label>
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '12px'
+                            } : {}}>
+                                <label style={isMobile ? {
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
+                                    fontWeight: 600
+                                } : {}}>Status</label>
                                 <select
                                     value={crewFormData.is_active}
                                     onChange={(e) => setCrewFormData({...crewFormData, is_active: e.target.value === 'true'})}
+                                    style={isMobile ? {
+                                        padding: '6px 8px',
+                                        fontSize: '13px',
+                                        borderRadius: '4px',
+                                        width: '100%',
+                                        height: '32px',
+                                        boxSizing: 'border-box'
+                                    } : {}}
                                 >
                                     <option value={true}>Active</option>
                                     <option value={false}>Inactive</option>
                                 </select>
                             </div>
                             
-                            <div className="form-actions">
+                            <div className="form-actions" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                paddingTop: '12px',
+                                marginTop: '12px',
+                                borderTop: '1px solid #e5e7eb'
+                            } : {}}>
                                 <button type="button" className="btn btn-secondary" onClick={() => {
                                     setShowCrewForm(false);
                                     setShowEditCrewForm(false);
                                     resetCrewForm();
-                                }}>
+                                }} style={isMobile ? {
+                                    padding: '8px 12px',
+                                    fontSize: '12px',
+                                    width: '100%',
+                                    borderRadius: '4px',
+                                    height: '36px'
+                                } : {}}>
                                     Cancel
                                 </button>
-                                <button type="submit" className="btn btn-primary">
+                                <button type="submit" className="btn btn-primary" style={isMobile ? {
+                                    padding: '8px 12px',
+                                    fontSize: '12px',
+                                    width: '100%',
+                                    borderRadius: '4px',
+                                    height: '36px'
+                                } : {}}>
                                     {showEditCrewForm ? 'Update Crew Member' : 'Add Crew Member'}
                                 </button>
                             </div>
