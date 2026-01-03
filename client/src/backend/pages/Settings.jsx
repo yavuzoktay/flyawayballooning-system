@@ -8123,10 +8123,27 @@ const Settings = () => {
 
             {/* Create/Edit Terms & Conditions Form Modal (includes Passenger Information terms) */}
             {(showTermsForm || showEditTermsForm || showPassengerTermsForm || showEditPassengerTermsForm) && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <div className="modal-header">
-                            <h3>{
+                <div className="modal-overlay" style={isMobile ? {
+                    padding: '8px',
+                    alignItems: 'flex-start',
+                    overflowY: 'auto'
+                } : {}}>
+                    <div className="modal-content" style={isMobile ? {
+                        maxWidth: 'calc(100vw - 16px)',
+                        width: '100%',
+                        maxHeight: 'calc(100vh - 16px)',
+                        margin: '0',
+                        borderRadius: '8px'
+                    } : {}}>
+                        <div className="modal-header" style={isMobile ? {
+                            padding: '10px 12px',
+                            borderBottom: '1px solid #e5e7eb'
+                        } : {}}>
+                            <h3 style={isMobile ? {
+                                fontSize: '14px',
+                                fontWeight: 600,
+                                margin: 0
+                            } : {}}>{
                                 showPassengerTermsForm
                                     ? 'Create Terms & Conditions for Passenger Information'
                                     : showEditPassengerTermsForm
@@ -8142,15 +8159,33 @@ const Settings = () => {
                                     setShowEditPassengerTermsForm(false);
                                     resetTermsForm();
                                 }}
+                                style={isMobile ? {
+                                    fontSize: '18px',
+                                    width: '24px',
+                                    height: '24px'
+                                } : {}}
                             >
                                 ×
                             </button>
                         </div>
                         
-                        <form onSubmit={(showPassengerTermsForm || showEditPassengerTermsForm) ? handlePassengerTermsSubmit : handleTermsSubmit} className="terms-form">
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Title *</label>
+                        <form onSubmit={(showPassengerTermsForm || showEditPassengerTermsForm) ? handlePassengerTermsSubmit : handleTermsSubmit} className="terms-form" style={isMobile ? {
+                            padding: '12px'
+                        } : {}}>
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                marginBottom: '12px'
+                            } : {}}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Title *</label>
                                     <input
                                         type="text"
                                         value={(showPassengerTermsForm || showEditPassengerTermsForm) ? passengerTermsFormData.title : termsFormData.title}
@@ -8163,11 +8198,24 @@ const Settings = () => {
                                         }}
                                         placeholder="e.g., Weekday Morning Terms, Any Day Flight Terms"
                                         required
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     />
                                 </div>
                                 
-                                <div className="form-group">
-                                    <label>Sort Order</label>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Sort Order</label>
                                     <input
                                         type="number"
                                         value={(showPassengerTermsForm || showEditPassengerTermsForm) ? passengerTermsFormData.sort_order : termsFormData.sort_order}
@@ -8181,12 +8229,25 @@ const Settings = () => {
                                         }}
                                         placeholder="0"
                                         min="0"
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     />
                                 </div>
                             </div>
                             
-                            <div className="form-group">
-                                <label>Content *</label>
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '12px'
+                            } : {}}>
+                                <label style={isMobile ? {
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
+                                    fontWeight: 600
+                                } : {}}>Content *</label>
                                 <textarea
                                     value={(showPassengerTermsForm || showEditPassengerTermsForm) ? passengerTermsFormData.content : termsFormData.content}
                                     onChange={(e) => {
@@ -8197,26 +8258,80 @@ const Settings = () => {
                                         }
                                     }}
                                     placeholder="Enter the terms and conditions text content..."
-                                    rows="8"
+                                    rows={isMobile ? 5 : 8}
                                     required
-                                    style={{ fontFamily: 'inherit', lineHeight: '1.5' }}
+                                    style={isMobile ? {
+                                        fontFamily: 'inherit',
+                                        lineHeight: '1.5',
+                                        padding: '6px 8px',
+                                        fontSize: '13px',
+                                        borderRadius: '4px',
+                                        minHeight: '120px',
+                                        resize: 'vertical',
+                                        boxSizing: 'border-box'
+                                    } : {
+                                        fontFamily: 'inherit',
+                                        lineHeight: '1.5'
+                                    }}
                                 />
-                                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                                <div style={isMobile ? {
+                                    fontSize: '10px',
+                                    color: '#6b7280',
+                                    marginTop: '4px'
+                                } : {
+                                    fontSize: '12px',
+                                    color: '#6b7280',
+                                    marginTop: '4px'
+                                }}>
                                     Use \n for line breaks. This content will be displayed in the balloning-book Terms & Conditions section.
                                 </div>
                             </div>
                             
                             {!(showPassengerTermsForm || showEditPassengerTermsForm) ? (
                                 // Original experiences/voucher type UI for regular Terms & Conditions
-                                <div className="form-group">
-                                    <label>Experiences *</label>
-                                    <div style={{ border: '1px solid #d1d5db', borderRadius: '8px', padding: '16px', background: '#f9fafb' }}>
-                                        <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Experiences *</label>
+                                    <div style={isMobile ? {
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '6px',
+                                        padding: '10px',
+                                        background: '#f9fafb'
+                                    } : {
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '8px',
+                                        padding: '16px',
+                                        background: '#f9fafb'
+                                    }}>
+                                        <div style={isMobile ? {
+                                            marginBottom: '8px',
+                                            fontSize: '11px',
+                                            color: '#374151'
+                                        } : {
+                                            marginBottom: '12px',
+                                            fontSize: '14px',
+                                            color: '#374151'
+                                        }}>
                                             Select which experiences these terms apply to:
                                         </div>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '6px' : '8px' }}>
                                             {experiences.map((experience) => (
-                                                <label key={experience.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                                <label key={experience.id} style={isMobile ? {
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    cursor: 'pointer'
+                                                } : {
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px',
+                                                    cursor: 'pointer'
+                                                }}>
                                                     <input
                                                         type="checkbox"
                                                         checked={termsFormData.experience_ids && termsFormData.experience_ids.includes(experience.id)}
@@ -8233,13 +8348,33 @@ const Settings = () => {
                                                                 setTermsFormData(prev => ({ ...prev, showPrivateVoucherTypes: e.target.checked }));
                                                             }
                                                         }}
+                                                        style={isMobile ? {
+                                                            width: '14px',
+                                                            height: '14px'
+                                                        } : {}}
                                                     />
-                                                    <span style={{ fontSize: '14px', color: '#374151' }}>{experience.title}</span>
+                                                    <span style={isMobile ? {
+                                                        fontSize: '11px',
+                                                        color: '#374151'
+                                                    } : {
+                                                        fontSize: '14px',
+                                                        color: '#374151'
+                                                    }}>{experience.title}</span>
                                                 </label>
                                             ))}
                                         </div>
                                         {experiences.length === 0 && (
-                                            <div style={{ color: '#9ca3af', fontSize: '14px', fontStyle: 'italic', marginTop: '8px' }}>
+                                            <div style={isMobile ? {
+                                                color: '#9ca3af',
+                                                fontSize: '10px',
+                                                fontStyle: 'italic',
+                                                marginTop: '6px'
+                                            } : {
+                                                color: '#9ca3af',
+                                                fontSize: '14px',
+                                                fontStyle: 'italic',
+                                                marginTop: '8px'
+                                            }}>
                                                 No experiences available. Please create experiences first.
                                             </div>
                                         )}
@@ -8247,15 +8382,49 @@ const Settings = () => {
                                 </div>
                             ) : (
                                 // Passenger Information: Journey Types (Flight Types)
-                                <div className="form-group">
-                                    <label>Flight Type *</label>
-                                    <div style={{ border: '1px solid #d1d5db', borderRadius: '8px', padding: '16px', background: '#f9fafb' }}>
-                                        <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Flight Type *</label>
+                                    <div style={isMobile ? {
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '6px',
+                                        padding: '10px',
+                                        background: '#f9fafb'
+                                    } : {
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '8px',
+                                        padding: '16px',
+                                        background: '#f9fafb'
+                                    }}>
+                                        <div style={isMobile ? {
+                                            marginBottom: '8px',
+                                            fontSize: '11px',
+                                            color: '#374151'
+                                        } : {
+                                            marginBottom: '12px',
+                                            fontSize: '14px',
+                                            color: '#374151'
+                                        }}>
                                             Select which flight types these terms apply to:
                                         </div>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 6 : 8 }}>
                                             {journeyTypes.map((label) => (
-                                                <label key={label} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                                <label key={label} style={isMobile ? {
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    cursor: 'pointer'
+                                                } : {
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px',
+                                                    cursor: 'pointer'
+                                                }}>
                                                     <input
                                                         type="checkbox"
                                                         checked={Array.isArray(passengerTermsFormData.journey_types) && passengerTermsFormData.journey_types.includes(label)}
@@ -8266,8 +8435,18 @@ const Settings = () => {
                                                                 : current.filter((x) => x !== label);
                                                             setPassengerTermsFormData({ ...passengerTermsFormData, journey_types: updated });
                                                         }}
+                                                        style={isMobile ? {
+                                                            width: '14px',
+                                                            height: '14px'
+                                                        } : {}}
                                                     />
-                                                    <span style={{ fontSize: '14px', color: '#374151' }}>{label}</span>
+                                                    <span style={isMobile ? {
+                                                        fontSize: '11px',
+                                                        color: '#374151'
+                                                    } : {
+                                                        fontSize: '14px',
+                                                        color: '#374151'
+                                                    }}>{label}</span>
                                                 </label>
                                             ))}
                                         </div>
@@ -8277,15 +8456,34 @@ const Settings = () => {
                             
                             {/* Voucher Types - only show when Shared Flight is selected */}
                             {!(showPassengerTermsForm || showEditPassengerTermsForm) && termsFormData.showVoucherTypes && (
-                                <div className="form-group">
-                                    <label>Voucher Types *</label>
-                                    <div style={{ 
-                                        border: '1px solid #d1d5db', 
-                                        borderRadius: '8px', 
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Voucher Types *</label>
+                                    <div style={isMobile ? {
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '6px',
+                                        padding: '10px',
+                                        background: '#f9fafb'
+                                    } : {
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '8px',
                                         padding: '16px',
                                         background: '#f9fafb'
                                     }}>
-                                        <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
+                                        <div style={isMobile ? {
+                                            marginBottom: '8px',
+                                            fontSize: '11px',
+                                            color: '#374151'
+                                        } : {
+                                            marginBottom: '12px',
+                                            fontSize: '14px',
+                                            color: '#374151'
+                                        }}>
                                             Select which voucher type these terms apply to:
                                         </div>
                                         <select
@@ -8297,7 +8495,22 @@ const Settings = () => {
                                                     voucher_type_ids: selectedId ? [selectedId] : []
                                                 });
                                             }}
-                                            style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #d1d5db', background: '#fff' }}
+                                            style={isMobile ? {
+                                                width: '100%',
+                                                padding: '6px 8px',
+                                                fontSize: '13px',
+                                                borderRadius: '4px',
+                                                border: '1px solid #d1d5db',
+                                                background: '#fff',
+                                                height: '32px',
+                                                boxSizing: 'border-box'
+                                            } : {
+                                                width: '100%',
+                                                padding: '8px',
+                                                borderRadius: '6px',
+                                                border: '1px solid #d1d5db',
+                                                background: '#fff'
+                                            }}
                                         >
                                             <option value="">Select a voucher type</option>
                                             {voucherTypes.map((voucherType) => (
@@ -8307,7 +8520,17 @@ const Settings = () => {
                                             ))}
                                         </select>
                                         {voucherTypes.length === 0 && (
-                                            <div style={{ color: '#9ca3af', fontSize: '14px', fontStyle: 'italic', marginTop: '8px' }}>
+                                            <div style={isMobile ? {
+                                                color: '#9ca3af',
+                                                fontSize: '10px',
+                                                fontStyle: 'italic',
+                                                marginTop: '6px'
+                                            } : {
+                                                color: '#9ca3af',
+                                                fontSize: '14px',
+                                                fontStyle: 'italic',
+                                                marginTop: '8px'
+                                            }}>
                                                 No voucher types available. Please create voucher types first.
                                             </div>
                                         )}
@@ -8317,15 +8540,34 @@ const Settings = () => {
                             
                             {/* Private Voucher Types - only show when Private Charter is selected */}
                             {!(showPassengerTermsForm || showEditPassengerTermsForm) && termsFormData.showPrivateVoucherTypes && (
-                                <div className="form-group">
-                                    <label>Private Voucher Types</label>
-                                    <div style={{ 
-                                        border: '1px solid #d1d5db', 
-                                        borderRadius: '8px', 
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Private Voucher Types</label>
+                                    <div style={isMobile ? {
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '6px',
+                                        padding: '10px',
+                                        background: '#f9fafb'
+                                    } : {
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '8px',
                                         padding: '16px',
                                         background: '#f9fafb'
                                     }}>
-                                        <div style={{ marginBottom: '12px', fontSize: '14px', color: '#374151' }}>
+                                        <div style={isMobile ? {
+                                            marginBottom: '8px',
+                                            fontSize: '11px',
+                                            color: '#374151'
+                                        } : {
+                                            marginBottom: '12px',
+                                            fontSize: '14px',
+                                            color: '#374151'
+                                        }}>
                                             Select which private charter voucher types these terms apply to:
                                         </div>
                                         <select
@@ -8342,7 +8584,22 @@ const Settings = () => {
                                                     private_voucher_type_ids: selectedId ? [selectedId] : []
                                                 });
                                             }}
-                                            style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #d1d5db', background: '#fff' }}
+                                            style={isMobile ? {
+                                                width: '100%',
+                                                padding: '6px 8px',
+                                                fontSize: '13px',
+                                                borderRadius: '4px',
+                                                border: '1px solid #d1d5db',
+                                                background: '#fff',
+                                                height: '32px',
+                                                boxSizing: 'border-box'
+                                            } : {
+                                                width: '100%',
+                                                padding: '8px',
+                                                borderRadius: '6px',
+                                                border: '1px solid #d1d5db',
+                                                background: '#fff'
+                                            }}
                                         >
                                             <option value="">Select a private charter voucher type</option>
                                             {privateCharterVoucherTypes.map((voucherType) => (
@@ -8352,7 +8609,17 @@ const Settings = () => {
                                             ))}
                                         </select>
                                         {privateCharterVoucherTypes.length === 0 && (
-                                            <div style={{ color: '#9ca3af', fontSize: '14px', fontStyle: 'italic', marginTop: '8px' }}>
+                                            <div style={isMobile ? {
+                                                color: '#9ca3af',
+                                                fontSize: '10px',
+                                                fontStyle: 'italic',
+                                                marginTop: '6px'
+                                            } : {
+                                                color: '#9ca3af',
+                                                fontSize: '14px',
+                                                fontStyle: 'italic',
+                                                marginTop: '8px'
+                                            }}>
                                                 No private charter voucher types available. Please create private charter voucher types first.
                                             </div>
                                         )}
@@ -8360,26 +8627,59 @@ const Settings = () => {
                                 </div>
                             )}
                             
-                            <div className="form-group">
-                                <label>Status</label>
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '12px'
+                            } : {}}>
+                                <label style={isMobile ? {
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
+                                    fontWeight: 600
+                                } : {}}>Status</label>
                                 <select
                                     value={termsFormData.is_active}
                                     onChange={(e) => setTermsFormData({...termsFormData, is_active: e.target.value === 'true'})}
+                                    style={isMobile ? {
+                                        padding: '6px 8px',
+                                        fontSize: '13px',
+                                        borderRadius: '4px',
+                                        width: '100%',
+                                        height: '32px',
+                                        boxSizing: 'border-box'
+                                    } : {}}
                                 >
                                     <option value={true}>Active</option>
                                     <option value={false}>Inactive</option>
                                 </select>
                             </div>
                             
-                            <div className="form-actions">
+                            <div className="form-actions" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                paddingTop: '12px',
+                                marginTop: '12px',
+                                borderTop: '1px solid #e5e7eb'
+                            } : {}}>
                                 <button type="button" className="btn btn-secondary" onClick={() => {
                                     setShowTermsForm(false);
                                     setShowEditTermsForm(false);
                                     resetTermsForm();
-                                }}>
+                                }} style={isMobile ? {
+                                    padding: '8px 12px',
+                                    fontSize: '12px',
+                                    width: '100%',
+                                    borderRadius: '4px',
+                                    height: '36px'
+                                } : {}}>
                                     Cancel
                                 </button>
-                                <button type="submit" className="btn btn-primary">
+                                <button type="submit" className="btn btn-primary" style={isMobile ? {
+                                    padding: '8px 12px',
+                                    fontSize: '12px',
+                                    width: '100%',
+                                    borderRadius: '4px',
+                                    height: '36px'
+                                } : {}}>
                                     {showEditTermsForm ? 'Update Terms' : 'Create Terms'}
                                 </button>
                             </div>
