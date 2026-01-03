@@ -5152,13 +5152,57 @@ setBookingDetail(finalVoucherDetail);
                         {activeTab === "vouchers" && (
                             <>
                                 <div className="booking-top-wrap">
-                                    <div className="booking-filter-heading">
-                                        <h3 style={{ fontFamily: "Gilroy Light" }}>All Vouchers</h3>
+                                    <div className="booking-filter-heading" style={{
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        gap: isMobile ? '8px' : '0',
+                                        flexWrap: isMobile ? 'nowrap' : 'wrap'
+                                    }}>
+                                        <h3 style={{ fontFamily: "Gilroy Light", margin: 0, marginRight: isMobile ? 'auto' : 0 }}>All Vouchers</h3>
+                                        {/* Export Button - Only show next to heading on mobile */}
+                                        {isMobile && (
+                                            <OutlinedInput
+                                                readOnly
+                                                onClick={handleExportCSV}
+                                                value="Export"
+                                                sx={{
+                                                    cursor: 'pointer',
+                                                    height: '32px',
+                                                    fontSize: 12,
+                                                    minWidth: '80px',
+                                                    '& input': {
+                                                        cursor: 'pointer',
+                                                        textAlign: 'center',
+                                                        padding: '8px 12px'
+                                                    },
+                                                    '& fieldset': {
+                                                        borderColor: 'primary.main'
+                                                    },
+                                                    '&:hover fieldset': {
+                                                        borderColor: 'primary.dark'
+                                                    }
+                                                }}
+                                                size="small"
+                                                startAdornment={
+                                                    <InputAdornment position="start">
+                                                        <FileDownloadIcon fontSize="small" color="primary" />
+                                                    </InputAdornment>
+                                                }
+                                            />
+                                        )}
                                     </div>
-                                    <div className="booking-search-booking" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <Button variant="outlined" color="primary" onClick={handleExportCSV} style={{ height: 40 }}>
-                                            Export
-                                        </Button>
+                                    <div className="booking-search-booking" style={{ 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        gap: isMobile ? 4 : 8,
+                                        flexWrap: isMobile ? 'wrap' : 'nowrap'
+                                    }}>
+                                        {/* Export Button - Only show on desktop */}
+                                        {!isMobile && (
+                                            <Button variant="outlined" color="primary" onClick={handleExportCSV} style={{ height: 40 }}>
+                                                Export
+                                            </Button>
+                                        )}
                                         <OutlinedInput placeholder="Search by name, email, phone, voucher ref, offer code..." value={filters.search}
                                             onChange={(e) => handleFilterChange("search", e.target.value)} sx={{ fontSize: 14, '& input::placeholder': { fontSize: 14 } }} />
                                     </div>
