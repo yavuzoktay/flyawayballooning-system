@@ -5154,13 +5154,35 @@ const Settings = () => {
 
             {/* Create Resources Form Modal */}
             {showResourceForm && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <div className="modal-header">
-                            <h3>Create New Resources</h3>
+                <div className="modal-overlay" style={isMobile ? {
+                    padding: '8px',
+                    alignItems: 'flex-start',
+                    overflowY: 'auto'
+                } : {}}>
+                    <div className="modal-content" style={isMobile ? {
+                        maxWidth: 'calc(100vw - 16px)',
+                        width: '100%',
+                        maxHeight: 'calc(100vh - 16px)',
+                        margin: '0',
+                        borderRadius: '8px'
+                    } : {}}>
+                        <div className="modal-header" style={isMobile ? {
+                            padding: '10px 12px',
+                            borderBottom: '1px solid #e5e7eb'
+                        } : {}}>
+                            <h3 style={isMobile ? {
+                                fontSize: '14px',
+                                fontWeight: 600,
+                                margin: 0
+                            } : {}}>Create New Resources</h3>
                             <button 
                                 className="close-btn"
                                 onClick={() => setShowResourceForm(false)}
+                                style={isMobile ? {
+                                    fontSize: '18px',
+                                    width: '24px',
+                                    height: '24px'
+                                } : {}}
                             >
                                 ×
                             </button>
@@ -5209,62 +5231,174 @@ const Settings = () => {
                                 }
                             }}
                             className="voucher-form"
+                            style={isMobile ? {
+                                padding: '12px'
+                            } : {}}
                         >
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Resource Name</label>
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                marginBottom: '12px'
+                            } : {}}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Resource Name</label>
                                     <input
                                         type="text"
                                         placeholder="Resource #244"
                                         value={resourceFormData.name}
                                         onChange={(e) => setResourceFormData({ ...resourceFormData, name: e.target.value })}
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     />
                                 </div>
-                                <div className="form-group">
-                                    <label>Resource Group</label>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Resource Group</label>
                                     <select
                                         value={resourceFormData.resource_group_id}
                                         onChange={(e) => setResourceFormData({ ...resourceFormData, resource_group_id: e.target.value })}
                                         required
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            width: '100%',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     >
                                         <option value="" disabled>Select group</option>
                                         {resourceGroups.map(g => (
                                             <option key={g.id} value={g.id}>{g.name}</option>
                                         ))}
                                     </select>
-                                    <small>Assign this resource to a Resource Group</small>
+                                    <small style={isMobile ? {
+                                        fontSize: '10px',
+                                        color: '#6b7280',
+                                        marginTop: '4px',
+                                        display: 'block'
+                                    } : {}}>Assign this resource to a Resource Group</small>
                                 </div>
                             </div>
 
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Max Uses</label>
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                marginBottom: '12px'
+                            } : {}}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Max Uses</label>
                                     <input
                                         type="number"
                                         min="1"
                                         value={resourceFormData.max_uses}
                                         onChange={(e) => setResourceFormData({ ...resourceFormData, max_uses: e.target.value })}
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     />
-                                    <small>Max number of times this resource can be used at one time.</small>
+                                    <small style={isMobile ? {
+                                        fontSize: '10px',
+                                        color: '#6b7280',
+                                        marginTop: '4px',
+                                        display: 'block'
+                                    } : {}}>Max number of times this resource can be used at one time.</small>
                                 </div>
-                                <div className="form-group">
-                                    <label>Sort Order</label>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Sort Order</label>
                                     <input
                                         type="number"
                                         min="0"
                                         value={resourceFormData.sort_order}
                                         onChange={(e) => setResourceFormData({ ...resourceFormData, sort_order: e.target.value })}
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     />
-                                    <small>Sort order to display resources on Manifest Timeline</small>
+                                    <small style={isMobile ? {
+                                        fontSize: '10px',
+                                        color: '#6b7280',
+                                        marginTop: '4px',
+                                        display: 'block'
+                                    } : {}}>Sort order to display resources on Manifest Timeline</small>
                                 </div>
                             </div>
 
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Experience</label>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                marginBottom: '12px'
+                            } : {}}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Experience</label>
+                                    <div style={isMobile ? {
+                                        display: 'grid',
+                                        gridTemplateColumns: '1fr',
+                                        gap: '6px',
+                                        padding: '10px',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '6px',
+                                        background: '#f9fafb'
+                                    } : {
+                                        display: 'grid',
+                                        gridTemplateColumns: '1fr',
+                                        gap: '8px'
+                                    }}>
                                         {experienceTypes.map(opt => (
-                                            <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <label key={opt} style={isMobile ? {
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px'
+                                            } : {
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px'
+                                            }}>
                                                 <input
                                                     type="checkbox"
                                                     checked={resourceFormData.experience_types.includes(opt)}
@@ -5276,51 +5410,141 @@ const Settings = () => {
                                                             return { ...prev, experience_types: Array.from(set) };
                                                         });
                                                     }}
+                                                    style={isMobile ? {
+                                                        width: '14px',
+                                                        height: '14px'
+                                                    } : {}}
                                                 />
-                                                {opt}
+                                                <span style={isMobile ? {
+                                                    fontSize: '11px',
+                                                    color: '#374151'
+                                                } : {}}>{opt}</span>
                                             </label>
                                         ))}
                                     </div>
-                                    <small>Choose which experience this resource is used for</small>
+                                    <small style={isMobile ? {
+                                        fontSize: '10px',
+                                        color: '#6b7280',
+                                        marginTop: '4px',
+                                        display: 'block'
+                                    } : {}}>Choose which experience this resource is used for</small>
                                 </div>
-                                <div className="form-group">
-                                    <label>Display Color</label>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Display Color</label>
                                     <input
                                         type="color"
                                         value={resourceFormData.color}
                                         onChange={(e) => setResourceFormData({ ...resourceFormData, color: e.target.value })}
+                                        style={isMobile ? {
+                                            width: '100%',
+                                            height: '32px',
+                                            borderRadius: '4px',
+                                            border: '1px solid #d1d5db',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     />
-                                    <small>The color to use when showing this resource on the manifest</small>
+                                    <small style={isMobile ? {
+                                        fontSize: '10px',
+                                        color: '#6b7280',
+                                        marginTop: '4px',
+                                        display: 'block'
+                                    } : {}}>The color to use when showing this resource on the manifest</small>
                                 </div>
-                                <div className="form-group">
-                                    <label>Icon</label>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Icon</label>
                                     <select
                                         value={resourceFormData.icon}
                                         onChange={(e) => setResourceFormData({ ...resourceFormData, icon: e.target.value })}
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            width: '100%',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     >
                                         <option value="Generic">Generic</option>
                                         <option value="Balloon">Balloon</option>
                                         <option value="Vehicle">Vehicle</option>
                                         <option value="Equipment">Equipment</option>
                                     </select>
-                                    <small>Icon used on manifest and booking views</small>
+                                    <small style={isMobile ? {
+                                        fontSize: '10px',
+                                        color: '#6b7280',
+                                        marginTop: '4px',
+                                        display: 'block'
+                                    } : {}}>Icon used on manifest and booking views</small>
                                 </div>
                             </div>
 
-                            <div className="form-group">
-                                <label>Number of Resources</label>
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '12px'
+                            } : {}}>
+                                <label style={isMobile ? {
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
+                                    fontWeight: 600
+                                } : {}}>Number of Resources</label>
                                 <input
                                     type="number"
                                     min="1"
                                     value={resourceFormData.quantity}
                                     onChange={(e) => setResourceFormData({ ...resourceFormData, quantity: e.target.value })}
+                                    style={isMobile ? {
+                                        padding: '6px 8px',
+                                        fontSize: '13px',
+                                        borderRadius: '4px',
+                                        height: '32px',
+                                        boxSizing: 'border-box'
+                                    } : {}}
                                 />
-                                <small>The number of resources you'd like to create.</small>
+                                <small style={isMobile ? {
+                                    fontSize: '10px',
+                                    color: '#6b7280',
+                                    marginTop: '4px',
+                                    display: 'block'
+                                } : {}}>The number of resources you'd like to create.</small>
                             </div>
 
-                            <div className="form-actions">
-                                <button type="button" className="btn btn-secondary" onClick={() => setShowResourceForm(false)}>Cancel</button>
-                                <button type="submit" className="btn btn-primary"><Plus size={16} /> Create</button>
+                            <div className="form-actions" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                paddingTop: '12px',
+                                marginTop: '12px',
+                                borderTop: '1px solid #e5e7eb'
+                            } : {}}>
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowResourceForm(false)} style={isMobile ? {
+                                    padding: '8px 12px',
+                                    fontSize: '12px',
+                                    width: '100%',
+                                    borderRadius: '4px',
+                                    height: '36px'
+                                } : {}}>Cancel</button>
+                                <button type="submit" className="btn btn-primary" style={isMobile ? {
+                                    padding: '8px 12px',
+                                    fontSize: '12px',
+                                    width: '100%',
+                                    borderRadius: '4px',
+                                    height: '36px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px'
+                                } : {}}><Plus size={isMobile ? 14 : 16} /> Create</button>
                             </div>
                         </form>
                     </div>
