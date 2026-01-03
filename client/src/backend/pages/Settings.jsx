@@ -4959,35 +4959,101 @@ const Settings = () => {
 
             {/* Create Resource Group Modal */}
             {showResourceGroupForm && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <div className="modal-header">
-                            <h3>Add Resource Group</h3>
+                <div className="modal-overlay" style={isMobile ? {
+                    padding: '8px',
+                    alignItems: 'flex-start',
+                    overflowY: 'auto'
+                } : {}}>
+                    <div className="modal-content" style={isMobile ? {
+                        maxWidth: 'calc(100vw - 16px)',
+                        width: '100%',
+                        maxHeight: 'calc(100vh - 16px)',
+                        margin: '0',
+                        borderRadius: '8px'
+                    } : {}}>
+                        <div className="modal-header" style={isMobile ? {
+                            padding: '10px 12px',
+                            borderBottom: '1px solid #e5e7eb'
+                        } : {}}>
+                            <h3 style={isMobile ? {
+                                fontSize: '14px',
+                                fontWeight: 600,
+                                margin: 0
+                            } : {}}>Add Resource Group</h3>
                             <button 
                                 className="close-btn"
                                 onClick={() => setShowResourceGroupForm(false)}
+                                style={isMobile ? {
+                                    fontSize: '18px',
+                                    width: '24px',
+                                    height: '24px'
+                                } : {}}
                             >
                                 ×
                             </button>
                         </div>
-                        <div className="voucher-form" style={{ paddingTop: 16 }}>
-                            <p style={{ color: '#6b7280', marginTop: 0 }}>
+                        <div className="voucher-form" style={isMobile ? {
+                            padding: '12px',
+                            paddingTop: '12px'
+                        } : {
+                            paddingTop: 16
+                        }}>
+                            <p style={isMobile ? {
+                                color: '#6b7280',
+                                marginTop: 0,
+                                marginBottom: '12px',
+                                fontSize: '11px',
+                                lineHeight: '1.4'
+                            } : {
+                                color: '#6b7280',
+                                marginTop: 0
+                            }}>
                                 A resource group allows you to group your resources together, and assign the group of resources to an activity.
                             </p>
-                            <div className="form-group">
-                                <label>Name</label>
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '12px'
+                            } : {}}>
+                                <label style={isMobile ? {
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
+                                    fontWeight: 600
+                                } : {}}>Name</label>
                                 <input
                                     type="text"
                                     placeholder="Canoe"
                                     value={resourceGroupFormData.name}
                                     onChange={(e) => setResourceGroupFormData({ name: e.target.value })}
+                                    style={isMobile ? {
+                                        padding: '6px 8px',
+                                        fontSize: '13px',
+                                        borderRadius: '4px',
+                                        height: '32px',
+                                        boxSizing: 'border-box'
+                                    } : {}}
                                 />
                             </div>
-                            <div className="form-actions" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <div className="form-actions" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                paddingTop: '12px',
+                                marginTop: '12px',
+                                borderTop: '1px solid #e5e7eb'
+                            } : {
+                                display: 'flex',
+                                justifyContent: 'space-between'
+                            }}>
                                 <button
                                     type="button"
                                     className="btn btn-secondary"
                                     onClick={() => setShowResourceGroupForm(false)}
+                                    style={isMobile ? {
+                                        padding: '8px 12px',
+                                        fontSize: '12px',
+                                        width: '100%',
+                                        borderRadius: '4px',
+                                        height: '36px'
+                                    } : {}}
                                 >
                                     Back
                                 </button>
@@ -5011,6 +5077,13 @@ const Settings = () => {
                                         setShowResourceGroupForm(false);
                                         setResourceGroupFormData({ name: '' });
                                     }}
+                                    style={isMobile ? {
+                                        padding: '8px 12px',
+                                        fontSize: '12px',
+                                        width: '100%',
+                                        borderRadius: '4px',
+                                        height: '36px'
+                                    } : {}}
                                 >
                                     Save
                                 </button>
