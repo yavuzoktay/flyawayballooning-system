@@ -6076,10 +6076,27 @@ const Settings = () => {
 
             {/* Create/Edit Voucher Type Form Modal */}
             {(showVoucherTypesForm || showEditVoucherTypeForm) && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <div className="modal-header">
-                            <h3>{showEditVoucherTypeForm ? 'Edit Voucher Type' : 'Create New Voucher Type'}</h3>
+                <div className="modal-overlay" style={isMobile ? {
+                    padding: '8px',
+                    alignItems: 'flex-start',
+                    overflowY: 'auto'
+                } : {}}>
+                    <div className="modal-content" style={isMobile ? {
+                        maxWidth: 'calc(100vw - 16px)',
+                        width: '100%',
+                        maxHeight: 'calc(100vh - 16px)',
+                        margin: '0',
+                        borderRadius: '8px'
+                    } : {}}>
+                        <div className="modal-header" style={isMobile ? {
+                            padding: '10px 12px',
+                            borderBottom: '1px solid #e5e7eb'
+                        } : {}}>
+                            <h3 style={isMobile ? {
+                                fontSize: '14px',
+                                fontWeight: 600,
+                                margin: 0
+                            } : {}}>{showEditVoucherTypeForm ? 'Edit Voucher Type' : 'Create New Voucher Type'}</h3>
                             <button 
                                 className="close-btn"
                                 onClick={() => {
@@ -6087,88 +6104,208 @@ const Settings = () => {
                                     setShowEditVoucherTypeForm(false);
                                     resetVoucherTypeForm();
                                 }}
+                                style={isMobile ? {
+                                    fontSize: '18px',
+                                    width: '24px',
+                                    height: '24px'
+                                } : {}}
                             >
                                 ×
                             </button>
                         </div>
                         
-                        <form onSubmit={handleVoucherTypeSubmit} className="voucher-type-form">
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Title *</label>
+                        <form onSubmit={handleVoucherTypeSubmit} className="voucher-type-form" style={isMobile ? {
+                            padding: '12px'
+                        } : {}}>
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                marginBottom: '12px'
+                            } : {}}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Title *</label>
                                     <input
                                         type="text"
                                         value={voucherTypeFormData.title}
                                         onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, title: e.target.value})}
                                         placeholder="e.g., Weekday Morning"
                                         required
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     />
                                 </div>
                                 
-                                <div className="form-group">
-                                    <label>Description *</label>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Description *</label>
                                     <textarea
                                         value={voucherTypeFormData.description}
                                         onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, description: e.target.value})}
                                         placeholder="Detailed description of the voucher type..."
-                                        rows="3"
+                                        rows={isMobile ? 2 : 3}
                                         required
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            minHeight: '60px',
+                                            resize: 'vertical',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     />
                                 </div>
                             </div>
                         
-                        <div className="form-row">
-                            <div className="form-group">
-                                <label>Image Text Tag</label>
+                        <div className="form-row" style={isMobile ? {
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px',
+                            marginBottom: '12px'
+                        } : {}}>
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '12px'
+                            } : {}}>
+                                <label style={isMobile ? {
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
+                                    fontWeight: 600
+                                } : {}}>Image Text Tag</label>
                                 <input
                                     type="text"
                                     value={voucherTypeFormData.image_text_tag}
                                     onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, image_text_tag: e.target.value})}
                                     placeholder="e.g., 5★ on Google, TripAdvisor & Facebook"
+                                    style={isMobile ? {
+                                        padding: '6px 8px',
+                                        fontSize: '13px',
+                                        borderRadius: '4px',
+                                        height: '32px',
+                                        boxSizing: 'border-box'
+                                    } : {}}
                                 />
                             </div>
                         </div>
                             
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Max Passengers</label>
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                marginBottom: '12px'
+                            } : {}}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Max Passengers</label>
                                     <input
                                         type="number"
                                         value={voucherTypeFormData.max_passengers}
                                         onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, max_passengers: e.target.value})}
                                         placeholder="8"
                                         min="1"
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     />
                                 </div>
                                 
-                                <div className="form-group">
-                                    <label>Validity (Months)</label>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Validity (Months)</label>
                                     <input
                                         type="number"
                                         value={voucherTypeFormData.validity_months}
                                         onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, validity_months: e.target.value})}
                                         placeholder="18"
                                         min="1"
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     />
                                 </div>
                             </div>
                             
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Flight Days</label>
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                marginBottom: '12px'
+                            } : {}}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Flight Days</label>
                                     <input
                                         type="text"
                                         value={voucherTypeFormData.flight_days}
                                         onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, flight_days: e.target.value})}
                                         placeholder="e.g., Monday - Friday"
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     />
                                 </div>
                                 
-                                <div className="form-group">
-                                    <label>Flight Time</label>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Flight Time</label>
                                     <select
                                         value={voucherTypeFormData.flight_time}
                                         onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, flight_time: e.target.value})}
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            width: '100%',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     >
                                         <option value="AM">AM</option>
                                         <option value="PM">PM</option>
@@ -6177,23 +6314,55 @@ const Settings = () => {
                                 </div>
                             </div>
                             
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Sort Order</label>
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                marginBottom: '12px'
+                            } : {}}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Sort Order</label>
                                     <input
                                         type="number"
                                         value={voucherTypeFormData.sort_order}
                                         onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, sort_order: e.target.value})}
                                         placeholder="0"
                                         min="0"
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     />
                                 </div>
                                 
-                                <div className="form-group">
-                                    <label>Status</label>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {}}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {}}>Status</label>
                                     <select
                                         value={voucherTypeFormData.is_active}
                                         onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, is_active: e.target.value === 'true'})}
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            width: '100%',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
+                                        } : {}}
                                     >
                                         <option value={true}>Active</option>
                                         <option value={false}>Inactive</option>
@@ -6201,49 +6370,117 @@ const Settings = () => {
                                 </div>
                             </div>
                             
-                            <div className="form-group">
-                                <label>Features (JSON Array)</label>
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '12px'
+                            } : {}}>
+                                <label style={isMobile ? {
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
+                                    fontWeight: 600
+                                } : {}}>Features (JSON Array)</label>
                                 <textarea
                                     value={voucherTypeFormData.features}
                                     onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, features: e.target.value})}
                                     placeholder='["Around 1 Hour of Air Time", "Complimentary Drink", "Inflight Photos and 3D Flight Track"]'
-                                    rows="2"
+                                    rows={isMobile ? 2 : 2}
+                                    style={isMobile ? {
+                                        padding: '6px 8px',
+                                        fontSize: '13px',
+                                        borderRadius: '4px',
+                                        minHeight: '60px',
+                                        resize: 'vertical',
+                                        boxSizing: 'border-box'
+                                    } : {}}
                                 />
                             </div>
                             
-                            <div className="form-group">
-                                <label>Terms & Conditions</label>
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '12px'
+                            } : {}}>
+                                <label style={isMobile ? {
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
+                                    fontWeight: 600
+                                } : {}}>Terms & Conditions</label>
                                 <textarea
                                     value={voucherTypeFormData.terms}
                                     onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, terms: e.target.value})}
                                     placeholder="Terms and conditions for this voucher type..."
-                                    rows="3"
+                                    rows={isMobile ? 2 : 3}
+                                    style={isMobile ? {
+                                        padding: '6px 8px',
+                                        fontSize: '13px',
+                                        borderRadius: '4px',
+                                        minHeight: '60px',
+                                        resize: 'vertical',
+                                        boxSizing: 'border-box'
+                                    } : {}}
                                 />
                             </div>
                             
-                            <div className="form-group">
-                                <label>Image</label>
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '12px'
+                            } : {}}>
+                                <label style={isMobile ? {
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
+                                    fontWeight: 600
+                                } : {}}>Image</label>
                                 <input
                                     type="file"
                                     accept="image/*"
                                     onChange={(e) => setVoucherTypeFormData({...voucherTypeFormData, image_file: e.target.files[0]})}
+                                    style={isMobile ? {
+                                        padding: '6px 8px',
+                                        fontSize: '11px',
+                                        height: '32px',
+                                        boxSizing: 'border-box'
+                                    } : {}}
                                 />
                                 {voucherTypeFormData.image_url && !voucherTypeFormData.image_file && (
-                                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                                    <div style={isMobile ? {
+                                        fontSize: '10px',
+                                        color: '#6b7280',
+                                        marginTop: '4px',
+                                        wordBreak: 'break-word'
+                                    } : {
+                                        fontSize: '12px',
+                                        color: '#6b7280',
+                                        marginTop: '4px'
+                                    }}>
                                         Current image: {voucherTypeFormData.image_url}
                                     </div>
                                 )}
                             </div>
                             
-                            <div className="form-actions">
+                            <div className="form-actions" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                paddingTop: '12px',
+                                marginTop: '12px',
+                                borderTop: '1px solid #e5e7eb'
+                            } : {}}>
                                 <button type="button" className="btn btn-secondary" onClick={() => {
                                     setShowVoucherTypesForm(false);
                                     setShowEditVoucherTypeForm(false);
                                     resetVoucherTypeForm();
-                                }}>
+                                }} style={isMobile ? {
+                                    padding: '8px 12px',
+                                    fontSize: '12px',
+                                    width: '100%',
+                                    borderRadius: '4px',
+                                    height: '36px'
+                                } : {}}>
                                     Cancel
                                 </button>
-                                <button type="submit" className="btn btn-primary">
+                                <button type="submit" className="btn btn-primary" style={isMobile ? {
+                                    padding: '8px 12px',
+                                    fontSize: '12px',
+                                    width: '100%',
+                                    borderRadius: '4px',
+                                    height: '36px'
+                                } : {}}>
                                     {showEditVoucherTypeForm ? 'Update Voucher Type' : 'Create Voucher Type'}
                                 </button>
                             </div>
