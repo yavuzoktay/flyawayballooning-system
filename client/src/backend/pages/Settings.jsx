@@ -7359,16 +7359,29 @@ const Settings = () => {
                         maxHeight: 'calc(100vh - 16px)',
                         margin: '0',
                         borderRadius: '8px'
-                    } : {}}>
+                    } : {
+                        maxWidth: '800px',
+                        width: '90%',
+                        maxHeight: '90vh',
+                        overflow: 'auto'
+                    }}>
                         <div className="modal-header" style={isMobile ? {
                             padding: '10px 12px',
                             borderBottom: '1px solid #e5e7eb'
-                        } : {}}>
+                        } : {
+                            padding: '20px 24px',
+                            borderBottom: '1px solid #e5e7eb'
+                        }}>
                             <h3 style={isMobile ? {
                                 fontSize: '14px',
                                 fontWeight: 600,
                                 margin: 0
-                            } : {}}>{showEditPrivateCharterVoucherTypeForm ? 'Edit Private Charter Voucher Type' : 'Create New Private Charter Voucher Type'}</h3>
+                            } : {
+                                fontSize: '20px',
+                                fontWeight: 600,
+                                margin: 0,
+                                color: '#1f2937'
+                            }}>{showEditPrivateCharterVoucherTypeForm ? 'Edit Private Charter Voucher Type' : 'Create New Private Charter Voucher Type'}</h3>
                             <button 
                                 className="close-btn"
                                 onClick={() => {
@@ -7380,7 +7393,11 @@ const Settings = () => {
                                     fontSize: '18px',
                                     width: '24px',
                                     height: '24px'
-                                } : {}}
+                                } : {
+                                    fontSize: '24px',
+                                    width: '32px',
+                                    height: '32px'
+                                }}
                             >
                                 ×
                             </button>
@@ -7388,21 +7405,33 @@ const Settings = () => {
                         
                         <form onSubmit={handlePrivateCharterVoucherTypeSubmit} className="private-charter-voucher-type-form" style={isMobile ? {
                             padding: '12px'
-                        } : {}}>
+                        } : {
+                            padding: '24px'
+                        }}>
                             <div className="form-row" style={isMobile ? {
                                 display: 'flex',
                                 flexDirection: 'column',
                                 gap: '8px',
                                 marginBottom: '12px'
-                            } : {}}>
+                            } : {
+                                marginBottom: '20px'
+                            }}>
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    marginBottom: 0
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Title *</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Title *</label>
                                     <input
                                         type="text"
                                         value={privateCharterVoucherTypeFormData.title}
@@ -7414,8 +7443,16 @@ const Settings = () => {
                                             fontSize: '13px',
                                             borderRadius: '4px',
                                             height: '32px',
+                                            boxSizing: 'border-box',
+                                            width: '100%'
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
                                             boxSizing: 'border-box'
-                                        } : {}}
+                                        }}
                                     />
                                 </div>
                                 
@@ -7426,15 +7463,28 @@ const Settings = () => {
                                 flexDirection: 'column',
                                 gap: '8px',
                                 marginBottom: '12px'
-                            } : {}}>
+                            } : {
+                                display: 'flex',
+                                gap: '20px',
+                                marginBottom: '20px'
+                            }}>
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    flex: 1,
+                                    marginBottom: 0
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Max Passengers</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Max Passengers</label>
                                     <input
                                         type="number"
                                         value={privateCharterVoucherTypeFormData.max_passengers}
@@ -7446,60 +7496,36 @@ const Settings = () => {
                                             fontSize: '13px',
                                             borderRadius: '4px',
                                             height: '32px',
+                                            boxSizing: 'border-box',
+                                            width: '100%'
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
                                             boxSizing: 'border-box'
-                                        } : {}}
+                                        }}
                                     />
                                 </div>
                                 
-                                
-                            </div>
-                            
-                            <div className="form-row" style={isMobile ? {
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '8px',
-                                marginBottom: '12px'
-                            } : {}}>
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    flex: 1,
+                                    marginBottom: 0
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Image Text Tag</label>
-                                    <input
-                                        type="text"
-                                        value={privateCharterVoucherTypeFormData.image_text_tag}
-                                        onChange={(e) => setPrivateCharterVoucherTypeFormData({ ...privateCharterVoucherTypeFormData, image_text_tag: e.target.value })}
-                                        placeholder="e.g., 5★ on Google, TripAdvisor & Facebook"
-                                        style={isMobile ? {
-                                            padding: '6px 8px',
-                                            fontSize: '13px',
-                                            borderRadius: '4px',
-                                            height: '32px',
-                                            boxSizing: 'border-box'
-                                        } : {}}
-                                    />
-                                </div>
-                            </div>
-                            
-                            <div className="form-row" style={isMobile ? {
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '8px',
-                                marginBottom: '12px'
-                            } : {}}>
-                                
-                                
-                                <div className="form-group" style={isMobile ? {
-                                    marginBottom: '12px'
-                                } : {}}>
-                                    <label style={isMobile ? {
-                                        fontSize: '11px',
-                                        marginBottom: '4px',
-                                        fontWeight: 600
-                                    } : {}}>Validity (Months)</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Validity (Months)</label>
                                     <input
                                         type="number"
                                         value={privateCharterVoucherTypeFormData.validity_months}
@@ -7511,8 +7537,16 @@ const Settings = () => {
                                             fontSize: '13px',
                                             borderRadius: '4px',
                                             height: '32px',
+                                            boxSizing: 'border-box',
+                                            width: '100%'
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
                                             boxSizing: 'border-box'
-                                        } : {}}
+                                        }}
                                     />
                                 </div>
                             </div>
@@ -7522,15 +7556,76 @@ const Settings = () => {
                                 flexDirection: 'column',
                                 gap: '8px',
                                 marginBottom: '12px'
-                            } : {}}>
+                            } : {
+                                marginBottom: '20px'
+                            }}>
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    marginBottom: 0
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Flight Days</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Image Text Tag</label>
+                                    <input
+                                        type="text"
+                                        value={privateCharterVoucherTypeFormData.image_text_tag}
+                                        onChange={(e) => setPrivateCharterVoucherTypeFormData({ ...privateCharterVoucherTypeFormData, image_text_tag: e.target.value })}
+                                        placeholder="e.g., 5★ on Google, TripAdvisor & Facebook"
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box',
+                                            width: '100%'
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
+                                            boxSizing: 'border-box'
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                marginBottom: '12px'
+                            } : {
+                                display: 'flex',
+                                gap: '20px',
+                                marginBottom: '20px'
+                            }}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {
+                                    flex: 1,
+                                    marginBottom: 0
+                                }}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Flight Days</label>
                                     <select
                                         value={privateCharterVoucherTypeFormData.flight_days}
                                         onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, flight_days: e.target.value})}
@@ -7541,7 +7636,16 @@ const Settings = () => {
                                             width: '100%',
                                             height: '32px',
                                             boxSizing: 'border-box'
-                                        } : {}}
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
+                                            boxSizing: 'border-box',
+                                            backgroundColor: '#fff',
+                                            cursor: 'pointer'
+                                        }}
                                     >
                                         <option value="Any Day">Any Day</option>
                                         <option value="Monday - Friday">Monday - Friday</option>
@@ -7552,12 +7656,21 @@ const Settings = () => {
                                 
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    flex: 1,
+                                    marginBottom: 0
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Flight Time</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Flight Time</label>
                                     <select
                                         value={privateCharterVoucherTypeFormData.flight_time}
                                         onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, flight_time: e.target.value})}
@@ -7568,7 +7681,16 @@ const Settings = () => {
                                             width: '100%',
                                             height: '32px',
                                             boxSizing: 'border-box'
-                                        } : {}}
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
+                                            boxSizing: 'border-box',
+                                            backgroundColor: '#fff',
+                                            cursor: 'pointer'
+                                        }}
                                     >
                                         <option value="AM">AM (Morning)</option>
                                         <option value="PM">PM (Afternoon/Evening)</option>
@@ -7582,15 +7704,28 @@ const Settings = () => {
                                 flexDirection: 'column',
                                 gap: '8px',
                                 marginBottom: '12px'
-                            } : {}}>
+                            } : {
+                                display: 'flex',
+                                gap: '20px',
+                                marginBottom: '20px'
+                            }}>
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    flex: 1,
+                                    marginBottom: 0
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Sort Order</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Sort Order</label>
                                     <input
                                         type="number"
                                         value={privateCharterVoucherTypeFormData.sort_order}
@@ -7602,134 +7737,36 @@ const Settings = () => {
                                             fontSize: '13px',
                                             borderRadius: '4px',
                                             height: '32px',
+                                            boxSizing: 'border-box',
+                                            width: '100%'
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
                                             boxSizing: 'border-box'
-                                        } : {}}
+                                        }}
                                     />
                                 </div>
-                            </div>
-                            
-                            <div className="form-group" style={isMobile ? {
-                                marginBottom: '12px'
-                            } : {}}>
-                                <label style={isMobile ? {
-                                    fontSize: '11px',
-                                    marginBottom: '4px',
-                                    fontWeight: 600
-                                } : {}}>Description *</label>
-                                <textarea
-                                    value={privateCharterVoucherTypeFormData.description}
-                                    onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, description: e.target.value})}
-                                    placeholder="Describe the private charter experience..."
-                                    rows={isMobile ? 3 : 4}
-                                    required
-                                    style={isMobile ? {
-                                        padding: '6px 8px',
-                                        fontSize: '13px',
-                                        borderRadius: '4px',
-                                        minHeight: '70px',
-                                        resize: 'vertical',
-                                        boxSizing: 'border-box'
-                                    } : {}}
-                                />
-                            </div>
-                            
-                            <div className="form-group" style={isMobile ? {
-                                marginBottom: '12px'
-                            } : {}}>
-                                <label style={isMobile ? {
-                                    fontSize: '11px',
-                                    marginBottom: '4px',
-                                    fontWeight: 600
-                                } : {}}>Features (JSON Array)</label>
-                                <textarea
-                                    value={privateCharterVoucherTypeFormData.features}
-                                    onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, features: e.target.value})}
-                                    placeholder='["Private Balloon", "Flexible Timing", "Personalized Experience"]'
-                                    rows={isMobile ? 2 : 2}
-                                    style={isMobile ? {
-                                        padding: '6px 8px',
-                                        fontSize: '13px',
-                                        borderRadius: '4px',
-                                        minHeight: '60px',
-                                        resize: 'vertical',
-                                        boxSizing: 'border-box'
-                                    } : {}}
-                                />
-                            </div>
-                            
-                            <div className="form-group" style={isMobile ? {
-                                marginBottom: '12px'
-                            } : {}}>
-                                <label style={isMobile ? {
-                                    fontSize: '11px',
-                                    marginBottom: '4px',
-                                    fontWeight: 600
-                                } : {}}>Terms & Conditions</label>
-                                <textarea
-                                    value={privateCharterVoucherTypeFormData.terms}
-                                    onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, terms: e.target.value})}
-                                    placeholder="Terms and conditions for this private charter voucher type..."
-                                    rows={isMobile ? 2 : 3}
-                                    style={isMobile ? {
-                                        padding: '6px 8px',
-                                        fontSize: '13px',
-                                        borderRadius: '4px',
-                                        minHeight: '60px',
-                                        resize: 'vertical',
-                                        boxSizing: 'border-box'
-                                    } : {}}
-                                />
-                            </div>
-                            
-                            <div className="form-group" style={isMobile ? {
-                                marginBottom: '12px'
-                            } : {}}>
-                                <label style={isMobile ? {
-                                    fontSize: '11px',
-                                    marginBottom: '4px',
-                                    fontWeight: 600
-                                } : {}}>Image</label>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, image_file: e.target.files[0]})}
-                                    style={isMobile ? {
-                                        padding: '6px 8px',
-                                        fontSize: '11px',
-                                        height: '32px',
-                                        boxSizing: 'border-box'
-                                    } : {}}
-                                />
-                                {privateCharterVoucherTypeFormData.image_url && !privateCharterVoucherTypeFormData.image_file && (
-                                    <div style={isMobile ? {
-                                        fontSize: '10px',
-                                        color: '#6b7280',
-                                        marginTop: '4px',
-                                        wordBreak: 'break-word'
-                                    } : {
-                                        fontSize: '12px',
-                                        color: '#6b7280',
-                                        marginTop: '4px'
-                                    }}>
-                                        Current image: {privateCharterVoucherTypeFormData.image_url}
-                                    </div>
-                                )}
-                            </div>
-                            
-                            <div className="form-row" style={isMobile ? {
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '8px',
-                                marginBottom: '12px'
-                            } : {}}>
+                                
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    flex: 1,
+                                    marginBottom: 0
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Status</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Status</label>
                                     <select
                                         value={privateCharterVoucherTypeFormData.is_active ? 'true' : 'false'}
                                         onChange={(e) => {
@@ -7747,7 +7784,16 @@ const Settings = () => {
                                             width: '100%',
                                             height: '32px',
                                             boxSizing: 'border-box'
-                                        } : {}}
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
+                                            boxSizing: 'border-box',
+                                            backgroundColor: '#fff',
+                                            cursor: 'pointer'
+                                        }}
                                     >
                                         <option value="true">Active</option>
                                         <option value="false">Inactive</option>
@@ -7759,11 +7805,193 @@ const Settings = () => {
                                     } : {
                                         fontSize: '12px',
                                         color: '#6b7280',
-                                        marginTop: '4px'
+                                        marginTop: '6px'
                                     }}>
                                         Current status: {privateCharterVoucherTypeFormData.is_active ? 'Active' : 'Inactive'}
                                     </div>
                                 </div>
+                            </div>
+                            
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '12px'
+                            } : {
+                                marginBottom: '20px'
+                            }}>
+                                <label style={isMobile ? {
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
+                                    fontWeight: 600
+                                } : {
+                                    display: 'block',
+                                    marginBottom: '8px',
+                                    fontWeight: 500,
+                                    color: '#374151',
+                                    fontSize: '14px'
+                                }}>Description *</label>
+                                <textarea
+                                    value={privateCharterVoucherTypeFormData.description}
+                                    onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, description: e.target.value})}
+                                    placeholder="Describe the private charter experience..."
+                                    rows={isMobile ? 3 : 4}
+                                    required
+                                    style={isMobile ? {
+                                        padding: '6px 8px',
+                                        fontSize: '13px',
+                                        borderRadius: '4px',
+                                        minHeight: '70px',
+                                        resize: 'vertical',
+                                        boxSizing: 'border-box',
+                                        width: '100%'
+                                    } : {
+                                        width: '100%',
+                                        padding: '10px 12px',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '6px',
+                                        fontSize: '14px',
+                                        resize: 'vertical',
+                                        boxSizing: 'border-box',
+                                        fontFamily: 'inherit'
+                                    }}
+                                />
+                            </div>
+                            
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '12px'
+                            } : {
+                                marginBottom: '20px'
+                            }}>
+                                <label style={isMobile ? {
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
+                                    fontWeight: 600
+                                } : {
+                                    display: 'block',
+                                    marginBottom: '8px',
+                                    fontWeight: 500,
+                                    color: '#374151',
+                                    fontSize: '14px'
+                                }}>Features (JSON Array)</label>
+                                <textarea
+                                    value={privateCharterVoucherTypeFormData.features}
+                                    onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, features: e.target.value})}
+                                    placeholder='["Private Balloon", "Flexible Timing", "Personalized Experience"]'
+                                    rows={isMobile ? 2 : 2}
+                                    style={isMobile ? {
+                                        padding: '6px 8px',
+                                        fontSize: '13px',
+                                        borderRadius: '4px',
+                                        minHeight: '60px',
+                                        resize: 'vertical',
+                                        boxSizing: 'border-box',
+                                        width: '100%'
+                                    } : {
+                                        width: '100%',
+                                        padding: '10px 12px',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '6px',
+                                        fontSize: '14px',
+                                        resize: 'vertical',
+                                        boxSizing: 'border-box',
+                                        fontFamily: 'inherit'
+                                    }}
+                                />
+                            </div>
+                            
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '12px'
+                            } : {
+                                marginBottom: '20px'
+                            }}>
+                                <label style={isMobile ? {
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
+                                    fontWeight: 600
+                                } : {
+                                    display: 'block',
+                                    marginBottom: '8px',
+                                    fontWeight: 500,
+                                    color: '#374151',
+                                    fontSize: '14px'
+                                }}>Terms & Conditions</label>
+                                <textarea
+                                    value={privateCharterVoucherTypeFormData.terms}
+                                    onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, terms: e.target.value})}
+                                    placeholder="Terms and conditions for this private charter voucher type..."
+                                    rows={isMobile ? 2 : 3}
+                                    style={isMobile ? {
+                                        padding: '6px 8px',
+                                        fontSize: '13px',
+                                        borderRadius: '4px',
+                                        minHeight: '60px',
+                                        resize: 'vertical',
+                                        boxSizing: 'border-box',
+                                        width: '100%'
+                                    } : {
+                                        width: '100%',
+                                        padding: '10px 12px',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '6px',
+                                        fontSize: '14px',
+                                        resize: 'vertical',
+                                        boxSizing: 'border-box',
+                                        fontFamily: 'inherit'
+                                    }}
+                                />
+                            </div>
+                            
+                            <div className="form-group" style={isMobile ? {
+                                marginBottom: '12px'
+                            } : {
+                                marginBottom: '20px'
+                            }}>
+                                <label style={isMobile ? {
+                                    fontSize: '11px',
+                                    marginBottom: '4px',
+                                    fontWeight: 600
+                                } : {
+                                    display: 'block',
+                                    marginBottom: '8px',
+                                    fontWeight: 500,
+                                    color: '#374151',
+                                    fontSize: '14px'
+                                }}>Image</label>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => setPrivateCharterVoucherTypeFormData({...privateCharterVoucherTypeFormData, image_file: e.target.files[0]})}
+                                    style={isMobile ? {
+                                        padding: '6px 8px',
+                                        fontSize: '11px',
+                                        height: '32px',
+                                        boxSizing: 'border-box',
+                                        width: '100%'
+                                    } : {
+                                        width: '100%',
+                                        padding: '8px',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '6px',
+                                        fontSize: '14px',
+                                        boxSizing: 'border-box'
+                                    }}
+                                />
+                                {privateCharterVoucherTypeFormData.image_url && !privateCharterVoucherTypeFormData.image_file && (
+                                    <div style={isMobile ? {
+                                        fontSize: '10px',
+                                        color: '#6b7280',
+                                        marginTop: '4px',
+                                        wordBreak: 'break-word'
+                                    } : {
+                                        fontSize: '12px',
+                                        color: '#6b7280',
+                                        marginTop: '8px',
+                                        padding: '8px 12px',
+                                        background: '#f9fafb',
+                                        borderRadius: '6px',
+                                        wordBreak: 'break-word'
+                                    }}>
+                                        Current image: {privateCharterVoucherTypeFormData.image_url}
+                                    </div>
+                                )}
                             </div>
                             
                             <div className="form-actions" style={isMobile ? {
@@ -7773,7 +8001,14 @@ const Settings = () => {
                                 paddingTop: '12px',
                                 marginTop: '12px',
                                 borderTop: '1px solid #e5e7eb'
-                            } : {}}>
+                            } : {
+                                borderTop: '1px solid #e5e7eb',
+                                padding: '16px 24px',
+                                display: 'flex',
+                                justifyContent: 'flex-end',
+                                gap: '12px',
+                                marginTop: '20px'
+                            }}>
                                 <button type="button" className="btn btn-secondary" onClick={() => {
                                     setShowPrivateCharterVoucherTypesForm(false);
                                     setShowEditPrivateCharterVoucherTypeForm(false);
@@ -7784,7 +8019,11 @@ const Settings = () => {
                                     width: '100%',
                                     borderRadius: '4px',
                                     height: '36px'
-                                } : {}}>
+                                } : {
+                                    padding: '8px 20px',
+                                    fontSize: '14px',
+                                    borderRadius: '6px'
+                                }}>
                                     Cancel
                                 </button>
                                 <button type="submit" className="btn btn-primary" style={isMobile ? {
@@ -7793,7 +8032,11 @@ const Settings = () => {
                                     width: '100%',
                                     borderRadius: '4px',
                                     height: '36px'
-                                } : {}}>
+                                } : {
+                                    padding: '8px 20px',
+                                    fontSize: '14px',
+                                    borderRadius: '6px'
+                                }}>
                                     {showEditPrivateCharterVoucherTypeForm ? 'Update Private Charter Voucher Type' : 'Create Private Charter Voucher Type'}
                                 </button>
                             </div>
