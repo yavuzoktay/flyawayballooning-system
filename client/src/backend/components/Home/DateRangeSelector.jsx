@@ -153,10 +153,17 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                 display: 'flex',
                 flexDirection: 'row',
                 flexWrap: 'wrap',
-                gap: '10px',
+                gap: isMobile ? '8px' : '10px',
                 alignItems: 'center'
             }} className="date-inputs-container">
-                <label style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: '1 1 auto', minWidth: '120px' }}>
+                <label style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: isMobile ? '3px' : '5px', 
+                    flex: '1 1 auto', 
+                    minWidth: isMobile ? '100px' : '120px',
+                    fontSize: isMobile ? '12px' : 'inherit'
+                }}>
                     Start Date:
                     <input
                         type="date"
@@ -164,14 +171,22 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                         onChange={(e) => setStartDate(e.target.value)}
                         style={{ 
                             width: '100%', 
-                            padding: '8px', 
+                            padding: isMobile ? '6px' : '8px', 
                             borderRadius: '4px', 
                             border: '1px solid #ccc',
-                            fontSize: isMobile ? '16px' : 'inherit'
+                            fontSize: isMobile ? '14px' : 'inherit',
+                            height: isMobile ? '36px' : 'auto'
                         }}
                     />
                 </label>
-                <label style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: '1 1 auto', minWidth: '120px' }}>
+                <label style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: isMobile ? '3px' : '5px', 
+                    flex: '1 1 auto', 
+                    minWidth: isMobile ? '100px' : '120px',
+                    fontSize: isMobile ? '12px' : 'inherit'
+                }}>
                     End Date:
                     <input
                         type="date"
@@ -179,10 +194,11 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                         onChange={(e) => setEndDate(e.target.value)}
                         style={{ 
                             width: '100%', 
-                            padding: '8px', 
+                            padding: isMobile ? '6px' : '8px', 
                             borderRadius: '4px', 
                             border: '1px solid #ccc',
-                            fontSize: isMobile ? '16px' : 'inherit'
+                            fontSize: isMobile ? '14px' : 'inherit',
+                            height: isMobile ? '36px' : 'auto'
                         }}
                     />
                 </label>
@@ -193,10 +209,12 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                         color: "#FFF", 
                         border: "1px solid #3274b4", 
                         cursor: "pointer",
-                        padding: '8px 16px',
+                        padding: isMobile ? '6px 12px' : '8px 16px',
                         borderRadius: '4px',
                         alignSelf: 'flex-end',
-                        whiteSpace: 'nowrap'
+                        whiteSpace: 'nowrap',
+                        fontSize: isMobile ? '13px' : 'inherit',
+                        height: isMobile ? '36px' : 'auto'
                     }}
                 >
                     Filter
