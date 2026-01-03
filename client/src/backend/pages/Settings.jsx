@@ -11810,15 +11810,19 @@ const Settings = () => {
                         <div className="modal-header" style={isMobile ? {
                             padding: '10px 12px',
                             borderBottom: '1px solid #e5e7eb'
-                        } : {}}>
+                        } : {
+                            padding: '20px 24px',
+                            borderBottom: '1px solid #e5e7eb'
+                        }}>
                             <h3 style={isMobile ? {
                                 margin: 0,
                                 fontSize: '14px',
                                 fontWeight: 600
                             } : {
                                 margin: 0,
-                                fontSize: '24px',
-                                fontWeight: 600
+                                fontSize: '20px',
+                                fontWeight: 600,
+                                color: '#1f2937'
                             }}>SMS Message Template</h3>
                             <button 
                                 className="close-btn"
@@ -11834,7 +11838,11 @@ const Settings = () => {
                                     fontSize: '18px',
                                     width: '24px',
                                     height: '24px'
-                                } : {}}
+                                } : {
+                                    fontSize: '24px',
+                                    width: '32px',
+                                    height: '32px'
+                                }}
                             >
                                 ×
                             </button>
@@ -11889,7 +11897,8 @@ const Settings = () => {
                                             display: 'block',
                                             marginBottom: '8px',
                                             fontWeight: 500,
-                                            color: '#374151'
+                                            color: '#374151',
+                                            fontSize: '14px'
                                         }}>Name</label>
                                         <input
                                             type="text"
@@ -11907,10 +11916,11 @@ const Settings = () => {
                                                 boxSizing: 'border-box'
                                             } : {
                                                 width: '100%',
-                                                padding: '8px 12px',
+                                                padding: '10px 12px',
                                                 border: '1px solid #d1d5db',
                                                 borderRadius: '6px',
-                                                fontSize: '14px'
+                                                fontSize: '14px',
+                                                boxSizing: 'border-box'
                                             }}
                                         />
                                         <p style={isMobile ? {
@@ -11923,7 +11933,8 @@ const Settings = () => {
                                             fontSize: '12px',
                                             color: '#6b7280',
                                             marginTop: '4px',
-                                            marginBottom: 0
+                                            marginBottom: 0,
+                                            lineHeight: '1.4'
                                         }}>
                                             This will help you identify this message when choosing from your list of messages. Not visible to the recipient.
                                         </p>
@@ -11943,7 +11954,8 @@ const Settings = () => {
                                             display: 'block',
                                             marginBottom: '8px',
                                             fontWeight: 500,
-                                            color: '#374151'
+                                            color: '#374151',
+                                            fontSize: '14px'
                                         }}>Category</label>
                                         <select
                                             value={smsTemplateFormData.category}
@@ -11958,10 +11970,13 @@ const Settings = () => {
                                                 boxSizing: 'border-box'
                                             } : {
                                                 width: '100%',
-                                                padding: '8px 12px',
+                                                padding: '10px 12px',
                                                 border: '1px solid #d1d5db',
                                                 borderRadius: '6px',
-                                                fontSize: '14px'
+                                                fontSize: '14px',
+                                                boxSizing: 'border-box',
+                                                backgroundColor: '#fff',
+                                                cursor: 'pointer'
                                             }}
                                         >
                                             <option value="User Defined Message">User Defined Message</option>
@@ -11990,7 +12005,8 @@ const Settings = () => {
                                             display: 'block',
                                             marginBottom: '8px',
                                             fontWeight: 500,
-                                            color: '#374151'
+                                            color: '#374151',
+                                            fontSize: '14px'
                                         }}>Message</label>
                                         <div style={isMobile ? {
                                             marginBottom: '6px',
@@ -12065,13 +12081,14 @@ const Settings = () => {
                                                 boxSizing: 'border-box'
                                             } : {
                                                 width: '100%', 
-                                                padding: '12px', 
+                                                padding: '10px 12px', 
                                                 border: '1px solid #d1d5db', 
                                                 borderRadius: '6px', 
                                                 fontSize: '14px',
                                                 fontFamily: 'inherit',
                                                 resize: 'vertical',
-                                                lineHeight: '1.5'
+                                                lineHeight: '1.5',
+                                                boxSizing: 'border-box'
                                             }}
                                         />
                                         <p style={isMobile ? {
@@ -12084,7 +12101,8 @@ const Settings = () => {
                                             fontSize: '12px',
                                             color: '#6b7280',
                                             marginTop: '4px',
-                                            marginBottom: 0
+                                            marginBottom: 0,
+                                            lineHeight: '1.4'
                                         }}>
                                             Click placeholder buttons above to insert dynamic data into your message.
                                         </p>
@@ -12224,7 +12242,8 @@ const Settings = () => {
                                 padding: '16px 24px',
                                 display: 'flex',
                                 justifyContent: 'flex-end',
-                                gap: '12px'
+                                gap: '12px',
+                                marginTop: '20px'
                             }}>
                                 <button 
                                     type="button" 
@@ -12244,7 +12263,9 @@ const Settings = () => {
                                         borderRadius: '4px',
                                         height: '36px'
                                     } : {
-                                        padding: '8px 20px'
+                                        padding: '8px 20px',
+                                        fontSize: '14px',
+                                        borderRadius: '6px'
                                     }}
                                 >
                                     Cancel
@@ -12256,7 +12277,9 @@ const Settings = () => {
                                     borderRadius: '4px',
                                     height: '36px'
                                 } : {
-                                    padding: '8px 20px'
+                                    padding: '8px 20px',
+                                    fontSize: '14px',
+                                    borderRadius: '6px'
                                 }}>
                                     Create Template
                                 </button>
