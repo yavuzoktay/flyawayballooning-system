@@ -5262,7 +5262,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                             console.log('========================================');
                             
                             try {
-                                sendAutomaticFlightVoucherConfirmationSms(voucherId, contactOverride);
+                                await sendAutomaticFlightVoucherConfirmationSms(voucherId, contactOverride);
                                 console.log('✅ [WEBHOOK] sendAutomaticFlightVoucherConfirmationSms function called successfully');
                             } catch (smsError) {
                                 console.error('❌ [WEBHOOK] Error calling sendAutomaticFlightVoucherConfirmationSms:', smsError);
@@ -11513,76 +11513,76 @@ app.post('/api/createBooking', (req, res) => {
                                             console.log('✅ [createGoogleCalendarEvent] Google Calendar event updated successfully for rebook');
                                         } else {
                                             // Create new event
-                                            console.log('📅 [createGoogleCalendarEvent] Calling createCalendarEvent...');
+                                console.log('📅 [createGoogleCalendarEvent] Calling createCalendarEvent...');
                                             eventId = await createCalendarEvent({
-                                                location: chooseLocation,
-                                                flightType: chooseFlightType.type,
-                                                passengerCount: totalPassengers,
-                                                flightDate: bookingDateTime,
+                                    location: chooseLocation,
+                                    flightType: chooseFlightType.type,
+                                    passengerCount: totalPassengers,
+                                    flightDate: bookingDateTime,
                                                 crewMember: crewMember, // Include crew if already assigned
                                                 pilotMember: pilotMember, // Include pilot if already assigned
-                                                bookingId: bookingId.toString()
-                                            });
+                                    bookingId: bookingId.toString()
+                                });
                                         }
-                                        
-                                        console.log('📅 [createGoogleCalendarEvent] Event created successfully, ID:', eventId);
-                                        
-                                        // For shared flights, update ALL bookings for this flight slot with the event ID
-                                        // For private flights, only update this booking
-                                        const isPrivateFlight = chooseFlightType.type === 'Private Charter' || chooseFlightType.type === 'Private';
-                                        
-                                        if (isPrivateFlight) {
-                                            // Private flight: only update this booking
-                                            con.query(
-                                                'UPDATE all_booking SET google_calendar_event_id = ? WHERE id = ?',
-                                                [eventId, bookingId],
-                                                (updateErr) => {
-                                                    if (updateErr) {
-                                                        console.error('❌ Error updating booking with Google Calendar event ID:', updateErr);
-                                                    } else {
-                                                        console.log('✅ Google Calendar event ID saved to booking:', eventId);
-                                                    }
-                                                    if (onComplete) onComplete();
-                                                }
-                                            );
-                                        } else {
-                                            // Shared flight: update all bookings for this flight slot
-                                            const updateAllBookingsSql = `
-                                                UPDATE all_booking 
-                                                SET google_calendar_event_id = ? 
-                                                WHERE flight_date = ? 
-                                                AND location = ? 
-                                                AND flight_type = ? 
-                                                AND time_slot = ?
-                                                AND status != 'Cancelled'
-                                            `;
-                                            con.query(
-                                                updateAllBookingsSql,
-                                                [eventId, bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null],
-                                                (updateErr, updateResult) => {
-                                                    if (updateErr) {
-                                                        console.error('❌ Error updating bookings with Google Calendar event ID:', updateErr);
-                                                    } else {
-                                                        console.log(`✅ Google Calendar event ID saved to ${updateResult.affectedRows} bookings for shared flight:`, eventId);
-                                                    }
-                                                    if (onComplete) onComplete();
-                                                }
-                                            );
+                                
+                                console.log('📅 [createGoogleCalendarEvent] Event created successfully, ID:', eventId);
+                                
+                                // For shared flights, update ALL bookings for this flight slot with the event ID
+                                // For private flights, only update this booking
+                                const isPrivateFlight = chooseFlightType.type === 'Private Charter' || chooseFlightType.type === 'Private';
+                                
+                                if (isPrivateFlight) {
+                                    // Private flight: only update this booking
+                                    con.query(
+                                        'UPDATE all_booking SET google_calendar_event_id = ? WHERE id = ?',
+                                        [eventId, bookingId],
+                                        (updateErr) => {
+                                            if (updateErr) {
+                                                console.error('❌ Error updating booking with Google Calendar event ID:', updateErr);
+                                            } else {
+                                                console.log('✅ Google Calendar event ID saved to booking:', eventId);
+                                            }
+                                            if (onComplete) onComplete();
                                         }
-                                    } catch (calendarError) {
-                                        console.error('❌ Error creating Google Calendar event:', calendarError);
-                                        
-                                        // Save error to logs database
-                                        const errorMessage = `Google Calendar: Failed to create event for booking ${bookingId}`;
-                                        const errorDetails = calendarError.response?.data 
-                                            ? JSON.stringify(calendarError.response.data) 
-                                            : calendarError.message || 'Unknown error';
-                                        const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
-                                        saveErrorLog('error', `${errorMessage}. Location: ${chooseLocation}, Flight Date: ${bookingDateTime}, Details: ${errorDetails}`, stackTrace, 'createBooking.googleCalendar');
-                                        
-                                        // Don't fail the booking creation if calendar sync fails
-                                        if (onComplete) onComplete();
-                                    }
+                                    );
+                                } else {
+                                    // Shared flight: update all bookings for this flight slot
+                                    const updateAllBookingsSql = `
+                                        UPDATE all_booking 
+                                        SET google_calendar_event_id = ? 
+                                        WHERE flight_date = ? 
+                                        AND location = ? 
+                                        AND flight_type = ? 
+                                        AND time_slot = ?
+                                        AND status != 'Cancelled'
+                                    `;
+                                    con.query(
+                                        updateAllBookingsSql,
+                                        [eventId, bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null],
+                                        (updateErr, updateResult) => {
+                                            if (updateErr) {
+                                                console.error('❌ Error updating bookings with Google Calendar event ID:', updateErr);
+                                            } else {
+                                                console.log(`✅ Google Calendar event ID saved to ${updateResult.affectedRows} bookings for shared flight:`, eventId);
+                                            }
+                                            if (onComplete) onComplete();
+                                        }
+                                    );
+                                }
+                            } catch (calendarError) {
+                                console.error('❌ Error creating Google Calendar event:', calendarError);
+                                
+                                // Save error to logs database
+                                const errorMessage = `Google Calendar: Failed to create event for booking ${bookingId}`;
+                                const errorDetails = calendarError.response?.data 
+                                    ? JSON.stringify(calendarError.response.data) 
+                                    : calendarError.message || 'Unknown error';
+                                const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
+                                saveErrorLog('error', `${errorMessage}. Location: ${chooseLocation}, Flight Date: ${bookingDateTime}, Details: ${errorDetails}`, stackTrace, 'createBooking.googleCalendar');
+                                
+                                // Don't fail the booking creation if calendar sync fails
+                                if (onComplete) onComplete();
+                            }
                                 });
                             } else {
                                 // No activity_id found, proceed without crew/pilot info
@@ -12643,7 +12643,12 @@ app.post('/api/createVoucher', (req, res) => {
             // No need to store in additional_information_answers table for vouchers
 
             // For Flight Voucher, create booking record and generate voucher code
-            if (voucher_type === 'Flight Voucher' || voucher_type === 'Any Day Flight' || voucher_type === 'Weekday Morning' || voucher_type === 'Flexible Weekday') {
+            // Check both voucher_type and book_flight for "Buy Flight Voucher" identification
+            const isFlightVoucherType = voucher_type === 'Flight Voucher' || voucher_type === 'Any Day Flight' || voucher_type === 'Weekday Morning' || voucher_type === 'Flexible Weekday';
+            const isBuyFlightVoucher = book_flight && (book_flight.toLowerCase().includes('flight voucher') || book_flight.toLowerCase().includes('buy flight voucher'));
+            const isFlightVoucher = isFlightVoucherType || isBuyFlightVoucher;
+            
+            if (isFlightVoucher) {
                 console.log('=== CREATING BOOKING RECORD FOR FLIGHT VOUCHER ===');
                 createBookingForFlightVoucher(result.insertId, finalVoucherRef, name, email, phone, weight, paid, actualVoucherType);
             } else if (voucher_type === 'Redeem Voucher') {
@@ -12772,7 +12777,7 @@ app.post('/api/createVoucher', (req, res) => {
             // Send automatic Flight Voucher Confirmation SMS
             console.log('========================================');
             console.log('📱 [Flight Voucher] SMS SEND PROCESS STARTING');
-            console.log('📱 [Flight Voucher] Voucher ID:', result.insertId);
+            console.log('📱 [Flight Voucher] Voucher ID:', voucherId);
             console.log('📱 [Flight Voucher] Phone:', phone);
             console.log('📱 [Flight Voucher] Calling sendAutomaticFlightVoucherConfirmationSms...');
             console.log('========================================');
@@ -12784,7 +12789,7 @@ app.post('/api/createVoucher', (req, res) => {
                     purchaser_phone: phone,
                     purchaser_mobile: mobile
                 };
-                sendAutomaticFlightVoucherConfirmationSms(result.insertId, contactOverride);
+                sendAutomaticFlightVoucherConfirmationSms(voucherId, contactOverride);
                 console.log('✅ [Flight Voucher] sendAutomaticFlightVoucherConfirmationSms function called successfully');
             } catch (smsError) {
                 console.error('❌ [Flight Voucher] Error calling sendAutomaticFlightVoucherConfirmationSms:', smsError);
@@ -14386,30 +14391,30 @@ app.post('/api/addPassenger', (req, res) => {
                                 let pilotMember = null;
                                 if (!pilotErr && pilotResult && pilotResult.length > 0) {
                                     pilotMember = `${pilotResult[0].first_name} ${pilotResult[0].last_name}`;
-                                }
-                                
-                                try {
-                                    await updateCalendarEvent(eventId, {
-                                        location: location,
-                                        flightType: flightType,
-                                        passengerCount: totalPassengers,
-                                        flightDate: flightDate,
-                                        crewMember: crewMember,
+                            }
+                            
+                            try {
+                                await updateCalendarEvent(eventId, {
+                                    location: location,
+                                    flightType: flightType,
+                                    passengerCount: totalPassengers,
+                                    flightDate: flightDate,
+                                    crewMember: crewMember,
                                         pilotMember: pilotMember,
-                                        bookingId: bookingId.toString()
-                                    });
-                                    console.log('✅ [updateGoogleCalendarForPassengerChange] Google Calendar event updated successfully');
-                                } catch (calendarError) {
-                                    console.error('❌ [updateGoogleCalendarForPassengerChange] Error updating Google Calendar event:', calendarError);
-                                    const errorMessage = `Google Calendar: Failed to update event ${eventId || 'unknown'} after passenger change for booking ${bookingId}`;
-                                    const errorDetails = calendarError.response?.data 
-                                        ? JSON.stringify(calendarError.response.data) 
-                                        : calendarError.message || 'Unknown error';
-                                    const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
-                                    saveErrorLog('error', `${errorMessage}. New Pax: ${newPax}, Details: ${errorDetails}`, stackTrace, 'addPassenger.updateGoogleCalendar');
-                                }
-                                
-                                if (onComplete) onComplete();
+                                    bookingId: bookingId.toString()
+                                });
+                                console.log('✅ [updateGoogleCalendarForPassengerChange] Google Calendar event updated successfully');
+                            } catch (calendarError) {
+                                console.error('❌ [updateGoogleCalendarForPassengerChange] Error updating Google Calendar event:', calendarError);
+                                const errorMessage = `Google Calendar: Failed to update event ${eventId || 'unknown'} after passenger change for booking ${bookingId}`;
+                                const errorDetails = calendarError.response?.data 
+                                    ? JSON.stringify(calendarError.response.data) 
+                                    : calendarError.message || 'Unknown error';
+                                const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
+                                saveErrorLog('error', `${errorMessage}. New Pax: ${newPax}, Details: ${errorDetails}`, stackTrace, 'addPassenger.updateGoogleCalendar');
+                            }
+                            
+                            if (onComplete) onComplete();
                             });
                         });
                     }
@@ -14833,33 +14838,33 @@ app.delete('/api/deletePassenger', (req, res) => {
                                             let pilotMember = null;
                                             if (!pilotErr && pilotResult && pilotResult.length > 0) {
                                                 pilotMember = `${pilotResult[0].first_name} ${pilotResult[0].last_name}`;
-                                            }
-                                            
-                                            try {
-                                                await updateCalendarEvent(eventId, {
-                                                    location: location,
-                                                    flightType: flightType,
-                                                    passengerCount: totalPassengers,
-                                                    flightDate: flightDate,
-                                                    crewMember: crewMember,
+                                        }
+                                        
+                                        try {
+                                            await updateCalendarEvent(eventId, {
+                                                location: location,
+                                                flightType: flightType,
+                                                passengerCount: totalPassengers,
+                                                flightDate: flightDate,
+                                                crewMember: crewMember,
                                                     pilotMember: pilotMember,
-                                                    bookingId: bookingId.toString()
-                                                });
-                                                console.log('✅ [updateGoogleCalendarForPassengerChange] Google Calendar event updated successfully');
-                                            } catch (calendarError) {
-                                                console.error('❌ [updateGoogleCalendarForPassengerChange] Error updating Google Calendar event:', calendarError);
-                                                const errorMessage = `Google Calendar: Failed to update event ${eventId || 'unknown'} after passenger deletion for booking ${bookingId}`;
-                                                const errorDetails = calendarError.response?.data 
-                                                    ? JSON.stringify(calendarError.response.data) 
-                                                    : calendarError.message || 'Unknown error';
-                                                const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
-                                                saveErrorLog('error', `${errorMessage}. New Pax: ${newPax}, Total Passengers: ${totalPassengers}, Details: ${errorDetails}`, stackTrace, 'deletePassenger.updateGoogleCalendar');
-                                            }
-                                            
-                                            if (onComplete) onComplete();
+                                                bookingId: bookingId.toString()
+                                            });
+                                            console.log('✅ [updateGoogleCalendarForPassengerChange] Google Calendar event updated successfully');
+                                        } catch (calendarError) {
+                                            console.error('❌ [updateGoogleCalendarForPassengerChange] Error updating Google Calendar event:', calendarError);
+                                            const errorMessage = `Google Calendar: Failed to update event ${eventId || 'unknown'} after passenger deletion for booking ${bookingId}`;
+                                            const errorDetails = calendarError.response?.data 
+                                                ? JSON.stringify(calendarError.response.data) 
+                                                : calendarError.message || 'Unknown error';
+                                            const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
+                                            saveErrorLog('error', `${errorMessage}. New Pax: ${newPax}, Total Passengers: ${totalPassengers}, Details: ${errorDetails}`, stackTrace, 'deletePassenger.updateGoogleCalendar');
+                                        }
+                                        
+                                        if (onComplete) onComplete();
                                         });
-                                    });
-                                });
+        });
+    });
                             } else {
                                 // Private flight: use booking's pax directly
                                 // Get crew member if assigned
@@ -20412,29 +20417,29 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
                                     let pilotMember = null;
                                     if (!pilotErr && pilotResult && pilotResult.length > 0) {
                                         pilotMember = `${pilotResult[0].first_name} ${pilotResult[0].last_name}`;
-                                    }
-                                    
-                                    try {
-                                        await updateCalendarEvent(eventId, {
-                                            location: location,
-                                            flightType: booking.flight_type || flightData.flight_type,
-                                            passengerCount: totalPassengers,
-                                            flightDate: flight_date,
-                                            crewMember: crewMember,
+                                }
+                                
+                                try {
+                                    await updateCalendarEvent(eventId, {
+                                        location: location,
+                                        flightType: booking.flight_type || flightData.flight_type,
+                                        passengerCount: totalPassengers,
+                                        flightDate: flight_date,
+                                        crewMember: crewMember,
                                             pilotMember: pilotMember,
-                                            bookingId: booking_id.toString()
-                                        });
-                                    } catch (calendarError) {
-                                        console.error('Error updating Google Calendar event:', calendarError);
-                                        
-                                        // Save error to logs database
-                                        const errorMessage = `Google Calendar: Failed to update event ${eventId || 'unknown'} for booking ${booking_id || 'unknown'}`;
-                                        const errorDetails = calendarError.response?.data 
-                                            ? JSON.stringify(calendarError.response.data) 
-                                            : calendarError.message || 'Unknown error';
-                                        const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
-                                        saveErrorLog('error', `${errorMessage}. Status: ${old_status} -> ${new_status}, Details: ${errorDetails}`, stackTrace, 'updateManifestStatus.updateCalendarEvent');
-                                    }
+                                        bookingId: booking_id.toString()
+                                    });
+                                } catch (calendarError) {
+                                    console.error('Error updating Google Calendar event:', calendarError);
+                                    
+                                    // Save error to logs database
+                                    const errorMessage = `Google Calendar: Failed to update event ${eventId || 'unknown'} for booking ${booking_id || 'unknown'}`;
+                                    const errorDetails = calendarError.response?.data 
+                                        ? JSON.stringify(calendarError.response.data) 
+                                        : calendarError.message || 'Unknown error';
+                                    const stackTrace = calendarError.stack || `${calendarError.name}: ${calendarError.message}`;
+                                    saveErrorLog('error', `${errorMessage}. Status: ${old_status} -> ${new_status}, Details: ${errorDetails}`, stackTrace, 'updateManifestStatus.updateCalendarEvent');
+                                }
                                 });
                             });
                         }
