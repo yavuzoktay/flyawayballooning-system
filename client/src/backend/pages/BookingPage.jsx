@@ -7711,19 +7711,110 @@ setBookingDetail(finalVoucherDetail);
                         </Button>
                     </DialogActions>
                 </Dialog>
-                <Dialog open={addGuestDialogOpen} onClose={() => setAddGuestDialogOpen(false)} maxWidth="sm" fullWidth>
-                    <DialogTitle sx={{ fontSize: isMobile ? 16 : 'inherit', padding: isMobile ? '12px 16px' : 'inherit' }}>Add Guest</DialogTitle>
+                <Dialog 
+                    open={addGuestDialogOpen} 
+                    onClose={() => setAddGuestDialogOpen(false)} 
+                    maxWidth={isMobile ? "sm" : "md"} 
+                    fullWidth
+                    PaperProps={{
+                        sx: !isMobile ? {
+                            maxWidth: '800px',
+                            width: '90%',
+                            maxHeight: '90vh',
+                            overflow: 'auto'
+                        } : {}
+                    }}
+                >
+                    <DialogTitle sx={{ 
+                        fontSize: isMobile ? 16 : '20px', 
+                        padding: isMobile ? '12px 16px' : '20px 24px',
+                        fontWeight: isMobile ? 'inherit' : 600,
+                        color: isMobile ? 'inherit' : '#1f2937',
+                        borderBottom: isMobile ? 'none' : '1px solid #e5e7eb',
+                        margin: isMobile ? 'inherit' : 0
+                    }}>
+                        Add Guest
+                    </DialogTitle>
                     <DialogContent sx={{ padding: isMobile ? '12px 16px' : '24px' }}>
-                        <Typography sx={{ mb: isMobile ? 1 : 2, fontSize: isMobile ? 14 : 'inherit' }}>Experience: <b>{guestType}</b></Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: isMobile ? 1 : 2, mb: isMobile ? 1 : 2 }}>
-                            <Typography sx={{ fontSize: isMobile ? 14 : 'inherit' }}>How many guests to add?</Typography>
-                            <Button variant="outlined" onClick={() => setGuestCount(Math.max(guestCount - 1, 0))} sx={{ minWidth: isMobile ? '32px' : 'auto', padding: isMobile ? '4px 8px' : 'inherit' }}>-</Button>
-                            <Typography sx={{ fontSize: isMobile ? 14 : 'inherit' }}>{guestCount}</Typography>
-                            <Button variant="outlined" onClick={() => setGuestCount(guestCount + 1)} sx={{ minWidth: isMobile ? '32px' : 'auto', padding: isMobile ? '4px 8px' : 'inherit' }}>+</Button>
+                        <Typography sx={{ 
+                            mb: isMobile ? 1 : 2, 
+                            fontSize: isMobile ? 14 : '14px',
+                            fontWeight: isMobile ? 'inherit' : 500,
+                            color: isMobile ? 'inherit' : '#374151'
+                        }}>
+                            Experience: <b>{guestType}</b>
+                        </Typography>
+                        <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: isMobile ? 1 : 2, 
+                            mb: isMobile ? 1 : 2 
+                        }}>
+                            <Typography sx={{ 
+                                fontSize: isMobile ? 14 : '14px',
+                                fontWeight: isMobile ? 'inherit' : 500,
+                                color: isMobile ? 'inherit' : '#374151'
+                            }}>
+                                How many guests to add?
+                            </Typography>
+                            <Button 
+                                variant="outlined" 
+                                onClick={() => setGuestCount(Math.max(guestCount - 1, 0))} 
+                                sx={{ 
+                                    minWidth: isMobile ? '32px' : 'auto', 
+                                    padding: isMobile ? '4px 8px' : '8px 12px',
+                                    fontSize: isMobile ? 'inherit' : '14px',
+                                    borderColor: isMobile ? 'inherit' : '#d1d5db',
+                                    borderRadius: isMobile ? 'inherit' : '6px',
+                                    '&:hover': {
+                                        borderColor: isMobile ? 'inherit' : '#9ca3af'
+                                    }
+                                }}
+                            >
+                                -
+                            </Button>
+                            <Typography sx={{ 
+                                fontSize: isMobile ? 14 : '14px',
+                                fontWeight: isMobile ? 'inherit' : 500,
+                                color: isMobile ? 'inherit' : '#374151',
+                                minWidth: isMobile ? 'auto' : '40px',
+                                textAlign: 'center'
+                            }}>
+                                {guestCount}
+                            </Typography>
+                            <Button 
+                                variant="outlined" 
+                                onClick={() => setGuestCount(guestCount + 1)} 
+                                sx={{ 
+                                    minWidth: isMobile ? '32px' : 'auto', 
+                                    padding: isMobile ? '4px 8px' : '8px 12px',
+                                    fontSize: isMobile ? 'inherit' : '14px',
+                                    borderColor: isMobile ? 'inherit' : '#d1d5db',
+                                    borderRadius: isMobile ? 'inherit' : '6px',
+                                    '&:hover': {
+                                        borderColor: isMobile ? 'inherit' : '#9ca3af'
+                                    }
+                                }}
+                            >
+                                +
+                            </Button>
                         </Box>
                         {guestForms.map((g, idx) => (
-                            <Box key={idx} sx={{ mb: isMobile ? 1 : 2, p: isMobile ? 1 : 2, border: '1px solid #eee', borderRadius: 2 }}>
-                                <Typography sx={{ fontWeight: 600, mb: isMobile ? 0.5 : 1, fontSize: isMobile ? 14 : 'inherit' }}>Guest {idx + 1}</Typography>
+                            <Box key={idx} sx={{ 
+                                mb: isMobile ? 1 : 2, 
+                                p: isMobile ? 1 : 2, 
+                                border: isMobile ? '1px solid #eee' : '1px solid #e5e7eb',
+                                borderRadius: isMobile ? 2 : '8px',
+                                backgroundColor: isMobile ? 'inherit' : '#f9fafb'
+                            }}>
+                                <Typography sx={{ 
+                                    fontWeight: 600, 
+                                    mb: isMobile ? 0.5 : 1, 
+                                    fontSize: isMobile ? 14 : '14px',
+                                    color: isMobile ? 'inherit' : '#374151'
+                                }}>
+                                    Guest {idx + 1}
+                                </Typography>
                                 <TextField 
                                     label="First Name" 
                                     value={g.firstName} 
@@ -7732,11 +7823,21 @@ setBookingDetail(finalVoucherDetail);
                                     size={isMobile ? "small" : "medium"}
                                     sx={{
                                         '& .MuiInputBase-root': {
-                                            fontSize: isMobile ? '14px' : 'inherit',
-                                            height: isMobile ? '40px' : 'auto'
+                                            fontSize: isMobile ? '14px' : '14px',
+                                            height: isMobile ? '40px' : 'auto',
+                                            padding: isMobile ? 'inherit' : '10px 12px',
+                                            border: isMobile ? 'inherit' : '1px solid #d1d5db',
+                                            borderRadius: isMobile ? 'inherit' : '6px'
                                         },
                                         '& .MuiInputLabel-root': {
-                                            fontSize: isMobile ? '14px' : 'inherit'
+                                            fontSize: isMobile ? '14px' : '14px',
+                                            fontWeight: isMobile ? 'inherit' : 500,
+                                            color: isMobile ? 'inherit' : '#374151'
+                                        },
+                                        '& .MuiOutlinedInput-root': {
+                                            '& fieldset': {
+                                                borderColor: isMobile ? 'inherit' : '#d1d5db'
+                                            }
                                         },
                                         mb: isMobile ? 1 : 1.5
                                     }}
@@ -7749,11 +7850,21 @@ setBookingDetail(finalVoucherDetail);
                                     size={isMobile ? "small" : "medium"}
                                     sx={{
                                         '& .MuiInputBase-root': {
-                                            fontSize: isMobile ? '14px' : 'inherit',
-                                            height: isMobile ? '40px' : 'auto'
+                                            fontSize: isMobile ? '14px' : '14px',
+                                            height: isMobile ? '40px' : 'auto',
+                                            padding: isMobile ? 'inherit' : '10px 12px',
+                                            border: isMobile ? 'inherit' : '1px solid #d1d5db',
+                                            borderRadius: isMobile ? 'inherit' : '6px'
                                         },
                                         '& .MuiInputLabel-root': {
-                                            fontSize: isMobile ? '14px' : 'inherit'
+                                            fontSize: isMobile ? '14px' : '14px',
+                                            fontWeight: isMobile ? 'inherit' : 500,
+                                            color: isMobile ? 'inherit' : '#374151'
+                                        },
+                                        '& .MuiOutlinedInput-root': {
+                                            '& fieldset': {
+                                                borderColor: isMobile ? 'inherit' : '#d1d5db'
+                                            }
                                         },
                                         mb: isMobile ? 1 : 1.5
                                     }}
@@ -7766,17 +7877,33 @@ setBookingDetail(finalVoucherDetail);
                                     size={isMobile ? "small" : "medium"}
                                     sx={{
                                         '& .MuiInputBase-root': {
-                                            fontSize: isMobile ? '14px' : 'inherit',
-                                            height: isMobile ? '40px' : 'auto'
+                                            fontSize: isMobile ? '14px' : '14px',
+                                            height: isMobile ? '40px' : 'auto',
+                                            padding: isMobile ? 'inherit' : '10px 12px',
+                                            border: isMobile ? 'inherit' : '1px solid #d1d5db',
+                                            borderRadius: isMobile ? 'inherit' : '6px'
                                         },
                                         '& .MuiInputLabel-root': {
-                                            fontSize: isMobile ? '14px' : 'inherit'
+                                            fontSize: isMobile ? '14px' : '14px',
+                                            fontWeight: isMobile ? 'inherit' : 500,
+                                            color: isMobile ? 'inherit' : '#374151'
+                                        },
+                                        '& .MuiOutlinedInput-root': {
+                                            '& fieldset': {
+                                                borderColor: isMobile ? 'inherit' : '#d1d5db'
+                                            }
                                         },
                                         mb: isMobile ? 1 : 1.5
                                     }}
                                 />
                                 {guestType && guestType.toLowerCase().includes('shared') && (
-                                    <Box sx={{ mt: isMobile ? 1 : 2, p: isMobile ? 1 : 2, backgroundColor: '#f5f9ff', borderRadius: 2, border: '1px solid #dbeafe' }}>
+                                    <Box sx={{ 
+                                        mt: isMobile ? 1 : 2, 
+                                        p: isMobile ? 1 : 2, 
+                                        backgroundColor: '#f5f9ff', 
+                                        borderRadius: isMobile ? 2 : '8px', 
+                                        border: '1px solid #dbeafe' 
+                                    }}>
                                         <FormControlLabel
                                             control={
                                                 <Switch
@@ -7793,11 +7920,17 @@ setBookingDetail(finalVoucherDetail);
                                                 width: '100%', 
                                                 margin: 0,
                                                 '& .MuiFormControlLabel-label': {
-                                                    fontSize: isMobile ? '13px' : 'inherit'
+                                                    fontSize: isMobile ? '13px' : '14px',
+                                                    fontWeight: isMobile ? 'inherit' : 500,
+                                                    color: isMobile ? 'inherit' : '#374151'
                                                 }
                                             }}
                                         />
-                                        <Typography variant="body2" color="text.secondary" sx={{ mt: isMobile ? 0.5 : 1, fontSize: isMobile ? '11px' : 'inherit' }}>
+                                        <Typography variant="body2" color="text.secondary" sx={{ 
+                                            mt: isMobile ? 0.5 : 1, 
+                                            fontSize: isMobile ? '11px' : '12px',
+                                            lineHeight: isMobile ? 'inherit' : '1.4'
+                                        }}>
                                             Provides weather protection for this guest. Charged per passenger.
                                         </Typography>
                                     </Box>
@@ -7805,9 +7938,36 @@ setBookingDetail(finalVoucherDetail);
                             </Box>
                         ))}
                     </DialogContent>
-                    <DialogActions sx={{ padding: isMobile ? '8px 16px' : 'inherit' }}>
-                        <Button onClick={() => setAddGuestDialogOpen(false)} sx={{ fontSize: isMobile ? '14px' : 'inherit', padding: isMobile ? '6px 12px' : 'inherit' }}>Cancel</Button>
-                        <Button onClick={handleSaveGuests} variant="contained" color="primary" sx={{ fontSize: isMobile ? '14px' : 'inherit', padding: isMobile ? '6px 12px' : 'inherit' }}>Save</Button>
+                    <DialogActions sx={{ 
+                        padding: isMobile ? '8px 16px' : '16px 24px',
+                        borderTop: isMobile ? 'none' : '1px solid #e5e7eb',
+                        marginTop: isMobile ? 'inherit' : '20px',
+                        display: 'flex',
+                        justifyContent: isMobile ? 'inherit' : 'flex-end',
+                        gap: isMobile ? 'inherit' : '12px'
+                    }}>
+                        <Button 
+                            onClick={() => setAddGuestDialogOpen(false)} 
+                            sx={{ 
+                                fontSize: isMobile ? '14px' : '14px', 
+                                padding: isMobile ? '6px 12px' : '8px 20px',
+                                borderRadius: isMobile ? 'inherit' : '6px'
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button 
+                            onClick={handleSaveGuests} 
+                            variant="contained" 
+                            color="primary" 
+                            sx={{ 
+                                fontSize: isMobile ? '14px' : '14px', 
+                                padding: isMobile ? '6px 12px' : '8px 20px',
+                                borderRadius: isMobile ? 'inherit' : '6px'
+                            }}
+                        >
+                            Save
+                        </Button>
                     </DialogActions>
                 </Dialog>
                 <RebookAvailabilityModal
