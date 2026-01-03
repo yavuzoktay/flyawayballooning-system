@@ -11245,9 +11245,24 @@ app.post('/api/createBooking', (req, res) => {
                         console.error('❌ [createBooking] Error calling sendAutomaticBookingConfirmationEmail:', emailError);
                     }
 
-                    // Send automatic booking confirmation SMS for "Book Flight Date" bookings
-                    // Only send SMS if activitySelect is "Book Flight" (which corresponds to "Book Flight Date" in UI)
-                    if (activitySelect === 'Book Flight' || activitySelect === 'Book Flight Date') {
+                    // Send automatic booking rescheduled SMS if this is a rebook operation
+                    if (email_template_override === 'Booking Rescheduled') {
+                        console.log('========================================');
+                        console.log('📱 [createBooking] BOOKING RESCHEDULED SMS SEND PROCESS STARTING');
+                        console.log('📱 [createBooking] Booking ID:', bookingId);
+                        console.log('📱 [createBooking] Email Template Override: Booking Rescheduled');
+                        console.log('📱 [createBooking] Calling sendAutomaticBookingRescheduledSms...');
+                        console.log('========================================');
+                        
+                        try {
+                            sendAutomaticBookingRescheduledSms(bookingId);
+                            console.log('✅ [createBooking] sendAutomaticBookingRescheduledSms function called successfully');
+                        } catch (smsError) {
+                            console.error('❌ [createBooking] Error calling sendAutomaticBookingRescheduledSms:', smsError);
+                        }
+                    } else if (activitySelect === 'Book Flight' || activitySelect === 'Book Flight Date') {
+                        // Send automatic booking confirmation SMS for "Book Flight Date" bookings
+                        // Only send SMS if activitySelect is "Book Flight" (which corresponds to "Book Flight Date" in UI)
                         console.log('========================================');
                         console.log('📱 [createBooking] SMS SEND PROCESS STARTING');
                         console.log('📱 [createBooking] Booking ID:', bookingId);
@@ -30342,6 +30357,256 @@ async function sendAutomaticBookingConfirmationSms(bookingId) {
         }
     } catch (error) {
         console.error('❌ [sendAutomaticBookingConfirmationSms] Error in automatic SMS function:', error);
+        // Don't throw error - SMS failure shouldn't break booking creation
+    }
+}
+
+// Send automatic booking rescheduled SMS for rebook operations
+async function sendAutomaticBookingRescheduledSms(bookingId) {
+    console.log('========================================');
+    console.log('📱 [sendAutomaticBookingRescheduledSms] FUNCTION CALLED');
+    console.log('📱 [sendAutomaticBookingRescheduledSms] Booking ID:', bookingId);
+    console.log('📱 [sendAutomaticBookingRescheduledSms] Timestamp:', new Date().toISOString());
+    console.log('========================================');
+
+    try {
+        // Check Twilio configuration
+        const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = process.env;
+        if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
+            console.warn('⚠️ [sendAutomaticBookingRescheduledSms] Twilio not configured, skipping SMS');
+            return;
+        }
+
+        // Fetch booking details from all_booking table
+        const bookingQuery = `SELECT * FROM all_booking WHERE id = ?`;
+        
+        con.query(bookingQuery, [bookingId], async (err, bookingRows) => {
+            if (err) {
+                console.error('❌ [sendAutomaticBookingRescheduledSms] Error fetching booking:', err);
+                return;
+            }
+
+            if (!bookingRows || bookingRows.length === 0) {
+                console.warn('⚠️ [sendAutomaticBookingRescheduledSms] Booking not found:', bookingId);
+                return;
+            }
+
+            const booking = bookingRows[0];
+            
+            // Get phone number from booking
+            const phoneNumber = booking.phone || booking.mobile || '';
+            
+            if (!phoneNumber || !phoneNumber.trim()) {
+                // Try to get phone from passengers if booking phone is empty
+                const passengerQuery = `SELECT phone FROM passenger WHERE booking_id = ? AND phone IS NOT NULL AND phone != '' ORDER BY id ASC LIMIT 1`;
+                con.query(passengerQuery, [bookingId], (passengerErr, passengerRows) => {
+                    if (!passengerErr && passengerRows && passengerRows.length > 0 && passengerRows[0].phone) {
+                        const passengerPhone = passengerRows[0].phone;
+                        console.log('📱 [sendAutomaticBookingRescheduledSms] Using phone from passenger:', passengerPhone);
+                        sendSmsWithPhone(booking, bookingId, passengerPhone);
+                    } else {
+                        console.warn('⚠️ [sendAutomaticBookingRescheduledSms] No phone number found for booking:', bookingId);
+                    }
+                });
+                return;
+            }
+
+            // Clean phone number (keep international format)
+            const normalizedPhone = cleanPhoneNumber(phoneNumber);
+            if (!normalizedPhone || !normalizedPhone.startsWith('+')) {
+                console.warn('⚠️ [sendAutomaticBookingRescheduledSms] Invalid international phone number:', phoneNumber, 'cleaned:', normalizedPhone);
+                return;
+            }
+
+            console.log('📋 [sendAutomaticBookingRescheduledSms] Booking found:', {
+                id: booking.id,
+                name: booking.name,
+                phone: phoneNumber,
+                normalizedPhone: normalizedPhone,
+                flight_date: booking.flight_date,
+                location: booking.location
+            });
+
+            // Fetch "Booking Rescheduled SMS" template
+            const templateQuery = `SELECT * FROM sms_templates WHERE name = 'Booking Rescheduled SMS' LIMIT 1`;
+            con.query(templateQuery, async (templateErr, templateRows) => {
+                if (templateErr) {
+                    console.error('❌ [sendAutomaticBookingRescheduledSms] Error fetching SMS template:', templateErr);
+                    return;
+                }
+
+                if (!templateRows || templateRows.length === 0) {
+                    console.warn('⚠️ [sendAutomaticBookingRescheduledSms] SMS template "Booking Rescheduled SMS" not found');
+                    return;
+                }
+
+                const template = templateRows[0];
+                console.log('📝 [sendAutomaticBookingRescheduledSms] Template found:', {
+                    id: template.id,
+                    name: template.name,
+                    messageLength: template.message?.length || 0
+                });
+
+                // Prepare booking object for placeholder replacement
+                const bookingObject = {
+                    id: booking.id,
+                    name: booking.name || '',
+                    customer_name: booking.name || '',
+                    email: booking.email || '',
+                    phone: phoneNumber,
+                    location: booking.location || '',
+                    flight_date: booking.flight_date || '',
+                    flight_type: booking.flight_type || '',
+                    experience: booking.experience || booking.flight_type || '',
+                    voucher_code: booking.voucher_code || ''
+                };
+
+                // Replace placeholders in template message
+                const messageWithPrompts = replaceSmsPrompts(template.message || '', bookingObject);
+                console.log('📝 [sendAutomaticBookingRescheduledSms] Message after placeholder replacement:', messageWithPrompts.substring(0, 100) + '...');
+
+                // Send SMS using Twilio
+                try {
+                    const client = Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+                    const { TWILIO_FROM_NUMBER, TWILIO_MESSAGING_SERVICE_SID } = process.env;
+                    
+                    const createParams = {
+                        to: normalizedPhone,
+                        body: messageWithPrompts,
+                        statusCallback: process.env.TWILIO_STATUS_CALLBACK_URL || undefined
+                    };
+                    
+                    // Priority order for sender
+                    const hasFromNumber = TWILIO_FROM_NUMBER && typeof TWILIO_FROM_NUMBER === 'string' && TWILIO_FROM_NUMBER.trim() !== '';
+                    const hasMessagingService = TWILIO_MESSAGING_SERVICE_SID && typeof TWILIO_MESSAGING_SERVICE_SID === 'string' && TWILIO_MESSAGING_SERVICE_SID.trim() !== '';
+                    
+                    if (hasMessagingService) {
+                        createParams.messagingServiceSid = TWILIO_MESSAGING_SERVICE_SID.trim();
+                    } else if (!hasFromNumber) {
+                        createParams.from = 'FLYAWAY';
+                    } else {
+                        createParams.from = TWILIO_FROM_NUMBER.trim();
+                    }
+                    
+                    console.log('📱 [sendAutomaticBookingRescheduledSms] Sending SMS via Twilio:', {
+                        to: normalizedPhone,
+                        from: createParams.from || `MessagingService:${createParams.messagingServiceSid}`,
+                        bodyLength: messageWithPrompts.length
+                    });
+                    
+                    const msg = await client.messages.create(createParams);
+                    
+                    // Log SMS to database
+                    ensureSmsLogsSchema(() => {
+                        const sql = `INSERT INTO sms_logs (booking_id, to_number, body, status, sid, sent_at) VALUES (?, ?, ?, ?, ?, NOW())`;
+                        con.query(sql, [bookingId, normalizedPhone, messageWithPrompts, msg.status || 'queued', msg.sid], (logErr) => {
+                            if (logErr) {
+                                console.error('❌ [sendAutomaticBookingRescheduledSms] Error logging SMS:', logErr);
+                            } else {
+                                console.log('✅ [sendAutomaticBookingRescheduledSms] SMS logged to database');
+                            }
+                        });
+                    });
+                    
+                    console.log('✅ [sendAutomaticBookingRescheduledSms] SMS sent successfully:', {
+                        sid: msg.sid,
+                        status: msg.status
+                    });
+                } catch (smsError) {
+                    console.error('❌ [sendAutomaticBookingRescheduledSms] Error sending SMS:', smsError);
+                    // Don't throw - SMS failure shouldn't break booking creation
+                }
+            });
+
+            // Helper function to send SMS with phone number
+            function sendSmsWithPhone(booking, bookingId, phoneNumber) {
+                const normalizedPhone = cleanPhoneNumber(phoneNumber);
+                if (!normalizedPhone || !normalizedPhone.startsWith('+')) {
+                    console.warn('⚠️ [sendAutomaticBookingRescheduledSms] Invalid international phone number:', phoneNumber, 'cleaned:', normalizedPhone);
+                    return;
+                }
+
+                // Fetch "Booking Rescheduled SMS" template
+                const templateQuery = `SELECT * FROM sms_templates WHERE name = 'Booking Rescheduled SMS' LIMIT 1`;
+                con.query(templateQuery, async (templateErr, templateRows) => {
+                    if (templateErr) {
+                        console.error('❌ [sendAutomaticBookingRescheduledSms] Error fetching SMS template:', templateErr);
+                        return;
+                    }
+
+                    if (!templateRows || templateRows.length === 0) {
+                        console.warn('⚠️ [sendAutomaticBookingRescheduledSms] SMS template "Booking Rescheduled SMS" not found');
+                        return;
+                    }
+
+                    const template = templateRows[0];
+
+                    // Prepare booking object for placeholder replacement
+                    const bookingObject = {
+                        id: booking.id,
+                        name: booking.name || '',
+                        customer_name: booking.name || '',
+                        email: booking.email || '',
+                        phone: phoneNumber,
+                        location: booking.location || '',
+                        flight_date: booking.flight_date || '',
+                        flight_type: booking.flight_type || '',
+                        experience: booking.experience || booking.flight_type || '',
+                        voucher_code: booking.voucher_code || ''
+                    };
+
+                    // Replace placeholders in template message
+                    const messageWithPrompts = replaceSmsPrompts(template.message || '', bookingObject);
+
+                    // Send SMS using Twilio
+                    try {
+                        const client = Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+                        const { TWILIO_FROM_NUMBER, TWILIO_MESSAGING_SERVICE_SID } = process.env;
+                        
+                        const createParams = {
+                            to: normalizedPhone,
+                            body: messageWithPrompts,
+                            statusCallback: process.env.TWILIO_STATUS_CALLBACK_URL || undefined
+                        };
+                        
+                        // Priority order for sender
+                        const hasFromNumber = TWILIO_FROM_NUMBER && typeof TWILIO_FROM_NUMBER === 'string' && TWILIO_FROM_NUMBER.trim() !== '';
+                        const hasMessagingService = TWILIO_MESSAGING_SERVICE_SID && typeof TWILIO_MESSAGING_SERVICE_SID === 'string' && TWILIO_MESSAGING_SERVICE_SID.trim() !== '';
+                        
+                        if (hasMessagingService) {
+                            createParams.messagingServiceSid = TWILIO_MESSAGING_SERVICE_SID.trim();
+                        } else if (!hasFromNumber) {
+                            createParams.from = 'FLYAWAY';
+                        } else {
+                            createParams.from = TWILIO_FROM_NUMBER.trim();
+                        }
+                        
+                        const msg = await client.messages.create(createParams);
+                        
+                        // Log SMS to database
+                        ensureSmsLogsSchema(() => {
+                            const sql = `INSERT INTO sms_logs (booking_id, to_number, body, status, sid, sent_at) VALUES (?, ?, ?, ?, ?, NOW())`;
+                            con.query(sql, [bookingId, normalizedPhone, messageWithPrompts, msg.status || 'queued', msg.sid], (logErr) => {
+                                if (logErr) {
+                                    console.error('❌ [sendAutomaticBookingRescheduledSms] Error logging SMS:', logErr);
+                                } else {
+                                    console.log('✅ [sendAutomaticBookingRescheduledSms] SMS logged to database');
+                                }
+                            });
+                        });
+                        
+                        console.log('✅ [sendAutomaticBookingRescheduledSms] SMS sent successfully:', {
+                            sid: msg.sid,
+                            status: msg.status
+                        });
+                    } catch (smsError) {
+                        console.error('❌ [sendAutomaticBookingRescheduledSms] Error sending SMS:', smsError);
+                    }
+                });
+            }
+        });
+    } catch (error) {
+        console.error('❌ [sendAutomaticBookingRescheduledSms] Error in automatic SMS function:', error);
         // Don't throw error - SMS failure shouldn't break booking creation
     }
 }
