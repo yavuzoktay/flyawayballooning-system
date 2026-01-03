@@ -1021,8 +1021,28 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
     };
 
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-            <DialogTitle sx={{ fontSize: isMobile ? 16 : 'inherit', padding: isMobile ? '12px 16px' : 'inherit' }}>
+        <Dialog 
+            open={open} 
+            onClose={onClose} 
+            maxWidth={isMobile ? "sm" : "md"} 
+            fullWidth
+            PaperProps={{
+                sx: !isMobile ? {
+                    maxWidth: '800px',
+                    width: '90%',
+                    maxHeight: '90vh',
+                    overflow: 'auto'
+                } : {}
+            }}
+        >
+            <DialogTitle sx={{ 
+                fontSize: isMobile ? 16 : 20, 
+                padding: isMobile ? '12px 16px' : '20px 24px',
+                fontWeight: 600,
+                color: !isMobile ? '#1f2937' : 'inherit',
+                borderBottom: !isMobile ? '1px solid #e5e7eb' : 'none',
+                margin: 0
+            }}>
                 {isGiftVoucherDetails ? 'Redeem - Select New Options' : 'Rebook - Select New Options & Time'}
             </DialogTitle>
             <DialogContent sx={{ padding: isMobile ? '12px 16px' : '24px' }}>
@@ -1035,8 +1055,15 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                         {isFlightVoucherDetails && (
                             <>
                                 {/* Locations Checkbox List */}
-                                <Box sx={{ mb: 3 }}>
-                                    <Typography variant="h6" sx={{ mb: 2 }}>Locations:</Typography>
+                                <Box sx={{ mb: !isMobile ? 3 : 3 }}>
+                                    <Typography variant="h6" sx={{ 
+                                        mb: !isMobile ? 2 : 2,
+                                        fontSize: !isMobile ? '18px' : 'inherit',
+                                        fontWeight: 600,
+                                        color: !isMobile ? '#1f2937' : 'inherit'
+                                    }}>
+                                        Locations:
+                                    </Typography>
                                     <FormGroup row>
                                         {availableLocations.map((loc) => (
                                             <FormControlLabel
@@ -1065,8 +1092,15 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                         {isGiftVoucherDetails && (
                             <>
                                 {/* Locations Checkbox List */}
-                                <Box sx={{ mb: 3 }}>
-                                    <Typography variant="h6" sx={{ mb: 2 }}>Locations:</Typography>
+                                <Box sx={{ mb: !isMobile ? 3 : 3 }}>
+                                    <Typography variant="h6" sx={{ 
+                                        mb: !isMobile ? 2 : 2,
+                                        fontSize: !isMobile ? '18px' : 'inherit',
+                                        fontWeight: 600,
+                                        color: !isMobile ? '#1f2937' : 'inherit'
+                                    }}>
+                                        Locations:
+                                    </Typography>
                                     <FormGroup row>
                                         {availableLocations.map((loc) => (
                                             <FormControlLabel
@@ -1115,7 +1149,14 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
 
                                         {selectedDate && (
                                             <>
-                                                <Typography variant="h6" sx={{ mb: isMobile ? 1 : 2, fontSize: isMobile ? 14 : 18, fontWeight: 600 }}>Available Times for {dayjs(selectedDate).format('DD/MM/YYYY')}:</Typography>
+                                                <Typography variant="h6" sx={{ 
+                                                    mb: isMobile ? 1 : 2, 
+                                                    fontSize: isMobile ? 14 : 18, 
+                                                    fontWeight: 600,
+                                                    color: !isMobile ? '#1f2937' : 'inherit'
+                                                }}>
+                                                    Available Times for {dayjs(selectedDate).format('DD/MM/YYYY')}:
+                                                </Typography>
                                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? 6 : 8, marginBottom: isMobile ? 12 : 16 }}>
                                                     {getTimesForDate(selectedDate, true).length === 0 && (
                                                         <Box sx={{ p: 2, textAlign: 'center', width: '100%' }}>
@@ -1312,8 +1353,15 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                             <>
                                 {/* Flight Type Selector */}
                                 {!isFlightVoucherDetails && !isGiftVoucherDetails && (
-                                <Box sx={{ mb: 3 }}>
-                                    <Typography variant="h6" sx={{ mb: 2 }}>Flight Type:</Typography>
+                                <Box sx={{ mb: !isMobile ? 3 : 3 }}>
+                                    <Typography variant="h6" sx={{ 
+                                        mb: !isMobile ? 2 : 2,
+                                        fontSize: !isMobile ? '18px' : 'inherit',
+                                        fontWeight: 600,
+                                        color: !isMobile ? '#1f2937' : 'inherit'
+                                    }}>
+                                        Flight Type:
+                                    </Typography>
                                     <FormGroup row>
                                         <FormControlLabel
                                             control={
@@ -1355,8 +1403,15 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
 
                                 {/* Voucher Type Selector */}
                                 {!isFlightVoucherDetails && !isGiftVoucherDetails && (
-                                <Box sx={{ mb: 3 }}>
-                                    <Typography variant="h6" sx={{ mb: 2 }}>Voucher Type:</Typography>
+                                <Box sx={{ mb: !isMobile ? 3 : 3 }}>
+                                    <Typography variant="h6" sx={{ 
+                                        mb: !isMobile ? 2 : 2,
+                                        fontSize: !isMobile ? '18px' : 'inherit',
+                                        fontWeight: 600,
+                                        color: !isMobile ? '#1f2937' : 'inherit'
+                                    }}>
+                                        Voucher Type:
+                                    </Typography>
                                     {/* Shared voucher types (only relevant when Shared flight is selected) */}
                                     {selectedFlightTypes.includes('shared') && (
                                         <FormGroup row>
@@ -1455,7 +1510,14 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
 
                                         {selectedDate && (
                                             <>
-                                                <Typography variant="h6" sx={{ mb: isMobile ? 1 : 2, fontSize: isMobile ? 14 : 18, fontWeight: 600 }}>Available Times for {dayjs(selectedDate).format('DD/MM/YYYY')}:</Typography>
+                                                <Typography variant="h6" sx={{ 
+                                                    mb: isMobile ? 1 : 2, 
+                                                    fontSize: isMobile ? 14 : 18, 
+                                                    fontWeight: 600,
+                                                    color: !isMobile ? '#1f2937' : 'inherit'
+                                                }}>
+                                                    Available Times for {dayjs(selectedDate).format('DD/MM/YYYY')}:
+                                                </Typography>
                                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? 6 : 8, marginBottom: isMobile ? 12 : 16 }}>
                                                     {getTimesForDate(selectedDate).length === 0 && (
                                                         <Box sx={{ p: 2, textAlign: 'center', width: '100%' }}>
@@ -1532,8 +1594,24 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                     </>
                 )}
             </DialogContent>
-            <DialogActions>
-                <Button onClick={onClose}>Cancel</Button>
+            <DialogActions sx={{
+                borderTop: !isMobile ? '1px solid #e5e7eb' : 'none',
+                padding: !isMobile ? '16px 24px' : 'inherit',
+                display: 'flex',
+                justifyContent: !isMobile ? 'flex-end' : 'inherit',
+                gap: !isMobile ? '12px' : 'inherit',
+                marginTop: !isMobile ? '20px' : 0
+            }}>
+                <Button 
+                    onClick={onClose}
+                    sx={!isMobile ? {
+                        padding: '8px 20px',
+                        fontSize: '14px',
+                        borderRadius: '6px'
+                    } : {}}
+                >
+                    Cancel
+                </Button>
                 <Button
                     onClick={() => {
                         // For Gift Voucher, find activity ID from selected location
@@ -1598,6 +1676,11 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                               !selectedLocation
                     }
                     variant="contained"
+                    sx={!isMobile ? {
+                        padding: '8px 20px',
+                        fontSize: '14px',
+                        borderRadius: '6px'
+                    } : {}}
                 >
                     Confirm
                 </Button>
