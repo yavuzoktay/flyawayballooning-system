@@ -9872,10 +9872,36 @@ const Settings = () => {
 
             {/* Create SMS Template Modal */}
             {showSmsTemplateForm && (
-                <div className="modal-overlay">
-                    <div className="modal-content" style={{ maxWidth: '1200px', width: '95%', maxHeight: '90vh', overflow: 'auto' }}>
-                        <div className="modal-header">
-                            <h3 style={{ margin: 0, fontSize: '24px', fontWeight: 600 }}>SMS Message Template</h3>
+                <div className="modal-overlay" style={isMobile ? {
+                    padding: '8px',
+                    alignItems: 'flex-start',
+                    overflowY: 'auto'
+                } : {}}>
+                    <div className="modal-content" style={isMobile ? {
+                        maxWidth: 'calc(100vw - 16px)',
+                        width: '100%',
+                        maxHeight: 'calc(100vh - 16px)',
+                        margin: '0',
+                        borderRadius: '8px'
+                    } : {
+                        maxWidth: '1200px',
+                        width: '95%',
+                        maxHeight: '90vh',
+                        overflow: 'auto'
+                    }}>
+                        <div className="modal-header" style={isMobile ? {
+                            padding: '10px 12px',
+                            borderBottom: '1px solid #e5e7eb'
+                        } : {}}>
+                            <h3 style={isMobile ? {
+                                margin: 0,
+                                fontSize: '14px',
+                                fontWeight: 600
+                            } : {
+                                margin: 0,
+                                fontSize: '24px',
+                                fontWeight: 600
+                            }}>SMS Message Template</h3>
                             <button 
                                 className="close-btn"
                                 onClick={() => {
@@ -9886,6 +9912,11 @@ const Settings = () => {
                                         category: 'User Defined Message'
                                     });
                                 }}
+                                style={isMobile ? {
+                                    fontSize: '18px',
+                                    width: '24px',
+                                    height: '24px'
+                                } : {}}
                             >
                                 ×
                             </button>
@@ -9908,29 +9939,112 @@ const Settings = () => {
                                 alert('Error creating template: ' + (error.response?.data?.message || error.message));
                             }
                         }}>
-                            <div className="modal-body" style={{ display: 'flex', gap: '24px', padding: '24px' }}>
+                            <div className="modal-body" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '12px',
+                                padding: '12px'
+                            } : {
+                                display: 'flex',
+                                gap: '24px',
+                                padding: '24px'
+                            }}>
                                 {/* Left Column - Form */}
-                                <div style={{ flex: '0 0 350px' }}>
-                                    <div className="form-group" style={{ marginBottom: '20px' }}>
-                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>Name</label>
+                                <div style={isMobile ? {
+                                    flex: '1 1 auto',
+                                    width: '100%'
+                                } : {
+                                    flex: '0 0 350px'
+                                }}>
+                                    <div className="form-group" style={isMobile ? {
+                                        marginBottom: '12px'
+                                    } : {
+                                        marginBottom: '20px'
+                                    }}>
+                                        <label style={isMobile ? {
+                                            display: 'block',
+                                            marginBottom: '4px',
+                                            fontWeight: 600,
+                                            color: '#374151',
+                                            fontSize: '11px'
+                                        } : {
+                                            display: 'block',
+                                            marginBottom: '8px',
+                                            fontWeight: 500,
+                                            color: '#374151'
+                                        }}>Name</label>
                                         <input
                                             type="text"
                                             value={smsTemplateFormData.name}
                                             onChange={(e) => setSmsTemplateFormData({ ...smsTemplateFormData, name: e.target.value })}
                                             placeholder="Booking Confirmation SMS"
                                             required
-                                            style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px' }}
+                                            style={isMobile ? {
+                                                width: '100%',
+                                                padding: '6px 8px',
+                                                border: '1px solid #d1d5db',
+                                                borderRadius: '4px',
+                                                fontSize: '13px',
+                                                height: '32px',
+                                                boxSizing: 'border-box'
+                                            } : {
+                                                width: '100%',
+                                                padding: '8px 12px',
+                                                border: '1px solid #d1d5db',
+                                                borderRadius: '6px',
+                                                fontSize: '14px'
+                                            }}
                                         />
-                                        <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>
+                                        <p style={isMobile ? {
+                                            fontSize: '10px',
+                                            color: '#6b7280',
+                                            marginTop: '4px',
+                                            marginBottom: 0,
+                                            lineHeight: '1.3'
+                                        } : {
+                                            fontSize: '12px',
+                                            color: '#6b7280',
+                                            marginTop: '4px',
+                                            marginBottom: 0
+                                        }}>
                                             This will help you identify this message when choosing from your list of messages. Not visible to the recipient.
                                         </p>
                                     </div>
-                                    <div className="form-group" style={{ marginBottom: '20px' }}>
-                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>Category</label>
+                                    <div className="form-group" style={isMobile ? {
+                                        marginBottom: '12px'
+                                    } : {
+                                        marginBottom: '20px'
+                                    }}>
+                                        <label style={isMobile ? {
+                                            display: 'block',
+                                            marginBottom: '4px',
+                                            fontWeight: 600,
+                                            color: '#374151',
+                                            fontSize: '11px'
+                                        } : {
+                                            display: 'block',
+                                            marginBottom: '8px',
+                                            fontWeight: 500,
+                                            color: '#374151'
+                                        }}>Category</label>
                                         <select
                                             value={smsTemplateFormData.category}
                                             onChange={(e) => setSmsTemplateFormData({ ...smsTemplateFormData, category: e.target.value })}
-                                            style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px' }}
+                                            style={isMobile ? {
+                                                width: '100%',
+                                                padding: '6px 8px',
+                                                border: '1px solid #d1d5db',
+                                                borderRadius: '4px',
+                                                fontSize: '13px',
+                                                height: '32px',
+                                                boxSizing: 'border-box'
+                                            } : {
+                                                width: '100%',
+                                                padding: '8px 12px',
+                                                border: '1px solid #d1d5db',
+                                                borderRadius: '6px',
+                                                fontSize: '14px'
+                                            }}
                                         >
                                             <option value="User Defined Message">User Defined Message</option>
                                             <option value="Confirmation">Confirmation</option>
@@ -9943,9 +10057,34 @@ const Settings = () => {
                                             <option value="Abandon Cart">Abandon Cart</option>
                                         </select>
                                     </div>
-                                    <div className="form-group" style={{ marginBottom: '20px' }}>
-                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>Message</label>
-                                        <div style={{ marginBottom: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                    <div className="form-group" style={isMobile ? {
+                                        marginBottom: '12px'
+                                    } : {
+                                        marginBottom: '20px'
+                                    }}>
+                                        <label style={isMobile ? {
+                                            display: 'block',
+                                            marginBottom: '4px',
+                                            fontWeight: 600,
+                                            color: '#374151',
+                                            fontSize: '11px'
+                                        } : {
+                                            display: 'block',
+                                            marginBottom: '8px',
+                                            fontWeight: 500,
+                                            color: '#374151'
+                                        }}>Message</label>
+                                        <div style={isMobile ? {
+                                            marginBottom: '6px',
+                                            display: 'flex',
+                                            gap: '4px',
+                                            flexWrap: 'wrap'
+                                        } : {
+                                            marginBottom: '8px',
+                                            display: 'flex',
+                                            gap: '6px',
+                                            flexWrap: 'wrap'
+                                        }}>
                                             {['[First Name]', '[Last Name]', '[Full Name]', '[Company Name]', '[Booking ID]', '[Customer Portal Link]', '[Email]', '[Phone]', '[Experience Data]'].map((placeholder) => (
                                                 <button
                                                     key={placeholder}
@@ -9964,10 +10103,19 @@ const Settings = () => {
                                                             }, 0);
                                                         }
                                                     }}
-                                                    style={{ 
-                                                        padding: '4px 8px', 
-                                                        fontSize: '11px', 
-                                                        backgroundColor: placeholder.includes('Company Name') || placeholder.includes('Customer Portal Link') || placeholder.includes('Experience Data') ? '#dbeafe' : '#f3f4f6', 
+                                                    style={isMobile ? {
+                                                        padding: '3px 6px',
+                                                        fontSize: '9px',
+                                                        backgroundColor: placeholder.includes('Company Name') || placeholder.includes('Customer Portal Link') || placeholder.includes('Experience Data') ? '#dbeafe' : '#f3f4f6',
+                                                        color: placeholder.includes('Company Name') || placeholder.includes('Customer Portal Link') || placeholder.includes('Experience Data') ? '#1d4ed8' : '#6366f1',
+                                                        border: '1px solid #e5e7eb',
+                                                        borderRadius: '3px',
+                                                        cursor: 'pointer',
+                                                        whiteSpace: 'nowrap'
+                                                    } : {
+                                                        padding: '4px 8px',
+                                                        fontSize: '11px',
+                                                        backgroundColor: placeholder.includes('Company Name') || placeholder.includes('Customer Portal Link') || placeholder.includes('Experience Data') ? '#dbeafe' : '#f3f4f6',
                                                         color: placeholder.includes('Company Name') || placeholder.includes('Customer Portal Link') || placeholder.includes('Experience Data') ? '#1d4ed8' : '#6366f1',
                                                         border: '1px solid #e5e7eb',
                                                         borderRadius: '4px',
@@ -9985,28 +10133,70 @@ const Settings = () => {
                                             onChange={(e) => setSmsTemplateFormData({ ...smsTemplateFormData, message: e.target.value })}
                                             placeholder="Enter your SMS message here..."
                                             required
-                                            rows={8}
-                                            style={{ 
-                                                width: '100%', 
-                                                padding: '12px', 
-                                                border: '1px solid #d1d5db', 
-                                                borderRadius: '6px', 
+                                            rows={isMobile ? 4 : 8}
+                                            style={isMobile ? {
+                                                width: '100%',
+                                                padding: '6px 8px',
+                                                border: '1px solid #d1d5db',
+                                                borderRadius: '4px',
+                                                fontSize: '13px',
+                                                fontFamily: 'inherit',
+                                                resize: 'vertical',
+                                                lineHeight: '1.5',
+                                                minHeight: '70px',
+                                                boxSizing: 'border-box'
+                                            } : {
+                                                width: '100%',
+                                                padding: '12px',
+                                                border: '1px solid #d1d5db',
+                                                borderRadius: '6px',
                                                 fontSize: '14px',
                                                 fontFamily: 'inherit',
                                                 resize: 'vertical',
                                                 lineHeight: '1.5'
                                             }}
                                         />
-                                        <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>
+                                        <p style={isMobile ? {
+                                            fontSize: '10px',
+                                            color: '#6b7280',
+                                            marginTop: '4px',
+                                            marginBottom: 0,
+                                            lineHeight: '1.3'
+                                        } : {
+                                            fontSize: '12px',
+                                            color: '#6b7280',
+                                            marginTop: '4px',
+                                            marginBottom: 0
+                                        }}>
                                             Click placeholder buttons above to insert dynamic data into your message.
                                         </p>
                                     </div>
                                 </div>
 
                                 {/* Right Column - Mobile Preview */}
-                                <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+                                <div style={isMobile ? {
+                                    flex: '1 1 auto',
+                                    width: '100%',
+                                    minWidth: 0,
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'flex-start'
+                                } : {
+                                    flex: 1,
+                                    minWidth: 0,
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'flex-start'
+                                }}>
                                     {/* Mobile Device Preview */}
-                                    <div style={{ 
+                                    <div style={isMobile ? {
+                                        width: '240px',
+                                        maxWidth: '100%',
+                                        background: '#000',
+                                        borderRadius: '18px',
+                                        padding: '8px',
+                                        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)'
+                                    } : {
                                         width: '320px',
                                         maxWidth: '100%',
                                         background: '#000',
@@ -10015,14 +10205,28 @@ const Settings = () => {
                                         boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)'
                                     }}>
                                         {/* Phone Screen */}
-                                        <div style={{
+                                        <div style={isMobile ? {
+                                            background: '#f5f5f5',
+                                            borderRadius: '14px',
+                                            padding: '6px',
+                                            minHeight: '280px'
+                                        } : {
                                             background: '#f5f5f5',
                                             borderRadius: '20px',
                                             padding: '8px',
                                             minHeight: '500px'
                                         }}>
                                             {/* Status Bar */}
-                                            <div style={{
+                                            <div style={isMobile ? {
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
+                                                padding: '6px 8px',
+                                                fontSize: '8px',
+                                                color: '#000',
+                                                background: '#fff',
+                                                borderRadius: '8px 8px 0 0'
+                                            } : {
                                                 display: 'flex',
                                                 justifyContent: 'space-between',
                                                 alignItems: 'center',
@@ -10033,14 +10237,22 @@ const Settings = () => {
                                                 borderRadius: '12px 12px 0 0'
                                             }}>
                                                 <span>9:41</span>
-                                                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                                    <span style={{ fontSize: '12px' }}>🔗</span>
-                                                    <span style={{ fontSize: '12px' }}>⌨️</span>
+                                                <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: isMobile ? '10px' : '12px' }}>🔗</span>
+                                                    <span style={{ fontSize: isMobile ? '10px' : '12px' }}>⌨️</span>
                                                 </div>
                                             </div>
 
                                             {/* Message Preview */}
-                                            <div style={{
+                                            <div style={isMobile ? {
+                                                padding: '12px',
+                                                background: '#fff',
+                                                borderRadius: '0 0 8px 8px',
+                                                minHeight: '200px',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                justifyContent: 'flex-start'
+                                            } : {
                                                 padding: '16px',
                                                 background: '#fff',
                                                 borderRadius: '0 0 12px 12px',
@@ -10050,7 +10262,19 @@ const Settings = () => {
                                                 justifyContent: 'flex-start'
                                             }}>
                                                 {/* Message Bubble */}
-                                                <div style={{
+                                                <div style={isMobile ? {
+                                                    background: '#e5e7eb',
+                                                    borderRadius: '12px',
+                                                    padding: '8px 12px',
+                                                    marginBottom: '6px',
+                                                    maxWidth: '85%',
+                                                    alignSelf: 'flex-start',
+                                                    wordWrap: 'break-word',
+                                                    fontSize: '12px',
+                                                    lineHeight: '1.5',
+                                                    color: '#111827',
+                                                    whiteSpace: 'pre-wrap'
+                                                } : {
                                                     background: '#e5e7eb',
                                                     borderRadius: '16px',
                                                     padding: '12px 16px',
@@ -10071,7 +10295,19 @@ const Settings = () => {
                                 </div>
                             </div>
 
-                            <div className="form-actions" style={{ borderTop: '1px solid #e5e7eb', padding: '16px 24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                            <div className="form-actions" style={isMobile ? {
+                                borderTop: '1px solid #e5e7eb',
+                                padding: '12px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px'
+                            } : {
+                                borderTop: '1px solid #e5e7eb',
+                                padding: '16px 24px',
+                                display: 'flex',
+                                justifyContent: 'flex-end',
+                                gap: '12px'
+                            }}>
                                 <button 
                                     type="button" 
                                     className="btn btn-secondary"
@@ -10083,11 +10319,27 @@ const Settings = () => {
                                             category: 'User Defined Message'
                                         });
                                     }}
-                                    style={{ padding: '8px 20px' }}
+                                    style={isMobile ? {
+                                        padding: '8px 12px',
+                                        fontSize: '12px',
+                                        width: '100%',
+                                        borderRadius: '4px',
+                                        height: '36px'
+                                    } : {
+                                        padding: '8px 20px'
+                                    }}
                                 >
                                     Cancel
                                 </button>
-                                <button type="submit" className="btn btn-primary" style={{ padding: '8px 20px' }}>
+                                <button type="submit" className="btn btn-primary" style={isMobile ? {
+                                    padding: '8px 12px',
+                                    fontSize: '12px',
+                                    width: '100%',
+                                    borderRadius: '4px',
+                                    height: '36px'
+                                } : {
+                                    padding: '8px 20px'
+                                }}>
                                     Create Template
                                 </button>
                             </div>
