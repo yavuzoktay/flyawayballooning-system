@@ -5527,11 +5527,11 @@ const Settings = () => {
                         borderRadius: '8px'
                     } : {}}>
                         <div className="modal-header" style={isMobile ? {
-                            padding: '12px 16px',
+                            padding: '10px 12px',
                             borderBottom: '1px solid #e5e7eb'
                         } : {}}>
                             <h3 style={isMobile ? {
-                                fontSize: '16px',
+                                fontSize: '14px',
                                 fontWeight: 600,
                                 margin: 0
                             } : {}}>{showEditForm ? 'Edit Voucher Code' : 'Create New Voucher Code'}</h3>
@@ -5543,9 +5543,9 @@ const Settings = () => {
                                     resetForm();
                                 }}
                                 style={isMobile ? {
-                                    fontSize: '20px',
-                                    width: '28px',
-                                    height: '28px'
+                                    fontSize: '18px',
+                                    width: '24px',
+                                    height: '24px'
                                 } : {}}
                             >
                                 ×
@@ -5553,20 +5553,20 @@ const Settings = () => {
                         </div>
                         
                         <form onSubmit={handleSubmit} className="voucher-form" style={isMobile ? {
-                            padding: '16px'
+                            padding: '12px'
                         } : {}}>
                             <div className="form-row" style={isMobile ? {
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '12px',
-                                marginBottom: '16px'
+                                gap: '8px',
+                                marginBottom: '12px'
                             } : {}}>
                                 <div className="form-group" style={isMobile ? {
-                                    marginBottom: '16px'
+                                    marginBottom: '12px'
                                 } : {}}>
                                     <label style={isMobile ? {
-                                        fontSize: '12px',
-                                        marginBottom: '6px',
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
                                         fontWeight: 600
                                     } : {}}>Voucher Code *</label>
                                     <input
@@ -5577,19 +5577,21 @@ const Settings = () => {
                                         required
                                         disabled={showEditForm}
                                         style={isMobile ? {
-                                            padding: '10px 12px',
-                                            fontSize: '14px',
-                                            borderRadius: '6px'
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
                                         } : {}}
                                     />
                                 </div>
                                 
                                 <div className="form-group" style={isMobile ? {
-                                    marginBottom: '16px'
+                                    marginBottom: '12px'
                                 } : {}}>
                                     <label style={isMobile ? {
-                                        fontSize: '12px',
-                                        marginBottom: '6px',
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
                                         fontWeight: 600
                                     } : {}}>Title *</label>
                                     <input
@@ -5599,9 +5601,11 @@ const Settings = () => {
                                         placeholder="e.g., Summer Special Discount"
                                         required
                                         style={isMobile ? {
-                                            padding: '10px 12px',
-                                            fontSize: '14px',
-                                            borderRadius: '6px'
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
                                         } : {}}
                                     />
                                 </div>
@@ -5610,15 +5614,15 @@ const Settings = () => {
                             <div className="form-row" style={isMobile ? {
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '12px',
-                                marginBottom: '16px'
+                                gap: '8px',
+                                marginBottom: '12px'
                             } : {}}>
                                 <div className="form-group" style={isMobile ? {
-                                    marginBottom: '16px'
+                                    marginBottom: '12px'
                                 } : {}}>
                                     <label style={isMobile ? {
-                                        fontSize: '12px',
-                                        marginBottom: '6px',
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
                                         fontWeight: 600
                                     } : {}}>Valid From</label>
                                     <input
@@ -5626,19 +5630,21 @@ const Settings = () => {
                                         value={formData.valid_from}
                                         onChange={(e) => setFormData({...formData, valid_from: e.target.value})}
                                         style={isMobile ? {
-                                            padding: '10px 12px',
+                                            padding: '6px 8px',
                                             fontSize: '16px',
-                                            borderRadius: '6px'
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
                                         } : {}}
                                     />
                                 </div>
                                 
                                 <div className="form-group" style={isMobile ? {
-                                    marginBottom: '16px'
+                                    marginBottom: '12px'
                                 } : {}}>
                                     <label style={isMobile ? {
-                                        fontSize: '12px',
-                                        marginBottom: '6px',
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
                                         fontWeight: 600
                                     } : {}}>Valid Until</label>
                                     <input
@@ -5646,9 +5652,11 @@ const Settings = () => {
                                         value={formData.valid_until}
                                         onChange={(e) => setFormData({...formData, valid_until: e.target.value})}
                                         style={isMobile ? {
-                                            padding: '10px 12px',
+                                            padding: '6px 8px',
                                             fontSize: '16px',
-                                            borderRadius: '6px'
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
                                         } : {}}
                                     />
                                 </div>
@@ -5657,15 +5665,15 @@ const Settings = () => {
                             <div className="form-row" style={isMobile ? {
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '12px',
-                                marginBottom: '16px'
+                                gap: '8px',
+                                marginBottom: '12px'
                             } : {}}>
                                 <div className="form-group" style={isMobile ? {
-                                    marginBottom: '16px'
+                                    marginBottom: '12px'
                                 } : {}}>
                                     <label style={isMobile ? {
-                                        fontSize: '12px',
-                                        marginBottom: '6px',
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
                                         fontWeight: 600
                                     } : {}}>Maximum Uses</label>
                                     <input
@@ -5675,29 +5683,33 @@ const Settings = () => {
                                         placeholder="Unlimited"
                                         min="1"
                                         style={isMobile ? {
-                                            padding: '10px 12px',
-                                            fontSize: '14px',
-                                            borderRadius: '6px'
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
                                         } : {}}
                                     />
                                 </div>
                                 
                                 <div className="form-group" style={isMobile ? {
-                                    marginBottom: '16px'
+                                    marginBottom: '12px'
                                 } : {}}>
                                     <label style={isMobile ? {
-                                        fontSize: '12px',
-                                        marginBottom: '6px',
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
                                         fontWeight: 600
                                     } : {}}>Status</label>
                                     <select
                                         value={formData.is_active}
                                         onChange={(e) => setFormData({...formData, is_active: e.target.value === 'true'})}
                                         style={isMobile ? {
-                                            padding: '10px 12px',
-                                            fontSize: '14px',
-                                            borderRadius: '6px',
-                                            width: '100%'
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            width: '100%',
+                                            height: '32px',
+                                            boxSizing: 'border-box'
                                         } : {}}
                                     >
                                         <option value={true}>Active</option>
@@ -5709,9 +5721,9 @@ const Settings = () => {
                             <div className="form-actions" style={isMobile ? {
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '10px',
-                                paddingTop: '16px',
-                                marginTop: '16px',
+                                gap: '8px',
+                                paddingTop: '12px',
+                                marginTop: '12px',
                                 borderTop: '1px solid #e5e7eb'
                             } : {}}>
                                 <button type="button" className="btn btn-secondary" onClick={() => {
@@ -5719,18 +5731,20 @@ const Settings = () => {
                                     setShowEditForm(false);
                                     resetForm();
                                 }} style={isMobile ? {
-                                    padding: '10px 16px',
-                                    fontSize: '13px',
+                                    padding: '8px 12px',
+                                    fontSize: '12px',
                                     width: '100%',
-                                    borderRadius: '6px'
+                                    borderRadius: '4px',
+                                    height: '36px'
                                 } : {}}>
                                     Cancel
                                 </button>
                                 <button type="submit" className="btn btn-primary" style={isMobile ? {
-                                    padding: '10px 16px',
-                                    fontSize: '13px',
+                                    padding: '8px 12px',
+                                    fontSize: '12px',
                                     width: '100%',
-                                    borderRadius: '6px'
+                                    borderRadius: '4px',
+                                    height: '36px'
                                 } : {}}>
                                     {showEditForm ? 'Update Voucher Code' : 'Create Voucher Code'}
                                 </button>
