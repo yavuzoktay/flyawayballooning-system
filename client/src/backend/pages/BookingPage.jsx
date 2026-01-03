@@ -4654,8 +4654,8 @@ setBookingDetail(finalVoucherDetail);
                             <>
                                 <div className="booking-top-wrap">
                                     <div className="booking-filter-heading" style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
+                                        display: 'flex', 
+                                        alignItems: 'center', 
                                         gap: isMobile ? '8px' : '0',
                                         flexWrap: isMobile ? 'nowrap' : 'wrap'
                                     }}>
@@ -4663,62 +4663,62 @@ setBookingDetail(finalVoucherDetail);
                                         {/* Export and Filter Buttons - Only show next to heading on mobile */}
                                         {isMobile && (
                                             <>
-                                                <OutlinedInput
-                                                    readOnly
-                                                    onClick={handleExportCSV}
-                                                    value="Export"
-                                                    sx={{
-                                                        cursor: 'pointer',
-                                                        height: '32px',
-                                                        fontSize: 12,
+                                            <OutlinedInput
+                                                readOnly
+                                                onClick={handleExportCSV}
+                                                value="Export"
+                                                sx={{
+                                                    cursor: 'pointer',
+                                                    height: '32px',
+                                                    fontSize: 12,
                                                         minWidth: '80px',
-                                                        '& input': {
-                                                            cursor: 'pointer',
-                                                            textAlign: 'center',
-                                                            padding: '8px 12px'
-                                                        },
-                                                        '& fieldset': {
-                                                            borderColor: 'primary.main'
-                                                        },
-                                                        '&:hover fieldset': {
-                                                            borderColor: 'primary.dark'
-                                                        }
-                                                    }}
-                                                    size="small"
-                                                    startAdornment={
-                                                        <InputAdornment position="start">
-                                                            <FileDownloadIcon fontSize="small" color="primary" />
-                                                        </InputAdornment>
-                                                    }
-                                                />
-                                                <OutlinedInput
-                                                    readOnly
-                                                    onClick={() => setFilterDialogOpen(true)}
-                                                    value="Filter"
-                                                    sx={{
+                                                    '& input': {
                                                         cursor: 'pointer',
-                                                        height: '32px',
-                                                        fontSize: 12,
-                                                        minWidth: '80px',
-                                                        '& input': {
-                                                            cursor: 'pointer',
-                                                            textAlign: 'center',
-                                                            padding: '8px 12px'
-                                                        },
-                                                        '& fieldset': {
-                                                            borderColor: 'secondary.main'
-                                                        },
-                                                        '&:hover fieldset': {
-                                                            borderColor: 'secondary.dark'
-                                                        }
-                                                    }}
-                                                    size="small"
-                                                    startAdornment={
-                                                        <InputAdornment position="start">
-                                                            <FilterListIcon fontSize="small" color="secondary" />
-                                                        </InputAdornment>
+                                                        textAlign: 'center',
+                                                        padding: '8px 12px'
+                                                    },
+                                                    '& fieldset': {
+                                                        borderColor: 'primary.main'
+                                                    },
+                                                    '&:hover fieldset': {
+                                                        borderColor: 'primary.dark'
                                                     }
-                                                />
+                                                }}
+                                                size="small"
+                                                startAdornment={
+                                                    <InputAdornment position="start">
+                                                        <FileDownloadIcon fontSize="small" color="primary" />
+                                                    </InputAdornment>
+                                                }
+                                            />
+                                            <OutlinedInput
+                                                readOnly
+                                                onClick={() => setFilterDialogOpen(true)}
+                                                value="Filter"
+                                                sx={{
+                                                    cursor: 'pointer',
+                                                    height: '32px',
+                                                    fontSize: 12,
+                                                        minWidth: '80px',
+                                                    '& input': {
+                                                        cursor: 'pointer',
+                                                        textAlign: 'center',
+                                                        padding: '8px 12px'
+                                                    },
+                                                    '& fieldset': {
+                                                        borderColor: 'secondary.main'
+                                                    },
+                                                    '&:hover fieldset': {
+                                                        borderColor: 'secondary.dark'
+                                                    }
+                                                }}
+                                                size="small"
+                                                startAdornment={
+                                                    <InputAdornment position="start">
+                                                        <FilterListIcon fontSize="small" color="secondary" />
+                                                    </InputAdornment>
+                                                }
+                                            />
                                             </>
                                         )}
                                     </div>
@@ -4737,14 +4737,14 @@ setBookingDetail(finalVoucherDetail);
                                         
                                         {/* Filter Button - Only show on desktop */}
                                         {!isMobile && (
-                                            <Button
-                                                variant="outlined"
-                                                color="secondary"
-                                                onClick={() => setFilterDialogOpen(true)}
-                                                style={{ height: 40 }}
-                                            >
-                                                Filter
-                                            </Button>
+                                        <Button
+                                            variant="outlined"
+                                            color="secondary"
+                                            onClick={() => setFilterDialogOpen(true)}
+                                            style={{ height: 40 }}
+                                        >
+                                            Filter
+                                        </Button>
                                         )}
                                         
                                         <Button
@@ -5336,8 +5336,18 @@ setBookingDetail(finalVoucherDetail);
                                 <Grid container spacing={2}>
                                     {/* Personal Details */}
                                     <Grid item xs={12} md={4}>
-                                        <Box sx={{ background: '#fff', borderRadius: 2, p: 1.5, mb: 0.75, boxShadow: 1 }}>
-                                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+                                        <Box sx={{ 
+                                            background: '#fff', 
+                                            borderRadius: 2, 
+                                            p: isMobile ? 1 : 1, 
+                                            mb: 0.75, 
+                                            boxShadow: 1 
+                                        }}>
+                                            <Typography variant="h6" sx={{ 
+                                                fontWeight: 700, 
+                                                mb: isMobile ? 0.25 : 0,
+                                                fontSize: isMobile ? '16px' : 'inherit'
+                                            }}>
                                                 {(() => {
                                                     const v = bookingDetail.voucher || {};
                                                     // For Gift Voucher (book_flight: "Gift Voucher"), show "Purchaser Information"
@@ -5364,7 +5374,10 @@ setBookingDetail(finalVoucherDetail);
                                                         );
                                                     }
                                                     return <>
-                                                        <Typography><b>Name:</b> {editField === 'name' ? (
+                                                        <Typography sx={{ 
+                                                            mb: isMobile ? 0 : 0,
+                                                            fontSize: isMobile ? '14px' : 'inherit'
+                                                        }}><b>Name:</b> {editField === 'name' ? (
                                                             <>
                                                                 <input 
                                                                     value={editValue} 
@@ -5378,11 +5391,28 @@ setBookingDetail(finalVoucherDetail);
                                                         ) : (
                                                             <>
                                                                 {v.name || '-'}
-                                                                <IconButton size="small" onClick={() => handleEditClick('name', v.name)}><EditIcon fontSize="small" /></IconButton>
+                                                                <IconButton 
+                                                                    size="small" 
+                                                                    onClick={() => handleEditClick('name', v.name)}
+                                                                    sx={{ 
+                                                                        padding: isMobile ? '2px' : '0px',
+                                                                        minWidth: isMobile ? '20px' : 'auto',
+                                                                        width: isMobile ? '20px' : 'auto',
+                                                                        height: isMobile ? '20px' : 'auto',
+                                                                        '& .MuiSvgIcon-root': {
+                                                                            fontSize: isMobile ? '10px' : 'inherit'
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    <EditIcon fontSize={isMobile ? '10px' : 'small'} />
+                                                                </IconButton>
                                                             </>
                                                         )}</Typography>
                                                         {/* Phone field - show purchaser_phone for Gift Vouchers, booking_phone for Flight Vouchers */}
-                                                        <Typography><b>Phone:</b> {editField === 'mobile' ? (
+                                                        <Typography sx={{ 
+                                                            mb: isMobile ? 0 : 1,
+                                                            fontSize: isMobile ? '14px' : 'inherit'
+                                                        }}><b>Phone:</b> {editField === 'mobile' ? (
                                                             <>
                                                                 <input 
                                                                     value={editValue} 
@@ -5399,29 +5429,67 @@ setBookingDetail(finalVoucherDetail);
                                                                     // For Flight Voucher, prioritize booking_phone (from linked booking)
                                                                     // For Gift Voucher, use purchaser_phone
                                                                     const isGiftVoucher = v.book_flight === "Gift Voucher" || (v.book_flight || '').toLowerCase().includes('gift');
+                                                                    let phoneValue = '';
                                                                     if (isGiftVoucher) {
-                                                                        return v.purchaser_phone || v.phone || '-';
+                                                                        phoneValue = v.purchaser_phone || v.phone || '-';
                                                                     } else {
                                                                         // Flight Voucher: Use booking_phone if available and not empty
                                                                         // booking_phone comes from the linked booking and has country code
                                                                         const bookingPhone = v.booking_phone && String(v.booking_phone).trim() !== '' ? String(v.booking_phone).trim() : null;
                                                                         if (bookingPhone) {
-                                                                            return bookingPhone;
-                                                                        }
+                                                                            phoneValue = bookingPhone;
+                                                                        } else {
                                                                         // Fallback to phone or mobile if booking_phone is not available
-                                                                        return v.phone || v.mobile || '-';
+                                                                            phoneValue = v.phone || v.mobile || '-';
+                                                                        }
                                                                     }
+                                                                    
+                                                                    // If phone value exists and is not '-', make it a clickable link
+                                                                    if (phoneValue && phoneValue !== '-') {
+                                                                        // Clean phone number for tel: link (remove spaces, dashes, parentheses)
+                                                                        const cleanPhone = phoneValue.replace(/[\s\-()]/g, '');
+                                                                        return (
+                                                                            <a 
+                                                                                href={`tel:${cleanPhone}`}
+                                                                                style={{ 
+                                                                                    color: '#3274b4',
+                                                                                    textDecoration: 'underline',
+                                                                                    cursor: 'pointer'
+                                                                                }}
+                                                                            >
+                                                                                {phoneValue}
+                                                                            </a>
+                                                                        );
+                                                                    }
+                                                                    return phoneValue;
                                                                 })()}
-                                                                <IconButton size="small" onClick={() => {
+                                                                <IconButton 
+                                                                    size="small" 
+                                                                    onClick={() => {
                                                                     const phoneValue = v.book_flight === "Gift Voucher" 
                                                                         ? (v.purchaser_phone || v.phone) 
                                                                         : (v.booking_phone && v.booking_phone.trim() !== '' ? v.booking_phone : (v.phone || v.mobile));
                                                                     handleEditClick('mobile', phoneValue);
-                                                                }}><EditIcon fontSize="small" /></IconButton>
+                                                                    }}
+                                                                    sx={{ 
+                                                                        padding: isMobile ? '2px' : '8px',
+                                                                        minWidth: isMobile ? '20px' : 'auto',
+                                                                        width: isMobile ? '20px' : 'auto',
+                                                                        height: isMobile ? '20px' : 'auto',
+                                                                        '& .MuiSvgIcon-root': {
+                                                                            fontSize: isMobile ? '10px' : 'inherit'
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    <EditIcon fontSize={isMobile ? '10px' : 'small'} />
+                                                                </IconButton>
                                                             </>
                                                         )}</Typography>
                                                         {/* Remove explicit Mobile row from Voucher Details popups */}
-                                                        <Typography><b>Email:</b> {editField === 'email' ? (
+                                                        <Typography sx={{ 
+                                                            mb: isMobile ? 0 : 1,
+                                                            fontSize: isMobile ? '14px' : 'inherit'
+                                                        }}><b>Email:</b> {editField === 'email' ? (
                                                             <>
                                                                 <input 
                                                                     type="email"
@@ -5435,11 +5503,50 @@ setBookingDetail(finalVoucherDetail);
                                                             </>
                                                         ) : (
                                                             <>
-                                                                {v.email || '-'}
-                                                                <IconButton size="small" onClick={() => handleEditClick('email', v.email)}><EditIcon fontSize="small" /></IconButton>
+                                                                {(() => {
+                                                                    // For Gift Voucher, use recipient_email; for Flight Voucher, use email
+                                                                    const isGiftVoucher = v.book_flight === "Gift Voucher" || (v.book_flight || '').toLowerCase().includes('gift');
+                                                                    const emailValue = isGiftVoucher 
+                                                                        ? (v.recipient_email || v.email || '-')
+                                                                        : (v.email || '-');
+                                                                    // If email exists and is not '-', make it a clickable link
+                                                                    if (emailValue && emailValue !== '-') {
+                                                                        return (
+                                                                            <a 
+                                                                                href={`mailto:${emailValue}`}
+                                                                                style={{ 
+                                                                                    color: '#3274b4',
+                                                                                    textDecoration: 'underline',
+                                                                                    cursor: 'pointer'
+                                                                                }}
+                                                                            >
+                                                                                {emailValue}
+                                                                            </a>
+                                                                        );
+                                                                    }
+                                                                    return emailValue;
+                                                                })()}
+                                                                <IconButton 
+                                                                    size="small" 
+                                                                    onClick={() => handleEditClick('email', v.email)}
+                                                                    sx={{ 
+                                                                        padding: isMobile ? '2px' : '8px',
+                                                                        minWidth: isMobile ? '20px' : 'auto',
+                                                                        width: isMobile ? '20px' : 'auto',
+                                                                        height: isMobile ? '20px' : 'auto',
+                                                                        '& .MuiSvgIcon-root': {
+                                                                            fontSize: isMobile ? '10px' : 'inherit'
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    <EditIcon fontSize={isMobile ? '10px' : 'small'} />
+                                                                </IconButton>
                                                             </>
                                                         )}</Typography>
-                                                        <Typography><b>Created:</b> {bookingDetail.voucher.created_at ? (
+                                                        <Typography sx={{ 
+                                                            mb: isMobile ? 0 : 1,
+                                                            fontSize: isMobile ? '14px' : 'inherit'
+                                                        }}><b>Created:</b> {bookingDetail.voucher.created_at ? (
                                                             (() => {
                                                                 // Backend returns DD/MM/YYYY HH:mm format
                                                                 // If it's already in DD/MM/YYYY format, use it directly
@@ -5453,7 +5560,10 @@ setBookingDetail(finalVoucherDetail);
                                                                 return createdMoment.isValid() ? createdMoment.format('DD/MM/YYYY') : bookingDetail.voucher.created_at;
                                                             })()
                                                         ) : '-'}</Typography>
-                                                        <Typography><b>Paid:</b> {editField === 'paid' ? (
+                                                        <Typography sx={{ 
+                                                            mb: isMobile ? 0 : 1,
+                                                            fontSize: isMobile ? '14px' : 'inherit'
+                                                        }}><b>Paid:</b> {editField === 'paid' ? (
                                                             <>
                                                                 <input 
                                                                     value={editValue} 
@@ -5467,10 +5577,27 @@ setBookingDetail(finalVoucherDetail);
                                                         ) : (
                                                             <>
                                                                 £{v.paid || '0.00'}
-                                                                <IconButton size="small" onClick={() => handleEditClick('paid', v.paid)}><EditIcon fontSize="small" /></IconButton>
+                                                                <IconButton 
+                                                                    size="small" 
+                                                                    onClick={() => handleEditClick('paid', v.paid)}
+                                                                    sx={{ 
+                                                                        padding: isMobile ? '2px' : '8px',
+                                                                        minWidth: isMobile ? '20px' : 'auto',
+                                                                        width: isMobile ? '20px' : 'auto',
+                                                                        height: isMobile ? '20px' : 'auto',
+                                                                        '& .MuiSvgIcon-root': {
+                                                                            fontSize: isMobile ? '10px' : 'inherit'
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    <EditIcon fontSize={isMobile ? '10px' : 'small'} />
+                                                                </IconButton>
                                                             </>
                                                         )}</Typography>
-                                                        <Typography><b>Expires:</b> {editField === 'expires' ? (
+                                                        <Typography sx={{ 
+                                                            mb: isMobile ? 0 : 1,
+                                                            fontSize: isMobile ? '14px' : 'inherit'
+                                                        }}><b>Expires:</b> {editField === 'expires' ? (
                                                             <>
                                                                 <LocalizationProvider dateAdapter={AdapterDayjs}>
                                                                     <DatePicker
@@ -5492,18 +5619,48 @@ setBookingDetail(finalVoucherDetail);
                                                                         return calculateExpiresDate(bookingDetail.voucher.expires, flightAttempts);
                                                                     })()
                                                                 ) : '-'}
-                                                                <IconButton size="small" onClick={() => handleEditClick('expires', bookingDetail.voucher.expires)}><EditIcon fontSize="small" /></IconButton>
+                                                                <IconButton 
+                                                                    size="small" 
+                                                                    onClick={() => handleEditClick('expires', bookingDetail.voucher.expires)}
+                                                                    sx={{ 
+                                                                        padding: isMobile ? '2px' : '8px',
+                                                                        minWidth: isMobile ? '20px' : 'auto',
+                                                                        width: isMobile ? '20px' : 'auto',
+                                                                        height: isMobile ? '20px' : 'auto',
+                                                                        '& .MuiSvgIcon-root': {
+                                                                            fontSize: isMobile ? '10px' : 'inherit'
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    <EditIcon fontSize={isMobile ? '10px' : 'small'} />
+                                                                </IconButton>
                                                             </>
                                                         )}</Typography>
                                                         {/* Weight field moved to Passenger Details section */}
-                                                        <Typography><b>Voucher ID:</b> {v.id || '-'}</Typography>
-                                                        <Typography><b>Voucher Code:</b> {v.voucher_code || '-'}</Typography>
-                                                        <Typography><b>Flight Attempts:</b> {v.flight_attempts ?? 0}</Typography>
+                                                        <Typography sx={{ 
+                                                            mb: isMobile ? 0 : 1,
+                                                            fontSize: isMobile ? '14px' : 'inherit'
+                                                        }}><b>Voucher ID:</b> {v.id || '-'}</Typography>
+                                                        <Typography sx={{ 
+                                                            mb: isMobile ? 0 : 1,
+                                                            fontSize: isMobile ? '14px' : 'inherit'
+                                                        }}><b>Voucher Code:</b> {v.voucher_code || '-'}</Typography>
+                                                        <Typography sx={{ 
+                                                            mb: isMobile ? 0 : 1,
+                                                            fontSize: isMobile ? '14px' : 'inherit'
+                                                        }}><b>Flight Attempts:</b> {v.flight_attempts ?? 0}</Typography>
                                                         {v.booking_references && v.booking_references.length > 0 && (
-                                                            <Typography><b>Attempt History:</b></Typography>
+                                                            <Typography sx={{ 
+                                                                mb: isMobile ? 0 : 1,
+                                                                fontSize: isMobile ? '14px' : 'inherit'
+                                                            }}><b>Attempt History:</b></Typography>
                                                         )}
                                                         {v.booking_references && v.booking_references.map((ref, idx) => (
-                                                            <Typography key={idx} style={{ marginLeft: '20px', fontSize: '0.9em' }}>
+                                                            <Typography key={idx} sx={{ 
+                                                                marginLeft: '20px', 
+                                                                fontSize: isMobile ? '12px' : '0.9em',
+                                                                mb: isMobile ? 0 : 1
+                                                            }}>
                                                                 Attempt {ref.attempt_number}: Booking #{ref.booking_id} cancelled on {new Date(ref.cancelled_at).toLocaleDateString()}
                                                             </Typography>
                                                         ))}
@@ -5511,7 +5668,10 @@ setBookingDetail(finalVoucherDetail);
                                                 })()
                                             ) : (
                                                 <>
-                                            <Typography><b>Booking Name:</b> {editField === 'name' ? (
+                                            <Typography sx={{ 
+                                                mb: isMobile ? 0 : 1,
+                                                fontSize: isMobile ? '14px' : 'inherit'
+                                            }}><b>Booking Name:</b> {editField === 'name' ? (
                                                 <>
                                                     <input value={editValue} onChange={e => setEditValue(e.target.value)} style={{marginRight: 8}} />
                                                     <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
@@ -5529,7 +5689,9 @@ setBookingDetail(finalVoucherDetail);
                                                             : '';
                                                         return passenger1Name || bookingDetail.booking.name || '-';
                                                     })()}
-                                                    <IconButton size="small" onClick={() => {
+                                                    <IconButton 
+                                                        size="small" 
+                                                        onClick={() => {
                                                         const passenger1 = bookingDetail.passengers && bookingDetail.passengers.length > 0 
                                                             ? bookingDetail.passengers[0] 
                                                             : null;
@@ -5537,12 +5699,30 @@ setBookingDetail(finalVoucherDetail);
                                                             ? `${passenger1.first_name || ''} ${passenger1.last_name || ''}`.trim() 
                                                             : '';
                                                         handleEditClick('name', passenger1Name || bookingDetail.booking.name || '');
-                                                    }}><EditIcon fontSize="small" /></IconButton>
+                                                        }}
+                                                        sx={{ 
+                                                            padding: isMobile ? '2px' : '8px',
+                                                            '& .MuiSvgIcon-root': {
+                                                                fontSize: isMobile ? '12px' : 'inherit'
+                                                            }
+                                                        }}
+                                                    >
+                                                        <EditIcon fontSize={isMobile ? '12px' : 'small'} />
+                                                    </IconButton>
                                                 </>
                                             )}</Typography>
-                                            <Typography><b>Booking ID:</b> {bookingDetail.booking.id || '-'}</Typography>
-                                            <Typography><b>Booking Created:</b> {bookingDetail.booking.created_at ? dayjs(bookingDetail.booking.created_at).format('DD/MM/YYYY') : '-'}</Typography>
-                                            <Typography><b>Phone:</b> {editField === 'phone' ? (
+                                            <Typography sx={{ 
+                                                mb: isMobile ? 0 : 1,
+                                                fontSize: isMobile ? '14px' : 'inherit'
+                                            }}><b>Booking ID:</b> {bookingDetail.booking.id || '-'}</Typography>
+                                            <Typography sx={{ 
+                                                mb: isMobile ? 0 : 1,
+                                                fontSize: isMobile ? '14px' : 'inherit'
+                                            }}><b>Booking Created:</b> {bookingDetail.booking.created_at ? dayjs(bookingDetail.booking.created_at).format('DD/MM/YYYY') : '-'}</Typography>
+                                            <Typography sx={{ 
+                                                mb: isMobile ? 0 : 1,
+                                                fontSize: isMobile ? '14px' : 'inherit'
+                                            }}><b>Phone:</b> {editField === 'phone' ? (
                                                 <>
                                                     <input value={editValue} onChange={e => setEditValue(e.target.value)} style={{marginRight: 8}} />
                                                     <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
@@ -5550,11 +5730,45 @@ setBookingDetail(finalVoucherDetail);
                                                 </>
                                             ) : (
                                                 <>
-                                                    {bookingDetail.booking.phone || '-'}
-                                                    <IconButton size="small" onClick={() => handleEditClick('phone', bookingDetail.booking.phone)}><EditIcon fontSize="small" /></IconButton>
+                                                    {(() => {
+                                                        const phoneValue = bookingDetail.booking.phone || '-';
+                                                        // If phone value exists and is not '-', make it a clickable link
+                                                        if (phoneValue && phoneValue !== '-') {
+                                                            // Clean phone number for tel: link (remove spaces, dashes, parentheses)
+                                                            const cleanPhone = phoneValue.replace(/[\s\-()]/g, '');
+                                                            return (
+                                                                <a 
+                                                                    href={`tel:${cleanPhone}`}
+                                                                    style={{ 
+                                                                        color: '#3274b4',
+                                                                        textDecoration: 'underline',
+                                                                        cursor: 'pointer'
+                                                                    }}
+                                                                >
+                                                                    {phoneValue}
+                                                                </a>
+                                                            );
+                                                        }
+                                                        return phoneValue;
+                                                    })()}
+                                                    <IconButton 
+                                                        size="small" 
+                                                        onClick={() => handleEditClick('phone', bookingDetail.booking.phone)}
+                                                        sx={{ 
+                                                            padding: isMobile ? '2px' : '8px',
+                                                            '& .MuiSvgIcon-root': {
+                                                                fontSize: isMobile ? '12px' : 'inherit'
+                                                            }
+                                                        }}
+                                                    >
+                                                        <EditIcon fontSize={isMobile ? '12px' : 'small'} />
+                                                    </IconButton>
                                                 </>
                                             )}</Typography>
-                                            <Typography><b>Email:</b> {editField === 'email' ? (
+                                            <Typography sx={{ 
+                                                mb: isMobile ? 0 : 1,
+                                                fontSize: isMobile ? '14px' : 'inherit'
+                                            }}><b>Email:</b> {editField === 'email' ? (
                                                 <>
                                                     <input value={editValue} onChange={e => setEditValue(e.target.value)} style={{marginRight: 8}} />
                                                     <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
@@ -5562,13 +5776,51 @@ setBookingDetail(finalVoucherDetail);
                                                 </>
                                             ) : (
                                                 <>
-                                                    {bookingDetail.booking.email || '-'}
-                                                    <IconButton size="small" onClick={() => handleEditClick('email', bookingDetail.booking.email)}><EditIcon fontSize="small" /></IconButton>
+                                                    {(() => {
+                                                        const emailValue = bookingDetail.booking.email || '-';
+                                                        // If email exists and is not '-', make it a clickable link
+                                                        if (emailValue && emailValue !== '-') {
+                                                            return (
+                                                                <a 
+                                                                    href={`mailto:${emailValue}`}
+                                                                    style={{ 
+                                                                        color: '#3274b4',
+                                                                        textDecoration: 'underline',
+                                                                        cursor: 'pointer'
+                                                                    }}
+                                                                >
+                                                                    {emailValue}
+                                                                </a>
+                                                            );
+                                                        }
+                                                        return emailValue;
+                                                    })()}
+                                                    <IconButton 
+                                                        size="small" 
+                                                        onClick={() => handleEditClick('email', bookingDetail.booking.email)}
+                                                        sx={{ 
+                                                            padding: isMobile ? '2px' : '8px',
+                                                            '& .MuiSvgIcon-root': {
+                                                                fontSize: isMobile ? '12px' : 'inherit'
+                                                            }
+                                                        }}
+                                                    >
+                                                        <EditIcon fontSize={isMobile ? '12px' : 'small'} />
+                                                    </IconButton>
                                                 </>
                                             )}</Typography>
-                                            <Typography><b>Flight Attempts:</b> {bookingDetail.booking.flight_attempts ?? 0}</Typography>
-                                            <Typography><b>Voucher Type:</b> {bookingDetail.booking.voucher_type || '-'}</Typography>
-                                            <Typography><b>Paid:</b> {editField === 'paid' ? (
+                                            <Typography sx={{ 
+                                                mb: isMobile ? 0 : 1,
+                                                fontSize: isMobile ? '14px' : 'inherit'
+                                            }}><b>Flight Attempts:</b> {bookingDetail.booking.flight_attempts ?? 0}</Typography>
+                                            <Typography sx={{ 
+                                                mb: isMobile ? 0 : 1,
+                                                fontSize: isMobile ? '14px' : 'inherit'
+                                            }}><b>Voucher Type:</b> {bookingDetail.booking.voucher_type || '-'}</Typography>
+                                            <Typography sx={{ 
+                                                mb: isMobile ? 0 : 1,
+                                                fontSize: isMobile ? '14px' : 'inherit'
+                                            }}><b>Paid:</b> {editField === 'paid' ? (
                                                         <>
                                                     <input value={editValue} onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} style={{marginRight: 8}} />
                                                             <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
@@ -5577,10 +5829,24 @@ setBookingDetail(finalVoucherDetail);
                                                     ) : (
                                                         <>
                                                     £{bookingDetail.booking.paid}
-                                                    <IconButton size="small" onClick={() => handleEditClick('paid', bookingDetail.booking.paid)}><EditIcon fontSize="small" /></IconButton>
+                                                    <IconButton 
+                                                        size="small" 
+                                                        onClick={() => handleEditClick('paid', bookingDetail.booking.paid)}
+                                                        sx={{ 
+                                                            padding: isMobile ? '2px' : '8px',
+                                                            '& .MuiSvgIcon-root': {
+                                                                fontSize: isMobile ? '12px' : 'inherit'
+                                                            }
+                                                        }}
+                                                    >
+                                                        <EditIcon fontSize={isMobile ? '12px' : 'small'} />
+                                                    </IconButton>
                                                         </>
                                                     )}</Typography>
-                                                    <Typography><b>Due:</b> {editField === 'due' ? (
+                                                    <Typography sx={{ 
+                                                        mb: isMobile ? 0 : 1,
+                                                        fontSize: isMobile ? '14px' : 'inherit'
+                                                    }}><b>Due:</b> {editField === 'due' ? (
                                                         <>
                                                     <input value={editValue} onChange={e => setEditValue(e.target.value.replace(/[^0-9.]/g, ''))} style={{marginRight: 8}} />
                                                             <Button size="small" onClick={async () => {
@@ -5638,10 +5904,24 @@ setBookingDetail(finalVoucherDetail);
                                                             return `£${currentDue.toFixed(2)}`;
                                                         })()}
                                                     </span>
-                                                    <IconButton size="small" onClick={() => handleEditClick('due', bookingDetail.booking.due)}><EditIcon fontSize="small" /></IconButton>
+                                                    <IconButton 
+                                                        size="small" 
+                                                        onClick={() => handleEditClick('due', bookingDetail.booking.due)}
+                                                        sx={{ 
+                                                            padding: isMobile ? '2px' : '8px',
+                                                            '& .MuiSvgIcon-root': {
+                                                                fontSize: isMobile ? '12px' : 'inherit'
+                                                            }
+                                                        }}
+                                                    >
+                                                        <EditIcon fontSize={isMobile ? '12px' : 'small'} />
+                                                    </IconButton>
                                                         </>
                                                     )}</Typography>
-                                                    <Typography><b>Expires:</b> {editField === 'expires' ? (
+                                                    <Typography sx={{ 
+                                                        mb: isMobile ? 0 : 1,
+                                                        fontSize: isMobile ? '14px' : 'inherit'
+                                                    }}><b>Expires:</b> {editField === 'expires' ? (
                                                         <>
                                                             <LocalizationProvider dateAdapter={AdapterDayjs}>
                                                                 <DatePicker
@@ -5663,7 +5943,18 @@ setBookingDetail(finalVoucherDetail);
                                                                     return calculateExpiresDate(bookingDetail.booking.expires, flightAttempts);
                                                                 })()
                                                             ) : '-'}
-                                                            <IconButton size="small" onClick={() => handleEditClick('expires', bookingDetail.booking.expires)}><EditIcon fontSize="small" /></IconButton>
+                                                            <IconButton 
+                                                                size="small" 
+                                                                onClick={() => handleEditClick('expires', bookingDetail.booking.expires)}
+                                                                sx={{ 
+                                                                    padding: isMobile ? '2px' : '8px',
+                                                                    '& .MuiSvgIcon-root': {
+                                                                        fontSize: isMobile ? '12px' : 'inherit'
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <EditIcon fontSize={isMobile ? '12px' : 'small'} />
+                                                            </IconButton>
                                                         </>
                                                     )}</Typography>
                                                 </>
@@ -5847,7 +6138,14 @@ setBookingDetail(finalVoucherDetail);
                                                         </>
                                                     )}
                                                 </Box>
-                                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 140 }}>
+                                                <Box sx={{ 
+                                                    display: 'flex', 
+                                                    flexDirection: isMobile ? 'row' : 'column', 
+                                                    flexWrap: isMobile ? 'wrap' : 'nowrap',
+                                                    gap: isMobile ? '8px' : 1, 
+                                                    minWidth: isMobile ? 'auto' : 140,
+                                                    width: isMobile ? '100%' : 'auto'
+                                                }}>
                                                     {(() => {
                                                         const v = bookingDetail?.voucher || {};
                                                         // For Gift Voucher: show "Redeem", for Flight Voucher: show "Rebook"
@@ -5855,11 +6153,60 @@ setBookingDetail(finalVoucherDetail);
                                                         const isFlightVoucher = !isGiftVoucher && (v?.voucher_type && typeof v.voucher_type === 'string' && v.voucher_type.toLowerCase().includes('flight'));
                                                         const label = isGiftVoucher ? 'Redeem' : 'Rebook';
                                                         return (
-                                                            <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleRebook}>{label}</Button>
+                                                            <Button 
+                                                                variant="contained" 
+                                                                color="primary" 
+                                                                sx={{ 
+                                                                    mb: isMobile ? 0 : 1, 
+                                                                    borderRadius: 2, 
+                                                                    fontWeight: 600, 
+                                                                    textTransform: 'none',
+                                                                    flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                                    minWidth: isMobile ? 'auto' : 'auto',
+                                                                    fontSize: isMobile ? '12px' : '14px',
+                                                                    padding: isMobile ? '6px 8px' : '8px 16px'
+                                                                }} 
+                                                                onClick={handleRebook}
+                                                            >
+                                                                {label}
+                                                            </Button>
                                                         );
                                                     })()}
-                                                    <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleAddGuestClick}>Add Guest</Button>
-                                                    <Button variant="contained" color="info" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d' }} onClick={handleCancelFlight}>Cancel Flight</Button>
+                                                    <Button 
+                                                        variant="contained" 
+                                                        color="primary" 
+                                                        sx={{ 
+                                                            mb: isMobile ? 0 : 1, 
+                                                            borderRadius: 2, 
+                                                            fontWeight: 600, 
+                                                            textTransform: 'none',
+                                                            flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                            minWidth: isMobile ? 'auto' : 'auto',
+                                                            fontSize: isMobile ? '12px' : '14px',
+                                                            padding: isMobile ? '6px 8px' : '8px 16px'
+                                                        }} 
+                                                        onClick={handleAddGuestClick}
+                                                    >
+                                                        Add Guest
+                                                    </Button>
+                                                    <Button 
+                                                        variant="contained" 
+                                                        color="info" 
+                                                        sx={{ 
+                                                            mb: isMobile ? 0 : 1, 
+                                                            borderRadius: 2, 
+                                                            fontWeight: 600, 
+                                                            textTransform: 'none', 
+                                                            background: '#6c757d',
+                                                            flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                            minWidth: isMobile ? 'auto' : 'auto',
+                                                            fontSize: isMobile ? '12px' : '14px',
+                                                            padding: isMobile ? '6px 8px' : '8px 16px'
+                                                        }} 
+                                                        onClick={handleCancelFlight}
+                                                    >
+                                                        Cancel Flight
+                                                    </Button>
                                                     {(() => {
                                                         const v = bookingDetail?.voucher || {};
                                                         const isGiftVoucher = v?.book_flight === 'Gift Voucher';
@@ -5886,7 +6233,17 @@ setBookingDetail(finalVoucherDetail);
                                                             <Button
                                                                 variant="contained"
                                                                 color="success"
-                                                                sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#28a745' }}
+                                                                sx={{ 
+                                                                    borderRadius: 2, 
+                                                                    fontWeight: 600, 
+                                                                    textTransform: 'none', 
+                                                                    background: '#28a745',
+                                                                    mb: isMobile ? 0 : 1,
+                                                                    flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                                    minWidth: isMobile ? 'auto' : 'auto',
+                                                                    fontSize: isMobile ? '12px' : '14px',
+                                                                    padding: isMobile ? '6px 8px' : '8px 16px'
+                                                                }}
                                                                 onClick={emailHandler}
                                                                 disabled={
                                                                     (isFlightVoucher && !v?.email && !bookingDetail?.booking?.email) ||
@@ -6033,7 +6390,17 @@ setBookingDetail(finalVoucherDetail);
                                                             <Button
                                                                 variant="contained"
                                                                 color="info"
-                                                                sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#17a2b8' }}
+                                                                sx={{ 
+                                                                    borderRadius: 2, 
+                                                                    fontWeight: 600, 
+                                                                    textTransform: 'none', 
+                                                                    background: '#17a2b8',
+                                                                    mb: isMobile ? 0 : 1,
+                                                                    flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                                    minWidth: isMobile ? 'auto' : 'auto',
+                                                                    fontSize: isMobile ? '12px' : '14px',
+                                                                    padding: isMobile ? '6px 8px' : '8px 16px'
+                                                                }}
                                                                 onClick={smsHandler}
                                                                 disabled={!hasPhone}
                                                             >
@@ -6062,7 +6429,17 @@ setBookingDetail(finalVoucherDetail);
                                                     <Button
                                                         variant="contained"
                                                         color="secondary"
-                                                        sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#17a2b8' }}
+                                                        sx={{ 
+                                                            borderRadius: 2, 
+                                                            fontWeight: 600, 
+                                                            textTransform: 'none', 
+                                                            background: '#17a2b8',
+                                                            mb: isMobile ? 0 : 1,
+                                                            flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                            minWidth: isMobile ? 'auto' : 'auto',
+                                                            fontSize: isMobile ? '12px' : '14px',
+                                                            padding: isMobile ? '6px 8px' : '8px 16px'
+                                                        }}
                                                                 onClick={() => target && messageHandler(target)}
                                                                 disabled={!target}
                                                     >
@@ -6071,7 +6448,18 @@ setBookingDetail(finalVoucherDetail);
                                                     <Button
                                                         variant="contained"
                                                         color="info"
-                                                        sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d', mt: 1 }}
+                                                        sx={{ 
+                                                            borderRadius: 2, 
+                                                            fontWeight: 600, 
+                                                            textTransform: 'none', 
+                                                            background: '#6c757d', 
+                                                            mt: isMobile ? 0 : 1,
+                                                            mb: isMobile ? 0 : 1,
+                                                            flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                            minWidth: isMobile ? 'auto' : 'auto',
+                                                            fontSize: isMobile ? '12px' : '14px',
+                                                            padding: isMobile ? '6px 8px' : '8px 16px'
+                                                        }}
                                                         onClick={() => {
                                                             // For vouchers, prioritize voucher ID/ref for payment history
                                                             // Voucher payment history includes voucher's own payment (all_vouchers.paid)
@@ -6096,7 +6484,17 @@ setBookingDetail(finalVoucherDetail);
                                                     <Button
                                                         variant="contained"
                                                         color="info"
-                                                        sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d', mt: 1 }}
+                                                        sx={{ 
+                                                            borderRadius: 2, 
+                                                            fontWeight: 600, 
+                                                            textTransform: 'none', 
+                                                            background: '#6c757d', 
+                                                            mt: isMobile ? 0 : 1,
+                                                            flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                            minWidth: isMobile ? 'auto' : 'auto',
+                                                            fontSize: isMobile ? '12px' : '14px',
+                                                            padding: isMobile ? '6px 8px' : '8px 16px'
+                                                        }}
                                                         onClick={() => {
                                                             // For vouchers, use linked booking_id; for bookings, use booking.id
                                                             const linkedBookingId = bookingDetail?.voucher?.booking_id || bookingDetail?.booking?.id;
@@ -6443,6 +6841,88 @@ setBookingDetail(finalVoucherDetail);
                                                     </Box>
                                                 );
                                             })()}
+                                            {/* HISTORY SECTION - Mobile: Below Passenger Details, Desktop: After Additional Information */}
+                                            {activeTab !== 'vouchers' && (
+                                                <Box sx={{ 
+                                                    background: '#e0e0e0', 
+                                                    borderRadius: 2, 
+                                                    p: isMobile ? 1.5 : 2, 
+                                                    mt: isMobile ? 2 : 0,
+                                                    mb: isMobile ? 2 : 2,
+                                                    display: isMobile ? 'block' : 'none' // Show on mobile, hide on desktop (desktop version is below)
+                                                }} className="booking-history-section">
+                                                    <Typography variant="h6" sx={{ 
+                                                        fontWeight: 700, 
+                                                        mb: isMobile ? 1 : 2,
+                                                        fontSize: isMobile ? '16px' : 'inherit'
+                                                    }}>History</Typography>
+                                                    <TableContainer component={Box} className="booking-history-table-container" sx={{
+                                                        maxHeight: isMobile ? '300px' : 'none',
+                                                        overflowX: isMobile ? 'auto' : 'visible',
+                                                        overflowY: isMobile ? 'auto' : 'visible'
+                                                    }}>
+                                                    <Table className="booking-history-table" sx={{
+                                                        minWidth: isMobile ? '500px' : 'auto',
+                                                        fontSize: isMobile ? '12px' : 'inherit'
+                                                    }}>
+                                                        <TableHead>
+                                                            <TableRow>
+                                                                <TableCell sx={{ 
+                                                                    fontSize: isMobile ? '11px' : 'inherit',
+                                                                    padding: isMobile ? '6px 4px' : '16px',
+                                                                    fontWeight: 600
+                                                                }}>Booking Date</TableCell>
+                                                                <TableCell sx={{ 
+                                                                    fontSize: isMobile ? '11px' : 'inherit',
+                                                                    padding: isMobile ? '6px 4px' : '16px',
+                                                                    fontWeight: 600
+                                                                }}>Activity Type</TableCell>
+                                                                <TableCell sx={{ 
+                                                                    fontSize: isMobile ? '11px' : 'inherit',
+                                                                    padding: isMobile ? '6px 4px' : '16px',
+                                                                    fontWeight: 600
+                                                                }}>Location</TableCell>
+                                                                <TableCell sx={{ 
+                                                                    fontSize: isMobile ? '11px' : 'inherit',
+                                                                    padding: isMobile ? '6px 4px' : '16px',
+                                                                    fontWeight: 600
+                                                                }}>Status</TableCell>
+                                                            </TableRow>
+                                                        </TableHead>
+                                                        <TableBody>
+                                                            {historyRows.map((h, i) => (
+                                                                <TableRow key={i}>
+                                                                    <TableCell sx={{ 
+                                                                        fontSize: isMobile ? '11px' : 'inherit',
+                                                                        padding: isMobile ? '6px 4px' : '16px'
+                                                                    }}>{h.flight_date ? dayjs(h.flight_date).format('DD/MM/YYYY HH:mm') : (h.changed_at ? dayjs(h.changed_at).format('DD/MM/YYYY HH:mm') : '-')}</TableCell>
+                                                                    <TableCell sx={{ 
+                                                                        fontSize: isMobile ? '11px' : 'inherit',
+                                                                        padding: isMobile ? '6px 4px' : '16px'
+                                                                    }}>{bookingDetail.booking?.flight_type || '-'}</TableCell>
+                                                                    <TableCell sx={{ 
+                                                                        fontSize: isMobile ? '11px' : 'inherit',
+                                                                        padding: isMobile ? '6px 4px' : '16px'
+                                                                    }}>{bookingDetail.booking?.location || '-'}</TableCell>
+                                                                    <TableCell sx={{ 
+                                                                        fontSize: isMobile ? '11px' : 'inherit',
+                                                                        padding: isMobile ? '6px 4px' : '16px'
+                                                                    }}>{h.status || 'Scheduled'}</TableCell>
+                                                                </TableRow>
+                                                            ))}
+                                                            {historyRows.length === 0 && (
+                                                                <TableRow>
+                                                                    <TableCell colSpan={4} align="center" sx={{ 
+                                                                        fontSize: isMobile ? '11px' : 'inherit',
+                                                                        padding: isMobile ? '6px 4px' : '16px'
+                                                                    }}>No history yet</TableCell>
+                                                                </TableRow>
+                                                            )}
+                                                        </TableBody>
+                                                    </Table>
+                                                    </TableContainer>
+                                                </Box>
+                                            )}
                                             {/* Recipient Details (Gift Voucher) above Notes */}
                                             {(() => {
                                                 const v = bookingDetail.voucher || {};
@@ -6844,8 +7324,8 @@ setBookingDetail(finalVoucherDetail);
                                             )}
                                             
                                             <Divider sx={{ my: 2 }} />
-                                            {/* HISTORY SECTION - Only for bookings, not vouchers */}
-                                            {activeTab !== 'vouchers' && (
+                                            {/* HISTORY SECTION - Desktop: After Additional Information (hidden on mobile, shown above) */}
+                                            {!isMobile && activeTab !== 'vouchers' && (
                                             <Box sx={{ background: '#e0e0e0', borderRadius: 2, p: 2, mt: 2, mb: 2 }} className="booking-history-section">
                                                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>History</Typography>
                                                 <TableContainer component={Box} className="booking-history-table-container">
