@@ -8058,16 +8058,29 @@ const Settings = () => {
                         maxHeight: 'calc(100vh - 16px)',
                         margin: '0',
                         borderRadius: '8px'
-                    } : {}}>
+                    } : {
+                        maxWidth: '800px',
+                        width: '90%',
+                        maxHeight: '90vh',
+                        overflow: 'auto'
+                    }}>
                         <div className="modal-header" style={isMobile ? {
                             padding: '10px 12px',
                             borderBottom: '1px solid #e5e7eb'
-                        } : {}}>
+                        } : {
+                            padding: '20px 24px',
+                            borderBottom: '1px solid #e5e7eb'
+                        }}>
                             <h3 style={isMobile ? {
                                 fontSize: '14px',
                                 fontWeight: 600,
                                 margin: 0
-                            } : {}}>{showEditAdditionalInfoForm ? 'Edit Question' : 'Create New Question'}</h3>
+                            } : {
+                                fontSize: '20px',
+                                fontWeight: 600,
+                                margin: 0,
+                                color: '#1f2937'
+                            }}>{showEditAdditionalInfoForm ? 'Edit Question' : 'Create New Question'}</h3>
                             <button 
                                 className="close-btn"
                                 onClick={() => {
@@ -8079,7 +8092,11 @@ const Settings = () => {
                                     fontSize: '18px',
                                     width: '24px',
                                     height: '24px'
-                                } : {}}
+                                } : {
+                                    fontSize: '24px',
+                                    width: '32px',
+                                    height: '32px'
+                                }}
                             >
                                 ×
                             </button>
@@ -8087,21 +8104,36 @@ const Settings = () => {
                         
                         <form onSubmit={handleAdditionalInfoSubmit} className="additional-info-form" style={isMobile ? {
                             padding: '12px'
-                        } : {}}>
+                        } : {
+                            padding: '24px'
+                        }}>
                             <div className="form-row" style={isMobile ? {
                                 display: 'flex',
                                 flexDirection: 'column',
                                 gap: '8px',
                                 marginBottom: '12px'
-                            } : {}}>
+                            } : {
+                                display: 'flex',
+                                gap: '20px',
+                                marginBottom: '20px'
+                            }}>
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    flex: 1,
+                                    marginBottom: 0
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Question Text *</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Question Text *</label>
                                     <input
                                         type="text"
                                         value={additionalInfoFormData.question_text}
@@ -8113,19 +8145,36 @@ const Settings = () => {
                                             fontSize: '13px',
                                             borderRadius: '4px',
                                             height: '32px',
+                                            boxSizing: 'border-box',
+                                            width: '100%'
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
                                             boxSizing: 'border-box'
-                                        } : {}}
+                                        }}
                                     />
                                 </div>
                                 
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    flex: 1,
+                                    marginBottom: 0
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Question Type *</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Question Type *</label>
                                     <select
                                         value={additionalInfoFormData.question_type}
                                         onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, question_type: e.target.value})}
@@ -8137,7 +8186,16 @@ const Settings = () => {
                                             width: '100%',
                                             height: '32px',
                                             boxSizing: 'border-box'
-                                        } : {}}
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
+                                            boxSizing: 'border-box',
+                                            backgroundColor: '#fff',
+                                            cursor: 'pointer'
+                                        }}
                                     >
                                         <option value="dropdown">Dropdown</option>
                                         <option value="text">Text Input</option>
@@ -8152,15 +8210,28 @@ const Settings = () => {
                                 flexDirection: 'column',
                                 gap: '8px',
                                 marginBottom: '12px'
-                            } : {}}>
+                            } : {
+                                display: 'flex',
+                                gap: '20px',
+                                marginBottom: '20px'
+                            }}>
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    flex: 1,
+                                    marginBottom: 0
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Category</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Category</label>
                                     <select
                                         value={additionalInfoFormData.category}
                                         onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, category: e.target.value})}
@@ -8171,7 +8242,16 @@ const Settings = () => {
                                             width: '100%',
                                             height: '32px',
                                             boxSizing: 'border-box'
-                                        } : {}}
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
+                                            boxSizing: 'border-box',
+                                            backgroundColor: '#fff',
+                                            cursor: 'pointer'
+                                        }}
                                     >
                                         <option value="General">General</option>
                                         <option value="Communication">Communication</option>
@@ -8183,12 +8263,21 @@ const Settings = () => {
                                 
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    flex: 1,
+                                    marginBottom: 0
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Sort Order</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Sort Order</label>
                                     <input
                                         type="number"
                                         value={additionalInfoFormData.sort_order}
@@ -8200,8 +8289,16 @@ const Settings = () => {
                                             fontSize: '13px',
                                             borderRadius: '4px',
                                             height: '32px',
+                                            boxSizing: 'border-box',
+                                            width: '100%'
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
                                             boxSizing: 'border-box'
-                                        } : {}}
+                                        }}
                                     />
                                 </div>
                             </div>
@@ -8211,15 +8308,28 @@ const Settings = () => {
                                 flexDirection: 'column',
                                 gap: '8px',
                                 marginBottom: '12px'
-                            } : {}}>
+                            } : {
+                                display: 'flex',
+                                gap: '20px',
+                                marginBottom: '20px'
+                            }}>
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    flex: 1,
+                                    marginBottom: 0
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Required Field</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Required Field</label>
                                     <select
                                         value={additionalInfoFormData.is_required}
                                         onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, is_required: e.target.value === 'true'})}
@@ -8230,7 +8340,16 @@ const Settings = () => {
                                             width: '100%',
                                             height: '32px',
                                             boxSizing: 'border-box'
-                                        } : {}}
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
+                                            boxSizing: 'border-box',
+                                            backgroundColor: '#fff',
+                                            cursor: 'pointer'
+                                        }}
                                     >
                                         <option value={true}>Required</option>
                                     </select>
@@ -8238,12 +8357,21 @@ const Settings = () => {
                                 
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    flex: 1,
+                                    marginBottom: 0
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Status</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Status</label>
                                     <select
                                         value={additionalInfoFormData.is_active}
                                         onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, is_active: e.target.value === 'true'})}
@@ -8254,7 +8382,16 @@ const Settings = () => {
                                             width: '100%',
                                             height: '32px',
                                             boxSizing: 'border-box'
-                                        } : {}}
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
+                                            boxSizing: 'border-box',
+                                            backgroundColor: '#fff',
+                                            cursor: 'pointer'
+                                        }}
                                     >
                                         <option value={true}>Active</option>
                                         <option value={false}>Inactive</option>
@@ -8264,12 +8401,20 @@ const Settings = () => {
                             
                             <div className="form-group" style={isMobile ? {
                                 marginBottom: '12px'
-                            } : {}}>
+                            } : {
+                                marginBottom: '20px'
+                            }}>
                                 <label style={isMobile ? {
                                     fontSize: '11px',
                                     marginBottom: '4px',
                                     fontWeight: 600
-                                } : {}}>Journey Types *</label>
+                                } : {
+                                    display: 'block',
+                                    marginBottom: '8px',
+                                    fontWeight: 500,
+                                    color: '#374151',
+                                    fontSize: '14px'
+                                }}>Journey Types *</label>
                                 <div style={isMobile ? {
                                     border: '1px solid #d1d5db', 
                                     borderRadius: '6px', 
@@ -8325,7 +8470,10 @@ const Settings = () => {
                                                     width: '14px',
                                                     height: '14px'
                                                 } : {
-                                                    marginRight: '8px'
+                                                    marginRight: '8px',
+                                                    width: '18px',
+                                                    height: '18px',
+                                                    cursor: 'pointer'
                                                 }}
                                             />
                                             <span style={isMobile ? {
@@ -8355,12 +8503,20 @@ const Settings = () => {
                             
                             <div className="form-group" style={isMobile ? {
                                 marginBottom: '12px'
-                            } : {}}>
+                            } : {
+                                marginBottom: '20px'
+                            }}>
                                 <label style={isMobile ? {
                                     fontSize: '11px',
                                     marginBottom: '4px',
                                     fontWeight: 600
-                                } : {}}>Locations *</label>
+                                } : {
+                                    display: 'block',
+                                    marginBottom: '8px',
+                                    fontWeight: 500,
+                                    color: '#374151',
+                                    fontSize: '14px'
+                                }}>Locations *</label>
                                 <div style={isMobile ? {
                                     border: '1px solid #d1d5db', 
                                     borderRadius: '6px', 
@@ -8416,7 +8572,10 @@ const Settings = () => {
                                                     width: '14px',
                                                     height: '14px'
                                                 } : {
-                                                    marginRight: '8px'
+                                                    marginRight: '8px',
+                                                    width: '18px',
+                                                    height: '18px',
+                                                    cursor: 'pointer'
                                                 }}
                                             />
                                             <span style={isMobile ? {
@@ -8446,12 +8605,20 @@ const Settings = () => {
                             
                             <div className="form-group" style={isMobile ? {
                                 marginBottom: '12px'
-                            } : {}}>
+                            } : {
+                                marginBottom: '20px'
+                            }}>
                                 <label style={isMobile ? {
                                     fontSize: '11px',
                                     marginBottom: '4px',
                                     fontWeight: 600
-                                } : {}}>Experience Types *</label>
+                                } : {
+                                    display: 'block',
+                                    marginBottom: '8px',
+                                    fontWeight: 500,
+                                    color: '#374151',
+                                    fontSize: '14px'
+                                }}>Experience Types *</label>
                                 <div style={isMobile ? {
                                     border: '1px solid #d1d5db', 
                                     borderRadius: '6px', 
@@ -8507,7 +8674,10 @@ const Settings = () => {
                                                     width: '14px',
                                                     height: '14px'
                                                 } : {
-                                                    marginRight: '8px'
+                                                    marginRight: '8px',
+                                                    width: '18px',
+                                                    height: '18px',
+                                                    cursor: 'pointer'
                                                 }}
                                             />
                                             <span style={isMobile ? {
@@ -8538,12 +8708,20 @@ const Settings = () => {
                             {(additionalInfoFormData.question_type === 'dropdown' || additionalInfoFormData.question_type === 'radio' || additionalInfoFormData.question_type === 'checkbox') && (
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    marginBottom: '20px'
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Options (JSON array)</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Options (JSON array)</label>
                                     <textarea
                                         value={additionalInfoFormData.options}
                                         onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, options: e.target.value})}
@@ -8556,9 +8734,17 @@ const Settings = () => {
                                             borderRadius: '4px',
                                             minHeight: '60px',
                                             resize: 'vertical',
-                                            boxSizing: 'border-box'
+                                            boxSizing: 'border-box',
+                                            width: '100%'
                                         } : {
-                                            fontFamily: 'monospace'
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
+                                            resize: 'vertical',
+                                            fontFamily: 'monospace',
+                                            boxSizing: 'border-box'
                                         }}
                                     />
                                     <div style={isMobile ? {
@@ -8578,12 +8764,20 @@ const Settings = () => {
                             {additionalInfoFormData.question_type === 'text' && (
                                 <div className="form-group" style={isMobile ? {
                                     marginBottom: '12px'
-                                } : {}}>
+                                } : {
+                                    marginBottom: '20px'
+                                }}>
                                     <label style={isMobile ? {
                                         fontSize: '11px',
                                         marginBottom: '4px',
                                         fontWeight: 600
-                                    } : {}}>Placeholder Text</label>
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Placeholder Text</label>
                                     <input
                                         type="text"
                                         value={additionalInfoFormData.placeholder_text}
@@ -8594,20 +8788,36 @@ const Settings = () => {
                                             fontSize: '13px',
                                             borderRadius: '4px',
                                             height: '32px',
+                                            boxSizing: 'border-box',
+                                            width: '100%'
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
                                             boxSizing: 'border-box'
-                                        } : {}}
+                                        }}
                                     />
                                 </div>
                             )}
                             
                             <div className="form-group" style={isMobile ? {
                                 marginBottom: '12px'
-                            } : {}}>
+                            } : {
+                                marginBottom: '20px'
+                            }}>
                                 <label style={isMobile ? {
                                     fontSize: '11px',
                                     marginBottom: '4px',
                                     fontWeight: 600
-                                } : {}}>Help Text</label>
+                                } : {
+                                    display: 'block',
+                                    marginBottom: '8px',
+                                    fontWeight: 500,
+                                    color: '#374151',
+                                    fontSize: '14px'
+                                }}>Help Text</label>
                                 <textarea
                                     value={additionalInfoFormData.help_text}
                                     onChange={(e) => setAdditionalInfoFormData({...additionalInfoFormData, help_text: e.target.value})}
@@ -8619,8 +8829,18 @@ const Settings = () => {
                                         borderRadius: '4px',
                                         minHeight: '60px',
                                         resize: 'vertical',
+                                        boxSizing: 'border-box',
+                                        width: '100%'
+                                    } : {
+                                        width: '100%',
+                                        padding: '10px 12px',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '6px',
+                                        fontSize: '14px',
+                                        resize: 'vertical',
+                                        fontFamily: 'inherit',
                                         boxSizing: 'border-box'
-                                    } : {}}
+                                    }}
                                 />
                             </div>
                             
@@ -8631,7 +8851,14 @@ const Settings = () => {
                                 paddingTop: '12px',
                                 marginTop: '12px',
                                 borderTop: '1px solid #e5e7eb'
-                            } : {}}>
+                            } : {
+                                borderTop: '1px solid #e5e7eb',
+                                padding: '16px 24px',
+                                display: 'flex',
+                                justifyContent: 'flex-end',
+                                gap: '12px',
+                                marginTop: '20px'
+                            }}>
                                 <button type="button" className="btn btn-secondary" onClick={() => {
                                     setShowAdditionalInfoForm(false);
                                     setShowEditAdditionalInfoForm(false);
@@ -8642,7 +8869,11 @@ const Settings = () => {
                                     width: '100%',
                                     borderRadius: '4px',
                                     height: '36px'
-                                } : {}}>
+                                } : {
+                                    padding: '8px 20px',
+                                    fontSize: '14px',
+                                    borderRadius: '6px'
+                                }}>
                                     Cancel
                                 </button>
                                 <button type="submit" className="btn btn-primary" style={isMobile ? {
@@ -8651,7 +8882,11 @@ const Settings = () => {
                                     width: '100%',
                                     borderRadius: '4px',
                                     height: '36px'
-                                } : {}}>
+                                } : {
+                                    padding: '8px 20px',
+                                    fontSize: '14px',
+                                    borderRadius: '6px'
+                                }}>
                                     {showEditAdditionalInfoForm ? 'Update Question' : 'Create Question'}
                                 </button>
                             </div>
