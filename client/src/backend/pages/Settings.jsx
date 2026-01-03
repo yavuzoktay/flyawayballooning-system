@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useTransition } from 'react';
 import axios from 'axios';
+import dayjs from 'dayjs';
 import { 
     Plus, 
     Edit, 
@@ -748,8 +749,8 @@ const Settings = () => {
     const [formData, setFormData] = useState({
         code: '',
         title: '',
-        valid_from: '',
-        valid_until: '',
+        valid_from: dayjs().format('YYYY-MM-DD'),
+        valid_until: dayjs().format('YYYY-MM-DD'),
         max_uses: '',
         applicable_locations: '',
         applicable_experiences: '',
@@ -2148,8 +2149,8 @@ const Settings = () => {
         setFormData({
             code: '',
             title: '',
-            valid_from: '',
-            valid_until: '',
+            valid_from: dayjs().format('YYYY-MM-DD'),
+            valid_until: dayjs().format('YYYY-MM-DD'),
             max_uses: '',
             applicable_locations: '',
             applicable_experiences: '',
