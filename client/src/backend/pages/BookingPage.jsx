@@ -6385,7 +6385,11 @@ setBookingDetail(finalVoucherDetail);
                                                                     flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
                                                                     minWidth: isMobile ? 'auto' : 'auto',
                                                                     fontSize: isMobile ? '12px' : '14px',
-                                                                    padding: isMobile ? '6px 8px' : '8px 16px'
+                                                                    padding: isMobile ? '6px 8px' : '8px 16px',
+                                                                    background: '#2ECC71',
+                                                                    '&:hover': {
+                                                                        background: '#27AE60'
+                                                                    }
                                                                 }} 
                                                                 onClick={handleRebook}
                                                             >
@@ -6404,7 +6408,11 @@ setBookingDetail(finalVoucherDetail);
                                                             flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
                                                             minWidth: isMobile ? 'auto' : 'auto',
                                                             fontSize: isMobile ? '12px' : '14px',
-                                                            padding: isMobile ? '6px 8px' : '8px 16px'
+                                                            padding: isMobile ? '6px 8px' : '8px 16px',
+                                                            background: '#1ABC9C',
+                                                            '&:hover': {
+                                                                background: '#16A085'
+                                                            }
                                                         }} 
                                                         onClick={handleAddGuestClick}
                                                     >
@@ -6418,11 +6426,14 @@ setBookingDetail(finalVoucherDetail);
                                                             borderRadius: 2, 
                                                             fontWeight: 600, 
                                                             textTransform: 'none', 
-                                                            background: '#6c757d',
+                                                            background: '#E74C3C',
                                                             flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
                                                             minWidth: isMobile ? 'auto' : 'auto',
                                                             fontSize: isMobile ? '12px' : '14px',
-                                                            padding: isMobile ? '6px 8px' : '8px 16px'
+                                                            padding: isMobile ? '6px 8px' : '8px 16px',
+                                                            '&:hover': {
+                                                                background: '#C0392B'
+                                                            }
                                                         }} 
                                                         onClick={handleCancelFlight}
                                                     >
@@ -6458,12 +6469,15 @@ setBookingDetail(finalVoucherDetail);
                                                                     borderRadius: 2, 
                                                                     fontWeight: 600, 
                                                                     textTransform: 'none', 
-                                                                    background: '#28a745',
+                                                                    background: '#3498DB',
                                                                     mb: isMobile ? 0 : 1,
                                                                     flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
                                                                     minWidth: isMobile ? 'auto' : 'auto',
                                                                     fontSize: isMobile ? '12px' : '14px',
-                                                                    padding: isMobile ? '6px 8px' : '8px 16px'
+                                                                    padding: isMobile ? '6px 8px' : '8px 16px',
+                                                                    '&:hover': {
+                                                                        background: '#2980B9'
+                                                                    }
                                                                 }}
                                                                 onClick={emailHandler}
                                                                 disabled={
@@ -6615,12 +6629,15 @@ setBookingDetail(finalVoucherDetail);
                                                                     borderRadius: 2, 
                                                                     fontWeight: 600, 
                                                                     textTransform: 'none', 
-                                                                    background: '#17a2b8',
+                                                                    background: '#3498DB',
                                                                     mb: isMobile ? 0 : 1,
                                                                     flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
                                                                     minWidth: isMobile ? 'auto' : 'auto',
                                                                     fontSize: isMobile ? '12px' : '14px',
-                                                                    padding: isMobile ? '6px 8px' : '8px 16px'
+                                                                    padding: isMobile ? '6px 8px' : '8px 16px',
+                                                                    '&:hover': {
+                                                                        background: '#2980B9'
+                                                                    }
                                                                 }}
                                                                 onClick={smsHandler}
                                                                 disabled={!hasPhone}
@@ -6654,12 +6671,15 @@ setBookingDetail(finalVoucherDetail);
                                                             borderRadius: 2, 
                                                             fontWeight: 600, 
                                                             textTransform: 'none', 
-                                                            background: '#17a2b8',
+                                                            background: '#5B6CFF',
                                                             mb: isMobile ? 0 : 1,
                                                             flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
                                                             minWidth: isMobile ? 'auto' : 'auto',
                                                             fontSize: isMobile ? '12px' : '14px',
-                                                            padding: isMobile ? '6px 8px' : '8px 16px'
+                                                            padding: isMobile ? '6px 8px' : '8px 16px',
+                                                            '&:hover': {
+                                                                background: '#4A5AE8'
+                                                            }
                                                         }}
                                                                 onClick={() => target && messageHandler(target)}
                                                                 disabled={!target}
@@ -6673,13 +6693,16 @@ setBookingDetail(finalVoucherDetail);
                                                             borderRadius: 2, 
                                                             fontWeight: 600, 
                                                             textTransform: 'none', 
-                                                            background: '#6c757d', 
+                                                            background: '#8E44AD', 
                                                             mt: isMobile ? 0 : 1,
                                                             mb: isMobile ? 0 : 1,
                                                             flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
                                                             minWidth: isMobile ? 'auto' : 'auto',
                                                             fontSize: isMobile ? '12px' : '14px',
-                                                            padding: isMobile ? '6px 8px' : '8px 16px'
+                                                            padding: isMobile ? '6px 8px' : '8px 16px',
+                                                            '&:hover': {
+                                                                background: '#7D3C98'
+                                                            }
                                                         }}
                                                         onClick={() => {
                                                             // For vouchers, prioritize voucher ID/ref for payment history
@@ -6709,12 +6732,15 @@ setBookingDetail(finalVoucherDetail);
                                                             borderRadius: 2, 
                                                             fontWeight: 600, 
                                                             textTransform: 'none', 
-                                                            background: '#6c757d', 
+                                                            background: '#7F8C8D', 
                                                             mt: isMobile ? 0 : 1,
                                                             flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
                                                             minWidth: isMobile ? 'auto' : 'auto',
                                                             fontSize: isMobile ? '12px' : '14px',
-                                                            padding: isMobile ? '6px 8px' : '8px 16px'
+                                                            padding: isMobile ? '6px 8px' : '8px 16px',
+                                                            '&:hover': {
+                                                                background: '#6C7A7B'
+                                                            }
                                                         }}
                                                         onClick={() => {
                                                             // For vouchers, use linked booking_id; for bookings, use booking.id
@@ -8778,8 +8804,8 @@ setBookingDetail(finalVoucherDetail);
                     }}>
                         <Button 
                             onClick={() => {
-                                setPaymentHistoryModalOpen(false);
-                                setExpandedPaymentIds({});
+                            setPaymentHistoryModalOpen(false);
+                            setExpandedPaymentIds({});
                             }} 
                             sx={{ 
                                 fontSize: isMobile ? 14 : '14px', 
