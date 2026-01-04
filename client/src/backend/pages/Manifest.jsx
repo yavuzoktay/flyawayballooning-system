@@ -4457,6 +4457,10 @@ const Manifest = () => {
                                                                                 value: newStatus
                                                                             });
                                                                             setFlights(prev => prev.map(f => f.id === flight.id ? { ...f, status: newStatus } : f));
+                                                                            // Refetch booking data to ensure backend changes are reflected
+                                                                            if (typeof bookingHook.refetch === 'function') {
+                                                                                await bookingHook.refetch();
+                                                                            }
                                                                         }}
                                                                         size="small"
                                                                         variant="standard"

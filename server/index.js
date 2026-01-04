@@ -6813,22 +6813,31 @@ app.get('/api/getAllBookingData', (req, res) => {
             }
 
             // If flight_date is set, status should be 'Scheduled' (not 'Open')
+            // BUT: Preserve existing statuses like 'Flown', 'Checked In', 'No Show', 'Cancelled'
             let finalStatus = rest.status;
             const hasFlightDate = rest.flight_date && rest.flight_date !== null && rest.flight_date !== '' && rest.flight_date !== '0000-00-00 00:00:00' && rest.flight_date !== 'null';
             
-            if (hasFlightDate && (finalStatus === 'Open' || finalStatus === null || finalStatus === '')) {
-                finalStatus = 'Scheduled';
-                // Update database if booking exists
-                if (rest.id) {
-                    con.query('UPDATE all_booking SET status = ? WHERE id = ?', ['Scheduled', rest.id], (updateErr) => {
-                        if (updateErr) {
-                            console.warn('Failed to update status to Scheduled for booking with flight_date', rest.id, updateErr.message);
-                        } else {
-                            console.log('✅ Updated status to Scheduled for booking with flight_date:', rest.id);
-                        }
-                    });
-                }
-            }
+            // Only override status to 'Scheduled' if it's 'Open', null, or empty
+            // Preserve all other statuses (Flown, Checked In, No Show, Cancelled, etc.)
+            const preserveStatuses = ['Flown', 'Checked In', 'No Show', 'Cancelled', 'Scheduled', 'Completed', 'Pending'];
+            const shouldPreserveStatus = finalStatus && preserveStatuses.includes(finalStatus);
+            
+            // REMOVED: Status override logic that was changing 'Flown' to 'Scheduled'
+            // This was causing the bug where status 'Flown' was being overridden
+            // Status should only be set to 'Scheduled' when explicitly updating, not during read operations
+            // if (hasFlightDate && !shouldPreserveStatus && (finalStatus === 'Open' || finalStatus === null || finalStatus === '')) {
+            //     finalStatus = 'Scheduled';
+            //     // Update database if booking exists
+            //     if (rest.id) {
+            //         con.query('UPDATE all_booking SET status = ? WHERE id = ?', ['Scheduled', rest.id], (updateErr) => {
+            //             if (updateErr) {
+            //                 console.warn('Failed to update status to Scheduled for booking with flight_date', rest.id, updateErr.message);
+            //             } else {
+            //                 console.log('✅ Updated status to Scheduled for booking with flight_date:', rest.id);
+            //             }
+            //         });
+            //     }
+            // }
             
             // For Redeem Voucher bookings, if status is still 'Open', change it to 'Scheduled'
             if (flight_type_source === 'Redeem Voucher' && finalStatus === 'Open') {
@@ -15196,6 +15205,15 @@ app.patch('/api/updateBookingField', (req, res) => {
                     normalizedValue = 'Completed';
                 } else if (statusLower === 'pending') {
                     normalizedValue = 'Pending';
+                } else if (statusLower === 'flown') {
+                    normalizedValue = 'Flown';
+                } else if (statusLower === 'checked in' || statusLower === 'checkedin') {
+                    normalizedValue = 'Checked In';
+                } else if (statusLower === 'no show' || statusLower === 'noshow') {
+                    normalizedValue = 'No Show';
+                } else {
+                    // Preserve original value if it doesn't match known patterns
+                    normalizedValue = value;
                 }
             }
 
@@ -15241,8 +15259,15 @@ app.patch('/api/updateBookingField', (req, res) => {
                 console.error('Error updating booking field:', err);
                 return res.status(500).json({ success: false, message: 'Database error' });
             }
-
-            console.log('updateBookingField - Database güncelleme başarılı:', { field, value, affectedRows: result.affectedRows });
+            
+            console.log('updateBookingField - Database güncelleme başarılı:', { field, value, normalizedValue, affectedRows: result.affectedRows });
+            
+            // Invalidate getAllBookingData cache when status is updated
+            if (field === 'status') {
+                __getAllBookingDataCache.lastKey = null;
+                __getAllBookingDataCache.lastResponse = null;
+                console.log('🔄 Cleared getAllBookingData cache after status update');
+            }
 
             // If flight_type, experience, or pax is updated, also update resources field
             if (field === 'flight_type' || field === 'experience' || field === 'pax') {
@@ -20173,6 +20198,29 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
 
     try {
         // 1. Update booking status
+        // BUT: Preserve statuses like 'Flown', 'Checked In', 'No Show', 'Cancelled' when new_status is 'Open' or 'Closed'
+        // Only update status if current status is not a preserved status
+        const preserveStatuses = ['Flown', 'Checked In', 'No Show', 'Cancelled'];
+        let shouldUpdateStatus = true;
+        let currentStatus = null;
+        
+        // Get current status first
+        const [currentStatusRows] = await new Promise((resolve, reject) => {
+            con.query("SELECT status FROM all_booking WHERE id = ?", [booking_id], (err, rows) => {
+                if (err) reject(err);
+                else resolve([rows]);
+            });
+        });
+        
+        if (currentStatusRows && currentStatusRows.length > 0) {
+            currentStatus = currentStatusRows[0].status;
+            // Don't override preserved statuses with 'Open' or 'Closed'
+            if (preserveStatuses.includes(currentStatus) && (new_status === 'Open' || new_status === 'Closed')) {
+                shouldUpdateStatus = false;
+                console.log(`⚠️ Preserving status '${currentStatus}' for booking ${booking_id}, not updating to '${new_status}'`);
+            }
+        }
+        
         const updateBookingSql = "UPDATE all_booking SET status = ? WHERE id = ?";
         // Only increment flight_attempts when a voucher is redeemed and booking is cancelled
         const incrementAttemptsForVoucher = async () => {
@@ -20233,12 +20281,15 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
             }
         };
 
-        await new Promise((resolve, reject) => {
-            con.query(updateBookingSql, [new_status, booking_id], (err, result) => {
-                if (err) reject(err);
-                else resolve(result);
+        // Only update status if it's not a preserved status
+        if (shouldUpdateStatus) {
+            await new Promise((resolve, reject) => {
+                con.query(updateBookingSql, [new_status, booking_id], (err, result) => {
+                    if (err) reject(err);
+                    else resolve(result);
+                });
             });
-        });
+        }
 
         // Also increment attempts if necessary (fire-and-forget)
         incrementAttemptsForVoucher();
