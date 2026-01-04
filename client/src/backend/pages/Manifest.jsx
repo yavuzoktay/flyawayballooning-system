@@ -4568,37 +4568,24 @@ const Manifest = () => {
                                                     {/* Move the summary row here, inside TableBody */}
                                                     <TableRow>
                                                         {isMobile ? (
-                                                            <>
-                                                                <TableCell 
-                                                                    sx={{ 
-                                                                        textAlign: 'left', 
-                                                                        fontWeight: 600, 
-                                                                        background: '#f5f5f5',
-                                                                        fontSize: '5px',
-                                                                        padding: '8px 4px',
-                                                                        whiteSpace: 'nowrap',
-                                                                        verticalAlign: 'middle',
-                                                                        overflow: 'hidden',
-                                                                        textOverflow: 'ellipsis',
-                                                                        lineHeight: '1',
-                                                                        wordBreak: 'keep-all',
-                                                                        minWidth: '250px',
-                                                                        maxWidth: '100%'
-                                                                    }}
-                                                                >
-                                                                    Total Price: £{groupFlights.reduce((sum, f) => sum + (parseFloat(f.paid) || 0), 0).toFixed(2)} | Total Weight: {totalWeightDisplay}kg | Total Pax: {passengerCountDisplay}
-                                                                </TableCell>
-                                                                {/* Empty cells for remaining columns on mobile */}
-                                                                <TableCell sx={{ background: '#f5f5f5', padding: '10px 6px' }}></TableCell>
-                                                                <TableCell sx={{ background: '#f5f5f5', padding: '10px 6px' }}></TableCell>
-                                                                <TableCell sx={{ background: '#f5f5f5', padding: '10px 6px' }}></TableCell>
-                                                                <TableCell sx={{ background: '#f5f5f5', padding: '10px 6px' }}></TableCell>
-                                                                <TableCell sx={{ background: '#f5f5f5', padding: '10px 6px' }}></TableCell>
-                                                                <TableCell sx={{ background: '#f5f5f5', padding: '10px 6px' }}></TableCell>
-                                                                <TableCell sx={{ background: '#f5f5f5', padding: '10px 6px' }}></TableCell>
-                                                                <TableCell sx={{ background: '#f5f5f5', padding: '10px 6px' }}></TableCell>
-                                                                <TableCell sx={{ background: '#f5f5f5', padding: '10px 6px' }}></TableCell>
-                                                            </>
+                                                            <TableCell 
+                                                                colSpan={10}
+                                                                sx={{ 
+                                                                    textAlign: 'left', 
+                                                                    fontWeight: 600, 
+                                                                    background: '#f5f5f5',
+                                                                    fontSize: '5px',
+                                                                    padding: '8px 4px',
+                                                                    whiteSpace: 'nowrap',
+                                                                    verticalAlign: 'middle',
+                                                                    overflow: 'visible',
+                                                                    lineHeight: '1.4',
+                                                                    wordBreak: 'normal',
+                                                                    width: '100%'
+                                                                }}
+                                                            >
+                                                                Total Price: £{groupFlights.reduce((sum, f) => sum + (parseFloat(f.paid) || 0), 0).toFixed(2)} | Total Weight: {totalWeightDisplay} kg | Total Pax: {passengerCountDisplay}
+                                                            </TableCell>
                                                         ) : (
                                                             <TableCell 
                                                                 colSpan={11} 

@@ -1295,37 +1295,37 @@ a.edit-activity svg {
     }
 
     .final-menifest-wrap .MuiTableHead-root .MuiTableCell-root {
-        padding: 10px 6px !important;
-        font-size: 10px !important;
-        font-weight: 600 !important;
-        white-space: nowrap !important;
-        color: #ffffff !important;
-        text-align: center !important;
-        line-height: 1.2 !important;
+        padding: 10px 6px;
+        font-size: 10px;
+        font-weight: 600;
+        white-space: nowrap;
+        color: #ffffff;
+        text-align: left;
+        line-height: 1.2;
     }
 
     /* Table Body - Better layout on mobile */
     .final-menifest-wrap .MuiTableBody-root .MuiTableCell-root {
-        padding: 10px 6px !important;
-        font-size: 11px !important;
-        white-space: normal !important;
-        word-wrap: break-word !important;
-        text-align: center !important;
-        vertical-align: middle !important;
-        line-height: 1.4 !important;
+        padding: 10px 6px;
+        font-size: 10px;
+        white-space: normal;
+        word-wrap: break-word;
+        text-align: left;
+        vertical-align: middle;
+        line-height: 1.4;
     }
 
     /* Table Cell Content - Better on mobile */
     .final-menifest-wrap .MuiTableCell-root span {
-        font-size: 11px !important;
-        display: inline-block !important;
-        word-wrap: break-word !important;
-        max-width: 100% !important;
+        font-size: 11px;
+        display: inline-block;
+        word-wrap: break-word;
+        max-width: 100%;
     }
 
     /* Table Rows - Better spacing on mobile */
     .final-menifest-wrap .MuiTableRow-root {
-        border-bottom: 1px solid #e5e7eb !important;
+        border-bottom: 1px solid #e5e7eb;
     }
 
     .final-menifest-wrap .MuiTableRow-root:hover {
