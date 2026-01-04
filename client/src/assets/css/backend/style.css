@@ -950,7 +950,7 @@ a.edit-activity svg {
 
     /* Manifest Page Content Box */
     .final-menifest-wrap .MuiBox-root {
-        padding: 10px !important;
+        padding: 5px !important;
     }
 
     /* Heading adjustments - Match Booking Page style */
@@ -1102,7 +1102,7 @@ a.edit-activity svg {
     /* Flight Info Card - Stack on mobile */
     .final-menifest-wrap .MuiCard-root {
         margin-bottom: 15px !important;
-        padding: 10px !important;
+        padding: 5px !important;
     }
 
     .final-menifest-wrap .MuiCardContent-root {
@@ -1305,7 +1305,7 @@ a.edit-activity svg {
     /* Table Body - Better layout on mobile */
     .final-menifest-wrap .MuiTableBody-root .MuiTableCell-root {
         padding: 10px 6px;
-        font-size: 10px;
+        font-size: 7px;
         white-space: normal;
         word-wrap: break-word;
         text-align: left;
