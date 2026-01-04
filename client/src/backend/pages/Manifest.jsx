@@ -4392,7 +4392,7 @@ const Manifest = () => {
                                             <Table className="manifest-table">
                                                 <TableHead sx={{ marginTop: 2, background: "#d3d3d3", color: "#000" }}>
                                                     <TableRow>
-                                                        <TableCell sx={isMobile ? { width: '60px', minWidth: '60px', maxWidth: '60px', padding: '8px 4px' } : {}}>Booking ID</TableCell>
+                                                        <TableCell sx={isMobile ? { width: '45px', minWidth: '45px', maxWidth: '45px', padding: '8px 2px', fontSize: '12px' } : {}}>Booking ID</TableCell>
                                                         <TableCell>Name</TableCell>
                                                         <TableCell>Weight</TableCell>
                                                         <TableCell>Mobile</TableCell>
@@ -4432,8 +4432,13 @@ const Manifest = () => {
                                                         })();
                                                         return (
                                                             <TableRow key={flight.id}>
-                                                                <TableCell sx={isMobile ? { width: '60px', minWidth: '60px', maxWidth: '60px', padding: '8px 4px' } : {}}>
-                                                                    <span style={{ color: '#3274b4', cursor: 'pointer', textDecoration: 'underline' }}
+                                                                <TableCell sx={isMobile ? { width: '45px', minWidth: '45px', maxWidth: '45px', padding: '8px 2px' } : {}}>
+                                                                    <span style={{ 
+                                                                        color: '#3274b4', 
+                                                                        cursor: 'pointer', 
+                                                                        textDecoration: 'underline',
+                                                                        fontSize: isMobile ? '12px' : 'inherit'
+                                                                    }}
                                                                         onClick={() => handleNameClick(flight.id)}>
                                                                         {flight.id || ''}
                                                                     </span>
