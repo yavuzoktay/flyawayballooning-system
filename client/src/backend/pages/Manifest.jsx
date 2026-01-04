@@ -79,56 +79,79 @@ const resolveTemplateName = (templateValue, dbTemplate) => {
 };
 
 const MemoizedEmailPreview = React.memo(
-    ({ html }) => (
-        <Box 
-            sx={{ 
-                display: 'flex',
-                justifyContent: 'center',
-                width: '100%',
-                overflow: 'auto',
-                pb: 0,
-                mb: 0
-            }}
-        >
-            <Box
+    ({ html, isMobile = false }) => {
+        return (
+            <Box 
                 sx={{ 
-                    transform: 'scale(0.75)',
-                    transformOrigin: 'top center',
-                    width: '133.33%',
-                    maxWidth: '100%',
-                    overflow: 'visible',
-                    marginBottom: '-25%',
-                    lineHeight: 1.6, 
-                    color: '#333',
-                    '& table': {
-                        maxWidth: '100% !important',
-                        width: '100% !important',
-                        marginBottom: '0 !important'
-                    },
-                    '& img': {
-                        maxWidth: '100% !important',
-                        height: 'auto !important'
-                    },
-                    '& body': {
-                        margin: '0 !important',
-                        padding: '0 !important'
-                    },
-                    '& td': {
-                        padding: '16px !important'
-                    },
-                    '& table[role="presentation"]': {
-                        margin: '0 !important',
-                        marginBottom: '0 !important'
-                    },
-                    '& tr:last-child td': {
-                        paddingBottom: '16px !important'
-                    }
-                }} 
-                dangerouslySetInnerHTML={{ __html: html }} 
-            />
-        </Box>
-    ),
-    (prev, next) => prev.html === next.html
+                    display: 'flex',
+                    justifyContent: 'center',
+                    width: '100%',
+                    overflow: 'auto',
+                    pb: 0,
+                    mb: 0
+                }}
+            >
+                <Box
+                    sx={{ 
+                        transform: isMobile ? 'scale(1)' : 'scale(0.75)',
+                        transformOrigin: 'top center',
+                        width: isMobile ? '100%' : '133.33%',
+                        maxWidth: '100%',
+                        overflow: 'visible',
+                        marginBottom: isMobile ? '0' : '-25%',
+                        lineHeight: 1.6, 
+                        color: '#333',
+                        '& table': {
+                            maxWidth: isMobile ? '100% !important' : '100% !important',
+                            width: '100% !important',
+                            marginBottom: '0 !important',
+                            tableLayout: isMobile ? 'auto !important' : 'auto !important'
+                        },
+                        '& table[role="presentation"]': {
+                            maxWidth: isMobile ? '100% !important' : '640px !important',
+                            width: isMobile ? '100% !important' : 'auto !important',
+                            margin: '0 !important',
+                            marginBottom: '0 !important'
+                        },
+                        '& td': {
+                            padding: isMobile ? '12px !important' : '16px !important',
+                            width: isMobile ? 'auto !important' : 'auto !important'
+                        },
+                        '& td[align="center"]': {
+                            padding: isMobile ? '16px 8px !important' : '32px 16px !important'
+                        },
+                        '& img': {
+                            maxWidth: '100% !important',
+                            width: isMobile ? '100% !important' : 'auto !important',
+                            height: 'auto !important'
+                        },
+                        '& body': {
+                            margin: '0 !important',
+                            padding: '0 !important',
+                            width: '100% !important'
+                        },
+                        '& tr': {
+                            padding: isMobile ? '0 !important' : 'auto',
+                            margin: isMobile ? '0 !important' : 'auto'
+                        },
+                        '& tr td': {
+                            paddingLeft: isMobile ? '12px !important' : undefined,
+                            paddingRight: isMobile ? '12px !important' : undefined
+                        },
+                        '& tr:last-child td': {
+                            paddingBottom: isMobile ? '12px !important' : '16px !important'
+                        },
+                        '& div': {
+                            maxWidth: isMobile ? '100% !important' : 'auto !important',
+                            width: isMobile ? '100% !important' : 'auto !important'
+                        }
+                    }} 
+                    dangerouslySetInnerHTML={{ __html: html }} 
+                />
+            </Box>
+        );
+    },
+    (prev, next) => prev.html === next.html && prev.isMobile === next.isMobile
 );
 
 const Manifest = () => {
@@ -192,6 +215,8 @@ const Manifest = () => {
     const [emailLogsPollId, setEmailLogsPollId] = useState(null);
     const [emailTemplates, setEmailTemplates] = useState([]);
     const [smsTemplates, setSmsTemplates] = useState([]);
+    const [emailPreviewDateTime, setEmailPreviewDateTime] = useState('');
+    const [groupMessagePreviewDateTime, setGroupMessagePreviewDateTime] = useState('');
     const [groupMessageModalOpen, setGroupMessageModalOpen] = useState(false);
     const [groupMessageForm, setGroupMessageForm] = useState({
         to: [],
@@ -304,6 +329,11 @@ const Manifest = () => {
             template: selectedTemplate
         });
         setGroupPersonalNote('');
+        // Set preview date/time once when modal opens
+        const now = new Date();
+        setGroupMessagePreviewDateTime(
+            `${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`
+        );
         setGroupMessageModalOpen(true);
 
         if (selectedTemplate && emailTemplates.length > 0) {
@@ -387,6 +417,11 @@ const Manifest = () => {
         }));
 
         setFlights(prev => prev.filter(f => !bookingIds.includes(f.id)));
+        
+        // Refetch booking data to ensure backend changes are reflected
+        if (typeof bookingHook.refetch === 'function') {
+            await bookingHook.refetch();
+        }
     };
 
     const closeGroupMessageModal = () => {
@@ -411,6 +446,11 @@ const Manifest = () => {
             subject: '',
             message: ''
         });
+        // Set preview date/time once when modal opens
+        const now = new Date();
+        setEmailPreviewDateTime(
+            `${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`
+        );
         setEmailModalOpen(true);
         
         // Fetch email logs
@@ -1338,14 +1378,6 @@ const Manifest = () => {
         const newDate = e.target.value;
         console.log('Date changed to:', newDate);
         setSelectedDate(newDate);
-        
-        // Clear crew assignments for the old date and fetch for the new date
-        setCrewAssignmentsBySlot({});
-        
-        // Fetch crew assignments for the new date
-        if (newDate) {
-            refreshCrewAssignments(newDate);
-        }
     };
 
     const handleMenuOpen = (event, flightId) => {
@@ -2923,7 +2955,7 @@ const Manifest = () => {
     const lastPilotFetchRef = React.useRef({ date: null, inFlight: false });
     const [pilotNotification, setPilotNotification] = useState({ show: false, message: '', type: 'success' });
 
-    const slotKey = (activityId, date, time) => `${activityId}_${date}_${time}`;
+    const slotKey = React.useCallback((activityId, date, time) => `${activityId}_${date}_${time}`, []);
 
     // Try to resolve activity id from various possible shapes on flight objects
     const getFlightActivityId = (flight) => {
@@ -2931,11 +2963,16 @@ const Manifest = () => {
         return flight.activity_id ?? flight.activityId ?? flight.activityID ?? (flight.activity && (flight.activity.id ?? flight.activity.activity_id)) ?? null;
     };
 
-    const refreshCrewAssignments = async (date) => {
+    const refreshCrewAssignments = React.useCallback(async (date) => {
         if (!date) return;
         // Prevent duplicate, rapid calls for the same date
-        if (lastCrewFetchRef.current.inFlight && lastCrewFetchRef.current.date === date) return;
-        if (lastCrewFetchRef.current.date === date && Object.keys(crewAssignmentsBySlot || {}).length > 0) return;
+        if (lastCrewFetchRef.current.inFlight && lastCrewFetchRef.current.date === date) {
+            return;
+        }
+        // If we already fetched this date and it's not in flight, skip
+        if (lastCrewFetchRef.current.date === date && !lastCrewFetchRef.current.inFlight) {
+            return;
+        }
         try {
             lastCrewFetchRef.current = { date, inFlight: true };
             const res = await axios.get('/api/crew-assignments', { params: { date } });
@@ -2955,13 +2992,18 @@ const Manifest = () => {
         } finally {
             lastCrewFetchRef.current.inFlight = false;
         }
-    };
+    }, [slotKey]);
 
-    const refreshPilotAssignments = async (date) => {
+    const refreshPilotAssignments = React.useCallback(async (date) => {
         if (!date) return;
         // Prevent duplicate, rapid calls for the same date
-        if (lastPilotFetchRef.current.inFlight && lastPilotFetchRef.current.date === date) return;
-        if (lastPilotFetchRef.current.date === date && Object.keys(pilotAssignmentsBySlot || {}).length > 0) return;
+        if (lastPilotFetchRef.current.inFlight && lastPilotFetchRef.current.date === date) {
+            return;
+        }
+        // If we already fetched this date and it's not in flight, skip
+        if (lastPilotFetchRef.current.date === date && !lastPilotFetchRef.current.inFlight) {
+            return;
+        }
         try {
             lastPilotFetchRef.current = { date, inFlight: true };
             const res = await axios.get('/api/pilot-assignments', { params: { date } });
@@ -2981,7 +3023,7 @@ const Manifest = () => {
         } finally {
             lastPilotFetchRef.current.inFlight = false;
         }
-    };
+    }, [slotKey]);
 
     // Helper function to get crew member name by ID
     const getCrewMemberName = (crewId) => {
@@ -3111,91 +3153,19 @@ const Manifest = () => {
         });
     }, []);
 
-    // Initialize crew assignments on mount and when selectedDate changes
+    // Fetch crew assignments ONLY when selectedDate changes
     useEffect(() => {
         if (selectedDate) {
-            console.log('Initial crew assignments fetch for date:', selectedDate);
             refreshCrewAssignments(selectedDate);
         }
-    }, [selectedDate]); // Run when selectedDate changes
+    }, [selectedDate, refreshCrewAssignments]); // Only when selectedDate changes
 
-    // Ensure crew assignments are loaded on initial mount
-    useEffect(() => {
-        if (selectedDate && crewList.length > 0) {
-            console.log('Component mounted, loading crew assignments for date:', selectedDate);
-            refreshCrewAssignments(selectedDate);
-        }
-    }, [crewList.length]); // Run when crew list is loaded
-
-    // Force refresh crew assignments on mount
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            if (selectedDate) {
-                console.log('Force refreshing crew assignments on mount for date:', selectedDate);
-                refreshCrewAssignments(selectedDate);
-            }
-        }, 1000); // Wait 1 second for everything to load
-        
-        return () => clearTimeout(timer);
-    }, []); // Run once on mount
-
-    // Additional effect to ensure crew assignments are loaded
-    useEffect(() => {
-        if (selectedDate && crewList.length > 0 && Object.keys(crewAssignmentsBySlot).length === 0) {
-            console.log('No crew assignments loaded, fetching for date:', selectedDate);
-            refreshCrewAssignments(selectedDate);
-        }
-    }, [selectedDate, crewList.length, crewAssignmentsBySlot]);
-
-    // Debug effect to log crew assignments changes
-    useEffect(() => {
-        console.log('Crew assignments changed:', crewAssignmentsBySlot);
-    }, [crewAssignmentsBySlot]);
-
-
-
-    // Also fetch crew assignments when flights change (in case of data refresh)
-    useEffect(() => {
-        if (!selectedDate || flights.length === 0) return;
-        refreshCrewAssignments(selectedDate);
-        refreshPilotAssignments(selectedDate);
-    }, [selectedDate, flights]);
-
-    // Initialize pilot assignments on mount and when selectedDate changes
+    // Fetch pilot assignments ONLY when selectedDate changes
     useEffect(() => {
         if (selectedDate) {
-            console.log('Initial pilot assignments fetch for date:', selectedDate);
             refreshPilotAssignments(selectedDate);
         }
-    }, [selectedDate]); // Run when selectedDate changes
-
-    // Ensure pilot assignments are loaded on initial mount
-    useEffect(() => {
-        if (selectedDate && pilotList.length > 0) {
-            console.log('Component mounted, loading pilot assignments for date:', selectedDate);
-            refreshPilotAssignments(selectedDate);
-        }
-    }, [pilotList.length]); // Run when pilot list is loaded
-
-    // Force refresh pilot assignments on mount
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            if (selectedDate) {
-                console.log('Force refreshing pilot assignments on mount for date:', selectedDate);
-                refreshPilotAssignments(selectedDate);
-            }
-        }, 1000); // Wait 1 second for everything to load
-        
-        return () => clearTimeout(timer);
-    }, []); // Run once on mount
-
-    // Additional effect to ensure pilot assignments are loaded
-    useEffect(() => {
-        if (selectedDate && pilotList.length > 0 && Object.keys(pilotAssignmentsBySlot).length === 0) {
-            console.log('No pilot assignments loaded, fetching for date:', selectedDate);
-            refreshPilotAssignments(selectedDate);
-        }
-    }, [selectedDate, pilotList.length, pilotAssignmentsBySlot]);
+    }, [selectedDate, refreshPilotAssignments]); // Only when selectedDate changes
 
     const handleCrewChange = async (activityId, flightDateStr, crewId) => {
         // flightDateStr like 'YYYY-MM-DD HH:mm:ss' or 'YYYY-MM-DD 17:00:00'
@@ -3457,13 +3427,8 @@ const Manifest = () => {
                 return updated;
             });
             
-            // Also refresh from server to ensure consistency
+            // Also refresh from server to ensure consistency (cache will prevent duplicate calls)
             await refreshPilotAssignments(date);
-            
-            // Force a re-render to ensure UI updates
-            setTimeout(() => {
-                setPilotAssignmentsBySlot(prev => ({ ...prev }));
-            }, 100);
         } catch (e) {
             console.error('Failed to save pilot selection:', e);
         }
@@ -3541,23 +3506,6 @@ const Manifest = () => {
                                         const newDate = dayjs(selectedDate).subtract(1, 'day').format('YYYY-MM-DD');
                                         console.log('Date navigation: going back to', newDate);
                                         setSelectedDate(newDate);
-                                        setCrewAssignmentsBySlot({});
-                                        
-                                        // Fetch crew assignments for the new date
-                                        axios.get('/api/crew-assignments', { params: { date: newDate } })
-                                            .then(res => {
-                                                if (res.data?.success && Array.isArray(res.data.data)) {
-                                                    const map = {};
-                                                    for (const row of res.data.data) {
-                                                        const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
-                                                        map[key] = row.crew_id;
-                                                    }
-                                                    setCrewAssignmentsBySlot(map);
-                                                }
-                                            })
-                                            .catch((err) => {
-                                                console.error('Error fetching crew assignments for previous date:', err);
-                                            });
                                     }} className="manifest-nav-buttons" sx={{ minWidth: 'auto', padding: '8px' }}>
                                         <ArrowBackIosNewIcon />
                                     </IconButton>
@@ -3569,25 +3517,6 @@ const Manifest = () => {
                                                 const newDate = date ? date.format('YYYY-MM-DD') : selectedDate;
                                                 console.log('Date picker changed to:', newDate);
                                                 setSelectedDate(newDate);
-                                                setCrewAssignmentsBySlot({});
-                                                
-                                                // Fetch crew assignments for the new date
-                                                if (newDate) {
-                                                    axios.get('/api/crew-assignments', { params: { date: newDate } })
-                                                        .then(res => {
-                                                            if (res.data?.success && Array.isArray(res.data.data)) {
-                                                                const map = {};
-                                                                for (const row of res.data.data) {
-                                                                    const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
-                                                                    map[key] = row.crew_id;
-                                                                }
-                                                                setCrewAssignmentsBySlot(map);
-                                                            }
-                                                        })
-                                                        .catch((err) => {
-                                                            console.error('Error fetching crew assignments for picked date:', err);
-                                                        });
-                                                }
                                             }}
                                             format="DD.MM.YYYY"
                                             views={["year", "month", "day"]}
@@ -3602,23 +3531,6 @@ const Manifest = () => {
                                         const newDate = dayjs(selectedDate).add(1, 'day').format('YYYY-MM-DD');
                                         console.log('Date navigation: going forward to', newDate);
                                         setSelectedDate(newDate);
-                                        setCrewAssignmentsBySlot({});
-                                        
-                                        // Fetch crew assignments for the new date
-                                        axios.get('/api/crew-assignments', { params: { date: newDate } })
-                                            .then(res => {
-                                                if (res.data?.success && Array.isArray(res.data.data)) {
-                                                    const map = {};
-                                                    for (const row of res.data.data) {
-                                                        const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
-                                                        map[key] = row.crew_id;
-                                                    }
-                                                    setCrewAssignmentsBySlot(map);
-                                                }
-                                            })
-                                            .catch((err) => {
-                                                console.error('Error fetching crew assignments for next date:', err);
-                                            });
                                     }} className="manifest-nav-buttons" sx={{ minWidth: 'auto', padding: '8px' }}>
                                         <ArrowForwardIosIcon />
                                     </IconButton>
@@ -3630,23 +3542,6 @@ const Manifest = () => {
                                         const newDate = dayjs(selectedDate).subtract(1, 'day').format('YYYY-MM-DD');
                                         console.log('Date navigation: going back to', newDate);
                                         setSelectedDate(newDate);
-                                        setCrewAssignmentsBySlot({});
-                                        
-                                        // Fetch crew assignments for the new date
-                                        axios.get('/api/crew-assignments', { params: { date: newDate } })
-                                            .then(res => {
-                                                if (res.data?.success && Array.isArray(res.data.data)) {
-                                                    const map = {};
-                                                    for (const row of res.data.data) {
-                                                        const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
-                                                        map[key] = row.crew_id;
-                                                    }
-                                                    setCrewAssignmentsBySlot(map);
-                                                }
-                                            })
-                                            .catch((err) => {
-                                                console.error('Error fetching crew assignments for previous date:', err);
-                                            });
                                     }} className="manifest-nav-buttons">
                                         <ArrowBackIosNewIcon />
                                     </IconButton>
@@ -3658,25 +3553,6 @@ const Manifest = () => {
                                                 const newDate = date ? date.format('YYYY-MM-DD') : selectedDate;
                                                 console.log('Date picker changed to:', newDate);
                                                 setSelectedDate(newDate);
-                                                setCrewAssignmentsBySlot({});
-                                                
-                                                // Fetch crew assignments for the new date
-                                                if (newDate) {
-                                                    axios.get('/api/crew-assignments', { params: { date: newDate } })
-                                                        .then(res => {
-                                                            if (res.data?.success && Array.isArray(res.data.data)) {
-                                                                const map = {};
-                                                                for (const row of res.data.data) {
-                                                                    const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
-                                                                    map[key] = row.crew_id;
-                                                                }
-                                                                setCrewAssignmentsBySlot(map);
-                                                            }
-                                                        })
-                                                        .catch((err) => {
-                                                            console.error('Error fetching crew assignments for picked date:', err);
-                                                        });
-                                                }
                                             }}
                                             format="DD.MM.YYYY"
                                             views={["year", "month", "day"]}
@@ -3691,23 +3567,6 @@ const Manifest = () => {
                                         const newDate = dayjs(selectedDate).add(1, 'day').format('YYYY-MM-DD');
                                         console.log('Date navigation: going forward to', newDate);
                                         setSelectedDate(newDate);
-                                        setCrewAssignmentsBySlot({});
-                                        
-                                        // Fetch crew assignments for the new date
-                                        axios.get('/api/crew-assignments', { params: { date: newDate } })
-                                            .then(res => {
-                                                if (res.data?.success && Array.isArray(res.data.data)) {
-                                                    const map = {};
-                                                    for (const row of res.data.data) {
-                                                        const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
-                                                        map[key] = row.crew_id;
-                                                    }
-                                                    setCrewAssignmentsBySlot(map);
-                                                }
-                                            })
-                                            .catch((err) => {
-                                                console.error('Error fetching crew assignments for next date:', err);
-                                            });
                                     }} className="manifest-nav-buttons">
                                         <ArrowForwardIosIcon />
                                     </IconButton>
@@ -6472,8 +6331,14 @@ const Manifest = () => {
                         </Typography>
                     )}
                 </DialogTitle>
-                <DialogContent sx={{ mt: 1 }}>
-                    <Grid container spacing={2}>
+                <DialogContent sx={{ 
+                    mt: 1,
+                    p: isMobile ? 1.5 : 3,
+                    '&.MuiDialogContent-root': {
+                        padding: isMobile ? '16px !important' : '24px !important'
+                    }
+                }}>
+                    <Grid container spacing={isMobile ? 1.5 : 2}>
                         <Grid item xs={12}>
                             <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
                                 Recipients
@@ -6583,7 +6448,7 @@ const Manifest = () => {
                                     From "Fly Away Ballooning" &lt;info@flyawayballooning.com&gt;
                                 </Typography>
                                 <Typography variant="caption" sx={{ color: '#999', display: 'block', mb: 2 }}>
-                                    {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                                    {groupMessagePreviewDateTime || `${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`}
                                 </Typography>
 
                                 <Typography sx={{
@@ -6596,13 +6461,14 @@ const Manifest = () => {
 
                                 <Box sx={{
                                     backgroundColor: '#fff',
-                                    p: 2,
+                                    p: isMobile ? 0.5 : 2,
                                     borderRadius: 2,
                                     minHeight: 200,
                                     overflow: 'auto',
-                                    maxHeight: '600px'
+                                    maxHeight: '600px',
+                                    width: '100%'
                                 }}>
-                                    <MemoizedEmailPreview html={groupPreviewHtml} />
+                                    <MemoizedEmailPreview html={groupPreviewHtml} isMobile={isMobile} />
                                 </Box>
             </Box>
                         </Grid>
@@ -6647,8 +6513,13 @@ const Manifest = () => {
                         </Typography>
                     )}
                 </DialogTitle>
-                <DialogContent>
-                    <Grid container spacing={2} sx={{ mt: 1 }}>
+                <DialogContent sx={{ 
+                    p: isMobile ? 1.5 : 3,
+                    '&.MuiDialogContent-root': {
+                        padding: isMobile ? '16px !important' : '24px !important'
+                    }
+                }}>
+                    <Grid container spacing={isMobile ? 1.5 : 2} sx={{ mt: 1 }}>
                         <Grid item xs={12}>
                             <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
                                 Choose a template:
@@ -6703,11 +6574,12 @@ const Manifest = () => {
                             <Box sx={{ 
                                 border: '1px solid #e0e0e0', 
                                 borderRadius: 2, 
-                                p: 2,
+                                p: isMobile ? 0.5 : 2,
                                 backgroundColor: '#f9f9f9',
                                 position: 'relative',
                                 overflow: 'auto',
-                                maxHeight: '600px'
+                                maxHeight: '600px',
+                                width: '100%'
                             }}>
                                 {/* Email Header */}
                                 <Box sx={{ 
@@ -6743,7 +6615,7 @@ const Manifest = () => {
                                     From "Fly Away Ballooning" &lt;info@flyawayballooning.com&gt;
                                 </Typography>
                                 <Typography variant="caption" sx={{ color: '#999', display: 'block', mb: 2 }}>
-                                    {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                                    {emailPreviewDateTime || `${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`}
                                 </Typography>
                                 
                                 {/* Email Subject */}
@@ -6759,7 +6631,7 @@ const Manifest = () => {
                                 </Typography>
                                 
                                 {/* Email Body Preview */}
-                                <MemoizedEmailPreview html={previewHtml} />
+                                <MemoizedEmailPreview html={previewHtml} isMobile={isMobile} />
                             </Box>
                         </Grid>
                         {/* Hidden fields for backend */}
