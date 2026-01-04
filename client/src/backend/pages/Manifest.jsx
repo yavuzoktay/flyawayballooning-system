@@ -3529,107 +3529,190 @@ const Manifest = () => {
                         {/* Intentionally hidden */}
                         <Box className="manifest-date-selector" sx={{
                             display: 'flex',
-                            flexDirection: isMobile ? 'column' : 'row',
-                            alignItems: isMobile ? 'center' : 'center',
-                            gap: isMobile ? 2 : 2
+                            flexDirection: isMobile ? 'row' : 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: isMobile ? 1 : 2
                         }}>
-                            {/* Navigation buttons - side by side on mobile, above date picker */}
-                            <Box sx={{
-                                display: 'flex',
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: isMobile ? 'center' : 'flex-start',
-                                gap: isMobile ? 1 : 0,
-                                order: isMobile ? -1 : 0,
-                                width: isMobile ? '100%' : 'auto',
-                                marginBottom: isMobile ? 1 : 0
-                            }} className="manifest-nav-buttons">
-                            <IconButton onClick={() => {
-                                const newDate = dayjs(selectedDate).subtract(1, 'day').format('YYYY-MM-DD');
-                                console.log('Date navigation: going back to', newDate);
-                                setSelectedDate(newDate);
-                                setCrewAssignmentsBySlot({});
-                                
-                                // Fetch crew assignments for the new date
-                                axios.get('/api/crew-assignments', { params: { date: newDate } })
-                                    .then(res => {
-                                        if (res.data?.success && Array.isArray(res.data.data)) {
-                                            const map = {};
-                                            for (const row of res.data.data) {
-                                                const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
-                                                map[key] = row.crew_id;
-                                            }
-                                            setCrewAssignmentsBySlot(map);
-                                        }
-                                    })
-                                    .catch((err) => {
-                                        console.error('Error fetching crew assignments for previous date:', err);
-                                    });
-                            }}>
-                                <ArrowBackIosNewIcon />
-                            </IconButton>
-                                <IconButton onClick={() => {
-                                    const newDate = dayjs(selectedDate).add(1, 'day').format('YYYY-MM-DD');
-                                    console.log('Date navigation: going forward to', newDate);
-                                    setSelectedDate(newDate);
-                                    setCrewAssignmentsBySlot({});
-                                    
-                                    // Fetch crew assignments for the new date
-                                    axios.get('/api/crew-assignments', { params: { date: newDate } })
-                                        .then(res => {
-                                            if (res.data?.success && Array.isArray(res.data.data)) {
-                                                const map = {};
-                                                for (const row of res.data.data) {
-                                                    const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
-                                                    map[key] = row.crew_id;
-                                                }
-                                                setCrewAssignmentsBySlot(map);
-                                            }
-                                        })
-                                        .catch((err) => {
-                                            console.error('Error fetching crew assignments for next date:', err);
-                                        });
-                                }}>
-                                    <ArrowForwardIosIcon />
-                                </IconButton>
-                            </Box>
-                            <LocalizationProvider dateAdapter={AdapterDayjs}>
-                                <DatePicker
-                                    label="Select Date"
-                                    value={dayjs(selectedDate)}
-                                    onChange={date => {
-                                        const newDate = date ? date.format('YYYY-MM-DD') : selectedDate;
-                                        console.log('Date picker changed to:', newDate);
+                            {isMobile ? (
+                                <>
+                                    {/* Mobile: Navigation buttons on the sides of date picker */}
+                                    <IconButton onClick={() => {
+                                        const newDate = dayjs(selectedDate).subtract(1, 'day').format('YYYY-MM-DD');
+                                        console.log('Date navigation: going back to', newDate);
                                         setSelectedDate(newDate);
                                         setCrewAssignmentsBySlot({});
                                         
                                         // Fetch crew assignments for the new date
-                                        if (newDate) {
-                                            axios.get('/api/crew-assignments', { params: { date: newDate } })
-                                                .then(res => {
-                                                    if (res.data?.success && Array.isArray(res.data.data)) {
-                                                        const map = {};
-                                                        for (const row of res.data.data) {
-                                                            const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
-                                                            map[key] = row.crew_id;
-                                                        }
-                                                        setCrewAssignmentsBySlot(map);
+                                        axios.get('/api/crew-assignments', { params: { date: newDate } })
+                                            .then(res => {
+                                                if (res.data?.success && Array.isArray(res.data.data)) {
+                                                    const map = {};
+                                                    for (const row of res.data.data) {
+                                                        const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
+                                                        map[key] = row.crew_id;
                                                     }
-                                                })
-                                                .catch((err) => {
-                                                    console.error('Error fetching crew assignments for picked date:', err);
-                                                });
-                                        }
-                                    }}
-                                    format="DD.MM.YYYY"
-                                    views={["year", "month", "day"]}
-                                    slotProps={{ textField: { size: 'small', sx: { minWidth: 180, background: '#fff', borderRadius: 1 } } }}
-                                    componentsProps={{
-                                        // Hide default calendar arrows
-                                        popper: { style: { zIndex: 1300 } },
-                                    }}
-                                />
-                            </LocalizationProvider>
+                                                    setCrewAssignmentsBySlot(map);
+                                                }
+                                            })
+                                            .catch((err) => {
+                                                console.error('Error fetching crew assignments for previous date:', err);
+                                            });
+                                    }} className="manifest-nav-buttons" sx={{ minWidth: 'auto', padding: '8px' }}>
+                                        <ArrowBackIosNewIcon />
+                                    </IconButton>
+                                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                                        <DatePicker
+                                            label="Select Date"
+                                            value={dayjs(selectedDate)}
+                                            onChange={date => {
+                                                const newDate = date ? date.format('YYYY-MM-DD') : selectedDate;
+                                                console.log('Date picker changed to:', newDate);
+                                                setSelectedDate(newDate);
+                                                setCrewAssignmentsBySlot({});
+                                                
+                                                // Fetch crew assignments for the new date
+                                                if (newDate) {
+                                                    axios.get('/api/crew-assignments', { params: { date: newDate } })
+                                                        .then(res => {
+                                                            if (res.data?.success && Array.isArray(res.data.data)) {
+                                                                const map = {};
+                                                                for (const row of res.data.data) {
+                                                                    const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
+                                                                    map[key] = row.crew_id;
+                                                                }
+                                                                setCrewAssignmentsBySlot(map);
+                                                            }
+                                                        })
+                                                        .catch((err) => {
+                                                            console.error('Error fetching crew assignments for picked date:', err);
+                                                        });
+                                                }
+                                            }}
+                                            format="DD.MM.YYYY"
+                                            views={["year", "month", "day"]}
+                                            slotProps={{ textField: { size: 'small', sx: { minWidth: 180, background: '#fff', borderRadius: 1 } } }}
+                                            componentsProps={{
+                                                // Hide default calendar arrows
+                                                popper: { style: { zIndex: 1300 } },
+                                            }}
+                                        />
+                                    </LocalizationProvider>
+                                    <IconButton onClick={() => {
+                                        const newDate = dayjs(selectedDate).add(1, 'day').format('YYYY-MM-DD');
+                                        console.log('Date navigation: going forward to', newDate);
+                                        setSelectedDate(newDate);
+                                        setCrewAssignmentsBySlot({});
+                                        
+                                        // Fetch crew assignments for the new date
+                                        axios.get('/api/crew-assignments', { params: { date: newDate } })
+                                            .then(res => {
+                                                if (res.data?.success && Array.isArray(res.data.data)) {
+                                                    const map = {};
+                                                    for (const row of res.data.data) {
+                                                        const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
+                                                        map[key] = row.crew_id;
+                                                    }
+                                                    setCrewAssignmentsBySlot(map);
+                                                }
+                                            })
+                                            .catch((err) => {
+                                                console.error('Error fetching crew assignments for next date:', err);
+                                            });
+                                    }} className="manifest-nav-buttons" sx={{ minWidth: 'auto', padding: '8px' }}>
+                                        <ArrowForwardIosIcon />
+                                    </IconButton>
+                                </>
+                            ) : (
+                                <>
+                                    {/* Desktop: Keep original layout */}
+                                    <IconButton onClick={() => {
+                                        const newDate = dayjs(selectedDate).subtract(1, 'day').format('YYYY-MM-DD');
+                                        console.log('Date navigation: going back to', newDate);
+                                        setSelectedDate(newDate);
+                                        setCrewAssignmentsBySlot({});
+                                        
+                                        // Fetch crew assignments for the new date
+                                        axios.get('/api/crew-assignments', { params: { date: newDate } })
+                                            .then(res => {
+                                                if (res.data?.success && Array.isArray(res.data.data)) {
+                                                    const map = {};
+                                                    for (const row of res.data.data) {
+                                                        const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
+                                                        map[key] = row.crew_id;
+                                                    }
+                                                    setCrewAssignmentsBySlot(map);
+                                                }
+                                            })
+                                            .catch((err) => {
+                                                console.error('Error fetching crew assignments for previous date:', err);
+                                            });
+                                    }} className="manifest-nav-buttons">
+                                        <ArrowBackIosNewIcon />
+                                    </IconButton>
+                                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                                        <DatePicker
+                                            label="Select Date"
+                                            value={dayjs(selectedDate)}
+                                            onChange={date => {
+                                                const newDate = date ? date.format('YYYY-MM-DD') : selectedDate;
+                                                console.log('Date picker changed to:', newDate);
+                                                setSelectedDate(newDate);
+                                                setCrewAssignmentsBySlot({});
+                                                
+                                                // Fetch crew assignments for the new date
+                                                if (newDate) {
+                                                    axios.get('/api/crew-assignments', { params: { date: newDate } })
+                                                        .then(res => {
+                                                            if (res.data?.success && Array.isArray(res.data.data)) {
+                                                                const map = {};
+                                                                for (const row of res.data.data) {
+                                                                    const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
+                                                                    map[key] = row.crew_id;
+                                                                }
+                                                                setCrewAssignmentsBySlot(map);
+                                                            }
+                                                        })
+                                                        .catch((err) => {
+                                                            console.error('Error fetching crew assignments for picked date:', err);
+                                                        });
+                                                }
+                                            }}
+                                            format="DD.MM.YYYY"
+                                            views={["year", "month", "day"]}
+                                            slotProps={{ textField: { size: 'small', sx: { minWidth: 180, background: '#fff', borderRadius: 1 } } }}
+                                            componentsProps={{
+                                                // Hide default calendar arrows
+                                                popper: { style: { zIndex: 1300 } },
+                                            }}
+                                        />
+                                    </LocalizationProvider>
+                                    <IconButton onClick={() => {
+                                        const newDate = dayjs(selectedDate).add(1, 'day').format('YYYY-MM-DD');
+                                        console.log('Date navigation: going forward to', newDate);
+                                        setSelectedDate(newDate);
+                                        setCrewAssignmentsBySlot({});
+                                        
+                                        // Fetch crew assignments for the new date
+                                        axios.get('/api/crew-assignments', { params: { date: newDate } })
+                                            .then(res => {
+                                                if (res.data?.success && Array.isArray(res.data.data)) {
+                                                    const map = {};
+                                                    for (const row of res.data.data) {
+                                                        const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
+                                                        map[key] = row.crew_id;
+                                                    }
+                                                    setCrewAssignmentsBySlot(map);
+                                                }
+                                            })
+                                            .catch((err) => {
+                                                console.error('Error fetching crew assignments for next date:', err);
+                                            });
+                                    }} className="manifest-nav-buttons">
+                                        <ArrowForwardIosIcon />
+                                    </IconButton>
+                                </>
+                            )}
                         </Box>
                     </Box>
 

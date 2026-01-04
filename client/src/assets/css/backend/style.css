@@ -969,12 +969,12 @@ a.edit-activity svg {
     }
 
     /* Date Selector - Compact and centered layout on mobile */
-    /* Date Navigation - Restructure for mobile: buttons above date picker, side by side */
+    /* Date Navigation - Buttons on the sides of date picker on mobile */
     .final-menifest-wrap .manifest-date-selector {
-        flex-direction: column !important;
+        flex-direction: row !important;
         align-items: center !important;
-        justify-content: flex-start !important;
-        gap: 12px !important;
+        justify-content: center !important;
+        gap: 8px !important;
         width: 100% !important;
         padding: 0 !important;
         margin: 0 auto !important;
@@ -982,16 +982,17 @@ a.edit-activity svg {
         box-sizing: border-box !important;
     }
 
-    /* Navigation buttons container - side by side above date picker, aligned with date input */
+    /* Navigation buttons - on the sides of date picker on mobile */
     .final-menifest-wrap .manifest-nav-buttons {
         display: flex !important;
         flex-direction: row !important;
         align-items: center !important;
         justify-content: center !important;
-        gap: 8px !important;
-        width: 100% !important;
-        max-width: 180px !important;
-        margin: 0 auto 8px auto !important;
+        gap: 0 !important;
+        width: auto !important;
+        max-width: none !important;
+        margin: 0 !important;
+        flex-shrink: 0 !important;
     }
 
     /* Navigation buttons - smaller size on mobile */
@@ -1007,74 +1008,69 @@ a.edit-activity svg {
         box-shadow: 0 1px 3px rgba(50, 116, 180, 0.2) !important;
     }
 
-    .final-menifest-wrap .manifest-nav-buttons .MuiIconButton-root:hover {
+    .final-menifest-wrap .manifest-date-selector > .MuiIconButton-root:hover,
+    .final-menifest-wrap .manifest-date-selector .manifest-nav-buttons:hover {
         background: #2563a8 !important;
         box-shadow: 0 2px 4px rgba(50, 116, 180, 0.3) !important;
     }
 
-    .final-menifest-wrap .manifest-nav-buttons .MuiIconButton-root:active {
+    .final-menifest-wrap .manifest-date-selector > .MuiIconButton-root:active,
+    .final-menifest-wrap .manifest-date-selector .manifest-nav-buttons:active {
         transform: scale(0.95) !important;
     }
 
-    .final-menifest-wrap .manifest-nav-buttons .MuiSvgIcon-root {
-        font-size: 14px !important;
+    .final-menifest-wrap .manifest-date-selector > .MuiIconButton-root .MuiSvgIcon-root,
+    .final-menifest-wrap .manifest-date-selector .manifest-nav-buttons .MuiSvgIcon-root {
+        font-size: 18px !important;
         color: #ffffff !important;
     }
 
     /* Date Picker - Aligned with navigation buttons on mobile */
     .final-menifest-wrap .manifest-date-selector .MuiLocalizationProvider-root {
-        width: 100% !important;
-        flex-basis: 100% !important;
+        width: auto !important;
+        flex-basis: auto !important;
         display: flex !important;
         justify-content: center !important;
+        flex-shrink: 0 !important;
     }
 
     .final-menifest-wrap .manifest-date-selector .MuiDatePicker-root {
-        width: 100% !important;
+        width: auto !important;
         max-width: 180px !important;
         min-width: 180px !important;
-        margin: 0 auto !important;
+        margin: 0 !important;
+        flex-shrink: 0 !important;
     }
 
-    .final-menifest-wrap .manifest-date-selector .MuiIconButton-root {
-        min-width: 28px !important;
-        width: 28px !important;
-        height: 28px !important;
-        padding: 0 !important;
+    /* Navigation IconButtons - on the sides of date picker */
+    .final-menifest-wrap .manifest-date-selector > .MuiIconButton-root,
+    .final-menifest-wrap .manifest-date-selector .manifest-nav-buttons {
+        min-width: 36px !important;
+        width: 36px !important;
+        height: 36px !important;
+        padding: 8px !important;
         flex-shrink: 0 !important;
         background: #3274b4 !important;
         border-radius: 4px !important;
         border: none !important;
         box-shadow: 0 1px 3px rgba(50, 116, 180, 0.2) !important;
+        margin: 0 !important;
     }
 
-    .final-menifest-wrap .manifest-date-selector .MuiIconButton-root:hover {
-        background: #2563a8 !important;
-        box-shadow: 0 2px 4px rgba(50, 116, 180, 0.3) !important;
-    }
-
-    .final-menifest-wrap .manifest-date-selector .MuiIconButton-root:active {
-        transform: scale(0.95) !important;
-    }
-
-    .final-menifest-wrap .manifest-date-selector .MuiSvgIcon-root {
-        font-size: 14px !important;
-        color: #ffffff !important;
-    }
 
     /* Date Picker - Compact size on mobile, aligned with buttons */
     .final-menifest-wrap .manifest-date-selector .MuiDatePicker-root {
         flex: 0 0 auto !important;
         max-width: 180px !important;
         min-width: 180px !important;
-        margin: 0 auto !important;
+        margin: 0 !important;
     }
 
     .final-menifest-wrap .manifest-date-selector .MuiTextField-root {
-        width: 100% !important;
+        width: auto !important;
         min-width: 180px !important;
         max-width: 180px !important;
-        margin: 0 auto !important;
+        margin: 0 !important;
         display: flex !important;
         justify-content: center !important;
     }
@@ -1096,9 +1092,11 @@ a.edit-activity svg {
 
     /* Date Picker Form Control - Center on mobile */
     .final-menifest-wrap .manifest-date-selector .MuiFormControl-root {
-        width: 100% !important;
+        width: auto !important;
         max-width: 180px !important;
-        margin: 0 auto !important;
+        min-width: 180px !important;
+        margin: 0 !important;
+        flex-shrink: 0 !important;
     }
 
     /* Flight Info Card - Stack on mobile */
