@@ -12,7 +12,9 @@ import {
     Alert,
     Checkbox,
     FormControlLabel,
-    FormGroup
+    FormGroup,
+    useMediaQuery,
+    useTheme
 } from '@mui/material';
 import dayjs from 'dayjs';
 import axios from 'axios';
@@ -20,6 +22,8 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
 const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess }) => {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('768'));
     const [availabilities, setAvailabilities] = useState([]);
     const [loading, setLoading] = useState(false);
     const [selectedDate, setSelectedDate] = useState(null);
@@ -594,7 +598,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                     }}
                     style={{
                         aspectRatio: '1 / 1',
-                        borderRadius: 10,
+                        borderRadius: isMobile ? 6 : 10,
                         background: isSelected
                             ? '#56C1FF'
                             : isPast
@@ -622,16 +626,16 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                         fontWeight: 700,
                         cursor: isSelectable ? 'pointer' : 'default',
                         userSelect: 'none',
-                        fontSize: 12,
+                        fontSize: isMobile ? 11 : 12,
                         zIndex: 1,
                         position: 'relative',
                         transition: 'all 0.2s ease',
                         minHeight: '40px',
-                        padding: '4px'
+                        padding: isMobile ? '2px' : '4px'
                     }}
                 >
-                    <div style={{ fontSize: 13, lineHeight: 1.2 }}>{d.date()}</div>
-                    <div style={{ fontSize: 9, fontWeight: 600, lineHeight: 1.2 }}>
+                    <div style={{ fontSize: isMobile ? 11 : 13, lineHeight: 1.2, fontWeight: 700 }}>{d.date()}</div>
+                    <div style={{ fontSize: isMobile ? 7 : 9, fontWeight: 600, lineHeight: 1.2, textAlign: 'center' }}>
                         {slots.length === 0 ? '' : (soldOut ? 'Sold Out' : `${total} Spaces`)}
                     </div>
                 </div>
@@ -925,19 +929,29 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         <Dialog
             open={open}
             onClose={onClose}
-            maxWidth="sm"
+            maxWidth={isMobile ? "sm" : "sm"}
             fullWidth
             PaperProps={{
                 sx: {
                     borderRadius: 3,
-                    maxHeight: '90vh'
+                    maxHeight: '90vh',
+                    ...(isMobile ? {
+                        margin: '8px',
+                        width: 'calc(100% - 16px)',
+                        maxWidth: 'calc(100% - 16px)'
+                    } : {})
                 }
             }}
         >
-            <DialogTitle sx={{ fontWeight: 700, fontSize: 20, pb: 1.5 }}>
+            <DialogTitle sx={{ 
+                fontWeight: 700, 
+                fontSize: isMobile ? 16 : 20, 
+                pb: 1.5,
+                padding: isMobile ? '12px 16px' : '20px 24px'
+            }}>
                 Reschedule Your Flight
             </DialogTitle>
-            <DialogContent>
+            <DialogContent sx={{ padding: isMobile ? '12px 16px' : '24px' }}>
                 {error && (
                     <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
                         {error}
@@ -952,8 +966,8 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                     <>
                         {/* Locations (Flight Voucher style) */}
                         {availableLocations.length > 0 && (
-                            <Box sx={{ mb: 3 }}>
-                                <Typography variant="h6" sx={{ mb: 2, fontSize: 16, fontWeight: 700 }}>
+                            <Box sx={{ mb: isMobile ? 2 : 3 }}>
+                                <Typography variant="h6" sx={{ mb: isMobile ? 1.5 : 2, fontSize: isMobile ? 14 : 16, fontWeight: 700 }}>
                                     Locations:
                                 </Typography>
                                 <FormGroup row>
@@ -984,27 +998,29 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                         )}
 
                         {/* Calendar */}
-                        <Box sx={{ mb: 3, maxWidth: '500px', mx: 'auto' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                        <Box sx={{ mb: 3, maxWidth: isMobile ? '100%' : '500px', mx: 'auto', px: isMobile ? 1 : 0 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: isMobile ? 0.5 : 1.5 }}>
                                 <IconButton 
                                     onClick={() => setCurrentMonth(prev => prev.subtract(1, 'month'))} 
                                     size="small"
+                                    sx={{ padding: isMobile ? '4px' : '8px' }}
                                 >
-                                    <ChevronLeftIcon />
+                                    <ChevronLeftIcon fontSize={isMobile ? 'small' : 'medium'} />
                                 </IconButton>
-                                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 16 }}>
+                                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 14 : 16 }}>
                                     {monthLabel}
                                 </Typography>
                                 <IconButton 
                                     onClick={() => setCurrentMonth(prev => prev.add(1, 'month'))} 
                                     size="small"
+                                    sx={{ padding: isMobile ? '4px' : '8px' }}
                                 >
-                                    <ChevronRightIcon />
+                                    <ChevronRightIcon fontSize={isMobile ? 'small' : 'medium'} />
                                 </IconButton>
                             </Box>
                             
                             {/* Calendar Grid */}
-                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', mb: 1 }}>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: isMobile ? '2px' : '2px', mb: isMobile ? 0.5 : 1 }}>
                                 {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
                                     <div 
                                         key={day} 
@@ -1012,7 +1028,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                             textAlign: 'center', 
                                             fontWeight: 700, 
                                             color: '#64748b', 
-                                            fontSize: 11 
+                                            fontSize: isMobile ? 9 : 11 
                                         }}
                                     >
                                         {day}
@@ -1020,7 +1036,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                 ))}
                             </Box>
                             
-                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: isMobile ? '2px' : '2px' }}>
                                 {buildDayCells()}
                             </Box>
                         </Box>
@@ -1028,10 +1044,10 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                         {/* Time Selection */}
                         {selectedDate && (
                             <Box sx={{ mt: 3 }}>
-                                <Typography variant="h6" sx={{ mb: 2, fontSize: 18, fontWeight: 600 }}>
+                                <Typography variant="h6" sx={{ mb: isMobile ? 1 : 2, fontSize: isMobile ? 14 : 18, fontWeight: 600 }}>
                                     Select Time for {dayjs(selectedDate).format('DD MMMM YYYY')}
                                 </Typography>
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? 6 : 1.5, marginBottom: isMobile ? 12 : 16 }}>
                                     {getTimesForDate(selectedDate).length === 0 ? (
                                         <Box sx={{ p: 2, textAlign: 'center', width: '100%' }}>
                                             <Typography color="text.secondary" sx={{ fontSize: 16, fontWeight: 500 }}>
@@ -1076,11 +1092,11 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                                                 ? '#56C1FF' 
                                                                 : '#22c55e',
                                                         cursor: isDisabled ? 'not-allowed' : 'pointer',
-                                                        fontSize: 16,
+                                                        fontSize: isMobile ? 14 : 16,
                                                         fontWeight: 600,
-                                                        padding: '12px 20px',
-                                                        minWidth: '140px',
-                                                        height: '50px',
+                                                        padding: isMobile ? '10px 16px' : '12px 20px',
+                                                        minWidth: isMobile ? '120px' : '140px',
+                                                        height: isMobile ? '45px' : '50px',
                                                         '&:hover': {
                                                             backgroundColor: isDisabled 
                                                                 ? '#f5f5f5' 
@@ -1111,7 +1127,12 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                     </>
                 )}
             </DialogContent>
-            <DialogActions sx={{ p: 3, pt: 2, justifyContent: 'flex-end' }}>
+            <DialogActions sx={{ 
+                p: isMobile ? 2 : 3, 
+                pt: isMobile ? 1.5 : 2, 
+                justifyContent: 'flex-end',
+                padding: isMobile ? '12px 16px' : '16px 24px'
+            }}>
                 <Button
                     onClick={handleConfirm}
                     disabled={!selectedDate || !selectedTime || submitting}
