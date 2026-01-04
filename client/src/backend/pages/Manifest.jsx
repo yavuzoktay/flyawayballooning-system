@@ -4392,7 +4392,7 @@ const Manifest = () => {
                                             <Table className="manifest-table">
                                                 <TableHead sx={{ marginTop: 2, background: "#d3d3d3", color: "#000" }}>
                                                     <TableRow>
-                                                        <TableCell>Booking ID</TableCell>
+                                                        <TableCell sx={isMobile ? { width: '60px', minWidth: '60px', maxWidth: '60px', padding: '8px 4px' } : {}}>Booking ID</TableCell>
                                                         <TableCell>Name</TableCell>
                                                         <TableCell>Weight</TableCell>
                                                         <TableCell>Mobile</TableCell>
@@ -4432,7 +4432,7 @@ const Manifest = () => {
                                                         })();
                                                         return (
                                                             <TableRow key={flight.id}>
-                                                                <TableCell>
+                                                                <TableCell sx={isMobile ? { width: '60px', minWidth: '60px', maxWidth: '60px', padding: '8px 4px' } : {}}>
                                                                     <span style={{ color: '#3274b4', cursor: 'pointer', textDecoration: 'underline' }}
                                                                         onClick={() => handleNameClick(flight.id)}>
                                                                         {flight.id || ''}
