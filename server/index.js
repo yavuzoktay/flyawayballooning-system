@@ -29354,7 +29354,7 @@ async function generateGiftVoucherPDF(voucher) {
             
             // Orange triangular shape at bottom (diagonal design like screenshot)
             // Create a diagonal triangle shape from bottom-left corner
-            const gradientHeight = pageHeight * 0.25; // 25% of page height for triangle
+            const gradientHeight = pageHeight * 0.15; // 15% of page height for triangle (reduced from 25%)
             const gradientStartY = pageHeight - gradientHeight;
             
             // Draw triangular shape with diagonal line
@@ -29382,12 +29382,14 @@ async function generateGiftVoucherPDF(voucher) {
             const leftContentX = (leftSectionWidth / 2) - (logoWidth / 2); // Horizontal center
             const balloonY = (pageHeight / 2) - (logoHeight / 2); // Vertical center
             
-            // Diagonal line separating left and right sections (centered vertically)
-            // Line starts from top of left section and goes down, centered on page
+            // Diagonal line separating left and right sections
+            // Add spacing between logo and diagonal line
+            const spacingBelowLogo = 30; // Space between logo bottom and diagonal line start
+            const logoBottomY = balloonY + logoHeight; // Bottom of logo
             const diagonalStartX = pageWidth * 0.35;
-            const diagonalStartY = pageHeight * 0.25; // Start from 25% down the page
+            const diagonalStartY = logoBottomY + spacingBelowLogo; // Start below logo with spacing
             const diagonalEndX = pageWidth * 0.20; // Moved closer to center
-            const diagonalEndY = pageHeight * 0.75; // End at 75% down the page (centered vertically)
+            const diagonalEndY = pageHeight * 0.75; // End at 75% down the page
             
             doc.moveTo(diagonalStartX, diagonalStartY)
                .lineTo(diagonalEndX, diagonalEndY)
@@ -29489,10 +29491,10 @@ async function generateGiftVoucherPDF(voucher) {
             const rightPadding = 40;
             const rightContentX = rightStartX + rightPadding;
             
-            // Main title "GIFT VOUCHER" (stacked, dark blue)
+            // Main title "GIFT VOUCHER" (stacked, black)
             const titleY = 60;
             doc.fontSize(42)
-               .fillColor('#1e3a8a') // Dark blue color
+               .fillColor('#1a1a1a') // Black color
                .font('Helvetica-Bold')
                .text('GIFT', rightContentX, titleY)
                .text('VOUCHER', rightContentX, titleY + 50);
@@ -29506,7 +29508,7 @@ async function generateGiftVoucherPDF(voucher) {
             
             // Information fields
             const fieldStartY = subtitleY + 80;
-            const fieldSpacing = 70;
+            const fieldSpacing = 50; // Reduced spacing between fields
             const fieldLabelWidth = 100;
             const fieldBoxWidth = 300;
             const fieldBoxHeight = 35;
@@ -29593,8 +29595,8 @@ async function generateGiftVoucherPDF(voucher) {
                    ellipsis: true
                });
             
-            // Terms and conditions at bottom right
-            const termsY = pageHeight - 120;
+            // Terms and conditions - moved up, positioned after EXPIRY field
+            const termsY = currentY + fieldSpacing + 20; // Position after EXPIRY field with small spacing
             const termsWidth = rightSectionWidth - rightPadding * 2;
             const termsText = "Your gift voucher is valid until the expiry date shown. Within this validity period, you must have either flown or booked onto a minimum of six flights that were cancelled in order to qualify for a free extension. Any booked flight must be within the voucher's validity period.";
             
