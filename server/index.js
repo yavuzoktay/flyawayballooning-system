@@ -29295,22 +29295,86 @@ async function generateGiftVoucherPDF(voucher) {
             const leftContentX = leftPadding;
             
             // Logo (use logoRemoveBackground.png from uploads/email directory)
-            const logoPath = path.join(__dirname, 'uploads', 'email', 'logoRemoveBackground.png');
+            const logoPath = path.resolve(__dirname, 'uploads', 'email', 'logoRemoveBackground.png');
             const balloonY = 80;
+            let logoLoaded = false;
+            
+            // Try to load logo - PDFKit requires absolute path or Buffer
             if (fs.existsSync(logoPath)) {
-                doc.image(logoPath, leftContentX, balloonY, { width: 140, height: 140, fit: [140, 140] });
-            } else {
-                // Fallback: try alternative logo path
-                const altLogoPath = path.join(__dirname, '..', 'client', 'public', 'FAB_Logo_DarkBlue.png');
-                if (fs.existsSync(altLogoPath)) {
-                    doc.image(altLogoPath, leftContentX, balloonY, { width: 140, height: 140, fit: [140, 140] });
-                } else {
-                    // Final fallback: use text (but this should not happen if logo file exists)
-                    console.warn('Logo file not found at:', logoPath, 'or', altLogoPath);
-                    doc.fontSize(60)
-                       .fillColor('#333333')
-                       .text('🎈', leftContentX, balloonY);
+                try {
+                    console.log('📷 Attempting to load logo from:', logoPath);
+                    // Method 1: Try with Buffer (most reliable for PDFKit)
+                    const logoBuffer = fs.readFileSync(logoPath);
+                    console.log('📷 Logo buffer size:', logoBuffer.length, 'bytes');
+                    
+                    // Use image with explicit options
+                    doc.image(logoBuffer, leftContentX, balloonY, {
+                        width: 140,
+                        height: 140
+                    });
+                    
+                    logoLoaded = true;
+                    console.log('✅ Logo loaded successfully from buffer');
+                } catch (imageError) {
+                    console.error('❌ Error loading logo image (buffer method):', imageError.message);
+                    // Method 2: Try with absolute path string
+                    try {
+                        console.log('📷 Attempting to load logo from path:', logoPath);
+                        doc.image(logoPath, leftContentX, balloonY, {
+                            width: 140,
+                            height: 140
+                        });
+                        logoLoaded = true;
+                        console.log('✅ Logo loaded successfully from path');
+                    } catch (pathError) {
+                        console.error('❌ Error loading logo image (path method):', pathError.message);
+                        logoLoaded = false;
+                    }
                 }
+            } else {
+                console.warn('⚠️ Logo file not found at:', logoPath);
+            }
+            
+            // Fallback: try alternative logo path
+            if (!logoLoaded) {
+                const altLogoPath = path.resolve(__dirname, '..', 'client', 'public', 'FAB_Logo_DarkBlue.png');
+                if (fs.existsSync(altLogoPath)) {
+                    try {
+                        console.log('📷 Attempting to load alternative logo from:', altLogoPath);
+                        const altLogoBuffer = fs.readFileSync(altLogoPath);
+                        doc.image(altLogoBuffer, leftContentX, balloonY, {
+                            width: 140,
+                            height: 140
+                        });
+                        logoLoaded = true;
+                        console.log('✅ Alternative logo loaded successfully from buffer');
+                    } catch (imageError) {
+                        console.error('❌ Error loading alternative logo image:', imageError.message);
+                        // Try direct path
+                        try {
+                            doc.image(altLogoPath, leftContentX, balloonY, {
+                                width: 140,
+                                height: 140
+                            });
+                            logoLoaded = true;
+                            console.log('✅ Alternative logo loaded successfully from path');
+                        } catch (pathError) {
+                            console.error('❌ Error loading alternative logo (path method):', pathError.message);
+                        }
+                    }
+                } else {
+                    console.warn('⚠️ Alternative logo file not found at:', altLogoPath);
+                }
+            }
+            
+            // Final fallback: use text only if logo failed to load (no emoji to avoid encoding issues)
+            if (!logoLoaded) {
+                console.warn('⚠️ All logo loading methods failed. Using text fallback.');
+                doc.fontSize(24)
+                   .fillColor('#1a1a1a')
+                   .font('Helvetica-Bold')
+                   .text('Fly Away', leftContentX, balloonY)
+                   .text('Ballooning', leftContentX, balloonY + 30);
             }
             
             // Company name
