@@ -29382,20 +29382,7 @@ async function generateGiftVoucherPDF(voucher) {
             const leftContentX = (leftSectionWidth / 2) - (logoWidth / 2); // Horizontal center
             const balloonY = (pageHeight / 2) - (logoHeight / 2); // Vertical center
             
-            // Diagonal line separating left and right sections
-            // Add spacing between logo and diagonal line
-            const spacingBelowLogo = 30; // Space between logo bottom and diagonal line start
-            const logoBottomY = balloonY + logoHeight; // Bottom of logo
-            const diagonalStartX = pageWidth * 0.35;
-            const diagonalStartY = logoBottomY + spacingBelowLogo; // Start below logo with spacing
-            const diagonalEndX = pageWidth * 0.20; // Moved closer to center
-            const diagonalEndY = pageHeight * 0.75; // End at 75% down the page
-            
-            doc.moveTo(diagonalStartX, diagonalStartY)
-               .lineTo(diagonalEndX, diagonalEndY)
-               .strokeColor('#333333')
-               .lineWidth(1)
-               .stroke();
+            // Diagonal line removed - no longer needed
             let logoLoaded = false;
             
             // Try to load logo - PDFKit requires absolute path or Buffer
