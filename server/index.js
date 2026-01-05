@@ -29585,7 +29585,7 @@ async function generateGiftVoucherPDF(voucher) {
             // Terms and conditions - moved up, positioned after EXPIRY field
             // Text split into 4 lines and reduced width
             const termsY = currentY + fieldSpacing + 20; // Position after EXPIRY field with small spacing
-            const termsWidth = (rightSectionWidth - rightPadding * 2) * 0.75; // Reduced width to 75% for 4-line layout
+            const termsWidth = (rightSectionWidth - rightPadding * 2) * 0.60; // Reduced width to 60% for narrower 4-line layout
             const termsText = "Your gift voucher is valid until the expiry date shown. Within this validity period, you must have either flown or booked onto a minimum of six flights that were cancelled in order to qualify for a free extension. Any booked flight must be within the voucher's validity period.";
             
             doc.fontSize(7)
