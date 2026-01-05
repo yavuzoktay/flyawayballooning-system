@@ -29468,7 +29468,7 @@ async function generateGiftVoucherPDF(voucher) {
             
             // Website URL at bottom (on orange triangle - black text)
             const websiteY = pageHeight - 30;
-            doc.fontSize(12)
+            doc.fontSize(9)
                .fillColor('#000000')
                .font('Helvetica-Bold')
                .text('FLYAWAYBALLOONING.COM', leftContentX, websiteY);
@@ -29541,10 +29541,10 @@ async function generateGiftVoucherPDF(voucher) {
                .lineWidth(1)
                .stroke();
             
-            doc.fontSize(14)
+            doc.fontSize(12)
                .fillColor('#FF6937')
-               .font('Helvetica-Bold')
-               .text(voucherCode, fieldBoxX + 10, currentY + 8, {
+               .font('Helvetica')
+               .text(voucherCode, fieldBoxX + 10, currentY + 10, {
                    width: fieldBoxWidth - 20,
                    ellipsis: true
                });
@@ -29587,7 +29587,7 @@ async function generateGiftVoucherPDF(voucher) {
             const termsWidth = rightSectionWidth - rightPadding * 2;
             const termsText = "Your gift voucher is valid until the expiry date shown. Within this validity period, you must have either flown or booked onto a minimum of six flights that were cancelled in order to qualify for a free extension. Any booked flight must be within the voucher's validity period.";
             
-            doc.fontSize(9)
+            doc.fontSize(7)
                .fillColor('#1a1a1a')
                .font('Helvetica')
                .text(termsText, rightContentX, termsY, {
