@@ -29489,7 +29489,7 @@ async function generateGiftVoucherPDF(voucher) {
             // Subtitle "YOUR TICKET TO THE SKIES"
             const subtitleY = titleY + 100;
             doc.fontSize(14)
-               .fillColor('#ff6b35')
+               .fillColor('#FF6937')
                .font('Helvetica-Bold')
                .text('YOUR TICKET TO THE SKIES', rightContentX, subtitleY);
             
@@ -29518,7 +29518,7 @@ async function generateGiftVoucherPDF(voucher) {
                .stroke();
             
             doc.fontSize(12)
-               .fillColor('#1a1a1a')
+               .fillColor('#FF6937')
                .font('Helvetica')
                .text(recipientName, fieldBoxX + 10, currentY + 10, {
                    width: fieldBoxWidth - 20,
@@ -29542,7 +29542,7 @@ async function generateGiftVoucherPDF(voucher) {
                .stroke();
             
             doc.fontSize(14)
-               .fillColor('#1a1a1a')
+               .fillColor('#FF6937')
                .font('Helvetica-Bold')
                .text(voucherCode, fieldBoxX + 10, currentY + 8, {
                    width: fieldBoxWidth - 20,
@@ -29575,7 +29575,7 @@ async function generateGiftVoucherPDF(voucher) {
                .stroke();
             
             doc.fontSize(12)
-               .fillColor('#1a1a1a')
+               .fillColor('#FF6937')
                .font('Helvetica')
                .text(expiryDate, fieldBoxX + 10, currentY + 10, {
                    width: fieldBoxWidth - 20,
