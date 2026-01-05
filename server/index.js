@@ -29373,18 +29373,16 @@ async function generateGiftVoucherPDF(voucher) {
             const logoWidth = 200; // Maintain aspect ratio, width determines size
             const logoHeight = logoWidth * (158 / 402); // Calculate height based on aspect ratio (~78.6)
             
-            // Center logo horizontally, position it in upper-middle of left section
+            // Center logo vertically and horizontally in left section
             const leftContentX = (leftSectionWidth / 2) - (logoWidth / 2); // Horizontal center
-            const balloonY = pageHeight * 0.20; // Position logo in upper-middle section (20% from top)
+            const balloonY = (pageHeight / 2) - (logoHeight / 2); // Vertical center
             
-            // Diagonal line separating left and right sections
-            // Line starts below the logo with spacing, and extends downward
-            const spacingBelowLogo = 40; // Space between logo bottom and diagonal line start
-            const logoBottomY = balloonY + logoHeight; // Bottom of logo
+            // Diagonal line separating left and right sections (centered vertically)
+            // Line starts from top of left section and goes down, centered on page
             const diagonalStartX = pageWidth * 0.35;
-            const diagonalStartY = logoBottomY + spacingBelowLogo; // Start below logo with spacing
+            const diagonalStartY = pageHeight * 0.25; // Start from 25% down the page
             const diagonalEndX = pageWidth * 0.20; // Moved closer to center
-            const diagonalEndY = pageHeight * 0.70; // End at 70% down the page
+            const diagonalEndY = pageHeight * 0.75; // End at 75% down the page (centered vertically)
             
             doc.moveTo(diagonalStartX, diagonalStartY)
                .lineTo(diagonalEndX, diagonalEndY)
