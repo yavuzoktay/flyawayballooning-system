@@ -20540,21 +20540,27 @@ app.get("/api/test/gift-voucher-pdf", async (req, res) => {
             voucher_type: 'Any Day Flight'
         };
         
-        console.log('📄 Generating test Gift Voucher PDF...');
+        console.log('📄 [TEST ENDPOINT] Generating test Gift Voucher PDF...');
+        console.log('📄 [TEST ENDPOINT] Test voucher data:', testVoucher);
         const pdfBuffer = await generateGiftVoucherPDF(testVoucher);
-        console.log('✅ Test PDF generated successfully, size:', pdfBuffer.length, 'bytes');
+        console.log('✅ [TEST ENDPOINT] Test PDF generated successfully, size:', pdfBuffer.length, 'bytes');
         
-        // Send PDF as download
+        // Send PDF as download with cache-busting headers
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="Test_Gift_Voucher_${testVoucher.voucher_ref}.pdf"`);
         res.setHeader('Content-Length', pdfBuffer.length);
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
         res.send(pdfBuffer);
     } catch (error) {
-        console.error('❌ Error generating test PDF:', error);
+        console.error('❌ [TEST ENDPOINT] Error generating test PDF:', error);
+        console.error('❌ [TEST ENDPOINT] Error stack:', error.stack);
         res.status(500).json({ 
             success: false, 
             message: 'Error generating PDF', 
-            error: error.message 
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 });
@@ -29358,11 +29364,11 @@ async function generateGiftVoucherPDF(voucher) {
                .fill();
             doc.restore();
             
-            // Diagonal line separating left and right sections
+            // Diagonal line separating left and right sections (shorter line)
             const diagonalStartX = pageWidth * 0.35;
             const diagonalStartY = 0;
-            const diagonalEndX = pageWidth * 0.15;
-            const diagonalEndY = pageHeight * 0.75;
+            const diagonalEndX = pageWidth * 0.20; // Moved closer to center
+            const diagonalEndY = pageHeight * 0.50; // Shorter line - only goes to middle of page
             
             doc.moveTo(diagonalStartX, diagonalStartY)
                .lineTo(diagonalEndX, diagonalEndY)
@@ -29372,7 +29378,6 @@ async function generateGiftVoucherPDF(voucher) {
             
             // LEFT SECTION
             const leftPadding = 40;
-            const leftContentX = leftPadding;
             
             // Logo (use logoRemoveBackground.png from uploads/email directory)
             // Logo dimensions: 402x158 (aspect ratio ~2.54:1)
@@ -29380,6 +29385,9 @@ async function generateGiftVoucherPDF(voucher) {
             const balloonY = 80;
             const logoWidth = 200; // Maintain aspect ratio, width determines size
             const logoHeight = logoWidth * (158 / 402); // Calculate height based on aspect ratio (~78.6)
+            
+            // Center logo horizontally in left section
+            const leftContentX = (leftSectionWidth / 2) - (logoWidth / 2);
             let logoLoaded = false;
             
             // Try to load logo - PDFKit requires absolute path or Buffer
@@ -29391,6 +29399,7 @@ async function generateGiftVoucherPDF(voucher) {
                     console.log('📷 Logo buffer size:', logoBuffer.length, 'bytes');
                     
                     // Use image with width only to maintain aspect ratio and quality
+                    // Logo is centered horizontally in left section
                     doc.image(logoBuffer, leftContentX, balloonY, {
                         width: logoWidth
                         // height not specified to maintain aspect ratio
