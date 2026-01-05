@@ -29375,8 +29375,8 @@ async function generateGiftVoucherPDF(voucher) {
             // Logo (use logoRemoveBackground.png from uploads/email directory)
             // Logo dimensions: 402x158 (aspect ratio ~2.54:1)
             const logoPath = path.resolve(__dirname, 'uploads', 'email', 'logoRemoveBackground.png');
-            const logoWidth = 200; // Maintain aspect ratio, width determines size
-            const logoHeight = logoWidth * (158 / 402); // Calculate height based on aspect ratio (~78.6)
+            const logoWidth = 250; // Increased logo size (was 200)
+            const logoHeight = logoWidth * (158 / 402); // Calculate height based on aspect ratio (~98.3)
             
             // Center logo vertically and horizontally in left section
             const leftContentX = (leftSectionWidth / 2) - (logoWidth / 2); // Horizontal center
@@ -29494,10 +29494,10 @@ async function generateGiftVoucherPDF(voucher) {
                .text('YOUR TICKET TO THE SKIES', rightContentX, subtitleY);
             
             // Information fields
-            const fieldStartY = subtitleY + 80;
+            const fieldStartY = subtitleY + 40; // Reduced spacing below subtitle (was 80)
             const fieldSpacing = 50; // Reduced spacing between fields
             const fieldLabelWidth = 100;
-            const fieldBoxWidth = 300;
+            const fieldBoxWidth = 220; // Reduced input box width (was 300)
             const fieldBoxHeight = 35;
             const fieldBoxX = rightContentX + fieldLabelWidth + 20;
             
