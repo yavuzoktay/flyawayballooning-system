@@ -4347,7 +4347,6 @@ const Manifest = () => {
                                                         <TableCell>Add On's</TableCell>
                                                         <TableCell>Notes</TableCell>
                                                         <TableCell>Status</TableCell>
-                                                        <TableCell>Actions</TableCell>
                                                     </TableRow>
                                                 </TableHead>
                                                 <TableBody>
@@ -4476,42 +4475,6 @@ const Manifest = () => {
                                                                         <MenuItem value="No Show">❌ No Show</MenuItem>
                                                                     </Select>
                                                                 </TableCell>
-                                                                <TableCell>
-                                                                    <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                                                                        <button
-                                                                            onClick={() => handleEmailClick(flight)}
-                                                                            style={{
-                                                                                padding: "4px 8px",
-                                                                                backgroundColor: "#28a745",
-                                                                                color: "white",
-                                                                                border: "none",
-                                                                                borderRadius: "4px",
-                                                                                cursor: "pointer",
-                                                                                fontSize: "12px",
-                                                                                fontWeight: "500"
-                                                                            }}
-                                                                            title="Send Email"
-                                                                        >
-                                                                            📧 Email
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => handleSmsClick(flight)}
-                                                                            style={{
-                                                                                padding: "4px 8px",
-                                                                                backgroundColor: "#17a2b8",
-                                                                                color: "white",
-                                                                                border: "none",
-                                                                                borderRadius: "4px",
-                                                                                cursor: "pointer",
-                                                                                fontSize: "12px",
-                                                                                fontWeight: "500"
-                                                                            }}
-                                                                            title="Send SMS"
-                                                                        >
-                                                                            📱 SMS
-                                                                        </button>
-                                                                    </div>
-                                                                </TableCell>
                                                             </TableRow>
                                                         );
                                                     })}
@@ -4519,7 +4482,7 @@ const Manifest = () => {
                                                     <TableRow>
                                                         {isMobile ? (
                                                             <TableCell 
-                                                                colSpan={10}
+                                                                colSpan={9}
                                                                 sx={{ 
                                                                     textAlign: 'left', 
                                                                     fontWeight: 600, 
@@ -4538,7 +4501,7 @@ const Manifest = () => {
                                                             </TableCell>
                                                         ) : (
                                                             <TableCell 
-                                                                colSpan={11} 
+                                                                colSpan={10} 
                                                                 sx={{ 
                                                                     textAlign: 'right', 
                                                                     fontWeight: 600, 
