@@ -29352,14 +29352,19 @@ async function generateGiftVoucherPDF(voucher) {
                .fillColor('#faf9f6')
                .fill();
             
-            // Orange gradient shape at bottom
-            // Create gradient effect using multiple rectangles with varying opacity
-            const gradientHeight = pageHeight * 0.2; // 20% of page height
+            // Orange triangular shape at bottom (diagonal design like screenshot)
+            // Create a diagonal triangle shape from bottom-left corner
+            const gradientHeight = pageHeight * 0.25; // 25% of page height for triangle
             const gradientStartY = pageHeight - gradientHeight;
             
-            // Draw gradient shape (irregular polygon)
+            // Draw triangular shape with diagonal line
+            // Triangle: bottom-left corner -> goes up diagonally -> then down to bottom-right
+            // Creates a dynamic diagonal triangle effect
             doc.save();
-            doc.path('M 0 ' + pageHeight + ' L 0 ' + gradientStartY + ' L ' + (leftSectionWidth * 0.8) + ' ' + (gradientStartY + gradientHeight * 0.3) + ' L ' + (leftSectionWidth * 1.2) + ' ' + (gradientStartY + gradientHeight * 0.5) + ' L ' + pageWidth + ' ' + (gradientStartY + gradientHeight * 0.7) + ' L ' + pageWidth + ' ' + pageHeight + ' Z')
+            // Main orange triangle shape - starts from bottom-left, goes diagonally up-right, then down to bottom-right
+            const triangleTopX = pageWidth * 0.6; // Triangle peak at 60% of width
+            const triangleTopY = gradientStartY; // Top of triangle
+            doc.path('M 0 ' + pageHeight + ' L 0 ' + triangleTopY + ' L ' + triangleTopX + ' ' + (triangleTopY + gradientHeight * 0.3) + ' L ' + pageWidth + ' ' + (triangleTopY + gradientHeight * 0.5) + ' L ' + pageWidth + ' ' + pageHeight + ' Z')
                .fillColor('#ff6b35')
                .fill();
             doc.restore();
@@ -29472,10 +29477,10 @@ async function generateGiftVoucherPDF(voucher) {
             
             // Company name removed - logo is sufficient
             
-            // Website URL at bottom (on orange gradient - white text)
+            // Website URL at bottom (on orange triangle - black text)
             const websiteY = pageHeight - 30;
             doc.fontSize(12)
-               .fillColor('#ffffff')
+               .fillColor('#000000')
                .font('Helvetica-Bold')
                .text('FLYAWAYBALLOONING.COM', leftContentX, websiteY);
             
