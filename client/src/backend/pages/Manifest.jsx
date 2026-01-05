@@ -4382,7 +4382,7 @@ const Manifest = () => {
                                                                         color: '#3274b4', 
                                                                         cursor: 'pointer', 
                                                                         textDecoration: 'underline',
-                                                                        fontSize: isMobile ? '8px' : 'inherit'
+                                                                        fontSize: isMobile ? '12px' : 'inherit'
                                                                     }}
                                                                         onClick={() => handleNameClick(flight.id)}>
                                                                         {flight.id || ''}
@@ -4393,7 +4393,7 @@ const Manifest = () => {
                                                                         color: 'rgb(50, 116, 180)', 
                                                                         cursor: 'pointer', 
                                                                         textDecoration: 'underline',
-                                                                        fontSize: '8px'
+                                                                        fontSize: '12px'
                                                                     }}
                                                                         onClick={() => handleNameClick(flight.id)}>
                                                                         {firstPassenger ? `${firstPassenger.first_name || ''} ${firstPassenger.last_name || ''}`.trim() : (flight.name || '')}
@@ -4403,7 +4403,7 @@ const Manifest = () => {
                                                                             {flight.passengers.slice(1).map((p, i) => (
                                                                                 <div key={`${flight.id}-p-${i+1}`} style={{ 
                                                                                     color: 'rgb(50, 116, 180)', 
-                                                                                    fontSize: '8px',
+                                                                                    fontSize: '12px',
                                                                                     marginTop: '2px'
                                                                                 }}>
                                                                                     {`${p.first_name || ''} ${p.last_name || ''}`.trim()}
@@ -4529,20 +4529,28 @@ const Manifest = () => {
                     )}
                 </Box>
             </Container>
-            <Dialog open={detailDialogOpen} onClose={() => setDetailDialogOpen(false)} maxWidth="md" fullWidth>
-                <DialogTitle style={{ background: '#2d4263', color: '#fff', fontWeight: 700, fontSize: 22 }}>Booking Details</DialogTitle>
-                <DialogContent style={{ background: '#f7f7f7', minHeight: 500 }}>
+            <Dialog open={detailDialogOpen} onClose={() => setDetailDialogOpen(false)} maxWidth="md" fullWidth
+                PaperProps={{
+                    sx: isMobile ? {
+                        margin: '8px',
+                        maxHeight: 'calc(100% - 16px)',
+                        height: 'calc(100% - 16px)'
+                    } : {}
+                }}
+            >
+                <DialogTitle style={{ background: '#2d4263', color: '#fff', fontWeight: 700, fontSize: isMobile ? 18 : 22 }}>Booking Details</DialogTitle>
+                <DialogContent style={{ background: '#f7f7f7', minHeight: isMobile ? 'auto' : 500, padding: isMobile ? '12px' : '24px' }}>
                     {loadingDetail ? (
                         <Typography>Loading...</Typography>
                     ) : detailError ? (
                         <Typography color="error">{detailError}</Typography>
                     ) : bookingDetail && bookingDetail.success ? (
                         <Box>
-                            <Grid container spacing={2}>
+                            <Grid container spacing={isMobile ? 1 : 2}>
                                 {/* Personal Details */}
                                 <Grid item xs={12} md={4}>
-                                    <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
-                                        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Personal Details</Typography>
+                                    <Box sx={{ background: '#fff', borderRadius: 2, p: isMobile ? 1.5 : 2, mb: isMobile ? 1 : 2, boxShadow: 1 }}>
+                                        <Typography variant="h6" sx={{ fontWeight: 700, mb: isMobile ? 0.5 : 1, fontSize: isMobile ? '16px' : 'inherit' }}>Personal Details</Typography>
                                         <Typography><b>Booking Name:</b> {editField === 'name' ? (
                                             <>
                                                 <input value={editValue} onChange={e => setEditValue(e.target.value)} style={{marginRight: 8}} />
@@ -4766,8 +4774,8 @@ const Manifest = () => {
                                     </Box>
                                     {/* Additional section removed - information is now displayed in Additional Information section */}
                                     {/* Add On */}
-                                    <Box sx={{ background: '#fff', borderRadius: 2, p: 2, mb: 2, boxShadow: 1 }}>
-                                        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Add On's</Typography>
+                                    <Box sx={{ background: '#fff', borderRadius: 2, p: isMobile ? 1.5 : 2, mb: isMobile ? 1 : 2, boxShadow: 1 }}>
+                                        <Typography variant="h6" sx={{ fontWeight: 700, mb: isMobile ? 0.5 : 1, fontSize: isMobile ? '16px' : 'inherit' }}>Add On's</Typography>
                                         
                                         {/* Display actual add-ons from choose_add_on field */}
                                         {(() => {
@@ -4847,11 +4855,11 @@ const Manifest = () => {
                                 </Grid>
                                 {/* Main Details */}
                                 <Grid item xs={12} md={8}>
-                                    <Box sx={{ background: '#fff', borderRadius: 2, p: 2, boxShadow: 1 }}>
+                                    <Box sx={{ background: '#fff', borderRadius: 2, p: isMobile ? 1.5 : 2, boxShadow: 1 }}>
                                         {/* Current Booking */}
-                                        <Box sx={{ mb: 2, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                                            <Box>
-                                                <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Current Booking</Typography>
+                                        <Box sx={{ mb: isMobile ? 1 : 2, display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'flex-start', justifyContent: 'space-between', gap: isMobile ? 1 : 0 }}>
+                                            <Box sx={{ flex: 1 }}>
+                                                <Typography variant="h6" sx={{ fontWeight: 700, mb: isMobile ? 0.5 : 1, fontSize: isMobile ? '16px' : 'inherit' }}>Current Booking</Typography>
                                                 <Typography><b>Activity:</b> {bookingDetail.booking.experience || bookingDetail.booking.flight_type || '-'} - {bookingDetail.booking.location}</Typography>
                                                 {bookingDetail.booking.status !== 'Cancelled' && (
                                                     <Typography><b>Booked For:</b> {bookingDetail.booking.flight_date ? (
@@ -4887,16 +4895,82 @@ const Manifest = () => {
                                                     </Box>
                                                 )}
                                             </Box>
-                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 140 }}>
-                                                <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleRebook}>Rebook</Button>
-                                                <Button variant="contained" color="primary" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none' }} onClick={handleAddGuestClick}>Add Guest</Button>
-                                                <Button variant="contained" color="info" sx={{ mb: 1, borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d' }} onClick={handleCancelFlight}>Cancel Flight</Button>
-                                                <Button variant="contained" color="success" sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#28a745' }} onClick={handleEmailBooking}>Email</Button>
-                                                <Button variant="contained" color="info" sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#17a2b8' }} onClick={handleSmsBooking}>SMS</Button>
+                                            <Box sx={{ 
+                                                display: 'flex', 
+                                                flexDirection: isMobile ? 'row' : 'column', 
+                                                flexWrap: isMobile ? 'wrap' : 'nowrap',
+                                                gap: isMobile ? '8px' : 1, 
+                                                minWidth: isMobile ? 'auto' : 140,
+                                                width: isMobile ? '100%' : 'auto',
+                                                mt: isMobile ? 1 : 0
+                                            }}>
+                                                <Button variant="contained" color="primary" sx={{ 
+                                                    mb: isMobile ? 0 : 1, 
+                                                    borderRadius: 2, 
+                                                    fontWeight: 600, 
+                                                    textTransform: 'none',
+                                                    flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                    minWidth: isMobile ? 'auto' : 'auto',
+                                                    fontSize: isMobile ? '12px' : '14px',
+                                                    padding: isMobile ? '6px 8px' : '8px 16px'
+                                                }} onClick={handleRebook}>Rebook</Button>
+                                                <Button variant="contained" color="primary" sx={{ 
+                                                    mb: isMobile ? 0 : 1, 
+                                                    borderRadius: 2, 
+                                                    fontWeight: 600, 
+                                                    textTransform: 'none',
+                                                    flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                    minWidth: isMobile ? 'auto' : 'auto',
+                                                    fontSize: isMobile ? '12px' : '14px',
+                                                    padding: isMobile ? '6px 8px' : '8px 16px'
+                                                }} onClick={handleAddGuestClick}>Add Guest</Button>
+                                                <Button variant="contained" color="info" sx={{ 
+                                                    mb: isMobile ? 0 : 1, 
+                                                    borderRadius: 2, 
+                                                    fontWeight: 600, 
+                                                    textTransform: 'none', 
+                                                    background: '#6c757d',
+                                                    flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                    minWidth: isMobile ? 'auto' : 'auto',
+                                                    fontSize: isMobile ? '12px' : '14px',
+                                                    padding: isMobile ? '6px 8px' : '8px 16px'
+                                                }} onClick={handleCancelFlight}>Cancel Flight</Button>
+                                                <Button variant="contained" color="success" sx={{ 
+                                                    borderRadius: 2, 
+                                                    fontWeight: 600, 
+                                                    textTransform: 'none', 
+                                                    background: '#28a745',
+                                                    mb: isMobile ? 0 : 1,
+                                                    flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                    minWidth: isMobile ? 'auto' : 'auto',
+                                                    fontSize: isMobile ? '12px' : '14px',
+                                                    padding: isMobile ? '6px 8px' : '8px 16px'
+                                                }} onClick={handleEmailBooking}>Email</Button>
+                                                <Button variant="contained" color="info" sx={{ 
+                                                    borderRadius: 2, 
+                                                    fontWeight: 600, 
+                                                    textTransform: 'none', 
+                                                    background: '#17a2b8',
+                                                    mb: isMobile ? 0 : 1,
+                                                    flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                    minWidth: isMobile ? 'auto' : 'auto',
+                                                    fontSize: isMobile ? '12px' : '14px',
+                                                    padding: isMobile ? '6px 8px' : '8px 16px'
+                                                }} onClick={handleSmsBooking}>SMS</Button>
                                                 <Button
                                                     variant="contained"
                                                     color="secondary"
-                                                    sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#17a2b8' }}
+                                                    sx={{ 
+                                                        borderRadius: 2, 
+                                                        fontWeight: 600, 
+                                                        textTransform: 'none', 
+                                                        background: '#17a2b8',
+                                                        mb: isMobile ? 0 : 1,
+                                                        flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                        minWidth: isMobile ? 'auto' : 'auto',
+                                                        fontSize: isMobile ? '12px' : '14px',
+                                                        padding: isMobile ? '6px 8px' : '8px 16px'
+                                                    }}
                                                     onClick={() => bookingDetail?.booking && handleMessagesClick(bookingDetail.booking)}
                                                     disabled={!bookingDetail?.booking}
                                                 >
@@ -4905,7 +4979,17 @@ const Manifest = () => {
                                                 <Button
                                                     variant="contained"
                                                     color="info"
-                                                    sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d', mt: 1 }}
+                                                    sx={{ 
+                                                        borderRadius: 2, 
+                                                        fontWeight: 600, 
+                                                        textTransform: 'none', 
+                                                        background: '#6c757d', 
+                                                        mt: isMobile ? 0 : 1,
+                                                        flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                        minWidth: isMobile ? 'auto' : 'auto',
+                                                        fontSize: isMobile ? '12px' : '14px',
+                                                        padding: isMobile ? '6px 8px' : '8px 16px'
+                                                    }}
                                                     onClick={() => {
                                                         if (bookingDetail?.booking?.id) {
                                                             // Clear payment history before opening modal to avoid showing stale data
@@ -4921,7 +5005,17 @@ const Manifest = () => {
                                                 <Button
                                                     variant="contained"
                                                     color="info"
-                                                    sx={{ borderRadius: 2, fontWeight: 600, textTransform: 'none', background: '#6c757d', mt: 1 }}
+                                                    sx={{ 
+                                                        borderRadius: 2, 
+                                                        fontWeight: 600, 
+                                                        textTransform: 'none', 
+                                                        background: '#6c757d', 
+                                                        mt: isMobile ? 0 : 1,
+                                                        flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                        minWidth: isMobile ? 'auto' : 'auto',
+                                                        fontSize: isMobile ? '12px' : '14px',
+                                                        padding: isMobile ? '6px 8px' : '8px 16px'
+                                                    }}
                                                     onClick={() => {
                                                         if (bookingDetail?.booking?.id) {
                                                             setUserSessionModalOpen(true);
@@ -4934,10 +5028,10 @@ const Manifest = () => {
                                                 </Button>
                                             </Box>
                                         </Box>
-                                        <Divider sx={{ my: 2 }} />
+                                        <Divider sx={{ my: isMobile ? 1 : 2 }} />
                                         {/* Passenger Details */}
-                                        <Box sx={{ mb: 2 }}>
-                                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Passenger Details</Typography>
+                                        <Box sx={{ mb: isMobile ? 1 : 2 }}>
+                                            <Typography variant="h6" sx={{ fontWeight: 700, mb: isMobile ? 0.5 : 1, fontSize: isMobile ? '16px' : 'inherit' }}>Passenger Details</Typography>
                                             {bookingDetail.passengers && bookingDetail.passengers.length > 0 ? (
                                                 <Box>
                                                     {(() => {
@@ -5068,10 +5162,46 @@ const Manifest = () => {
                                                 </Box>
                                             ) : null}
                                         </Box>
-                                        <Divider sx={{ my: 2 }} />
+                                        {/* HISTORY SECTION - Mobile: Below Passenger Details */}
+                                        {isMobile && (
+                                            <>
+                                                <Divider sx={{ my: 1 }} />
+                                                <Box sx={{ background: '#e0e0e0', borderRadius: 2, p: 1, mt: 1, mb: 1 }} className="booking-history-section">
+                                                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 1, fontSize: '16px' }}>History</Typography>
+                                                    <TableContainer component={Box} className="booking-history-table-container">
+                                                        <Table className="booking-history-table">
+                                                            <TableHead>
+                                                                <TableRow>
+                                                                    <TableCell>Booking Date</TableCell>
+                                                                    <TableCell>Activity Type</TableCell>
+                                                                    <TableCell>Location</TableCell>
+                                                                    <TableCell>Status</TableCell>
+                                                                </TableRow>
+                                                            </TableHead>
+                                                            <TableBody>
+                                                                {historyRows.map((h, i) => (
+                                                                    <TableRow key={i}>
+                                                                        <TableCell>{h.flight_date ? dayjs(h.flight_date).format('DD/MM/YYYY HH:mm') : (h.changed_at ? dayjs(h.changed_at).format('DD/MM/YYYY HH:mm') : '-')}</TableCell>
+                                                                        <TableCell>{bookingDetail.booking.flight_type || '-'}</TableCell>
+                                                                        <TableCell>{bookingDetail.booking.location || '-'}</TableCell>
+                                                                        <TableCell>{getStatusWithEmoji(h.status || 'Scheduled')}</TableCell>
+                                                                    </TableRow>
+                                                                ))}
+                                                                {historyRows.length === 0 && (
+                                                                    <TableRow>
+                                                                        <TableCell colSpan={4} align="center">No history yet</TableCell>
+                                                                    </TableRow>
+                                                                )}
+                                                            </TableBody>
+                                                        </Table>
+                                                    </TableContainer>
+                                                </Box>
+                                            </>
+                                        )}
+                                        <Divider sx={{ my: isMobile ? 1 : 2 }} />
                                         {/* Notes */}
                                         <Box>
-                                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Notes</Typography>
+                                            <Typography variant="h6" sx={{ fontWeight: 700, mb: isMobile ? 0.5 : 1, fontSize: isMobile ? '16px' : 'inherit' }}>Notes</Typography>
                                             <Box sx={{ mb: 2, background: '#f7f7f7', p: 2, borderRadius: 2 }}>
                                                 <TextField
                                                     multiline
@@ -5100,11 +5230,11 @@ const Manifest = () => {
                                                 </Box>
                                             )) : <Typography>No notes</Typography>}
                                         </Box>
-                                        <Divider sx={{ my: 2 }} />
+                                        <Divider sx={{ my: isMobile ? 1 : 2 }} />
                                         {/* Additional Information Section */}
                                         {additionalInformation && (
                                             <Box>
-                                                                                                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Additional Information & Notes</Typography>
+                                                                                                    <Typography variant="h6" sx={{ fontWeight: 700, mb: isMobile ? 1 : 2, fontSize: isMobile ? '16px' : 'inherit' }}>Additional Information & Notes</Typography>
                                                 {additionalInfoLoading ? (
                                                     <Typography>Loading additional information...</Typography>
                                                 ) : (
@@ -5203,38 +5333,40 @@ const Manifest = () => {
                                                 )}
                                             </Box>
                                         )}
-                                        <Divider sx={{ my: 2 }} />
-                                        {/* HISTORY SECTION - visually separated */}
-                                        <Box sx={{ background: '#e0e0e0', borderRadius: 2, p: 2, mt: 2, mb: 2 }} className="booking-history-section">
-                                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>History</Typography>
-                                            <TableContainer component={Box} className="booking-history-table-container">
-                                            <Table className="booking-history-table">
-                                                <TableHead>
-                                                    <TableRow>
-                                                        <TableCell>Booking Date</TableCell>
-                                                        <TableCell>Activity Type</TableCell>
-                                                        <TableCell>Location</TableCell>
-                                                        <TableCell>Status</TableCell>
-                                                    </TableRow>
-                                                </TableHead>
-                                                <TableBody>
-                                                    {historyRows.map((h, i) => (
-                                                            <TableRow key={i}>
-                                                                <TableCell>{h.flight_date ? dayjs(h.flight_date).format('DD/MM/YYYY HH:mm') : (h.changed_at ? dayjs(h.changed_at).format('DD/MM/YYYY HH:mm') : '-')}</TableCell>
-                                                                <TableCell>{bookingDetail.booking.flight_type || '-'}</TableCell>
-                                                                <TableCell>{bookingDetail.booking.location || '-'}</TableCell>
-                                                                <TableCell>{getStatusWithEmoji(h.status || 'Scheduled')}</TableCell>
+                                        <Divider sx={{ my: isMobile ? 1 : 2 }} />
+                                        {/* HISTORY SECTION - Desktop: After Additional Information */}
+                                        {!isMobile && (
+                                            <Box sx={{ background: '#e0e0e0', borderRadius: 2, p: 2, mt: 2, mb: 2 }} className="booking-history-section">
+                                                <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>History</Typography>
+                                                <TableContainer component={Box} className="booking-history-table-container">
+                                                    <Table className="booking-history-table">
+                                                        <TableHead>
+                                                            <TableRow>
+                                                                <TableCell>Booking Date</TableCell>
+                                                                <TableCell>Activity Type</TableCell>
+                                                                <TableCell>Location</TableCell>
+                                                                <TableCell>Status</TableCell>
                                                             </TableRow>
-                                                        ))}
-                                                    {historyRows.length === 0 && (
-                                                        <TableRow>
-                                                            <TableCell colSpan={4} align="center">No history yet</TableCell>
-                                                        </TableRow>
-                                                    )}
-                                                </TableBody>
-                                            </Table>
-                                            </TableContainer>
-                                        </Box>
+                                                        </TableHead>
+                                                        <TableBody>
+                                                            {historyRows.map((h, i) => (
+                                                                <TableRow key={i}>
+                                                                    <TableCell>{h.flight_date ? dayjs(h.flight_date).format('DD/MM/YYYY HH:mm') : (h.changed_at ? dayjs(h.changed_at).format('DD/MM/YYYY HH:mm') : '-')}</TableCell>
+                                                                    <TableCell>{bookingDetail.booking.flight_type || '-'}</TableCell>
+                                                                    <TableCell>{bookingDetail.booking.location || '-'}</TableCell>
+                                                                    <TableCell>{getStatusWithEmoji(h.status || 'Scheduled')}</TableCell>
+                                                                </TableRow>
+                                                            ))}
+                                                            {historyRows.length === 0 && (
+                                                                <TableRow>
+                                                                    <TableCell colSpan={4} align="center">No history yet</TableCell>
+                                                                </TableRow>
+                                                            )}
+                                                        </TableBody>
+                                                    </Table>
+                                                </TableContainer>
+                                            </Box>
+                                        )}
                                     </Box>
                                 </Grid>
                             </Grid>

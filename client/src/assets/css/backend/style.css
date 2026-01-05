@@ -1310,7 +1310,7 @@ a.edit-activity svg {
     /* Table Body - Better layout on mobile */
     .final-menifest-wrap .MuiTableBody-root .MuiTableCell-root {
         padding: 10px 6px;
-        font-size: 8px;
+        font-size: 12px;
         white-space: normal;
         word-wrap: break-word;
         text-align: left;

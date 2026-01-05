@@ -7,9 +7,6 @@ import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
-import TextField from '@mui/material/TextField';
-import IconButton from '@mui/material/IconButton';
-import DeleteIcon from '@mui/icons-material/Delete';
 import dayjs from 'dayjs';
 import Checkbox from '@mui/material/Checkbox';
 
@@ -32,9 +29,6 @@ const ActivityAvailabilitiesPage = () => {
     const [activityName, setActivityName] = useState('');
     const [modalOpen, setModalOpen] = useState(false);
     const [availabilities, setAvailabilities] = useState([]);
-    const [selectedRow, setSelectedRow] = useState(null);
-    const [editDate, setEditDate] = useState('');
-    const [editOpen, setEditOpen] = useState(false);
     const [selectedRows, setSelectedRows] = useState([]);
     const [filterDialogOpen, setFilterDialogOpen] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -91,39 +85,6 @@ const ActivityAvailabilitiesPage = () => {
         fetchAndUpdateAvailabilities();
     }, [id]);
 
-    const handleRowClick = (row) => {
-        setSelectedRow(row);
-        setEditDate(row.date);
-        setEditOpen(true);
-    };
-
-    const handleEditSave = async () => {
-        await axios.put(`/api/availability/${selectedRow.id}`, { date: editDate });
-        setEditOpen(false);
-        // Tabloyu güncelle
-        setLoading(true);
-        axios.get(`/api/activity/${id}/availabilities`, { timeout: 60000 }).then(res => {
-            if (res.data.success) setAvailabilities(res.data.data);
-        }).catch(error => {
-            console.error('Error refreshing availabilities:', error);
-        }).finally(() => {
-            setLoading(false);
-        });
-    };
-
-    const handleDelete = async () => {
-        await axios.delete(`/api/availability/${selectedRow.id}`);
-        setEditOpen(false);
-        // Tabloyu güncelle
-        setLoading(true);
-        axios.get(`/api/activity/${id}/availabilities`, { timeout: 60000 }).then(res => {
-            if (res.data.success) setAvailabilities(res.data.data);
-        }).catch(error => {
-            console.error('Error refreshing availabilities:', error);
-        }).finally(() => {
-            setLoading(false);
-        });
-    };
 
     const handleStatusToggle = async (availabilityId, currentStatus, event) => {
         event.stopPropagation(); // Prevent row click
@@ -506,8 +467,8 @@ const ActivityAvailabilitiesPage = () => {
                 </TableHead>
                 <TableBody>
                     {filteredAvailabilities.map(row => (
-                        <TableRow key={row.id} hover style={{ cursor: 'pointer' }} onClick={() => handleRowClick(row)}>
-                            <TableCell padding="checkbox" onClick={e => e.stopPropagation()}>
+                        <TableRow key={row.id} hover>
+                            <TableCell padding="checkbox">
                                 <Checkbox
                                     checked={selectedRows.includes(row.id)}
                                     onChange={() => handleCheckboxChange(row.id)}
@@ -647,26 +608,6 @@ const ActivityAvailabilitiesPage = () => {
                     setLoading(false);
                 });
             }} />
-            <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="xs" fullWidth>
-                <DialogTitle>
-                    Availability for {selectedRow ? `${dayjs(selectedRow.date).format('DD/MM/YYYY')} at ${selectedRow.time ? selectedRow.time.slice(0,5) : ''}` : ''}
-                </DialogTitle>
-                <DialogContent>
-                    <TextField
-                        label="Start Date"
-                        type="date"
-                        value={editDate}
-                        onChange={e => setEditDate(e.target.value)}
-                        InputLabelProps={{ shrink: true }}
-                        fullWidth
-                    />
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setEditOpen(false)}>Back</Button>
-                    <IconButton onClick={handleDelete} color="error"><DeleteIcon /></IconButton>
-                    <Button onClick={handleEditSave} variant="contained" color="primary">Save</Button>
-                </DialogActions>
-            </Dialog>
             {/* Filter Dialog */}
             <Dialog
                 open={filterDialogOpen}

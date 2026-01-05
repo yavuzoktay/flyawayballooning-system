@@ -980,7 +980,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                     }}
                     style={{
                         aspectRatio: '1 / 1',
-                        borderRadius: isMobile ? 6 : 10,
+                        borderRadius: isMobile ? 4 : 6,
                         background: isSelected 
                             ? '#56C1FF' 
                             : isCurrentBookingDate 
@@ -1000,15 +1000,15 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                         fontWeight: 700,
                         cursor: isSelectable ? 'pointer' : 'default',
                         userSelect: 'none',
-                        fontSize: isMobile ? 11 : 14,
+                        fontSize: isMobile ? 9 : 11,
                         zIndex: 1,
                         position: 'relative',
                         transition: 'all 0.2s ease',
-                        padding: isMobile ? '2px' : '4px'
+                        padding: isMobile ? '1px' : '2px'
                     }}
                 >
-                    <div style={{ fontSize: isMobile ? 11 : 14, fontWeight: 700 }}>{d.date()}</div>
-                    <div style={{ fontSize: isMobile ? 7 : 10, fontWeight: 600, lineHeight: 1.2, textAlign: 'center' }}>
+                    <div style={{ fontSize: isMobile ? 9 : 11, fontWeight: 700 }}>{d.date()}</div>
+                    <div style={{ fontSize: isMobile ? 6 : 8, fontWeight: 600, lineHeight: 1.1, textAlign: 'center' }}>
                         {isCurrentBookingDate 
                             ? 'Current' 
                             : (availableSlots.length === 0 ? '' : (soldOut ? 'Sold Out' : `${totalAvailable} Spaces`))
@@ -1028,16 +1028,16 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
             fullWidth
             PaperProps={{
                 sx: !isMobile ? {
-                    maxWidth: '800px',
-                    width: '90%',
-                    maxHeight: '90vh',
+                    maxWidth: '650px',
+                    width: '85%',
+                    maxHeight: '85vh',
                     overflow: 'auto'
                 } : {}
             }}
         >
             <DialogTitle sx={{ 
-                fontSize: isMobile ? 16 : 20, 
-                padding: isMobile ? '12px 16px' : '20px 24px',
+                fontSize: isMobile ? 14 : 18, 
+                padding: isMobile ? '10px 14px' : '16px 20px',
                 fontWeight: 600,
                 color: !isMobile ? '#1f2937' : 'inherit',
                 borderBottom: !isMobile ? '1px solid #e5e7eb' : 'none',
@@ -1045,7 +1045,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
             }}>
                 {isGiftVoucherDetails ? 'Redeem - Select New Options' : 'Rebook - Select New Options & Time'}
             </DialogTitle>
-            <DialogContent sx={{ padding: isMobile ? '12px 16px' : '24px' }}>
+            <DialogContent sx={{ padding: isMobile ? '10px 14px' : '18px 20px' }}>
                 {loadingActivities ? (
                     <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
                         <CircularProgress />
@@ -1132,17 +1132,17 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                     <>
                                         {/* Live Availability style calendar */}
                                         <Box sx={{ mb: 2 }} key={`calendar-gift-${selectedDate ? dayjs(selectedDate).format('YYYY-MM-DD') : 'no-date'}`}>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: isMobile ? 0.5 : 1 }}>
-                                                <IconButton onClick={() => setCurrentMonth(prev => prev.subtract(1, 'month'))} size="small" sx={{ padding: isMobile ? '4px' : '8px' }}><ChevronLeftIcon fontSize={isMobile ? 'small' : 'medium'} /></IconButton>
-                                                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 14 : 18 }}>{monthLabel}</Typography>
-                                                <IconButton onClick={() => setCurrentMonth(prev => prev.add(1, 'month'))} size="small" sx={{ padding: isMobile ? '4px' : '8px' }}><ChevronRightIcon fontSize={isMobile ? 'small' : 'medium'} /></IconButton>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: isMobile ? 0.25 : 0.5 }}>
+                                                <IconButton onClick={() => setCurrentMonth(prev => prev.subtract(1, 'month'))} size="small" sx={{ padding: isMobile ? '2px' : '4px' }}><ChevronLeftIcon fontSize={isMobile ? 'small' : 'small'} /></IconButton>
+                                                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 12 : 14 }}>{monthLabel}</Typography>
+                                                <IconButton onClick={() => setCurrentMonth(prev => prev.add(1, 'month'))} size="small" sx={{ padding: isMobile ? '2px' : '4px' }}><ChevronRightIcon fontSize={isMobile ? 'small' : 'small'} /></IconButton>
                                             </Box>
-                                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: isMobile ? '2px' : '4px', mb: isMobile ? 0.5 : 1 }}>
+                                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: isMobile ? '1px' : '2px', mb: isMobile ? 0.25 : 0.5 }}>
                                                 {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(w => (
-                                                    <div key={w} style={{ textAlign: 'center', fontWeight: 700, color: '#64748b', fontSize: isMobile ? 9 : 12 }}>{w}</div>
+                                                    <div key={w} style={{ textAlign: 'center', fontWeight: 700, color: '#64748b', fontSize: isMobile ? 8 : 10 }}>{w}</div>
                                                 ))}
                                             </Box>
-                                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: isMobile ? '2px' : '4px' }}>
+                                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: isMobile ? '1px' : '2px' }}>
                                                 {buildDayCells(true)}
                                             </Box>
                                 </Box>
@@ -1150,14 +1150,14 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                         {selectedDate && (
                                             <>
                                                 <Typography variant="h6" sx={{ 
-                                                    mb: isMobile ? 1 : 2, 
-                                                    fontSize: isMobile ? 14 : 18, 
+                                                    mb: isMobile ? 0.75 : 1.5, 
+                                                    fontSize: isMobile ? 12 : 16, 
                                                     fontWeight: 600,
                                                     color: !isMobile ? '#1f2937' : 'inherit'
                                                 }}>
                                                     Available Times for {dayjs(selectedDate).format('DD/MM/YYYY')}:
                                                 </Typography>
-                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? 6 : 8, marginBottom: isMobile ? 12 : 16 }}>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? 5 : 6, marginBottom: isMobile ? 10 : 12 }}>
                                                     {getTimesForDate(selectedDate, true).length === 0 && (
                                                         <Box sx={{ p: 2, textAlign: 'center', width: '100%' }}>
                                                             <Typography color="text.secondary" sx={{ fontSize: 16, fontWeight: 500 }}>
@@ -1493,17 +1493,17 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                     <>
                                         {/* Live Availability style calendar */}
                                         <Box sx={{ mb: 2 }} key={`calendar-${selectedDate ? dayjs(selectedDate).format('YYYY-MM-DD') : 'no-date'}`}>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: isMobile ? 0.5 : 1 }}>
-                                                <IconButton onClick={() => setCurrentMonth(prev => prev.subtract(1, 'month'))} size="small" sx={{ padding: isMobile ? '4px' : '8px' }}><ChevronLeftIcon fontSize={isMobile ? 'small' : 'medium'} /></IconButton>
-                                                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 14 : 18 }}>{monthLabel}</Typography>
-                                                <IconButton onClick={() => setCurrentMonth(prev => prev.add(1, 'month'))} size="small" sx={{ padding: isMobile ? '4px' : '8px' }}><ChevronRightIcon fontSize={isMobile ? 'small' : 'medium'} /></IconButton>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: isMobile ? 0.25 : 0.5 }}>
+                                                <IconButton onClick={() => setCurrentMonth(prev => prev.subtract(1, 'month'))} size="small" sx={{ padding: isMobile ? '2px' : '4px' }}><ChevronLeftIcon fontSize={isMobile ? 'small' : 'small'} /></IconButton>
+                                                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 12 : 14 }}>{monthLabel}</Typography>
+                                                <IconButton onClick={() => setCurrentMonth(prev => prev.add(1, 'month'))} size="small" sx={{ padding: isMobile ? '2px' : '4px' }}><ChevronRightIcon fontSize={isMobile ? 'small' : 'small'} /></IconButton>
                                             </Box>
-                                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: isMobile ? '2px' : '4px', mb: isMobile ? 0.5 : 1 }}>
+                                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: isMobile ? '1px' : '2px', mb: isMobile ? 0.25 : 0.5 }}>
                                                 {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(w => (
-                                                    <div key={w} style={{ textAlign: 'center', fontWeight: 700, color: '#64748b', fontSize: isMobile ? 9 : 12 }}>{w}</div>
+                                                    <div key={w} style={{ textAlign: 'center', fontWeight: 700, color: '#64748b', fontSize: isMobile ? 8 : 10 }}>{w}</div>
                                                 ))}
                                             </Box>
-                                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: isMobile ? '2px' : '4px' }}>
+                                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: isMobile ? '1px' : '2px' }}>
                                                 {buildDayCells(false)}
                                             </Box>
                                         </Box>
@@ -1511,14 +1511,14 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                         {selectedDate && (
                                             <>
                                                 <Typography variant="h6" sx={{ 
-                                                    mb: isMobile ? 1 : 2, 
-                                                    fontSize: isMobile ? 14 : 18, 
+                                                    mb: isMobile ? 0.75 : 1.5, 
+                                                    fontSize: isMobile ? 12 : 16, 
                                                     fontWeight: 600,
                                                     color: !isMobile ? '#1f2937' : 'inherit'
                                                 }}>
                                                     Available Times for {dayjs(selectedDate).format('DD/MM/YYYY')}:
                                                 </Typography>
-                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? 6 : 8, marginBottom: isMobile ? 12 : 16 }}>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? 5 : 6, marginBottom: isMobile ? 10 : 12 }}>
                                                     {getTimesForDate(selectedDate).length === 0 && (
                                                         <Box sx={{ p: 2, textAlign: 'center', width: '100%' }}>
                                                             <Typography color="text.secondary" sx={{ fontSize: 16, fontWeight: 500 }}>

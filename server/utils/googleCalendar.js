@@ -268,7 +268,7 @@ const updateCalendarEvent = async (eventId, flightData) => {
 /**
  * Delete a Google Calendar event
  * @param {string} eventId - Google Calendar event ID
- * @returns {Promise<void>}
+ * @returns {Promise<{success: boolean, alreadyDeleted?: boolean}>}
  */
 const deleteCalendarEvent = async (eventId) => {
     try {
@@ -281,11 +281,13 @@ const deleteCalendarEvent = async (eventId) => {
         });
 
         console.log('✅ Google Calendar event deleted:', eventId);
+        return { success: true };
     } catch (error) {
-        // If event not found, that's okay (might have been deleted manually)
-        if (error.code === 404) {
-            console.log('⚠️ Google Calendar event not found (may have been deleted):', eventId);
-            return;
+        // If event not found (404) or already deleted (410), that's okay
+        if (error.code === 404 || error.code === 410 || error.status === 404 || error.status === 410) {
+            console.log('⚠️ Google Calendar event not found or already deleted (code: ' + (error.code || error.status) + '):', eventId);
+            // Return a special indicator that event was already deleted
+            return { success: true, alreadyDeleted: true };
         }
         console.error('❌ Error deleting Google Calendar event:', error);
         
@@ -303,10 +305,119 @@ const deleteCalendarEvent = async (eventId) => {
     }
 };
 
+/**
+ * Find and delete a Google Calendar event by flight details (when event ID is not available)
+ * @param {Object} flightData - Flight booking data
+ * @param {string} flightData.location - Flight location (e.g., "Bath")
+ * @param {string} flightData.flightType - "Private" or "Shared"
+ * @param {number} flightData.passengerCount - Total number of passengers
+ * @param {string} flightData.flightDate - Flight date in format "YYYY-MM-DD HH:mm:ss"
+ * @returns {Promise<string|null>} - Google Calendar event ID if found and deleted, null otherwise
+ */
+const findAndDeleteCalendarEventByDetails = async (flightData) => {
+    try {
+        const calendar = getCalendarClient();
+        const calendarId = process.env.GOOGLE_CALENDAR_ID || 'primary';
+
+        // Parse flight date
+        const flightDateTime = new Date(flightData.flightDate);
+        const endDateTime = new Date(flightDateTime);
+        endDateTime.setHours(endDateTime.getHours() + 2); // 2 hour flight duration
+
+        // Format expected title: [Location] – [Private/Shared] – x [Count]
+        const flightTypeLabel = flightData.flightType === 'Private Charter' || flightData.flightType === 'Private' 
+            ? 'Private' 
+            : 'Shared';
+        const expectedTitle = `${flightData.location} – ${flightTypeLabel} – x ${flightData.passengerCount}`;
+
+        console.log('🔍 [findAndDeleteCalendarEventByDetails] Searching for event:', {
+            location: flightData.location,
+            flightType: flightData.flightType,
+            passengerCount: flightData.passengerCount,
+            flightDate: flightData.flightDate,
+            expectedTitle
+        });
+
+        // Search for events on the flight date
+        const timeMin = new Date(flightDateTime);
+        timeMin.setHours(0, 0, 0, 0);
+        const timeMax = new Date(flightDateTime);
+        timeMax.setHours(23, 59, 59, 999);
+
+        const response = await calendar.events.list({
+            calendarId: calendarId,
+            timeMin: timeMin.toISOString(),
+            timeMax: timeMax.toISOString(),
+            maxResults: 100,
+            singleEvents: true,
+            orderBy: 'startTime',
+        });
+
+        if (!response.data.items || response.data.items.length === 0) {
+            console.log('⚠️ [findAndDeleteCalendarEventByDetails] No events found for date:', flightData.flightDate);
+            return null;
+        }
+
+        console.log(`📋 [findAndDeleteCalendarEventByDetails] Found ${response.data.items.length} events for date, searching for matching event...`);
+
+        // Find event matching the expected title
+        const matchingEvent = response.data.items.find(event => {
+            const eventTitle = event.summary || '';
+            const matchesTitle = eventTitle === expectedTitle;
+            
+            // Also check if the event time matches (within 1 hour tolerance)
+            if (matchesTitle && event.start && event.start.dateTime) {
+                const eventStart = new Date(event.start.dateTime);
+                const timeDiff = Math.abs(eventStart.getTime() - flightDateTime.getTime());
+                const matchesTime = timeDiff < 60 * 60 * 1000; // 1 hour tolerance
+                return matchesTime;
+            }
+            
+            return matchesTitle;
+        });
+
+        if (!matchingEvent) {
+            console.log('⚠️ [findAndDeleteCalendarEventByDetails] No matching event found. Expected title:', expectedTitle);
+            console.log('📋 [findAndDeleteCalendarEventByDetails] Available events:', response.data.items.map(e => ({
+                title: e.summary,
+                start: e.start?.dateTime,
+                id: e.id
+            })));
+            return null;
+        }
+
+        console.log('✅ [findAndDeleteCalendarEventByDetails] Found matching event:', {
+            id: matchingEvent.id,
+            title: matchingEvent.summary,
+            start: matchingEvent.start?.dateTime
+        });
+
+        // Delete the found event
+        await deleteCalendarEvent(matchingEvent.id);
+        
+        return matchingEvent.id;
+    } catch (error) {
+        console.error('❌ Error finding and deleting Google Calendar event by details:', error);
+        
+        // Save error to logs database
+        if (saveErrorLogFunction) {
+            const errorMessage = `Google Calendar: Failed to find and delete event by details for booking ${flightData.bookingId || 'unknown'}`;
+            const errorDetails = error.response?.data 
+                ? JSON.stringify(error.response.data) 
+                : error.message || 'Unknown error';
+            const stackTrace = error.stack || `${error.name}: ${error.message}`;
+            saveErrorLogFunction('error', `${errorMessage}. Details: ${errorDetails}`, stackTrace, 'googleCalendar.findAndDeleteCalendarEventByDetails');
+        }
+        
+        throw error;
+    }
+};
+
 module.exports = {
     createCalendarEvent,
     updateCalendarEvent,
     deleteCalendarEvent,
+    findAndDeleteCalendarEventByDetails,
     setSaveErrorLog,
 };
 
