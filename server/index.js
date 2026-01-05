@@ -29328,9 +29328,9 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
 async function generateGiftVoucherPDF(voucher) {
     return new Promise((resolve, reject) => {
         try {
-            // Landscape orientation with wider width and reduced height
+            // Landscape orientation with reduced width and height
             const doc = new PDFDocument({ 
-                size: [900, 500], // Wider and shorter: width > height
+                size: [750, 500], // Reduced width: width > height
                 margin: 0
             });
             const chunks = [];
@@ -29342,7 +29342,7 @@ async function generateGiftVoucherPDF(voucher) {
             });
             doc.on('error', reject);
             
-            const pageWidth = 900;
+            const pageWidth = 750;
             const pageHeight = 500;
             const leftSectionWidth = pageWidth * 0.35; // 35% of page width
             const rightSectionWidth = pageWidth * 0.65; // 65% of page width
@@ -29370,7 +29370,7 @@ async function generateGiftVoucherPDF(voucher) {
             doc.restore();
             
             // LEFT SECTION
-            const leftPadding = 40;
+            const leftPadding = 25; // Reduced padding
             
             // Logo (use logoRemoveBackground.png from uploads/email directory)
             // Logo dimensions: 402x158 (aspect ratio ~2.54:1)
@@ -29474,8 +29474,8 @@ async function generateGiftVoucherPDF(voucher) {
                .text('FLYAWAYBALLOONING.COM', leftContentX, websiteY);
             
             // RIGHT SECTION
-            const rightStartX = leftSectionWidth + 20;
-            const rightPadding = 40;
+            const rightStartX = leftSectionWidth + 15; // Reduced spacing
+            const rightPadding = 25; // Reduced padding
             const rightContentX = rightStartX + rightPadding;
             
             // Main title "GIFT VOUCHER" (stacked, black)
@@ -29585,7 +29585,7 @@ async function generateGiftVoucherPDF(voucher) {
             // Terms and conditions - moved up, positioned after EXPIRY field
             // Text split into 4 lines and reduced width
             const termsY = currentY + fieldSpacing + 20; // Position after EXPIRY field with small spacing
-            const termsWidth = (rightSectionWidth - rightPadding * 2) * 0.60; // Reduced width to 60% for narrower 4-line layout
+            const termsWidth = (rightSectionWidth - rightPadding * 2) * 0.70; // Reduced width to 60% for narrower 4-line layout
             const termsText = "Your gift voucher is valid until the expiry date shown. Within this validity period, you must have either flown or booked onto a minimum of six flights that were cancelled in order to qualify for a free extension. Any booked flight must be within the voucher's validity period.";
             
             doc.fontSize(7)
