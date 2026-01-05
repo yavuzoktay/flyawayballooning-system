@@ -29328,9 +29328,9 @@ async function sendFlightVoucherEmailToCustomerAndOwner(voucher, voucherId) {
 async function generateGiftVoucherPDF(voucher) {
     return new Promise((resolve, reject) => {
         try {
-            // Landscape orientation for the new design
+            // Landscape orientation with wider width and reduced height
             const doc = new PDFDocument({ 
-                size: [792, 612], // Landscape: 11x8.5 inches in points (72 DPI)
+                size: [900, 500], // Wider and shorter: width > height
                 margin: 0
             });
             const chunks = [];
@@ -29342,8 +29342,8 @@ async function generateGiftVoucherPDF(voucher) {
             });
             doc.on('error', reject);
             
-            const pageWidth = 792;
-            const pageHeight = 612;
+            const pageWidth = 900;
+            const pageHeight = 500;
             const leftSectionWidth = pageWidth * 0.35; // 35% of page width
             const rightSectionWidth = pageWidth * 0.65; // 65% of page width
             
