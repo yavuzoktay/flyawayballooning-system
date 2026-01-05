@@ -29364,30 +29364,31 @@ async function generateGiftVoucherPDF(voucher) {
                .fill();
             doc.restore();
             
-            // Diagonal line separating left and right sections (shorter line)
-            const diagonalStartX = pageWidth * 0.35;
-            const diagonalStartY = 0;
-            const diagonalEndX = pageWidth * 0.20; // Moved closer to center
-            const diagonalEndY = pageHeight * 0.50; // Shorter line - only goes to middle of page
-            
-            doc.moveTo(diagonalStartX, diagonalStartY)
-               .lineTo(diagonalEndX, diagonalEndY)
-               .strokeColor('#333333')
-               .lineWidth(1)
-               .stroke();
-            
             // LEFT SECTION
             const leftPadding = 40;
             
             // Logo (use logoRemoveBackground.png from uploads/email directory)
             // Logo dimensions: 402x158 (aspect ratio ~2.54:1)
             const logoPath = path.resolve(__dirname, 'uploads', 'email', 'logoRemoveBackground.png');
-            const balloonY = 80;
             const logoWidth = 200; // Maintain aspect ratio, width determines size
             const logoHeight = logoWidth * (158 / 402); // Calculate height based on aspect ratio (~78.6)
             
-            // Center logo horizontally in left section
-            const leftContentX = (leftSectionWidth / 2) - (logoWidth / 2);
+            // Center logo vertically and horizontally in left section
+            const leftContentX = (leftSectionWidth / 2) - (logoWidth / 2); // Horizontal center
+            const balloonY = (pageHeight / 2) - (logoHeight / 2); // Vertical center
+            
+            // Diagonal line separating left and right sections (centered vertically)
+            // Line starts from top of left section and goes down, centered on page
+            const diagonalStartX = pageWidth * 0.35;
+            const diagonalStartY = pageHeight * 0.25; // Start from 25% down the page
+            const diagonalEndX = pageWidth * 0.20; // Moved closer to center
+            const diagonalEndY = pageHeight * 0.75; // End at 75% down the page (centered vertically)
+            
+            doc.moveTo(diagonalStartX, diagonalStartY)
+               .lineTo(diagonalEndX, diagonalEndY)
+               .strokeColor('#333333')
+               .lineWidth(1)
+               .stroke();
             let logoLoaded = false;
             
             // Try to load logo - PDFKit requires absolute path or Buffer
