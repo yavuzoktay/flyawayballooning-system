@@ -29457,9 +29457,9 @@ async function generateGiftVoucherPDF(voucher) {
             // Final fallback: use text only if logo failed to load (no emoji to avoid encoding issues)
             if (!logoLoaded) {
                 console.warn('⚠️ All logo loading methods failed. Using text fallback.');
-                doc.fontSize(24)
-                   .fillColor('#1a1a1a')
-                   .font('Helvetica-Bold')
+            doc.fontSize(24)
+               .fillColor('#1a1a1a')
+               .font('Helvetica-Bold')
                    .text('Fly Away', leftContentX, balloonY)
                    .text('Ballooning', leftContentX, balloonY + 30);
             }
@@ -29504,7 +29504,7 @@ async function generateGiftVoucherPDF(voucher) {
             // DEAR field
             let currentY = fieldStartY;
             doc.fontSize(12)
-               .fillColor('#1e3a8a') // Dark blue color
+               .fillColor('#1a1a1a') // Black color
                .font('Helvetica-Bold')
                .text('DEAR', rightContentX, currentY + 10);
             
@@ -29528,7 +29528,7 @@ async function generateGiftVoucherPDF(voucher) {
             // CODE field
             currentY += fieldSpacing;
             doc.fontSize(12)
-               .fillColor('#1e3a8a') // Dark blue color
+               .fillColor('#1a1a1a') // Black color
                .font('Helvetica-Bold')
                .text('CODE', rightContentX, currentY + 10);
             
@@ -29552,7 +29552,7 @@ async function generateGiftVoucherPDF(voucher) {
             // EXPIRY field
             currentY += fieldSpacing;
             doc.fontSize(12)
-               .fillColor('#1e3a8a') // Dark blue color
+               .fillColor('#1a1a1a') // Black color
                .font('Helvetica-Bold')
                .text('EXPIRY', rightContentX, currentY + 10);
             
@@ -29583,8 +29583,9 @@ async function generateGiftVoucherPDF(voucher) {
                });
             
             // Terms and conditions - moved up, positioned after EXPIRY field
+            // Text split into 4 lines and reduced width
             const termsY = currentY + fieldSpacing + 20; // Position after EXPIRY field with small spacing
-            const termsWidth = rightSectionWidth - rightPadding * 2;
+            const termsWidth = (rightSectionWidth - rightPadding * 2) * 0.75; // Reduced width to 75% for 4-line layout
             const termsText = "Your gift voucher is valid until the expiry date shown. Within this validity period, you must have either flown or booked onto a minimum of six flights that were cancelled in order to qualify for a free extension. Any booked flight must be within the voucher's validity period.";
             
             doc.fontSize(7)
@@ -29593,7 +29594,7 @@ async function generateGiftVoucherPDF(voucher) {
                .text(termsText, rightContentX, termsY, {
                    width: termsWidth,
                    align: 'left',
-                   lineGap: 3
+                   lineGap: 2
                });
             
             doc.end();
