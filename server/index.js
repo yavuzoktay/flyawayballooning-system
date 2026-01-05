@@ -29365,7 +29365,7 @@ async function generateGiftVoucherPDF(voucher) {
             const triangleTopX = pageWidth * 0.6; // Triangle peak at 60% of width
             const triangleTopY = gradientStartY; // Top of triangle
             doc.path('M 0 ' + pageHeight + ' L 0 ' + triangleTopY + ' L ' + triangleTopX + ' ' + (triangleTopY + gradientHeight * 0.3) + ' L ' + pageWidth + ' ' + (triangleTopY + gradientHeight * 0.5) + ' L ' + pageWidth + ' ' + pageHeight + ' Z')
-               .fillColor('#ff6b35')
+               .fillColor('#FF6937')
                .fill();
             doc.restore();
             
