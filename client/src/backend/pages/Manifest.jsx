@@ -4382,7 +4382,7 @@ const Manifest = () => {
                                                                         color: '#3274b4', 
                                                                         cursor: 'pointer', 
                                                                         textDecoration: 'underline',
-                                                                        fontSize: isMobile ? '12px' : 'inherit'
+                                                                        fontSize: isMobile ? '8px' : 'inherit'
                                                                     }}
                                                                         onClick={() => handleNameClick(flight.id)}>
                                                                         {flight.id || ''}
@@ -4393,7 +4393,7 @@ const Manifest = () => {
                                                                         color: 'rgb(50, 116, 180)', 
                                                                         cursor: 'pointer', 
                                                                         textDecoration: 'underline',
-                                                                        fontSize: '14px'
+                                                                        fontSize: '8px'
                                                                     }}
                                                                         onClick={() => handleNameClick(flight.id)}>
                                                                         {firstPassenger ? `${firstPassenger.first_name || ''} ${firstPassenger.last_name || ''}`.trim() : (flight.name || '')}
@@ -4403,7 +4403,7 @@ const Manifest = () => {
                                                                             {flight.passengers.slice(1).map((p, i) => (
                                                                                 <div key={`${flight.id}-p-${i+1}`} style={{ 
                                                                                     color: 'rgb(50, 116, 180)', 
-                                                                                    fontSize: '14px',
+                                                                                    fontSize: '8px',
                                                                                     marginTop: '2px'
                                                                                 }}>
                                                                                     {`${p.first_name || ''} ${p.last_name || ''}`.trim()}
@@ -4417,7 +4417,7 @@ const Manifest = () => {
                                                                         <div>
                                                                             {flight.passengers.map((p, i) => (
                                                                                 <div key={`${flight.id}-weight-${i}`} style={{ 
-                                                                                    fontSize: '14px',
+                                                                                    fontSize: '8px',
                                                                                     marginBottom: i < flight.passengers.length - 1 ? '2px' : '0'
                                                                                 }}>
                                                                                     {p.weight ? `${p.weight}kg` : ''}

@@ -160,9 +160,9 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                     display: 'flex', 
                     flexDirection: 'column', 
                     gap: isMobile ? '2px' : '5px', 
-                    flex: '1 1 auto', 
-                    minWidth: isMobile ? '90px' : '100px',
-                    maxWidth: isMobile ? 'none' : '140px',
+                    flex: '0 0 auto', 
+                    minWidth: isMobile ? '80px' : '90px',
+                    maxWidth: isMobile ? 'none' : '90px',
                     fontSize: isMobile ? '10px' : '12px'
                 }}>
                     Start Date:
@@ -172,11 +172,11 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                         onChange={(e) => setStartDate(e.target.value)}
                         style={{ 
                             width: '100%', 
-                            padding: isMobile ? '4px' : '6px', 
+                            padding: isMobile ? '4px' : '5px', 
                             borderRadius: '4px', 
                             border: '1px solid #ccc',
-                            fontSize: isMobile ? '16px' : '13px', // Keep 16px for iOS zoom prevention
-                            height: isMobile ? '30px' : '36px'
+                            fontSize: isMobile ? '16px' : '12px', // Keep 16px for iOS zoom prevention
+                            height: isMobile ? '30px' : '32px'
                         }}
                     />
                 </label>
@@ -184,9 +184,9 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                     display: 'flex', 
                     flexDirection: 'column', 
                     gap: isMobile ? '2px' : '5px', 
-                    flex: '1 1 auto', 
-                    minWidth: isMobile ? '90px' : '100px',
-                    maxWidth: isMobile ? 'none' : '140px',
+                    flex: '0 0 auto', 
+                    minWidth: isMobile ? '80px' : '90px',
+                    maxWidth: isMobile ? 'none' : '90px',
                     fontSize: isMobile ? '10px' : '12px'
                 }}>
                     End Date:
@@ -196,11 +196,11 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                         onChange={(e) => setEndDate(e.target.value)}
                         style={{ 
                             width: '100%', 
-                            padding: isMobile ? '4px' : '6px', 
+                            padding: isMobile ? '4px' : '5px', 
                             borderRadius: '4px', 
                             border: '1px solid #ccc',
-                            fontSize: isMobile ? '16px' : '13px', // Keep 16px for iOS zoom prevention
-                            height: isMobile ? '30px' : '36px'
+                            fontSize: isMobile ? '16px' : '12px', // Keep 16px for iOS zoom prevention
+                            height: isMobile ? '30px' : '32px'
                         }}
                     />
                 </label>
