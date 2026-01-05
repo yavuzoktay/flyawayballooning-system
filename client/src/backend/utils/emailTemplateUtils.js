@@ -846,10 +846,7 @@ const DEFAULT_TEMPLATE_BUILDERS = {
             bodyHtml: messageWithPrompts,
             customerName,
             signatureLines: [],
-            footerLinks: [
-                { label: 'Download voucher', url: 'https://flyawayballooning.com/account/vouchers' },
-                { label: 'Gift FAQs', url: 'https://flyawayballooning.com/gift-faqs' }
-            ]
+            footerLinks: []
         });
     },
     // Alias for "Your Flight Voucher" - uses same builder as "Flight Voucher Confirmation"
@@ -878,10 +875,7 @@ const DEFAULT_TEMPLATE_BUILDERS = {
             bodyHtml: messageWithPrompts,
             customerName,
             signatureLines: [],
-            footerLinks: [
-                { label: 'Download voucher', url: 'https://flyawayballooning.com/account/vouchers' },
-                { label: 'Gift FAQs', url: 'https://flyawayballooning.com/gift-faqs' }
-            ]
+            footerLinks: []
         });
     },
     // Booking Confirmation builder (reused for "Your Flight Confirmation" alias)

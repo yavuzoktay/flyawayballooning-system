@@ -4747,55 +4747,111 @@ setBookingDetail(finalVoucherDetail);
                                         </Button>
                                         )}
                                         
-                                        <Button
-                                            variant="contained"
-                                            color="primary"
-                                            disabled={selectedBookingIds.length === 0}
-                                            onClick={() => {
-                                                if (selectedBookingIds.length === 0) return;
-                                                // Çoklu alıcılar için varsayılan booking'i kullan (ilk seçilen)
-                                                const primaryBooking = booking.find(b => b.id === selectedBookingIds[0]);
-                                                if (primaryBooking) {
-                                                    openEmailModalForBooking(primaryBooking, { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
-                                                } else if (filteredData.length > 0) {
-                                                    openEmailModalForBooking(filteredData[0], { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
-                                                }
-                                            }}
-                                            style={{ 
-                                                height: isMobile ? 32 : 40, 
-                                                fontSize: isMobile ? '11px' : '14px', 
-                                                padding: isMobile ? '4px 8px' : '8px 16px',
-                                                flex: isMobile ? '1 1 calc(50% - 2px)' : 'none',
-                                                minWidth: isMobile ? 0 : 'auto'
-                                            }}
-                                        >
-                                            Bulk Email
-                                        </Button>
-                                        <Button
-                                            variant="contained"
-                                            color="info"
-                                            disabled={selectedBookingIds.length === 0}
-                                            onClick={() => {
-                                                if (selectedBookingIds.length === 0) return;
-                                                // Çoklu alıcılar için varsayılan booking'i kullan (ilk seçilen)
-                                                const primaryBooking = booking.find(b => b.id === selectedBookingIds[0]);
-                                                if (primaryBooking) {
-                                                    openSmsModalForBooking(primaryBooking, { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
-                                                } else if (filteredData.length > 0) {
-                                                    openSmsModalForBooking(filteredData[0], { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
-                                                }
-                                            }}
-                                            style={{ 
-                                                height: isMobile ? 32 : 40, 
-                                                background: '#17a2b8', 
-                                                fontSize: isMobile ? '11px' : '14px', 
-                                                padding: isMobile ? '4px 8px' : '8px 16px',
-                                                flex: isMobile ? '1 1 calc(50% - 2px)' : 'none',
-                                                minWidth: isMobile ? 0 : 'auto'
-                                            }}
-                                        >
-                                            Bulk SMS
-                                        </Button>
+                                        {isMobile ? (
+                                            // Mobile: Bulk Email & Bulk SMS yan yana, iki kolon
+                                            <Box sx={{ display: 'flex', width: '100%', gap: 0.5 }}>
+                                                <Button
+                                                    variant="contained"
+                                                    color="primary"
+                                                    disabled={selectedBookingIds.length === 0}
+                                                    onClick={() => {
+                                                        if (selectedBookingIds.length === 0) return;
+                                                        // Çoklu alıcılar için varsayılan booking'i kullan (ilk seçilen)
+                                                        const primaryBooking = booking.find(b => b.id === selectedBookingIds[0]);
+                                                        if (primaryBooking) {
+                                                            openEmailModalForBooking(primaryBooking, { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
+                                                        } else if (filteredData.length > 0) {
+                                                            openEmailModalForBooking(filteredData[0], { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
+                                                        }
+                                                    }}
+                                                    sx={{
+                                                        flex: 1,
+                                                        height: 36,
+                                                        fontSize: '11px',
+                                                        padding: '4px 8px',
+                                                        minWidth: 0
+                                                    }}
+                                                >
+                                                    Bulk Email
+                                                </Button>
+                                                <Button
+                                                    variant="contained"
+                                                    color="info"
+                                                    disabled={selectedBookingIds.length === 0}
+                                                    onClick={() => {
+                                                        if (selectedBookingIds.length === 0) return;
+                                                        // Çoklu alıcılar için varsayılan booking'i kullan (ilk seçilen)
+                                                        const primaryBooking = booking.find(b => b.id === selectedBookingIds[0]);
+                                                        if (primaryBooking) {
+                                                            openSmsModalForBooking(primaryBooking, { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
+                                                        } else if (filteredData.length > 0) {
+                                                            openSmsModalForBooking(filteredData[0], { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
+                                                        }
+                                                    }}
+                                                    sx={{
+                                                        flex: 1,
+                                                        height: 36,
+                                                        fontSize: '11px',
+                                                        padding: '4px 8px',
+                                                        minWidth: 0,
+                                                        background: '#17a2b8',
+                                                        '&:hover': {
+                                                            background: '#148a9b'
+                                                        }
+                                                    }}
+                                                >
+                                                    Bulk SMS
+                                                </Button>
+                                            </Box>
+                                        ) : (
+                                            <>
+                                                <Button
+                                                    variant="contained"
+                                                    color="primary"
+                                                    disabled={selectedBookingIds.length === 0}
+                                                    onClick={() => {
+                                                        if (selectedBookingIds.length === 0) return;
+                                                        const primaryBooking = booking.find(b => b.id === selectedBookingIds[0]);
+                                                        if (primaryBooking) {
+                                                            openEmailModalForBooking(primaryBooking, { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
+                                                        } else if (filteredData.length > 0) {
+                                                            openEmailModalForBooking(filteredData[0], { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
+                                                        }
+                                                    }}
+                                                    style={{
+                                                        height: 40,
+                                                        fontSize: '14px',
+                                                        padding: '8px 16px',
+                                                        minWidth: 'auto'
+                                                    }}
+                                                >
+                                                    Bulk Email
+                                                </Button>
+                                                <Button
+                                                    variant="contained"
+                                                    color="info"
+                                                    disabled={selectedBookingIds.length === 0}
+                                                    onClick={() => {
+                                                        if (selectedBookingIds.length === 0) return;
+                                                        const primaryBooking = booking.find(b => b.id === selectedBookingIds[0]);
+                                                        if (primaryBooking) {
+                                                            openSmsModalForBooking(primaryBooking, { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
+                                                        } else if (filteredData.length > 0) {
+                                                            openSmsModalForBooking(filteredData[0], { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
+                                                        }
+                                                    }}
+                                                    style={{
+                                                        height: 40,
+                                                        background: '#17a2b8',
+                                                        fontSize: '14px',
+                                                        padding: '8px 16px',
+                                                        minWidth: 'auto'
+                                                    }}
+                                                >
+                                                    Bulk SMS
+                                                </Button>
+                                            </>
+                                        )}
                                         
                                         {/* Search Input - Input-like on mobile, full input on desktop */}
                                         {isMobile ? (
@@ -6249,15 +6305,10 @@ setBookingDetail(finalVoucherDetail);
         
         // Check weather_refund_total_price for both Private Charter and Shared Flight
         if (weatherRefundTotalPrice > 0) {
-            // Get passenger names for display
-            const passengerNames = Array.isArray(bookingDetail.passengers)
-                ? bookingDetail.passengers.map(p => `${p.first_name || ''} ${p.last_name || ''}`.trim()).filter(Boolean)
-                : [];
-            const namesDisplay = passengerNames.length > 0 ? ` — ${passengerNames.join(', ')}` : '';
         return (
             <span>
                 <span style={{ color: '#10b981', fontWeight: 'bold', marginRight: '4px' }}>✔</span>
-                    Yes{namesDisplay}
+                    Yes
             </span>
         );
         } else {

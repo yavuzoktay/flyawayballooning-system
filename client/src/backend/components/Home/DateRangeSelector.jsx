@@ -153,7 +153,7 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                 display: 'flex',
                 flexDirection: 'row',
                 flexWrap: 'wrap',
-                gap: isMobile ? '6px' : '10px',
+                gap: isMobile ? '6px' : '20px',
                 alignItems: 'center'
             }} className="date-inputs-container">
                 <label style={{ 
@@ -161,8 +161,9 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                     flexDirection: 'column', 
                     gap: isMobile ? '2px' : '5px', 
                     flex: '1 1 auto', 
-                    minWidth: isMobile ? '90px' : '120px',
-                    fontSize: isMobile ? '10px' : 'inherit'
+                    minWidth: isMobile ? '90px' : '100px',
+                    maxWidth: isMobile ? 'none' : '140px',
+                    fontSize: isMobile ? '10px' : '12px'
                 }}>
                     Start Date:
                     <input
@@ -171,11 +172,11 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                         onChange={(e) => setStartDate(e.target.value)}
                         style={{ 
                             width: '100%', 
-                            padding: isMobile ? '4px' : '8px', 
+                            padding: isMobile ? '4px' : '6px', 
                             borderRadius: '4px', 
                             border: '1px solid #ccc',
-                            fontSize: isMobile ? '16px' : 'inherit', // Keep 16px for iOS zoom prevention
-                            height: isMobile ? '30px' : 'auto'
+                            fontSize: isMobile ? '16px' : '13px', // Keep 16px for iOS zoom prevention
+                            height: isMobile ? '30px' : '36px'
                         }}
                     />
                 </label>
@@ -184,8 +185,9 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                     flexDirection: 'column', 
                     gap: isMobile ? '2px' : '5px', 
                     flex: '1 1 auto', 
-                    minWidth: isMobile ? '90px' : '120px',
-                    fontSize: isMobile ? '10px' : 'inherit'
+                    minWidth: isMobile ? '90px' : '100px',
+                    maxWidth: isMobile ? 'none' : '140px',
+                    fontSize: isMobile ? '10px' : '12px'
                 }}>
                     End Date:
                     <input
@@ -194,11 +196,11 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                         onChange={(e) => setEndDate(e.target.value)}
                         style={{ 
                             width: '100%', 
-                            padding: isMobile ? '4px' : '8px', 
+                            padding: isMobile ? '4px' : '6px', 
                             borderRadius: '4px', 
                             border: '1px solid #ccc',
-                            fontSize: isMobile ? '16px' : 'inherit', // Keep 16px for iOS zoom prevention
-                            height: isMobile ? '30px' : 'auto'
+                            fontSize: isMobile ? '16px' : '13px', // Keep 16px for iOS zoom prevention
+                            height: isMobile ? '30px' : '36px'
                         }}
                     />
                 </label>
@@ -211,10 +213,11 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                         cursor: "pointer",
                         padding: isMobile ? '4px 10px' : '8px 16px',
                         borderRadius: '4px',
-                        alignSelf: 'flex-end',
+                        alignSelf: isMobile ? 'flex-end' : 'flex-start',
                         whiteSpace: 'nowrap',
                         fontSize: isMobile ? '11px' : 'inherit',
-                        height: isMobile ? '30px' : 'auto'
+                        height: isMobile ? '30px' : '36px',
+                        marginTop: isMobile ? 0 : '24px'
                     }}
                 >
                     Filter

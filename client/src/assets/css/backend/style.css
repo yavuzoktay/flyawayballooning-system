@@ -413,22 +413,27 @@ body {
         flex-shrink: 0 !important;
     }
 
-    /* Search and Filter Buttons - Stack on mobile */
+    /* Search and Bulk Action Buttons - Mobile layout */
     .booking-search-booking {
-        flex-direction: column !important;
+        /* Use row layout with wrapping so Bulk Email & Bulk SMS can sit side by side */
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
         align-items: stretch !important;
-        gap: 10px !important;
+        gap: 8px !important;
         width: 100% !important;
     }
 
+    /* On mobile, Bulk Email and Bulk SMS appear as two columns */
     .booking-search-booking button {
-        width: 100% !important;
-        height: 44px !important;
-        font-size: 14px !important;
+        width: calc(50% - 4px) !important;
+        height: 36px !important;
+        font-size: 12px !important;
     }
 
+    /* Keep the search field full width below the buttons on mobile */
     .booking-search-booking .MuiOutlinedInput-root {
         width: 100% !important;
+        flex: 0 0 100% !important;
     }
 
     /* Filter Wrap - Stack on mobile */

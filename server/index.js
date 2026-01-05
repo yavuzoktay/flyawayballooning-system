@@ -27682,10 +27682,7 @@ function generateFlightVoucherConfirmationEmail(voucher, template = null) {
         bodyHtml,
         customerName,
         signatureLines: [],
-        footerLinks: [
-            { label: 'Download voucher', url: 'https://flyawayballooning.com/account/vouchers' },
-            { label: 'Gift FAQs', url: 'https://flyawayballooning.com/gift-faqs' }
-        ]
+        footerLinks: []
     });
 }
 

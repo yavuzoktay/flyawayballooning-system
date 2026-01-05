@@ -4200,13 +4200,15 @@ const Manifest = () => {
                                         native
                                         value={currentCrewId || ''}
                                         onChange={(e) => handleCrewChange(activityIdForSlot, first.flight_date, e.target.value)}
-                                                                disabled={!isActivityIdValid}
-                                                                sx={{ 
-                                                                    minWidth: 200, 
-                                                                    mr: 1, 
-                                                                    background: isActivityIdValid ? '#fff' : '#f3f4f6',
-                                                                    opacity: isActivityIdValid ? 1 : 0.6
-                                                                }}
+                                        disabled={!isActivityIdValid}
+                                        sx={{ 
+                                            minWidth: 140, 
+                                            maxWidth: 160,
+                                            mr: 1, 
+                                            background: isActivityIdValid ? '#fff' : '#f3f4f6',
+                                            opacity: isActivityIdValid ? 1 : 0.6,
+                                            fontSize: 13,
+                                        }}
                                     >
                                                                 <option value="">{isActivityIdValid ? 'Crew Selection' : 'Activity ID Missing'}</option>
                                         {crewList.map(c => (
@@ -4265,13 +4267,15 @@ const Manifest = () => {
                                         native
                                         value={currentPilotId || ''}
                                         onChange={(e) => handlePilotChange(activityIdForSlot, first.flight_date, e.target.value)}
-                                                                disabled={!isActivityIdValid}
-                                                                sx={{ 
-                                                                    minWidth: 200, 
-                                                                    mr: 1, 
-                                                                    background: isActivityIdValid ? '#fff' : '#f3f4f6',
-                                                                    opacity: isActivityIdValid ? 1 : 0.6
-                                                                }}
+                                        disabled={!isActivityIdValid}
+                                        sx={{ 
+                                            minWidth: 140, 
+                                            maxWidth: 160,
+                                            mr: 1, 
+                                            background: isActivityIdValid ? '#fff' : '#f3f4f6',
+                                            opacity: isActivityIdValid ? 1 : 0.6,
+                                            fontSize: 13,
+                                        }}
                                     >
                                                                 <option value="">{isActivityIdValid ? 'Pilot Selection' : 'Activity ID Missing'}</option>
                                         {pilotList.map(p => (
@@ -4864,15 +4868,10 @@ const Manifest = () => {
                                                 
                                                 // Check weather_refund_total_price for both Private Charter and Shared Flight
                                                 if (weatherRefundTotalPrice > 0) {
-                                                    // Get passenger names for display
-                                                    const passengerNames = Array.isArray(bookingDetail.passengers)
-                                                        ? bookingDetail.passengers.map(p => `${p.first_name || ''} ${p.last_name || ''}`.trim()).filter(Boolean)
-                                                        : [];
-                                                    const namesDisplay = passengerNames.length > 0 ? ` — ${passengerNames.join(', ')}` : '';
                                                     return (
                                                         <span>
                                                             <span style={{ color: '#10b981', fontWeight: 'bold', marginRight: '4px' }}>✔</span>
-                                                            Yes{namesDisplay}
+                                                            Yes
                                                         </span>
                                                     );
                                                 } else {
