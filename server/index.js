@@ -20527,6 +20527,86 @@ app.get("/api/debugVouchers", (req, res) => {
     });
 });
 
+// Test endpoint to generate and download Gift Voucher PDF
+app.get("/api/test/gift-voucher-pdf", async (req, res) => {
+    try {
+        // Create test voucher data
+        const testVoucher = {
+            voucher_ref: 'TEST' + Date.now(),
+            recipient_name: 'Test Recipient',
+            name: 'Test Recipient',
+            expires: moment().add(18, 'months').toDate(),
+            created_at: new Date(),
+            voucher_type: 'Any Day Flight'
+        };
+        
+        console.log('📄 Generating test Gift Voucher PDF...');
+        const pdfBuffer = await generateGiftVoucherPDF(testVoucher);
+        console.log('✅ Test PDF generated successfully, size:', pdfBuffer.length, 'bytes');
+        
+        // Send PDF as download
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="Test_Gift_Voucher_${testVoucher.voucher_ref}.pdf"`);
+        res.setHeader('Content-Length', pdfBuffer.length);
+        res.send(pdfBuffer);
+    } catch (error) {
+        console.error('❌ Error generating test PDF:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error generating PDF', 
+            error: error.message 
+        });
+    }
+});
+
+// Test endpoint to generate PDF with specific voucher ID
+app.get("/api/test/gift-voucher-pdf/:voucherId", async (req, res) => {
+    const { voucherId } = req.params;
+    
+    try {
+        // Get voucher from database
+        const getVoucherSql = 'SELECT * FROM all_vouchers WHERE id = ?';
+        con.query(getVoucherSql, [voucherId], async (err, results) => {
+            if (err) {
+                console.error('Error fetching voucher:', err);
+                return res.status(500).json({ success: false, message: 'Database error' });
+            }
+            
+            if (results.length === 0) {
+                return res.status(404).json({ success: false, message: 'Voucher not found' });
+            }
+            
+            const voucher = results[0];
+            console.log('📄 Generating Gift Voucher PDF for voucher ID:', voucherId);
+            
+            try {
+                const pdfBuffer = await generateGiftVoucherPDF(voucher);
+                console.log('✅ PDF generated successfully, size:', pdfBuffer.length, 'bytes');
+                
+                // Send PDF as download
+                res.setHeader('Content-Type', 'application/pdf');
+                res.setHeader('Content-Disposition', `attachment; filename="Gift_Voucher_${voucher.voucher_ref || voucherId}.pdf"`);
+                res.setHeader('Content-Length', pdfBuffer.length);
+                res.send(pdfBuffer);
+            } catch (pdfError) {
+                console.error('❌ Error generating PDF:', pdfError);
+                res.status(500).json({ 
+                    success: false, 
+                    message: 'Error generating PDF', 
+                    error: pdfError.message 
+                });
+            }
+        });
+    } catch (error) {
+        console.error('❌ Error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: error.message 
+        });
+    }
+});
+
 // Test endpoint to add Gift Voucher for testing
 app.post("/api/addTestGiftVoucher", (req, res) => {
     console.log('Adding test Gift Voucher...');
@@ -29295,8 +29375,11 @@ async function generateGiftVoucherPDF(voucher) {
             const leftContentX = leftPadding;
             
             // Logo (use logoRemoveBackground.png from uploads/email directory)
+            // Logo dimensions: 402x158 (aspect ratio ~2.54:1)
             const logoPath = path.resolve(__dirname, 'uploads', 'email', 'logoRemoveBackground.png');
             const balloonY = 80;
+            const logoWidth = 200; // Maintain aspect ratio, width determines size
+            const logoHeight = logoWidth * (158 / 402); // Calculate height based on aspect ratio (~78.6)
             let logoLoaded = false;
             
             // Try to load logo - PDFKit requires absolute path or Buffer
@@ -29307,25 +29390,25 @@ async function generateGiftVoucherPDF(voucher) {
                     const logoBuffer = fs.readFileSync(logoPath);
                     console.log('📷 Logo buffer size:', logoBuffer.length, 'bytes');
                     
-                    // Use image with explicit options
+                    // Use image with width only to maintain aspect ratio and quality
                     doc.image(logoBuffer, leftContentX, balloonY, {
-                        width: 140,
-                        height: 140
+                        width: logoWidth
+                        // height not specified to maintain aspect ratio
                     });
                     
                     logoLoaded = true;
-                    console.log('✅ Logo loaded successfully from buffer');
+                    console.log('✅ Logo loaded successfully from buffer (width:', logoWidth, 'height:', logoHeight, ')');
                 } catch (imageError) {
                     console.error('❌ Error loading logo image (buffer method):', imageError.message);
                     // Method 2: Try with absolute path string
                     try {
                         console.log('📷 Attempting to load logo from path:', logoPath);
                         doc.image(logoPath, leftContentX, balloonY, {
-                            width: 140,
-                            height: 140
+                            width: logoWidth
+                            // height not specified to maintain aspect ratio
                         });
                         logoLoaded = true;
-                        console.log('✅ Logo loaded successfully from path');
+                        console.log('✅ Logo loaded successfully from path (width:', logoWidth, 'height:', logoHeight, ')');
                     } catch (pathError) {
                         console.error('❌ Error loading logo image (path method):', pathError.message);
                         logoLoaded = false;
@@ -29343,8 +29426,8 @@ async function generateGiftVoucherPDF(voucher) {
                         console.log('📷 Attempting to load alternative logo from:', altLogoPath);
                         const altLogoBuffer = fs.readFileSync(altLogoPath);
                         doc.image(altLogoBuffer, leftContentX, balloonY, {
-                            width: 140,
-                            height: 140
+                            width: logoWidth
+                            // height not specified to maintain aspect ratio
                         });
                         logoLoaded = true;
                         console.log('✅ Alternative logo loaded successfully from buffer');
@@ -29353,8 +29436,8 @@ async function generateGiftVoucherPDF(voucher) {
                         // Try direct path
                         try {
                             doc.image(altLogoPath, leftContentX, balloonY, {
-                                width: 140,
-                                height: 140
+                                width: logoWidth
+                                // height not specified to maintain aspect ratio
                             });
                             logoLoaded = true;
                             console.log('✅ Alternative logo loaded successfully from path');
@@ -29377,13 +29460,7 @@ async function generateGiftVoucherPDF(voucher) {
                    .text('Ballooning', leftContentX, balloonY + 30);
             }
             
-            // Company name
-            const companyNameY = balloonY + 160;
-            doc.fontSize(24)
-               .fillColor('#1a1a1a')
-               .font('Helvetica-Bold')
-               .text('Fly Away', leftContentX, companyNameY)
-               .text('Ballooning', leftContentX, companyNameY + 35);
+            // Company name removed - logo is sufficient
             
             // Website URL at bottom (on orange gradient - white text)
             const websiteY = pageHeight - 30;
