@@ -4403,7 +4403,7 @@ const Manifest = () => {
                                                                             {flight.passengers.slice(1).map((p, i) => (
                                                                                 <div key={`${flight.id}-p-${i+1}`} style={{ 
                                                                                     color: 'rgb(50, 116, 180)', 
-                                                                                    fontSize: '12px',
+                                                                                    fontSize: isMobile ? '12px' : '0.875rem',
                                                                                     marginTop: '2px'
                                                                                 }}>
                                                                                     {`${p.first_name || ''} ${p.last_name || ''}`.trim()}
@@ -4417,7 +4417,7 @@ const Manifest = () => {
                                                                         <div>
                                                                             {flight.passengers.map((p, i) => (
                                                                                 <div key={`${flight.id}-weight-${i}`} style={{ 
-                                                                                    fontSize: isMobile ? '12px' : '8px',
+                                                                                    fontSize: isMobile ? '12px' : '0.875rem',
                                                                                     marginBottom: i < flight.passengers.length - 1 ? '2px' : '0'
                                                                                 }}>
                                                                                     {p.weight ? `${p.weight}kg` : ''}
