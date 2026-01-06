@@ -5302,22 +5302,48 @@ setBookingDetail(finalVoucherDetail);
                                         gap: isMobile ? 4 : 8,
                                         flexWrap: isMobile ? 'wrap' : 'nowrap'
                                     }}>
-                                        <OutlinedInput 
-                                            placeholder="Search" 
-                                            value={filters.search}
-                                            onChange={(e) => handleFilterChange("search", e.target.value)} 
-                                            sx={{ 
-                                                fontSize: 14, 
-                                                '& input::placeholder': { fontSize: 14 },
-                                                flex: 2,
-                                                minWidth: 350 
-                                            }}
-                                            startAdornment={
-                                                <InputAdornment position="start">
-                                                    <SearchIcon />
-                                                </InputAdornment>
-                                            }
-                                        />
+                                        {isMobile ? (
+                                            <OutlinedInput
+                                                placeholder="Search..."
+                                                value={filters.search}
+                                                onChange={(e) => handleFilterChange("search", e.target.value)}
+                                                sx={{ 
+                                                    fontSize: 11,
+                                                    flex: '1 1 100%',
+                                                    minWidth: 0,
+                                                    width: '100%',
+                                                    '& input::placeholder': { fontSize: 11 },
+                                                    height: '32px',
+                                                    '& .MuiOutlinedInput-input': {
+                                                        padding: '6px 8px',
+                                                        fontSize: '11px'
+                                                    }
+                                                }}
+                                                size="small"
+                                                startAdornment={
+                                                    <InputAdornment position="start">
+                                                        <SearchIcon sx={{ fontSize: isMobile ? '16px' : 'inherit' }} />
+                                                    </InputAdornment>
+                                                }
+                                            />
+                                        ) : (
+                                            <OutlinedInput 
+                                                placeholder="Search" 
+                                                value={filters.search}
+                                                onChange={(e) => handleFilterChange("search", e.target.value)} 
+                                                sx={{ 
+                                                    fontSize: 14, 
+                                                    '& input::placeholder': { fontSize: 14 },
+                                                    flex: 2,
+                                                    minWidth: 350 
+                                                }}
+                                                startAdornment={
+                                                    <InputAdornment position="start">
+                                                        <SearchIcon />
+                                                    </InputAdornment>
+                                                }
+                                            />
+                                        )}
                                     </div>
                                     <div className="booking-filter-wrap" style={isMobile ? {
                                         display: 'flex',
