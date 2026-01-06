@@ -4393,7 +4393,7 @@ const Manifest = () => {
                                                                         color: 'rgb(50, 116, 180)', 
                                                                         cursor: 'pointer', 
                                                                         textDecoration: 'underline',
-                                                                        fontSize: '12px'
+                                                                        fontSize: isMobile ? '12px' : '0.875rem',
                                                                     }}
                                                                         onClick={() => handleNameClick(flight.id)}>
                                                                         {firstPassenger ? `${firstPassenger.first_name || ''} ${firstPassenger.last_name || ''}`.trim() : (flight.name || '')}
