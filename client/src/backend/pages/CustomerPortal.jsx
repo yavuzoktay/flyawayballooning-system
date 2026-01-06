@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import { Container, Typography, Box, Paper, CircularProgress, Alert, Button, TextField } from '@mui/material';
+import { Container, Typography, Box, Paper, CircularProgress, Alert, Button, TextField, useMediaQuery, useTheme } from '@mui/material';
 import dayjs from 'dayjs';
 import CustomerPortalHeader from '../components/CustomerPortal/CustomerPortalHeader';
 import RescheduleFlightModal from '../components/CustomerPortal/RescheduleFlightModal';
@@ -61,6 +61,10 @@ const CustomerPortal = () => {
     const [extendingVoucher, setExtendingVoucher] = useState(false);
     const [paymentHistory, setPaymentHistory] = useState([]);
     const [isFullyRefunded, setIsFullyRefunded] = useState(false);
+
+    // Responsive helpers
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('768'));
 
     // Passenger edit states
     const [editingPassenger, setEditingPassenger] = useState(null);
@@ -1383,19 +1387,29 @@ const CustomerPortal = () => {
                     setSelectedActivityId(null);
                     setError(null);
                 }}
-                maxWidth="sm"
+                maxWidth={isMobile ? "sm" : "sm"}
                 fullWidth
                 PaperProps={{
                     sx: {
                         borderRadius: 3,
-                        maxHeight: '90vh'
+                        maxHeight: '90vh',
+                        ...(isMobile ? {
+                            margin: '8px',
+                            width: 'calc(100% - 16px)',
+                            maxWidth: 'calc(100% - 16px)'
+                        } : {})
                     }
                 }}
             >
-                <DialogTitle sx={{ fontWeight: 700, fontSize: 20, pb: 1.5 }}>
+                <DialogTitle sx={{ 
+                    fontWeight: 700, 
+                    fontSize: isMobile ? 16 : 20, 
+                    pb: 1.5,
+                    padding: isMobile ? '12px 16px' : '20px 24px'
+                }}>
                     Change Flight Location
                 </DialogTitle>
-                <DialogContent>
+                <DialogContent sx={{ padding: isMobile ? '12px 16px' : '24px' }}>
                     {error && (
                         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
                             {error}
@@ -1574,27 +1588,29 @@ const CustomerPortal = () => {
                             ) : (
                                 <>
                                     {/* Calendar */}
-                                    <Box sx={{ mb: 3, maxWidth: '500px', mx: 'auto' }}>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                                    <Box sx={{ mb: 3, maxWidth: isMobile ? '100%' : '500px', mx: 'auto', px: isMobile ? 1 : 0 }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: isMobile ? 0.5 : 1.5 }}>
                                             <IconButton
                                                 onClick={() => setCurrentMonth(prev => prev.subtract(1, 'month'))}
                                                 size="small"
+                                                sx={{ padding: isMobile ? '4px' : '8px' }}
                                             >
-                                                <ChevronLeftIcon />
+                                                <ChevronLeftIcon fontSize={isMobile ? 'small' : 'medium'} />
                                             </IconButton>
-                                            <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 16 }}>
+                                            <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? 14 : 16 }}>
                                                 {currentMonth.format('MMMM YYYY')}
                                             </Typography>
                                             <IconButton
                                                 onClick={() => setCurrentMonth(prev => prev.add(1, 'month'))}
                                                 size="small"
+                                                sx={{ padding: isMobile ? '4px' : '8px' }}
                                             >
-                                                <ChevronRightIcon />
+                                                <ChevronRightIcon fontSize={isMobile ? 'small' : 'medium'} />
                                             </IconButton>
                                         </Box>
 
                                         {/* Calendar Grid */}
-                                        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', mb: 1 }}>
+                                        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: isMobile ? '2px' : '2px', mb: isMobile ? 0.5 : 1 }}>
                                             {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
                                                 <div
                                                     key={day}
@@ -1602,7 +1618,7 @@ const CustomerPortal = () => {
                                                         textAlign: 'center',
                                                         fontWeight: 700,
                                                         color: '#64748b',
-                                                        fontSize: 11
+                                                        fontSize: isMobile ? 9 : 11
                                                     }}
                                                 >
                                                     {day}
@@ -1610,7 +1626,7 @@ const CustomerPortal = () => {
                                             ))}
                                         </Box>
 
-                                        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
+                                        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: isMobile ? '2px' : '2px' }}>
                                             {(() => {
                                                 const cells = [];
                                                 const startOfMonth = currentMonth.startOf('month');
@@ -1708,7 +1724,7 @@ const CustomerPortal = () => {
                                                             }}
                                                             style={{
                                                                 aspectRatio: '1 / 1',
-                                                                borderRadius: 10,
+                                                                borderRadius: isMobile ? 6 : 10,
                                                                 background: isSelected
                                                                     ? '#56C1FF'
                                                                     : isPast
@@ -1732,16 +1748,16 @@ const CustomerPortal = () => {
                                                                 fontWeight: 700,
                                                                 cursor: isSelectable ? 'pointer' : 'default',
                                                                 userSelect: 'none',
-                                                                fontSize: 12,
+                                                                fontSize: isMobile ? 11 : 12,
                                                                 zIndex: 1,
                                                                 position: 'relative',
                                                                 transition: 'all 0.2s ease',
                                                                 minHeight: '40px',
-                                                                padding: '4px'
+                                                                padding: isMobile ? '2px' : '4px'
                                                             }}
                                                         >
-                                                            <div style={{ fontSize: 13, lineHeight: 1.2 }}>{d.date()}</div>
-                                                            <div style={{ fontSize: 9, fontWeight: 600, lineHeight: 1.2 }}>
+                                                            <div style={{ fontSize: isMobile ? 11 : 13, lineHeight: 1.2, fontWeight: 700 }}>{d.date()}</div>
+                                                            <div style={{ fontSize: isMobile ? 7 : 9, fontWeight: 600, lineHeight: 1.2, textAlign: 'center' }}>
                                                                 {slots.length === 0 ? '' : (soldOut ? 'Sold Out' : `${totalAvailable} Spaces`)}
                                                             </div>
                                                         </div>

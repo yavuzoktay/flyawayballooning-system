@@ -338,7 +338,6 @@ body {
 .booking-filter-wrap, .booking-top-wrap {
     display: flex;
     align-items: center;
-    gap: 20px;
 }
 
 .booking-filter-heading {

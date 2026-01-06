@@ -176,7 +176,7 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                             borderRadius: '4px', 
                             border: '1px solid #ccc',
                             fontSize: isMobile ? '16px' : '12px', // Keep 16px for iOS zoom prevention
-                            height: isMobile ? '30px' : '32px'
+                            height: isMobile ? '25px' : '25px'
                         }}
                     />
                 </label>
@@ -200,7 +200,7 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                             borderRadius: '4px', 
                             border: '1px solid #ccc',
                             fontSize: isMobile ? '16px' : '12px', // Keep 16px for iOS zoom prevention
-                            height: isMobile ? '30px' : '32px'
+                            height: isMobile ? '25px' : '25px'
                         }}
                     />
                 </label>
@@ -211,13 +211,13 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                         color: "#FFF", 
                         border: "1px solid #3274b4", 
                         cursor: "pointer",
-                        padding: isMobile ? '4px 10px' : '8px 16px',
+                        padding: isMobile ? '4px 10px' : '5px 16px',
                         borderRadius: '4px',
                         alignSelf: isMobile ? 'flex-end' : 'flex-start',
                         whiteSpace: 'nowrap',
                         fontSize: isMobile ? '11px' : 'inherit',
                         height: isMobile ? '30px' : '36px',
-                        marginTop: isMobile ? 0 : '24px'
+                        marginTop: isMobile ? 0 : '20px'
                     }}
                 >
                     Filter

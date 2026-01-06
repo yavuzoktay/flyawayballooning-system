@@ -29330,7 +29330,7 @@ async function generateGiftVoucherPDF(voucher) {
         try {
             // Landscape orientation with reduced width and height
             const doc = new PDFDocument({ 
-                size: [750, 500], // Reduced width: width > height
+                size: [650, 450], // Reduced width: width > height
                 margin: 0
             });
             const chunks = [];
@@ -29342,8 +29342,8 @@ async function generateGiftVoucherPDF(voucher) {
             });
             doc.on('error', reject);
             
-            const pageWidth = 750;
-            const pageHeight = 500;
+            const pageWidth = 650;
+            const pageHeight = 450;
             const leftSectionWidth = pageWidth * 0.35; // 35% of page width
             const rightSectionWidth = pageWidth * 0.65; // 65% of page width
             
@@ -29466,12 +29466,12 @@ async function generateGiftVoucherPDF(voucher) {
             
             // Company name removed - logo is sufficient
             
-            // Website URL at bottom (on orange triangle - black text)
+            // Website URL at bottom (on orange triangle - now off-white to match background, aligned to left section)
             const websiteY = pageHeight - 30;
             doc.fontSize(9)
-               .fillColor('#000000')
+               .fillColor('#faf9f6')
                .font('Helvetica-Bold')
-               .text('FLYAWAYBALLOONING.COM', leftContentX, websiteY);
+               .text('FLYAWAYBALLOONING.COM', leftPadding, websiteY);
             
             // RIGHT SECTION
             const rightStartX = leftSectionWidth + 15; // Reduced spacing
@@ -29510,6 +29510,7 @@ async function generateGiftVoucherPDF(voucher) {
             
             // Recipient name box
             const recipientName = voucher.recipient_name || voucher.name || 'Recipient';
+            const recipientNameUpper = recipientName ? String(recipientName).toUpperCase() : '';
             doc.rect(fieldBoxX, currentY, fieldBoxWidth, fieldBoxHeight)
                .fillColor('#f5f5f5')
                .fill()
@@ -29520,7 +29521,7 @@ async function generateGiftVoucherPDF(voucher) {
             doc.fontSize(12)
                .fillColor('#FF6937')
                .font('Helvetica')
-               .text(recipientName, fieldBoxX + 10, currentY + 10, {
+               .text(recipientNameUpper, fieldBoxX + 10, currentY + 10, {
                    width: fieldBoxWidth - 20,
                    ellipsis: true
                });
@@ -29534,6 +29535,7 @@ async function generateGiftVoucherPDF(voucher) {
             
             // Voucher code box
             const voucherCode = voucher.voucher_ref || voucher.voucher_code || 'N/A';
+            const voucherCodeUpper = voucherCode ? String(voucherCode).toUpperCase() : '';
             doc.rect(fieldBoxX, currentY, fieldBoxWidth, fieldBoxHeight)
                .fillColor('#f5f5f5')
                .fill()
@@ -29544,7 +29546,7 @@ async function generateGiftVoucherPDF(voucher) {
             doc.fontSize(12)
                .fillColor('#FF6937')
                .font('Helvetica')
-               .text(voucherCode, fieldBoxX + 10, currentY + 10, {
+               .text(voucherCodeUpper, fieldBoxX + 10, currentY + 10, {
                    width: fieldBoxWidth - 20,
                    ellipsis: true
                });
@@ -29566,6 +29568,8 @@ async function generateGiftVoucherPDF(voucher) {
                 const monthsToAdd = isAnyDay ? 24 : 18;
                 expiryDate = moment(voucher.created_at).add(monthsToAdd, 'months').format('MMMM D, YYYY');
             }
+
+            const expiryDateUpper = expiryDate ? String(expiryDate).toUpperCase() : '';
             
             doc.rect(fieldBoxX, currentY, fieldBoxWidth, fieldBoxHeight)
                .fillColor('#f5f5f5')
@@ -29577,19 +29581,19 @@ async function generateGiftVoucherPDF(voucher) {
             doc.fontSize(12)
                .fillColor('#FF6937')
                .font('Helvetica')
-               .text(expiryDate, fieldBoxX + 10, currentY + 10, {
+               .text(expiryDateUpper, fieldBoxX + 10, currentY + 10, {
                    width: fieldBoxWidth - 20,
                    ellipsis: true
                });
             
             // Terms and conditions - moved up, positioned after EXPIRY field
             // Text split into 4 lines and reduced width
-            const termsY = currentY + fieldSpacing + 20; // Position after EXPIRY field with small spacing
+            const termsY = currentY + fieldSpacing + 0; // Position after EXPIRY field with small spacing
             const termsWidth = (rightSectionWidth - rightPadding * 2) * 0.70; // Reduced width to 60% for narrower 4-line layout
             const termsText = "Your gift voucher is valid until the expiry date shown. Within this validity period, you must have either flown or booked onto a minimum of six flights that were cancelled in order to qualify for a free extension. Any booked flight must be within the voucher's validity period.";
             
             doc.fontSize(7)
-               .fillColor('#1a1a1a')
+               .fillColor('#555555')
                .font('Helvetica')
                .text(termsText, rightContentX, termsY, {
                    width: termsWidth,

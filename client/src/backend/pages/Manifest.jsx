@@ -4142,7 +4142,7 @@ const Manifest = () => {
                                             <Box display="flex" alignItems="center" gap={isMobile ? 0.5 : 1} className="manifest-flight-actions" sx={{
                                                 flexDirection: isMobile ? 'row' : 'row',
                                                 flexWrap: isMobile ? 'wrap' : 'nowrap',
-                                                mt: isMobile ? 0.25 : undefined,
+                                                mt: isMobile ? 0.25 : 2,
                                                 mb: isMobile ? 0.25 : undefined
                                             }}>
                                                 {/* Sold Out Badge - Show when flight is fully booked */}

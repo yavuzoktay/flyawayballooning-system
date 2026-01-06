@@ -4515,7 +4515,69 @@ setBookingDetail(finalVoucherDetail);
                     </h2>
                     <hr />
                 </div>
-                <div style={{ padding: "50px", background: "#f9f9f9", borderRadius: "20px" }} className="booking-page-content">
+                <div style={{ padding: "40px", background: "#f9f9f9", borderRadius: "20px" }} className="booking-page-content">
+                    {/* Desktop: Section headings above tabs */}
+                    {!isMobile && activeTab === "bookings" && (
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginBottom: "20px"
+                        }}>
+                            <h3 style={{ fontFamily: "Gilroy Light", margin: 0 }}>ALL BOOKING</h3>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <Button 
+                                    variant="outlined" 
+                                    color="primary" 
+                                    onClick={handleExportCSV} 
+                                    startIcon={<FileDownloadIcon />}
+                                    style={{ height: 40 }}
+                                >
+                                    Export
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    color="secondary"
+                                    onClick={() => setFilterDialogOpen(true)}
+                                    startIcon={<FilterListIcon />}
+                                    style={{ height: 40 }}
+                                >
+                                    Filter
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                    {!isMobile && activeTab === "vouchers" && (
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginBottom: "20px"
+                        }}>
+                            <h3 style={{ fontFamily: "Gilroy Light", margin: 0 }}>ALL VOUCHERS</h3>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <Button 
+                                    variant="outlined" 
+                                    color="primary" 
+                                    onClick={handleExportCSV} 
+                                    startIcon={<FileDownloadIcon />}
+                                    style={{ height: 40 }}
+                                >
+                                    Export
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                    {!isMobile && activeTab === "dateRequests" && (
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginBottom: "20px"
+                        }}>
+                            <h3 style={{ fontFamily: "Gilroy Light", margin: 0 }}>DATE REQUESTS</h3>
+                        </div>
+                    )}
                     {/* Tabs */}
                     <div style={{ 
                         marginBottom: "20px",
@@ -4545,7 +4607,7 @@ setBookingDetail(finalVoucherDetail);
                                 flex: isMobile ? "1" : "none"
                             }}
                         >
-                            All Bookings
+                            ALL BOOKINGS
                             {hasNewBookings && (
                                 <span style={{
                                     position: "absolute",
@@ -4588,7 +4650,7 @@ setBookingDetail(finalVoucherDetail);
                                 flex: isMobile ? "1" : "none"
                             }}
                         >
-                            All Vouchers
+                            ALL VOUCHERS
                             {hasNewVouchers && (
                                 <span style={{
                                     position: "absolute",
@@ -4628,7 +4690,7 @@ setBookingDetail(finalVoucherDetail);
                                 flex: isMobile ? "1" : "none"
                             }}
                         >
-                            Date Requests
+                            DATE REQUESTS
                         </button>
                     </div>
                     
@@ -4653,16 +4715,16 @@ setBookingDetail(finalVoucherDetail);
                         {activeTab === "bookings" && (
                             <>
                                 <div className="booking-top-wrap">
-                                    <div className="booking-filter-heading" style={{
-                                        display: 'flex', 
-                                        alignItems: 'center', 
-                                        gap: isMobile ? '8px' : '0',
-                                        flexWrap: isMobile ? 'nowrap' : 'wrap'
-                                    }}>
-                                        <h3 style={{ fontFamily: "Gilroy Light", margin: 0, marginRight: isMobile ? 'auto' : 0 }}>All Bookings</h3>
-                                        {/* Export and Filter Buttons - Only show next to heading on mobile */}
-                                        {isMobile && (
-                                            <>
+                                    {/* Mobile: All Bookings heading with Export and Filter buttons */}
+                                    {isMobile && (
+                                        <div className="booking-filter-heading" style={{
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            gap: '8px',
+                                            flexWrap: 'nowrap',
+                                            marginBottom: '10px'
+                                        }}>
+                                            <h3 style={{ fontFamily: "Gilroy Light", margin: 0, marginRight: 'auto' }}>ALL BOOKINGS</h3>
                                             <OutlinedInput
                                                 readOnly
                                                 onClick={handleExportCSV}
@@ -4671,7 +4733,7 @@ setBookingDetail(finalVoucherDetail);
                                                     cursor: 'pointer',
                                                     height: '32px',
                                                     fontSize: 12,
-                                                        minWidth: '80px',
+                                                    minWidth: '80px',
                                                     '& input': {
                                                         cursor: 'pointer',
                                                         textAlign: 'center',
@@ -4699,7 +4761,7 @@ setBookingDetail(finalVoucherDetail);
                                                     cursor: 'pointer',
                                                     height: '32px',
                                                     fontSize: 12,
-                                                        minWidth: '80px',
+                                                    minWidth: '80px',
                                                     '& input': {
                                                         cursor: 'pointer',
                                                         textAlign: 'center',
@@ -4719,33 +4781,14 @@ setBookingDetail(finalVoucherDetail);
                                                     </InputAdornment>
                                                 }
                                             />
-                                            </>
-                                        )}
-                                    </div>
+                                        </div>
+                                    )}
                                     <div className="booking-search-booking" style={{ 
                                         display: 'flex', 
                                         alignItems: 'center', 
                                         gap: isMobile ? 4 : 8,
                                         flexWrap: isMobile ? 'wrap' : 'nowrap'
                                     }}>
-                                        {/* Export Button - Only show on desktop */}
-                                        {!isMobile && (
-                                            <Button variant="outlined" color="primary" onClick={handleExportCSV} style={{ height: 40 }}>
-                                                Export
-                                            </Button>
-                                        )}
-                                        
-                                        {/* Filter Button - Only show on desktop */}
-                                        {!isMobile && (
-                                        <Button
-                                            variant="outlined"
-                                            color="secondary"
-                                            onClick={() => setFilterDialogOpen(true)}
-                                            style={{ height: 40 }}
-                                        >
-                                            Filter
-                                        </Button>
-                                        )}
                                         
                                         {isMobile ? (
                                             // Mobile: Bulk Email & Bulk SMS yan yana, iki kolon
@@ -4772,7 +4815,7 @@ setBookingDetail(finalVoucherDetail);
                                                         minWidth: 0
                                                     }}
                                                 >
-                                                    Bulk Email
+                                                    EMAIL
                                                 </Button>
                                                 <Button
                                                     variant="contained"
@@ -4800,7 +4843,7 @@ setBookingDetail(finalVoucherDetail);
                                                         }
                                                     }}
                                                 >
-                                                    Bulk SMS
+                                                    SMS
                                                 </Button>
                                             </Box>
                                         ) : (
@@ -4825,7 +4868,7 @@ setBookingDetail(finalVoucherDetail);
                                                         minWidth: 'auto'
                                                     }}
                                                 >
-                                                    Bulk Email
+                                                    EMAIL
                                                 </Button>
                                                 <Button
                                                     variant="contained"
@@ -4848,7 +4891,7 @@ setBookingDetail(finalVoucherDetail);
                                                         minWidth: 'auto'
                                                     }}
                                                 >
-                                                    Bulk SMS
+                                                    SMS
                                                 </Button>
                                             </>
                                         )}
@@ -4879,17 +4922,22 @@ setBookingDetail(finalVoucherDetail);
                                                 }
                                             />
                                         ) : (
-                                        <OutlinedInput
-                                            placeholder="Search by name, email, phone, location..."
-                                            value={filters.search}
-                                            onChange={(e) => handleFilterChange("search", e.target.value)}
+                                            <OutlinedInput
+                                                placeholder="Search"
+                                                value={filters.search}
+                                                onChange={(e) => handleFilterChange("search", e.target.value)}
                                                 sx={{ 
                                                     fontSize: 14, 
                                                     '& input::placeholder': { fontSize: 14 },
-                                                    flex: 1,
-                                                    minWidth: 200
+                                                    flex: 2,
+                                                    minWidth: 350
                                                 }}
-                                        />
+                                                startAdornment={
+                                                    <InputAdornment position="start">
+                                                        <SearchIcon />
+                                                    </InputAdornment>
+                                                }
+                                            />
                                         )}
                                     </div>
                                     {/* Show active advanced filters as chips */}
@@ -5208,15 +5256,16 @@ setBookingDetail(finalVoucherDetail);
                         {activeTab === "vouchers" && (
                             <>
                                 <div className="booking-top-wrap">
-                                    <div className="booking-filter-heading" style={{
-                                        display: 'flex', 
-                                        alignItems: 'center', 
-                                        gap: isMobile ? '8px' : '0',
-                                        flexWrap: isMobile ? 'nowrap' : 'wrap'
-                                    }}>
-                                        <h3 style={{ fontFamily: "Gilroy Light", margin: 0, marginRight: isMobile ? 'auto' : 0 }}>All Vouchers</h3>
-                                        {/* Export Button - Only show next to heading on mobile */}
-                                        {isMobile && (
+                                    {/* Mobile heading + Export input for vouchers */}
+                                    {isMobile && (
+                                        <div className="booking-filter-heading" style={{
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            gap: '8px',
+                                            flexWrap: 'nowrap',
+                                            marginBottom: '10px'
+                                        }}>
+                                            <h3 style={{ fontFamily: "Gilroy Light", margin: 0, marginRight: 'auto' }}>ALL VOUCHERS</h3>
                                             <OutlinedInput
                                                 readOnly
                                                 onClick={handleExportCSV}
@@ -5245,22 +5294,30 @@ setBookingDetail(finalVoucherDetail);
                                                     </InputAdornment>
                                                 }
                                             />
-                                        )}
-                                    </div>
+                                        </div>
+                                    )}
                                     <div className="booking-search-booking" style={{ 
                                         display: 'flex', 
                                         alignItems: 'center', 
                                         gap: isMobile ? 4 : 8,
                                         flexWrap: isMobile ? 'wrap' : 'nowrap'
                                     }}>
-                                        {/* Export Button - Only show on desktop */}
-                                        {!isMobile && (
-                                        <Button variant="outlined" color="primary" onClick={handleExportCSV} style={{ height: 40 }}>
-                                            Export
-                                        </Button>
-                                        )}
-                                        <OutlinedInput placeholder="Search by name, email, phone, voucher ref, offer code..." value={filters.search}
-                                            onChange={(e) => handleFilterChange("search", e.target.value)} sx={{ fontSize: 14, '& input::placeholder': { fontSize: 14 } }} />
+                                        <OutlinedInput 
+                                            placeholder="Search" 
+                                            value={filters.search}
+                                            onChange={(e) => handleFilterChange("search", e.target.value)} 
+                                            sx={{ 
+                                                fontSize: 14, 
+                                                '& input::placeholder': { fontSize: 14 },
+                                                flex: 2,
+                                                minWidth: 350 
+                                            }}
+                                            startAdornment={
+                                                <InputAdornment position="start">
+                                                    <SearchIcon />
+                                                </InputAdornment>
+                                            }
+                                        />
                                     </div>
                                     <div className="booking-filter-wrap" style={isMobile ? {
                                         display: 'flex',
@@ -5390,12 +5447,12 @@ setBookingDetail(finalVoucherDetail);
                                                 m: 1, 
                                                 minWidth: 160 
                                             }} size="small">
-                                                <InputLabel id="book-redeemed-status-label" sx={isMobile ? { fontSize: '11px' } : {}}>Redeemed Status</InputLabel>
+                                                <InputLabel id="book-redeemed-status-label" sx={isMobile ? { fontSize: '11px' } : {}}>Redeemed</InputLabel>
                                                 <Select
                                                     labelId="book-redeemed-status-label"
                                                     value={filters.redeemedStatus}
                                                     onChange={(e) => handleFilterChange("redeemedStatus", e.target.value)}
-                                                    label="Redeemed Status"
+                                                    label="Redeemed"
                                                     sx={isMobile ? { 
                                                         fontSize: '11px',
                                                         height: '32px',
@@ -5537,7 +5594,9 @@ setBookingDetail(finalVoucherDetail);
                         )}
                         {activeTab === "dateRequests" && (
                             <>
-                                <h3 style={{ fontFamily: "Gilroy Light" }}>Date Requests</h3>
+                                {isMobile && (
+                                    <h3 style={{ fontFamily: "Gilroy Light" }}>DATE REQUESTS</h3>
+                                )}
                                 <Button variant="contained" color="error" style={{marginBottom: 16}} onClick={handleDeleteDateRequests} disabled={!selectedDateRequestIds || selectedDateRequestIds.length === 0}>
                                     Delete
                                 </Button>
